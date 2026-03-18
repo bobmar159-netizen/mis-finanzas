@@ -1669,18 +1669,19 @@ function doGet(e) {
         if (tx.type === 'ingreso') {
           const sh = getOrCreateSheet(ss, 'Ingresos (Negocio)');
           ensureHeader(sh, ['Fecha','Servicio','Cliente','Monto','ID'], '#1565C0');
-          sh.appendRow([tx.date, tx.category, tx.cliente||'—', 'S/ '+Number(tx.amount).toFixed(2), tx.id]);
+          sh.appendRow([tx.date, tx.category, tx.cliente||'—', Number(tx.amount), tx.id]);
         } else {
           const sh = getOrCreateSheet(ss, 'Gastos (Negocio)');
           ensureHeader(sh, ['Fecha','Categoría','Descripción','Monto','ID'], '#B71C1C');
-          sh.appendRow([tx.date, tx.category, tx.description||'—', '-S/ '+Number(tx.amount).toFixed(2), tx.id]);
+          sh.appendRow([tx.date, tx.category, tx.description||'—', 'S/ '+Number(tx.amount).toFixed(2), tx.id]);
         }
       } else {
         // ── PERSONAL: una sola hoja ──
         const sh = getOrCreateSheet(ss, 'Movimientos (Personal)');
         ensureHeader(sh, ['Fecha','Tipo','Categoría','Descripción','Monto','ID'], '#1565C0');
-        const signo = tx.type === 'ingreso' ? '+S/ ' : '-S/ ';
-        sh.appendRow([tx.date, tx.type === 'ingreso' ? 'Ingreso' : 'Egreso', tx.category, tx.description||'—', signo+Number(tx.amount).toFixed(2), tx.id]);
+        const monto = Number(tx.amount).toFixed(2);
+        const signo = tx.type === 'ingreso' ? 'S/ ' : '-S/ ';
+        sh.appendRow([tx.date, tx.type === 'ingreso' ? 'Ingreso' : 'Egreso', tx.category, tx.description||'—', signo+monto, tx.id]);
       }
 
       // ── Actualizar resumen mensual ──
