@@ -1258,22 +1258,18 @@ function appendWithoutOverlap(existing, newText) {
   return e + (uniqueNew ? ' ' + uniqueNew : '') + ' ';
 }
 
-function syncToSheets(){
+function syncToSheets(lastTx){
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(!url) return;
   clearTimeout(_syncTimer);
   _syncTimer=setTimeout(()=>{
     _syncStatus='syncing';
     _updateSyncBadge();
+    const tx = lastTx || (state.transactions.length ? state.transactions[state.transactions.length-1] : null);
     const payload={
-      modo:         state.modo,
-      timestamp:    new Date().toISOString(),
-      transactions: state.transactions,
-      debts:        state.debts,
-      servicios:    state.servicios,
-      prestamos:    state.prestamos,
-      catsIn:       state.catsIn,
-      catsEx:       state.catsEx,
+      modo:      state.modo,
+      timestamp: new Date().toISOString(),
+      tx:        tx,
     };
     const encoded = encodeURIComponent(JSON.stringify(payload));
     const fullUrl = url + '?data=' + encoded;
@@ -1730,77 +1726,37 @@ function doPost(e) {
 function doGet(e) {
   try {
     const raw = e && e.parameter && e.parameter.data ? e.parameter.data : null;
-    const cb  = e && e.parameter && e.parameter.callback ? e.parameter.callback : null;
-
-    function respond(obj) {
-      const json = JSON.stringify(obj);
-      if (cb) {
-        return ContentService.createTextOutput(cb + '(' + json + ')')
-          .setMimeType(ContentService.MimeType.JAVASCRIPT);
-      }
-      return ContentService.createTextOutput(json)
+    if (!raw) {
+      return ContentService.createTextOutput('Mis Finanzas Apps Script activo ✓');
+    }
+    const data = JSON.parse(decodeURIComponent(raw));
+    if (data.test) {
+      return ContentService.createTextOutput(JSON.stringify({ok:true,msg:'OK'}))
         .setMimeType(ContentService.MimeType.JSON);
     }
-
-    if (!raw) return respond({ok:true, msg:'Mis Finanzas Apps Script activo ✓'});
-
-    const data = JSON.parse(decodeURIComponent(raw));
-    if (data.test) return respond({ok:true, msg:'Conexión exitosa'});
-
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const modo = data.modo || 'personal';
     const suffix = modo === 'negocio' ? ' (Negocio)' : '';
     const ts = new Date().toLocaleString('es-PE');
 
-    writeSheet(ss, 'Movimientos'+suffix, data.transactions || [], [
-      'ID','Tipo','Monto','Categoría','Descripción','Fecha','Negocio'
-    ], r => [r.id, r.type, r.amount, r.category, r.description||'', r.date, r.negocio?'Sí':'No']);
-
-    writeSheet(ss, 'Deudas'+suffix, data.debts || [], [
-      'ID','Nombre','Categoría','Monto Total','Cuota Mensual','Cuotas Totales','Cuotas Pagadas','Color'
-    ], r => [r.id, r.name, r.categoria, r.totalAmount, r.cuotaMonto, r.cuotasTotales, r.cuotasPagadas, r.color]);
-
-    writeSheet(ss, 'Servicios'+suffix, data.servicios || [], [
-      'ID','Nombre','Monto','Día Vencimiento','Pagado','Categoría'
-    ], r => [r.id, r.name, r.monto, r.venceDia, r.pagado?'Sí':'No', r.categoria||'']);
-
-    const prestamoRows = [];
-    (data.prestamos || []).forEach(p => {
-      if (p.pagos && p.pagos.length > 0) {
-        p.pagos.forEach(pg => {
-          prestamoRows.push({
-            prestamo_id: p.id, nombre: p.nombre, tipo: p.tipo,
-            capital_original: p.capital, tasa_mensual: p.tasaMensual,
-            capital_pendiente_actual: p.capitalPendiente,
-            pago_id: pg.id, pago_fecha: pg.fecha, pago_tipo: pg.tipo,
-            monto_interes: pg.montoInteres, monto_capital: pg.montoCapital,
-            capital_tras_pago: pg.capitalPendiente, nota: pg.nota||''
-          });
-        });
-      } else {
-        prestamoRows.push({
-          prestamo_id: p.id, nombre: p.nombre, tipo: p.tipo,
-          capital_original: p.capital, tasa_mensual: p.tasaMensual,
-          capital_pendiente_actual: p.capitalPendiente,
-          pago_id:'', pago_fecha:'', pago_tipo:'Sin pagos',
-          monto_interes:0, monto_capital:0, capital_tras_pago:p.capitalPendiente, nota:''
-        });
+    // Append solo el movimiento nuevo
+    if (data.tx) {
+      const r = data.tx;
+      const sheetName = 'Movimientos' + suffix;
+      const sheet = getOrCreateSheet(ss, sheetName);
+      if (sheet.getLastRow() === 0) {
+        sheet.appendRow(['ID','Tipo','Monto','Categoría','Descripción','Fecha','Negocio','Sincronizado']);
+        sheet.getRange(1,1,1,8).setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
+        sheet.setFrozenRows(1);
       }
-    });
-    writeSheet(ss, 'Préstamos'+suffix, prestamoRows, [
-      'Préstamo ID','Nombre','Tipo','Capital Original','Tasa Mensual %',
-      'Capital Pendiente','Pago ID','Fecha Pago','Tipo Pago',
-      'Monto Interés','Monto Capital','Capital Después','Nota'
-    ], r => [
-      r.prestamo_id, r.nombre, r.tipo, r.capital_original, r.tasa_mensual,
-      r.capital_pendiente_actual, r.pago_id, r.pago_fecha, r.pago_tipo,
-      r.monto_interes, r.monto_capital, r.capital_tras_pago, r.nota
-    ]);
+      sheet.appendRow([r.id, r.type, r.amount, r.category, r.description||'', r.date, r.negocio?'Sí':'No', ts]);
+    }
 
     const logSheet = getOrCreateSheet(ss, 'Log Sync');
-    logSheet.appendRow([ts, modo, 'OK', (data.transactions||[]).length + ' movim.']);
+    logSheet.appendRow([ts, modo, 'OK', data.tx ? data.tx.type + ' S/'+data.tx.amount : '-']);
 
-    return respond({ok:true, ts:ts});
+    return ContentService.createTextOutput(JSON.stringify({ok:true,ts:ts}))
+      .setMimeType(ContentService.MimeType.JSON);
 
 function writeSheet(ss, name, rows, headers, mapFn) {
   const sheet = getOrCreateSheet(ss, name);
