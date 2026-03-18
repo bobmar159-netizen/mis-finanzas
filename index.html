@@ -1254,7 +1254,9 @@ function syncToSheets(){
       catsIn:       state.catsIn,
       catsEx:       state.catsEx,
     };
-    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)})
+    const encoded = encodeURIComponent(JSON.stringify(payload));
+    const fullUrl = url + '?data=' + encoded;
+    fetch(fullUrl, {method:'GET', mode:'no-cors'})
       .then(()=>{ _syncStatus='ok'; _updateSyncBadge(); setTimeout(()=>{ _syncStatus='idle'; _updateSyncBadge(); },3000); })
       .catch(e=>{ _syncStatus='error'; _updateSyncBadge(); console.error('Sheets sync error:',e); });
   },1200);
@@ -1282,7 +1284,8 @@ function testSheetsSync(){
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(!url)return toast('Primero guarda la URL del script','error');
   toast('Enviando prueba...');
-  fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({test:true,timestamp:new Date().toISOString()})})
+  const testUrl = url + '?data=' + encodeURIComponent(JSON.stringify({test:true,timestamp:new Date().toISOString()}));
+  fetch(testUrl, {method:'GET', mode:'no-cors'})
     .then(()=>toast('✓ Datos enviados — revisa tu hoja de Google Sheets'))
     .catch(()=>toast('⚠ Error de conexión. Revisa la URL','error'));
 }
