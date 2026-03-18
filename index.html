@@ -1277,12 +1277,8 @@ function syncToSheets(){
     };
     const encoded = encodeURIComponent(JSON.stringify(payload));
     const fullUrl = url + '?data=' + encoded;
-    fetch(fullUrl, {method:'GET', mode:'cors'})
-      .then(r=>r.json())
-      .then(json=>{ 
-        if(json && json.ok){ _syncStatus='ok'; _updateSyncBadge(); setTimeout(()=>{ _syncStatus='idle'; _updateSyncBadge(); },3000); }
-        else { _syncStatus='error'; _updateSyncBadge(); console.error('Sheets error:',json); }
-      })
+    fetch(fullUrl, {method:'GET', mode:'no-cors'})
+      .then(()=>{ _syncStatus='ok'; _updateSyncBadge(); setTimeout(()=>{ _syncStatus='idle'; _updateSyncBadge(); },3000); })
       .catch(e=>{ _syncStatus='error'; _updateSyncBadge(); console.error('Sheets sync error:',e); });
   },1200);
 }
@@ -1310,10 +1306,9 @@ function testSheetsSync(){
   if(!url)return toast('Primero guarda la URL del script','error');
   toast('Enviando prueba...');
   const testUrl = url + '?data=' + encodeURIComponent(JSON.stringify({test:true,timestamp:new Date().toISOString()}));
-  fetch(testUrl, {method:'GET', mode:'cors'})
-    .then(r=>r.json())
-    .then(json=>{ if(json&&json.ok) toast('✓ Conexión exitosa — Google Sheets funcionando'); else toast('⚠ El script respondió pero con error','error'); })
-    .catch(()=>toast('⚠ Error de conexión. Revisa la URL y el deployment','error'));
+  fetch(testUrl, {method:'GET', mode:'no-cors'})
+    .then(()=>toast('✓ Solicitud enviada — abrí tu Google Sheet y verificá'))
+    .catch(()=>toast('⚠ Error de red. Verificá la URL','error'));
 }
 
 
@@ -1735,14 +1730,23 @@ function doPost(e) {
 function doGet(e) {
   try {
     const raw = e && e.parameter && e.parameter.data ? e.parameter.data : null;
-    if (!raw) {
-      return ContentService.createTextOutput('Mis Finanzas Apps Script activo ✓');
-    }
-    const data = JSON.parse(decodeURIComponent(raw));
-    if (data.test) {
-      return ContentService.createTextOutput(JSON.stringify({ok:true,msg:'Conexión exitosa'}))
+    const cb  = e && e.parameter && e.parameter.callback ? e.parameter.callback : null;
+
+    function respond(obj) {
+      const json = JSON.stringify(obj);
+      if (cb) {
+        return ContentService.createTextOutput(cb + '(' + json + ')')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(json)
         .setMimeType(ContentService.MimeType.JSON);
     }
+
+    if (!raw) return respond({ok:true, msg:'Mis Finanzas Apps Script activo ✓'});
+
+    const data = JSON.parse(decodeURIComponent(raw));
+    if (data.test) return respond({ok:true, msg:'Conexión exitosa'});
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const modo = data.modo || 'personal';
     const suffix = modo === 'negocio' ? ' (Negocio)' : '';
@@ -1796,14 +1800,7 @@ function doGet(e) {
     const logSheet = getOrCreateSheet(ss, 'Log Sync');
     logSheet.appendRow([ts, modo, 'OK', (data.transactions||[]).length + ' movim.']);
 
-    return ContentService.createTextOutput(JSON.stringify({ok:true,ts:ts}))
-      .setMimeType(ContentService.MimeType.JSON);
-
-  } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({ok:false,error:err.message}))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
+    return respond({ok:true, ts:ts});
 
 function writeSheet(ss, name, rows, headers, mapFn) {
   const sheet = getOrCreateSheet(ss, name);
