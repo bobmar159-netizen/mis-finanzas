@@ -3147,6 +3147,8 @@ function normalizeServicioLabel(label){
 function parseAgendaVoz(text){
   // Limpiar palabras de activación que confunden al parser
   let text2 = text
+    .replace(/\bcrea\s+(un|una)?\s*(evento|trabajo|visita)?\b/gi, '')
+    .replace(/\bnuevo\s+(evento|trabajo|visita)\b/gi, '')
     .replace(/\b(agenda|agend[aá])\b/gi, '')
     .replace(/\b(construccion|construcción|construcion)\b/gi, '')
     .replace(/\b(oye|hey|escucha|ok|mira|anota|registra|apunta|guarda|crea)\b/gi, '')
@@ -4032,6 +4034,30 @@ function extractDate(text) {
     return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   }
   function shift(days){ const d=new Date(today); d.setDate(d.getDate()+days); return toStr(d); }
+
+  // ── PRIORIDAD MÁXIMA: "este/para este + día" ──
+  // Debe ir ANTES de mañana/ayer porque "para este sábado" no debe
+  // confundirse con ninguna otra cosa
+  const DIAS_MAP = {domingo:0,lunes:1,martes:2,miercoles:3,jueves:4,viernes:5,sabado:6};
+  const esteMatch = t.match(/\b(?:este|esta|para este|para esta|el este)\s+(domingo|lunes|martes|miercoles|jueves|viernes|sabado)\b/);
+  if(esteMatch){
+    const num = DIAS_MAP[esteMatch[1]];
+    const d2=new Date(today);
+    let diff=(num-d2.getDay()+7)%7;
+    if(diff===0) diff=7;
+    d2.setDate(d2.getDate()+diff);
+    return toStr(d2);
+  }
+  // "el próximo + día"
+  const proxMatch = t.match(/(?:el proximo|el próximo|proximo|próximo)\s+(domingo|lunes|martes|miercoles|jueves|viernes|sabado)/);
+  if(proxMatch){
+    const num = DIAS_MAP[proxMatch[1]];
+    const d2=new Date(today);
+    let diff=(num-d2.getDay()+7)%7||7;
+    d2.setDate(d2.getDate()+diff);
+    return toStr(d2);
+  }
+
   // pasado mañana
   if(/pasado (manana|mañana)/.test(t)||t.includes('pasado manana')) return shift(+2);
   // antes de ayer / anteayer / antier
@@ -4048,20 +4074,8 @@ function extractDate(text) {
   if(/\ben (\d+) días\b|en (\d+) dias\b/.test(t)){
     const mm=t.match(/en (\d+) d[ií]as/); if(mm) return shift(parseInt(mm[1]));
   }
-  // "el próximo lunes/martes..." → día de la semana siguiente
-  const prox = t.match(/el proximo (lunes|martes|miercoles|jueves|viernes|sabado|domingo)/);
-  if(prox){
-    const DIAS2=[['domingo',0],['lunes',1],['martes',2],['miercoles',3],['jueves',4],['viernes',5],['sabado',6]];
-    for(const [nm,nu] of DIAS2){
-      if(prox[1]===nm){
-        const d=new Date(today);
-        let diff=(nu-d.getDay()+7)%7||7;
-        d.setDate(d.getDate()+diff);
-        return toStr(d);
-      }
-    }
-  }
-    // Días de la semana
+
+  // Días de la semana
   const DIAS = [['domingo',0],['lunes',1],['martes',2],['miercoles',3],['jueves',4],['viernes',5],['sabado',6]];
   const esFuturo = /\b(este|esta|el proximo|el próximo|proximo|próximo|para el|para esta|para este)\b/.test(t);
   for (const [nombre,num] of DIAS) {
@@ -4403,6 +4417,9 @@ function isAgendaCommand(text){
     'pasar donde','pasar por donde','ir a ver','ir a revisar','ir a checar',
     'ir a chequear','ir a cotizar','ir a dar presupuesto','dar una vuelta',
     'pasaré a ver','pasare a ver','voy a visitar','voy a pasar',
+    // Crear evento
+    'crea un evento','crear evento','nuevo evento','crea evento',
+    'crea una visita','crea un trabajo','crear un trabajo',
     // Agenda/programar
     'agendar','agendé','agenda','agendar visita','agendar trabajo',
     'agendar un trabajo','agendar una visita','programar','programé',
