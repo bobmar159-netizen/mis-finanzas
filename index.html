@@ -3386,7 +3386,25 @@ function checkReminders(){
 // Render dinámico de listas cuando se carga ajustes
 const _origRender = render;
 function render(){
-  _origRender();
+  applyModoTheme();
+  const content=document.getElementById('content');
+  const bal=balance();
+  document.getElementById('header-date').textContent=MONTHS_FULL[new Date().getMonth()]+' '+new Date().getFullYear();
+  const hb=document.getElementById('header-balance');
+  hb.textContent=fmtSign(bal);hb.style.color=bal>=0?'var(--green)':'var(--red)';
+  switch(state.page){
+    case 'dashboard':content.innerHTML=renderDashboard();break;
+    case 'movimientos':content.innerHTML=renderMovimientos();break;
+    case 'categorias':content.innerHTML=renderCategorias();break;
+    case 'deudas':content.innerHTML=renderDeudas();break;
+    case 'servicios':content.innerHTML=renderServicios();break;
+    case 'metas':content.innerHTML=renderMetas();break;
+    case 'presupuesto':content.innerHTML=renderPresupuesto();break;
+    case 'agenda':content.innerHTML=renderAgenda();break;
+    case 'graficos':content.innerHTML=renderGraficos();setTimeout(buildCharts,50);break;
+    case 'ajustes':content.innerHTML=renderAjustes();break;
+    case 'notas':content.innerHTML=renderNotas();break;
+  }
   setTimeout(()=>{
     renderSoundsList();
     renderRemindersList();
@@ -4497,27 +4515,6 @@ function toast(msg,type='success'){
 // ─────────────────────────────────────────────
 // MAIN RENDER
 // ─────────────────────────────────────────────
-function render(){
-  applyModoTheme();
-  const content=document.getElementById('content');
-  const bal=balance();
-  document.getElementById('header-date').textContent=MONTHS_FULL[new Date().getMonth()]+' '+new Date().getFullYear();
-  const hb=document.getElementById('header-balance');
-  hb.textContent=fmtSign(bal);hb.style.color=bal>=0?'var(--green)':'var(--red)';
-  switch(state.page){
-    case 'dashboard':content.innerHTML=renderDashboard();break;
-    case 'movimientos':content.innerHTML=renderMovimientos();break;
-    case 'categorias':content.innerHTML=renderCategorias();break;
-    case 'deudas':content.innerHTML=renderDeudas();break;
-    case 'servicios':content.innerHTML=renderServicios();break;
-    case 'metas':content.innerHTML=renderMetas();break;
-    case 'presupuesto':content.innerHTML=renderPresupuesto();break;
-    case 'agenda':content.innerHTML=renderAgenda();break;
-    case 'graficos':content.innerHTML=renderGraficos();setTimeout(buildCharts,50);break;
-    case 'ajustes':content.innerHTML=renderAjustes();break;
-    case 'notas':content.innerHTML=renderNotas();break;
-  }
-}
 
 render();
 
