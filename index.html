@@ -1954,7 +1954,7 @@ function appendWithoutOverlap(existing, newText) {
 function syncAgendaToSheets(item){
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(!url) return;
-  _sendToSheets(url,{type:'agenda',item});
+  _sendToSheets(url,{type:'agenda',item,modo:state.modo,timestamp:new Date().toISOString()});
 }
 
 function syncSeccionToSheets(type,item){
@@ -3770,14 +3770,76 @@ render();
   const saved=localStorage.getItem('fnz_fab_pos');
   if(saved){try{const p=JSON.parse(saved);fab.style.bottom=p.b;fab.style.right=p.r;}catch(e){}}
   let _drag=false,_moved=false,_hold=null,_sx=0,_sy=0,_ox=0,_oy=0;
-  function _start(cx,cy){_drag=true;_moved=false;fab.classList.add('dragging');const r=fab.getBoundingClientRect();fab.style.top=r.top+'px';fab.style.left=r.left+'px';fab.style.bottom='auto';fab.style.right='auto';fab.style.transition='none';_ox=r.left;_oy=r.top;_sx=cx;_sy=cy;}
-  function _move(cx,cy){if(!_drag)return;const dx=cx-_sx,dy=cy-_sy;if(Math.abs(dx)>4||Math.abs(dy)>4)_moved=true;fab.style.left=Math.max(0,Math.min(window.innerWidth-64,_ox+dx))+'px';fab.style.top=Math.max(0,Math.min(window.innerHeight-64,_oy+dy))+'px';}
-  function _end(){if(!_drag)return;_drag=false;fab.classList.remove('dragging');fab.style.transition='';clearTimeout(_hold);if(_moved){const r=fab.getBoundingClientRect();const b=Math.max(8,window.innerHeight-r.bottom);const ri=Math.max(8,window.innerWidth-r.right);fab.style.bottom=b+'px';fab.style.right=ri+'px';fab.style.top='';fab.style.left='';localStorage.setItem('fnz_fab_pos',JSON.stringify({b:fab.style.bottom,r:fab.style.right}));}}
-  fab.addEventListener('touchstart',(e)=>{const t=e.touches[0];_sx=t.clientX;_sy=t.clientY;_moved=false;_hold=setTimeout(()=>{_start(t.clientX,t.clientY);if(navigator.vibrate)navigator.vibrate(40);},400);},{passive:true});
-  document.addEventListener('touchmove',(e)=>{if(!_drag)return;e.preventDefault();const t=e.touches[0];_move(t.clientX,t.clientY);},{passive:false});
-  document.addEventListener('touchend',(e)=>{clearTimeout(_hold);if(_drag){_end();e.preventDefault();}},{passive:false});
+
+  function _start(cx,cy){
+    _drag=true;_moved=false;
+    fab.classList.add('dragging');
+    // Calcular posición actual del FAB en viewport
+    const r=fab.getBoundingClientRect();
+    _ox=r.left;_oy=r.top;_sx=cx;_sy=cy;
+    fab.style.position='fixed';
+    fab.style.left=_ox+'px';
+    fab.style.top=_oy+'px';
+    fab.style.bottom='auto';
+    fab.style.right='auto';
+    fab.style.transition='none';
+  }
+  function _move(cx,cy){
+    if(!_drag)return;
+    const dx=cx-_sx,dy=cy-_sy;
+    if(Math.abs(dx)>3||Math.abs(dy)>3)_moved=true;
+    const nx=Math.max(0,Math.min(window.innerWidth-64,_ox+dx));
+    const ny=Math.max(0,Math.min(window.innerHeight-64,_oy+dy));
+    fab.style.left=nx+'px';
+    fab.style.top=ny+'px';
+  }
+  function _end(){
+    if(!_drag)return;
+    _drag=false;
+    fab.classList.remove('dragging');
+    fab.style.transition='';
+    clearTimeout(_hold);
+    if(_moved){
+      const r=fab.getBoundingClientRect();
+      const b=Math.max(8,window.innerHeight-r.bottom);
+      const ri=Math.max(8,window.innerWidth-r.right);
+      fab.style.bottom=b+'px';fab.style.right=ri+'px';
+      fab.style.top='';fab.style.left='';
+      localStorage.setItem('fnz_fab_pos',JSON.stringify({b:fab.style.bottom,r:fab.style.right}));
+    }
+  }
+
+  // Touch — touchstart en el FAB, move/end en document
+  fab.addEventListener('touchstart',(e)=>{
+    const t=e.touches[0];
+    _moved=false;
+    // Guardar posición del toque para usar en _start
+    const startX=t.clientX,startY=t.clientY;
+    _hold=setTimeout(()=>{
+      _start(startX,startY);
+      if(navigator.vibrate)navigator.vibrate(40);
+    },400);
+  },{passive:true});
+
+  document.addEventListener('touchmove',(e)=>{
+    if(!_drag)return;
+    e.preventDefault();
+    _move(e.touches[0].clientX,e.touches[0].clientY);
+  },{passive:false});
+
+  document.addEventListener('touchend',(e)=>{
+    clearTimeout(_hold);
+    if(_drag){_end();e.preventDefault();}
+  },{passive:false});
+
   document.addEventListener('touchcancel',()=>{clearTimeout(_hold);if(_drag)_end();});
-  fab.addEventListener('mousedown',(e)=>{_sx=e.clientX;_sy=e.clientY;_moved=false;_hold=setTimeout(()=>_start(e.clientX,e.clientY),400);});
+
+  // Mouse
+  fab.addEventListener('mousedown',(e)=>{
+    const sx=e.clientX,sy=e.clientY;
+    _moved=false;
+    _hold=setTimeout(()=>_start(sx,sy),400);
+  });
   document.addEventListener('mousemove',(e)=>{if(_drag)_move(e.clientX,e.clientY);});
   document.addEventListener('mouseup',()=>{clearTimeout(_hold);if(_drag)_end();});
   fab.addEventListener('click',(e)=>{if(_moved)e.stopImmediatePropagation();},true);
@@ -4868,7 +4930,6 @@ function startListening() {
 }
 
 function restartListening() {
-  // Reinicio silencioso — mantiene el texto acumulado
   if (!micListening) return;
   micRestartLock = true;
   try { recognition.stop(); } catch(e) {}
@@ -4881,8 +4942,6 @@ function restartListening() {
     recognition.interimResults = true;
     recognition.maxAlternatives= 3;
     recognition.continuous     = true;
-    recognition.onresult = arguments.callee._onresult || (() => {});
-    // Re-asignar handlers copiando del objeto anterior — usamos el mismo startListening
     startListeningHandlers(recognition);
     try { recognition.start(); } catch(e) {}
   }, 150);
