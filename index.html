@@ -174,15 +174,19 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
   color: #0D0D0F;
   border: none;
   font-size: 24px;
-  cursor: pointer;
+  cursor: grab;
   box-shadow: 0 4px 16px #C9A84C55;
   z-index: 90;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform .2s, box-shadow .2s;
+  transition: box-shadow .2s, opacity .2s;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
-#micFab:hover { transform: scale(1.08); box-shadow: 0 6px 24px #C9A84C77; }
+#micFab.dragging { cursor: grabbing; opacity: .85; box-shadow: 0 8px 28px #C9A84C88; }
+#micFab:not(.dragging):hover { transform: scale(1.08); box-shadow: 0 6px 24px #C9A84C77; }
 #micFab.listening { background: linear-gradient(135deg, #E05252, #f87171); box-shadow: 0 4px 20px #E0525266; animation: micPulse 1s infinite; }
 
 @keyframes micPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
@@ -2656,32 +2660,61 @@ function toggleNotaVoz(){
   if(_notaVozEscuchando){ _stopNotaVoz(); return; }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ toast('Necesitas Chrome para usar el micrófono','error'); return; }
-  _notaVozRec = new SR();
-  _notaVozRec.lang='es-PE';
-  _notaVozRec.interimResults=true;
-  _notaVozRec.continuous=true;
-  _notaVozRec.maxAlternatives=3;
   _notaVozEscuchando=true;
   _setBtnMicNota(true);
+  _notaVozBuffer='';
+  _iniciarNotaVozRec();
+}
 
-  _notaVozRec.onresult=(e)=>{
-    let interim='', finalPart='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal) finalPart+=e.results[i][0].transcript+' ';
-      else interim+=e.results[i][0].transcript;
-    }
-    const display=(_notaVozBuffer+finalPart+interim).trim();
-    const el=document.getElementById('nv-text');
-    if(el){el.textContent=display||'Escuchando...';el.style.color='#1E293B';}
+function _iniciarNotaVozRec(){
+  if(!_notaVozEscuchando) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR) return;
+  try{
+    _notaVozRec = new SR();
+    _notaVozRec.lang='es-PE';
+    _notaVozRec.interimResults=true;
+    _notaVozRec.continuous=false; // ★ false: más estable en Android
+    _notaVozRec.maxAlternatives=1;
 
-    if(finalPart){
-      _notaVozBuffer+=finalPart;
-      _procesarFragmentoNota(_notaVozBuffer);
-    }
-  };
-  _notaVozRec.onerror=()=>_stopNotaVoz();
-  _notaVozRec.onend=()=>{if(_notaVozEscuchando) try{_notaVozRec.start();}catch(e){}};
-  try{_notaVozRec.start();}catch(e){}
+    _notaVozRec.onresult=(e)=>{
+      let interim='', finalPart='';
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        if(e.results[i].isFinal) finalPart+=e.results[i][0].transcript+' ';
+        else interim+=e.results[i][0].transcript;
+      }
+      const display=(_notaVozBuffer+finalPart+interim).trim();
+      const el=document.getElementById('nv-text');
+      if(el){el.textContent=display||'Escuchando...';el.style.color='#1E293B';}
+      if(finalPart){
+        _notaVozBuffer = appendWithoutOverlap(_notaVozBuffer, finalPart);
+        _procesarFragmentoNota(_notaVozBuffer);
+      }
+    };
+
+    _notaVozRec.onerror=(e)=>{
+      if(e.error==='no-speech'||e.error==='aborted') return;
+      _stopNotaVoz();
+    };
+
+    // ★ onend: si hay buffer → procesar; si no → reiniciar
+    _notaVozRec.onend=()=>{
+      if(!_notaVozEscuchando) return;
+      if(_notaVozBuffer.trim().length > 2){
+        // Tiene texto → procesar después de pausa corta
+        setTimeout(()=>{
+          if(_notaVozEscuchando) _procesarFragmentoNota(_notaVozBuffer);
+        }, 400);
+        // Reiniciar para seguir escuchando más ítems
+        setTimeout(()=>{ if(_notaVozEscuchando) _iniciarNotaVozRec(); }, 700);
+      } else {
+        // Sin texto → reiniciar directo
+        setTimeout(()=>{ if(_notaVozEscuchando) _iniciarNotaVozRec(); }, 200);
+      }
+    };
+
+    _notaVozRec.start();
+  } catch(e){ _stopNotaVoz(); }
 }
 
 function _stopNotaVoz(){
@@ -4487,6 +4520,61 @@ function render(){
 
 render();
 
+// ── FAB arrastrable — mantener presionado 400ms para mover ──
+(function(){
+  const fab = document.getElementById('micFab');
+  if(!fab) return;
+  const saved = localStorage.getItem('fnz_fab_pos');
+  if(saved){ try{ const p=JSON.parse(saved); fab.style.bottom=p.b; fab.style.right=p.r; }catch(e){} }
+
+  let _drag=false, _moved=false, _hold=null;
+  let _sx=0,_sy=0,_ox=0,_oy=0;
+
+  function startDrag(cx,cy){
+    _drag=true; _moved=false;
+    fab.classList.add('dragging');
+    const r=fab.getBoundingClientRect();
+    fab.style.top=r.top+'px'; fab.style.left=r.left+'px';
+    fab.style.bottom='auto'; fab.style.right='auto';
+    _ox=r.left; _oy=r.top; _sx=cx; _sy=cy;
+  }
+  function moveDrag(cx,cy){
+    if(!_drag) return;
+    const dx=cx-_sx, dy=cy-_sy;
+    if(Math.abs(dx)>4||Math.abs(dy)>4) _moved=true;
+    fab.style.left=Math.max(0,Math.min(window.innerWidth-64,_ox+dx))+'px';
+    fab.style.top =Math.max(0,Math.min(window.innerHeight-64,_oy+dy))+'px';
+  }
+  function endDrag(){
+    if(!_drag) return;
+    _drag=false; fab.classList.remove('dragging'); clearTimeout(_hold);
+    if(_moved){
+      const r=fab.getBoundingClientRect();
+      const b=Math.max(8,window.innerHeight-r.bottom);
+      const ri=Math.max(8,window.innerWidth-r.right);
+      fab.style.bottom=b+'px'; fab.style.right=ri+'px';
+      fab.style.top=''; fab.style.left='';
+      localStorage.setItem('fnz_fab_pos',JSON.stringify({b:fab.style.bottom,r:fab.style.right}));
+    }
+  }
+  // Touch
+  fab.addEventListener('touchstart',(e)=>{
+    const t=e.touches[0]; _sx=t.clientX; _sy=t.clientY; _moved=false;
+    _hold=setTimeout(()=>{ startDrag(t.clientX,t.clientY); if(navigator.vibrate)navigator.vibrate(30); },400);
+  },{passive:true});
+  fab.addEventListener('touchmove',(e)=>{
+    const t=e.touches[0];
+    if(_drag){ e.preventDefault(); moveDrag(t.clientX,t.clientY); }
+    else if(Math.abs(t.clientX-_sx)>8||Math.abs(t.clientY-_sy)>8) clearTimeout(_hold);
+  },{passive:false});
+  fab.addEventListener('touchend',(e)=>{ clearTimeout(_hold); if(_drag){ endDrag(); e.preventDefault(); } },{passive:false});
+  // Mouse
+  fab.addEventListener('mousedown',(e)=>{ _sx=e.clientX; _sy=e.clientY; _moved=false; _hold=setTimeout(()=>startDrag(e.clientX,e.clientY),400); });
+  document.addEventListener('mousemove',(e)=>{ if(_drag) moveDrag(e.clientX,e.clientY); });
+  document.addEventListener('mouseup',()=>{ clearTimeout(_hold); if(_drag) endDrag(); });
+  fab.addEventListener('click',(e)=>{ if(_moved) e.stopImmediatePropagation(); },true);
+})();
+
 // ─────────────────────────────────────────────
 // MIC AI — MOTOR NLP LOCAL v2 (SIN API EXTERNA)
 // ─────────────────────────────────────────────
@@ -5660,7 +5748,7 @@ let micSilenceTimer   = null;
 let micFullTranscript = '';
 let micRestartLock    = false;
 let _micLastProcessed = ''; // ★ evita procesar el mismo texto dos veces
-const MIC_SILENCE_MS  = 2200; // ms de silencio antes de procesar (más corto = más ágil)
+const MIC_SILENCE_MS  = 2500; // ms de silencio antes de procesar
 
 function _micHandlers(rec) {
   rec.onresult = (e) => {
@@ -5707,10 +5795,24 @@ function _micHandlers(rec) {
     stopListening();
   };
 
-  // ★ onend: Chrome Android corta la sesión solo cada ~10s con continuous=false
-  // Reiniciar transparentemente si sigue escuchando
+  // ★ CLAVE: si hay texto acumulado → esperar el timer de silencio (NO reiniciar)
+  // Solo reiniciar si no hay nada transcripto aún
   rec.onend = () => {
-    if (micListening && !micRestartLock) _micReiniciar();
+    if (!micListening) return;
+    if (micFullTranscript.trim()) {
+      // Hay texto → acelerar el timer para procesar rápido
+      clearTimeout(micSilenceTimer);
+      micSilenceTimer = setTimeout(() => {
+        const txt = micFullTranscript.trim();
+        if (micListening && txt && txt !== _micLastProcessed) {
+          _micLastProcessed = txt;
+          processVoiceResult(txt);
+        }
+      }, 1000); // 1000ms tras corte = total ~2.5s de sensación
+    } else {
+      // Sin texto aún → reiniciar para seguir escuchando
+      if (!micRestartLock) _micReiniciar();
+    }
   };
 }
 
