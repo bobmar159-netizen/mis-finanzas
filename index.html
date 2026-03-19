@@ -5788,35 +5788,27 @@ function toggleListening() {
   else startListening();
 }
 
-// ── Motor de micrófono v3 — continuous=true con deduplicación por sesión ──
-// continuous=true evita que Chrome corte mientras el usuario habla
-// La deduplicación se hace por sesión: cada resultado final se marca con su índice
-
+// ── Motor de micrófono v4 — Android/Chrome confiable ──
 let micSilenceTimer   = null;
 let micFullTranscript = '';
 let micRestartLock    = false;
 let _micLastProcessed = '';
-let _micSessionIdx    = 0;   // índice de sesión — sube en cada reinicio
-let _micFinalWords    = new Set(); // palabras ya procesadas en esta sesión
 const MIC_SILENCE_MS  = 2500;
 
 function _micHandlers(rec) {
-  const mySession = _micSessionIdx; // capturar sesión actual
+  // ★ Cada instancia tiene su propio Set de índices procesados
+  const processed = new Set();
 
   rec.onresult = (e) => {
-    if (_micSessionIdx !== mySession) return; // resultado de sesión vieja → ignorar
-
-    let interim = '';
     let newFinal = '';
+    let interim  = '';
 
     for (let i = e.resultIndex; i < e.results.length; i++) {
       if (e.results[i].isFinal) {
-        const txt = e.results[i][0].transcript.trim();
-        // ★ Deduplicar por índice de resultado — cada índice solo se procesa una vez
-        const key = mySession + ':' + i;
-        if (!_micFinalWords.has(key)) {
-          _micFinalWords.add(key);
-          newFinal += txt + ' ';
+        // ★ Solo procesar cada índice UNA VEZ por instancia
+        if (!processed.has(i)) {
+          processed.add(i);
+          newFinal += e.results[i][0].transcript.trim() + ' ';
         }
       } else {
         interim += e.results[i][0].transcript;
@@ -5827,11 +5819,12 @@ function _micHandlers(rec) {
       micFullTranscript = (micFullTranscript + ' ' + newFinal).trim();
     }
 
-    const display = (micFullTranscript + (interim ? ' ' + interim : '')).trim();
     const el = document.getElementById('micText');
-    if (el) { el.textContent = display || '...'; el.style.color = '#1E293B'; }
+    if (el) {
+      el.textContent = (micFullTranscript + (interim ? ' ' + interim : '')).trim() || '...';
+      el.style.color = '#1E293B';
+    }
 
-    // Reiniciar timer de silencio cada vez que llega texto
     clearTimeout(micSilenceTimer);
     if (micFullTranscript.trim()) {
       micSilenceTimer = setTimeout(() => {
@@ -5845,11 +5838,7 @@ function _micHandlers(rec) {
   };
 
   rec.onerror = (e) => {
-    if (e.error === 'aborted') return;
-    if (e.error === 'no-speech') {
-      // Chrome Android manda no-speech a veces — ignorar, el timer de silencio se encarga
-      return;
-    }
+    if (e.error === 'aborted' || e.error === 'no-speech') return;
     if (e.error === 'not-allowed') {
       const el = document.getElementById('micText');
       if (el) { el.textContent = '⚠ Permiso de micrófono denegado.'; el.style.color = '#E05252'; }
@@ -5858,8 +5847,8 @@ function _micHandlers(rec) {
   };
 
   rec.onend = () => {
-    if (!micListening || _micSessionIdx !== mySession) return;
-    // Chrome cortó la sesión — reiniciar transparentemente manteniendo el texto
+    if (!micListening) return;
+    // Chrome cortó — reiniciar transparentemente (mantiene micFullTranscript)
     if (!micRestartLock) _micReiniciar();
   };
 }
@@ -5874,12 +5863,12 @@ function _micReiniciar() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
     try {
-      _micSessionIdx++; // nueva sesión — los resultados viejos quedan marcados
+      // ★ Nueva instancia = nuevo Set de índices = sin duplicados
       recognition = new SR();
       recognition.lang            = 'es-PE';
       recognition.interimResults  = true;
       recognition.maxAlternatives = 1;
-      recognition.continuous      = true; // ★ true: no corta mientras habla
+      recognition.continuous      = true;
       _micHandlers(recognition);
       recognition.start();
     } catch(err) { micRestartLock = false; }
@@ -5893,16 +5882,11 @@ function startListening() {
     if (el) { el.textContent = '⚠ Necesitas Chrome para usar el micrófono.'; el.style.color = '#E05252'; }
     return;
   }
-
-  // Reset completo
-  micFullTranscript    = '';
-  micRestartLock       = false;
-  _micLastProcessed    = '';
-  _micSessionIdx++;
-  _micFinalWords       = new Set();
+  micFullTranscript        = '';
+  micRestartLock           = false;
+  _micLastProcessed        = '';
   processVoiceResult._busy = false;
   clearTimeout(micSilenceTimer);
-
   micListening = true;
   _micSetUI(true);
 
@@ -5910,7 +5894,7 @@ function startListening() {
   recognition.lang            = 'es-PE';
   recognition.interimResults  = true;
   recognition.maxAlternatives = 1;
-  recognition.continuous      = true; // ★ true: no corta mientras habla
+  recognition.continuous      = true;
   _micHandlers(recognition);
   try { recognition.start(); } catch(e) {}
 }
