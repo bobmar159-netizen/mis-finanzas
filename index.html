@@ -3462,7 +3462,7 @@ function parseAgendaVoz(text){
     .replace(/\b(agenda|agend[aá])\b/gi, '')
     .replace(/\b(construccion|construcción|construcion)\b/gi, '')
     .replace(/\b(oye|hey|escucha|ok|mira|anota|registra|apunta|guarda|crea)\b/gi, '')
-    .replace(/\b(para el dia de|para el dia|el dia de|día de mañana|dia de manana)\b/gi, 'mañana')
+    .replace(/\b(para el dia de|para el dia|el dia de|día de mañana|dia de manana)\b(?!\s*(?:domingo|lunes|martes|miercoles|jueves|viernes|sabado))/gi, 'mañana')
     .replace(/\bservicio\s+(punto|terma|cocina|horno|calefon|reparacion|instalacion|conexion|gasfiteria|documentacion|conversion|modificacion|parrilla|secadora)/gi, '$1')
     .replace(/\s+/g, ' ')
     .trim();
@@ -4288,8 +4288,6 @@ function extractDate(text) {
   function shift(days){ const d=new Date(today); d.setDate(d.getDate()+days); return toStr(d); }
 
   // ── PRIORIDAD MÁXIMA: "este/para este + día" ──
-  // Debe ir ANTES de mañana/ayer porque "para este sábado" no debe
-  // confundirse con ninguna otra cosa
   const DIAS_MAP = {domingo:0,lunes:1,martes:2,miercoles:3,jueves:4,viernes:5,sabado:6};
   const esteMatch = t.match(/\b(?:este|esta|para este|para esta|el este)\s+(domingo|lunes|martes|miercoles|jueves|viernes|sabado)\b/);
   if(esteMatch){
@@ -4310,6 +4308,20 @@ function extractDate(text) {
     return toStr(d2);
   }
 
+  // ── PRIORIDAD 2: días de la semana solos (antes que mañana/hoy) ──
+  const DIAS = [['domingo',0],['lunes',1],['martes',2],['miercoles',3],['jueves',4],['viernes',5],['sabado',6]];
+  const esFuturo = /\b(este|esta|el proximo|el próximo|proximo|próximo|para el|para esta|para este)\b/.test(t);
+  for (const [nombre,num] of DIAS) {
+    if(new RegExp('\\b'+nombre+'\\b').test(t)){
+      const d=new Date(today);
+      const hoy=d.getDay();
+      let diff=(num-hoy+7)%7;
+      if(diff===0) diff=7; // mismo día → próxima semana
+      d.setDate(d.getDate()+diff);
+      return toStr(d);
+    }
+  }
+
   // pasado mañana
   if(/pasado (manana|mañana)/.test(t)||t.includes('pasado manana')) return shift(+2);
   // antes de ayer / anteayer / antier
@@ -4325,29 +4337,6 @@ function extractDate(text) {
   if(/\besta semana\b/.test(t)) return toStr(today);
   if(/\ben (\d+) días\b|en (\d+) dias\b/.test(t)){
     const mm=t.match(/en (\d+) d[ií]as/); if(mm) return shift(parseInt(mm[1]));
-  }
-
-  // Días de la semana
-  const DIAS = [['domingo',0],['lunes',1],['martes',2],['miercoles',3],['jueves',4],['viernes',5],['sabado',6]];
-  const esFuturo = /\b(este|esta|el proximo|el próximo|proximo|próximo|para el|para esta|para este)\b/.test(t);
-  for (const [nombre,num] of DIAS) {
-    if(new RegExp('\\b'+nombre+'\\b').test(t)){
-      const d=new Date(today);
-      const hoy=d.getDay();
-      if(esFuturo){
-        // Siempre ir hacia adelante
-        let diff=(num-hoy+7)%7;
-        if(diff===0) diff=7; // mismo día = próxima semana
-        d.setDate(d.getDate()+diff);
-      } else {
-        // Sin indicador: si el día aún no llegó esta semana → futuro próximo
-        //                si ya pasó → la semana que viene igual
-        let diff=(num-hoy+7)%7;
-        if(diff===0) diff=7;
-        d.setDate(d.getDate()+diff);
-      }
-      return toStr(d);
-    }
   }
   // esta semana → hoy
   if(/esta semana/.test(t)) return toStr(today);
