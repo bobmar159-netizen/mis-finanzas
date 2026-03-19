@@ -5820,14 +5820,18 @@ function _micHandlers(rec) {
     const el = document.getElementById('micText');
     if (el) { el.textContent = display || '...'; el.style.color = '#1E293B'; }
 
+    // ★ Mostrar botón Guardar en cuanto hay texto
+    const totalText = [micFullTranscript, micSessionTranscript].filter(Boolean).join(' ').trim();
+    const saveBtn = document.getElementById('micSaveBtn');
+    if (saveBtn && totalText) saveBtn.style.display = 'block';
+
     // Timer de silencio sobre el total
     clearTimeout(micSilenceTimer);
-    const totalText = [micFullTranscript, micSessionTranscript].filter(Boolean).join(' ').trim();
     if (totalText) {
       micSilenceTimer = setTimeout(() => {
         if (micListening && totalText !== _micLastProcessed) {
           _micLastProcessed = totalText;
-          micFullTranscript = totalText;   // commit antes de procesar
+          micFullTranscript = totalText;
           micSessionTranscript = '';
           processVoiceResult(totalText);
         }
@@ -5846,13 +5850,29 @@ function _micHandlers(rec) {
 
   rec.onend = () => {
     if (!micListening) return;
-    // ★ Commit: guardar texto de esta sesión antes de reiniciar
+    // Commit texto de esta sesión
     if (micSessionTranscript.trim()) {
       micFullTranscript = [micFullTranscript, micSessionTranscript].filter(Boolean).join(' ').trim();
       micSessionTranscript = '';
     }
-    // Reiniciar para seguir escuchando
-    if (!micRestartLock) _micReiniciar();
+    const totalText = micFullTranscript.trim();
+    if (totalText && totalText !== _micLastProcessed) {
+      // ★ Hay texto → esperar 2.5s de silencio real antes de procesar
+      // Si en ese tiempo no llega más texto, guardar
+      clearTimeout(micSilenceTimer);
+      micSilenceTimer = setTimeout(() => {
+        const txt = micFullTranscript.trim();
+        if (micListening && txt && txt !== _micLastProcessed) {
+          _micLastProcessed = txt;
+          processVoiceResult(txt);
+        }
+      }, MIC_SILENCE_MS);
+      // Reiniciar para seguir escuchando mientras corre el timer
+      if (!micRestartLock) _micReiniciar();
+    } else {
+      // Sin texto aún → reiniciar directo
+      if (!micRestartLock) _micReiniciar();
+    }
   };
 }
 
@@ -5908,6 +5928,7 @@ function startListeningHandlers(rec) { _micHandlers(rec); }
 function stopListening() {
   micListening   = false;
   micRestartLock = true;
+  processVoiceResult._busy = false;
   clearTimeout(micSilenceTimer);
   try { if (recognition) { recognition.onend = null; recognition.abort(); } } catch(e) {}
   _micSetUI(false);
@@ -6224,6 +6245,17 @@ function updateCatSelect(type, selectedId) {
 }
 
 function saveMicTx() {
+  // Si hay texto acumulado sin procesar → procesar primero
+  const txt = (micFullTranscript + ' ' + micSessionTranscript).trim();
+  if (txt && txt !== _micLastProcessed) {
+    _micLastProcessed = txt;
+    micFullTranscript = txt;
+    micSessionTranscript = '';
+    stopListening();
+    processVoiceResult._busy = false;
+    processVoiceResult(txt);
+    return;
+  }
   const amount = parseFloat(document.getElementById('pvAmtEdit').value);
   const type = document.getElementById('pvTypeEdit').value;
   const catId = document.getElementById('pvCatEdit').value;
