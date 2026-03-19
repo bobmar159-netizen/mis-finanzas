@@ -201,6 +201,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
   animation: waveAnim 0.8s var(--d) infinite ease-in-out alternate;
 }
 @keyframes waveAnim { from{height:8px} to{height:40px} }
+
 </style>
 </head>
 <body>
@@ -551,15 +552,15 @@ function circleProgress(pct,size,stroke,color,labelHtml){
 // ─────────────────────────────────────────────
 // CATEGORY SELECTOR HTML
 // ─────────────────────────────────────────────
-function catSelectHtml(id, type, selectedName){
-  const list = type==='ingreso'?state.catsIn:state.catsEx;
-  const sel = list.find(c=>c.name===selectedName)||list[0];
-  return `<div class="cat-select-wrap">
-    <span class="cat-select-icon" id="cat-icon-preview">${sel?iconHtml(sel.icon):''}</span>
-    <select class="field" id="${id}" onchange="updateCatIcon('${id}','${type}')" style="padding-left:42px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding-top:12px;padding-bottom:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-      ${list.map(c=>`<option value="${c.name}" ${c.name===selectedName?'selected':''}>${iconLabel(c.icon)} ${c.name}</option>`).join('')}
-    </select>
-  </div>`;
+function catSelectHtml(id, type, selected){
+  const cats = type==='ingreso' ? state.catsIn : state.catsEx;
+  const selNorm = (selected||'').toLowerCase().trim();
+  const opts = cats.map(c=>{
+    const isSelected = c.id===selected || c.name===selected ||
+      c.name.toLowerCase().trim()===selNorm;
+    return `<option value="${c.id}" ${isSelected?'selected':''}>${c.icon||''} ${c.name}</option>`;
+  }).join('');
+  return `<select id="${id}" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">${opts}</select>`;
 }
 
 function updateCatIcon(selId, type){
@@ -1093,7 +1094,8 @@ function calcTablaAmort(capital, tasa, plazo, sistema){
   return tabla;
 }
 
-function openAddPrestPers(){
+function openAddPrestPers(pre){
+  pre = pre || {};
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:#6C3483">Nuevo Préstamo Personal</div>
     <div class="field">
@@ -2016,9 +2018,13 @@ function buildCharts(){
 function openAddTx(){ openTxModal(null); }
 function openEditTx(id){ openTxModal(state.transactions.find(t=>t.id===id)); }
 
-function openTxModal(tx){
+function openAddTxWithData(pre){ openTxModal(null, pre); }
+
+function openTxModal(tx, preData){
   const isEdit=!!tx;
-  const t=tx||{type:'egreso',date:todayStr(),amount:'',category:state.catsEx[0]?.name||'',description:'',cliente:'',ubicacion:''};
+  const pre = preData || {};
+  const defType = pre.type || 'egreso';
+  const t=tx||{type:defType,date:pre.date||todayStr(),amount:pre.amount||'',category:pre.category||state.catsEx[0]?.name||'',description:pre.description||'',cliente:pre.cliente||'',ubicacion:pre.ubicacion||''};
   window._txType=t.type;
   const isNeg=state.modo==='negocio';
   document.getElementById('modal-content').innerHTML=`
@@ -2057,6 +2063,12 @@ function openTxModal(tx){
       <button class="btn-gold" onclick="saveTx('${isEdit?t.id:''}')">Guardar</button>
     </div>`;
   showModal();
+  setTimeout(()=>{
+    // Asegurar que tipo y categoría estén correctos
+    if(t.type) setTxType(t.type);
+    // Si hay moneda pre-seteada
+    if(pre.moneda) setTxMoneda(pre.moneda, null);
+  }, 30);
 }
 
 
@@ -2139,12 +2151,13 @@ function deleteTx(id){
 // ─────────────────────────────────────────────
 // MODALS: DEBT
 // ─────────────────────────────────────────────
-function openAddDebt(){ openDebtModal(null); }
+function openAddDebt(pre){ openDebtModal(null, pre); }
 function openEditDebt(id){ openDebtModal(state.debts.find(d=>d.id===id)); }
 
-function openDebtModal(debt){
+function openDebtModal(debt, preData){
+  const pre = preData||{};
   const isEdit=!!debt;
-  const d=debt||{name:'',totalAmount:'',cuotaMonto:'',cuotasTotales:'',cuotasPagadas:0,categoria:DEBT_CATS[0],color:DEBT_COLORS[0]};
+  const d=debt||{name:pre.name||'',totalAmount:pre.totalAmount||'',cuotaMonto:pre.cuotaMonto||'',cuotasTotales:pre.cuotasTotales||'',cuotasPagadas:0,categoria:pre.categoria||DEBT_CATS[0],color:DEBT_COLORS[0]};
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:var(--blue)">${isEdit?'Editar':'Nueva'} Deuda</div>
     <div class="field"><label class="field-label">Nombre</label><input id="d-name" type="text" placeholder="Ej: BCP, Tarjeta Ripley" value="${d.name}"></div>
@@ -2186,12 +2199,13 @@ function pagarCuota(id){
 // ─────────────────────────────────────────────
 // MODALS: SERVICE
 // ─────────────────────────────────────────────
-function openAddService(){openServiceModal(null);}
+function openAddService(pre){openServiceModal(null, pre);}
 function openEditService(id){openServiceModal(state.servicios.find(s=>s.id===id));}
 const SVC_ICONS=['⚡','💧','📡','🔥','📱','🏠','🛒','🎬','🎵','🚗','🏥','📚','💡','🌐','🖥','🎮','🐶','🌱','✈️','🧴','🍳','♨️','💨','🌡️','🥩','🫕','🔧','🪠','🔌','🔩'];
-function openServiceModal(svc){
+function openServiceModal(svc, preData){
+  const pre = preData||{};
   const isEdit=!!svc;
-  const s=svc||{name:'',monto:'',venceDia:15,icon:'💡',categoria:'Básico'};
+  const s=svc||{name:pre.name||'',monto:pre.monto||'',venceDia:pre.venceDia||15,icon:pre.icon||'💡',categoria:pre.categoria||'Básico'};
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:var(--gold)">${isEdit?'Editar':'Nuevo'} Servicio</div>
     <div class="field"><label class="field-label">Nombre</label><input id="s-name" type="text" placeholder="Ej: Luz del Sur, Netflix" value="${s.name}"></div>
@@ -2773,27 +2787,32 @@ function renderAgenda(){
 }
 
 // ── Formulario agregar/editar ──
-function openAddAgenda(tipo, editId){
+function openAddAgenda(tipo, editId, preData){
   const isEdit = !!editId;
   const item = isEdit ? (state.agenda||[]).find(x=>x.id===editId) : null;
   const isVisita = (item?item.tipo:tipo) === 'visita';
   const colorTitle = isVisita ? '#1565C0' : '#6C3483';
-  const serviciosOpts = AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${item&&item.servicio===s?'selected':''}>${s}</option>`).join('');
+  // preData: datos pre-llenados desde voz (tiene prioridad sobre item vacío)
+  const pre = preData || {};
+  const serviciosOpts = AGENDA_SERVICIOS.map(s=>{
+    const isSelected = (item&&item.servicio===s) || (!item&&pre.servicio&&s===pre.servicio);
+    return `<option value="${s}" ${isSelected?'selected':''}>${s}</option>`;
+  }).join('');
   const estadosOpts = Object.entries(AGENDA_ESTADOS).map(([k,v])=>`<option value="${k}" ${item&&item.estado===k?'selected':k==='pendiente'&&!item?'selected':''}>${v.label}</option>`).join('');
 
   document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title" style="color:${colorTitle}">${isEdit?'Editar':'Nueva'} ${isVisita?'Visita':'Trabajo'}</div>
+    <div class="modal-title" style="color:${colorTitle}">${isEdit?'Editar':(isVisita?'Nueva':'Nuevo')} ${isVisita?'Visita':'Trabajo'}</div>
     <div class="field"><label class="field-label">Cliente</label>
-      <input id="ag-cliente" type="text" placeholder="Nombre del cliente" value="${item?item.cliente||'':''}">
+      <input id="ag-cliente" type="text" placeholder="Nombre del cliente" value="${item?item.cliente||'':pre.cliente||''}">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div class="field"><label class="field-label">Fecha</label>
-        <input id="ag-fecha" type="date" value="${item?item.fecha:getAgendaHoy()}">
+        <input id="ag-fecha" type="date" value="${item?item.fecha:pre.fecha||getAgendaHoy()}">
       </div>
       <div class="field"><label class="field-label">Hora</label>
         <div style="display:flex;gap:6px;align-items:center">
           <input id="ag-hora-txt" type="text" inputmode="numeric" placeholder="Ej: 9:00 o 3:30"
-            value="${item&&item.hora?horaTo12(item.hora).replace(' AM','').replace(' PM',''):''}"
+            value="${item&&item.hora?horaTo12(item.hora).replace(' AM','').replace(' PM',''):(pre.hora?horaTo12(pre.hora).replace(' AM','').replace(' PM',''):'')}"
             style="flex:1;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px"
             oninput="formatHoraInput(this)">
           <div style="display:flex;gap:4px;flex-shrink:0">
@@ -2811,22 +2830,22 @@ function openAddAgenda(tipo, editId){
       </select>
     </div>
     <div class="field"><label class="field-label">Precio acordado (S/)</label>
-      <input id="ag-precio" type="number" inputmode="decimal" placeholder="0.00" value="${item?item.precio||'':''}">
+      <input id="ag-precio" type="number" inputmode="decimal" placeholder="0.00" value="${item?item.precio||'':pre.precio||''}">
     </div>`:''}
     <div class="field"><label class="field-label">Ubicación / Dirección</label>
       <div class="ubic-wrap">
         <input id="ag-ubicacion" type="text" placeholder="Dirección, distrito o pega link de Google Maps"
-          value="${item?item.ubicacion||':':''}" oninput="filterAgUbic(this.value)" autocomplete="off"
+          value="${item?item.ubicacion||'':pre.ubicacion||''}" oninput="filterAgUbic(this.value)" autocomplete="off"
           style="font-size:13px">
         <div id="ag-ubic-dropdown" class="ubic-dropdown" style="display:none"></div>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:4px">Podés pegar un enlace de Google Maps o WhatsApp — se abrirá directamente en Maps.</div>
     </div>
     <div class="field"><label class="field-label">Teléfono (opcional)</label>
-      <input id="ag-telefono" type="tel" inputmode="tel" placeholder="Ej: 987654321" value="${item?item.telefono||'':''}">
+      <input id="ag-telefono" type="tel" inputmode="tel" placeholder="Ej: 987654321" value="${item?item.telefono||'':pre.telefono||''}">
     </div>
     <div class="field"><label class="field-label">Notas (opcional)</label>
-      <input id="ag-notas" type="text" placeholder="Ej: Traer válvula de 3/4, dar presupuesto primero" value="${item?item.notas||'':''}">
+      <input id="ag-notas" type="text" placeholder="Ej: Traer válvula de 3/4, dar presupuesto primero" value="${item?item.notas||'':pre.notas||''}">
     </div>
     <div class="field"><label class="field-label">Estado</label>
       <select id="ag-estado" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
@@ -2842,9 +2861,10 @@ function openAddAgenda(tipo, editId){
   setTimeout(()=>{
     const el=document.getElementById('ag-ubicacion');
     if(el) el.addEventListener('input', ()=>filterAgUbic(el.value));
-    // Initialize AM/PM button state
-    if(item&&item.hora){
-      const h24=parseInt(item.hora.split(':')[0]);
+    // Initialize AM/PM
+    const horaRef = (item&&item.hora) ? item.hora : (pre.hora||'');
+    if(horaRef){
+      const h24=parseInt(horaRef.split(':')[0]);
       setAgAmpm(h24>=12?'PM':'AM');
     } else {
       window._agAmpm='AM';
@@ -2914,7 +2934,6 @@ function selectAgUbic(val){
 function saveAgendaItem(editId, tipo){
   const clienteEl  = document.getElementById('ag-cliente');
   const fechaEl    = document.getElementById('ag-fecha');
-  const horaEl     = document.getElementById('ag-hora');
   const servicioEl = document.getElementById('ag-servicio');
   const precioEl   = document.getElementById('ag-precio');
   const ubicEl     = document.getElementById('ag-ubicacion');
@@ -2932,21 +2951,22 @@ function saveAgendaItem(editId, tipo){
   const notas     = notasEl?.value.trim()||'';
   const estado    = estadoEl?.value||'pendiente';
 
-  // Obligatorios — no dejar guardar
-  if(!cliente||!fecha) return toast('Completa cliente y fecha','error');
-
-  // Opcionales — marcar en rojo pero permitir guardar
-  if(ubicEl){
-    ubicEl.style.borderColor = !ubicacion ? '#E05252' : 'var(--border)';
-    const lbl = ubicEl.closest('.field')?.querySelector('.field-label');
-    if(lbl) lbl.style.color = !ubicacion ? '#E05252' : 'var(--muted)';
-  }
-  if(telEl){
-    telEl.style.borderColor = !telefono ? '#E05252' : 'var(--border)';
-    const lbl = telEl.closest('.field')?.querySelector('.field-label');
-    if(lbl) lbl.style.color = !telefono ? '#E05252' : 'var(--muted)';
+  // ── Solo cliente y fecha son obligatorios ──
+  if(!cliente || !fecha){
+    if(clienteEl) clienteEl.style.borderColor = !cliente ? '#E05252' : 'var(--border)';
+    if(fechaEl)   fechaEl.style.borderColor   = !fecha   ? '#E05252' : 'var(--border)';
+    toast('Completá al menos cliente y fecha','error');
+    return;
   }
 
+  // ── Marcar en rojo campos opcionales vacíos pero GUARDAR igual ──
+  const markRed = (el) => { if(el) el.style.borderColor = '#E05252'; };
+  const markOk  = (el) => { if(el) el.style.borderColor = 'var(--border)'; };
+  !ubicacion && tipo!=='visita' ? markRed(ubicEl) : markOk(ubicEl);
+  !telefono ? markRed(telEl) : markOk(telEl);
+  tipo==='trabajo' && !servicio ? markRed(servicioEl) : markOk(servicioEl);
+
+  // ── Guardar siempre ──
   if(!state.agenda) state.agenda=[];
   const item = { id:editId||Date.now()+'', tipo, cliente, fecha, hora, servicio, precio, ubicacion, telefono, notas, estado };
   if(editId){ state.agenda=state.agenda.map(x=>x.id===editId?item:x); }
@@ -2954,13 +2974,14 @@ function saveAgendaItem(editId, tipo){
   save('fnz_agenda', state.agenda);
   closeModal(); render();
 
-  let msg = (tipo==='visita'?'Visita':'Trabajo')+' guardado ✓';
-  const faltantes = [];
+  const faltantes=[];
   if(!ubicacion) faltantes.push('ubicación');
-  if(!telefono) faltantes.push('teléfono');
-  if(faltantes.length) msg += ' · Falta: '+faltantes.join(', ')+' (en rojo)';
+  if(!telefono)  faltantes.push('teléfono');
+  if(tipo==='trabajo'&&!servicio) faltantes.push('servicio');
+  const msg = (tipo==='visita'?'Visita':'Trabajo')+' guardado ✓'+(faltantes.length?' · Falta: '+faltantes.join(', '):'');
   toast(msg);
 }
+
 
 function editAgendaItem(id){ const item=(state.agenda||[]).find(x=>x.id===id); if(item) openAddAgenda(item.tipo,id); }
 
@@ -2974,7 +2995,15 @@ function cambiarEstadoAgenda(id, estado){
   const item=(state.agenda||[]).find(x=>x.id===id);
   if(!item) return;
   item.estado=estado;
-  save('fnz_agenda',state.agenda); render();
+  save('fnz_agenda',state.agenda);
+  // Notificar Apps Script para actualizar Google Calendar
+  const url=localStorage.getItem('fnz_sheets_url')||'';
+  if(url){
+    const payload={ agenda_estado:{ id:item.id, estado, tipo:item.tipo } };
+    const img=new Image();
+    img.src=url+'?data='+encodeURIComponent(JSON.stringify(payload));
+  }
+  render();
   toast('Estado actualizado a '+AGENDA_ESTADOS[estado].label);
 }
 
@@ -3057,35 +3086,104 @@ function stopAgendaVoz(){
 // Extractor de cliente específico para agenda — patrones más simples
 function extractClienteAgenda(text){
   const t2 = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  // "llamó/llamó Juan", "me llamó el señor García"
   const patterns = [
-    /(?:me llamo|me llamo|llamo|contacto|contactó|pidio|pidió|solicito|solicitó|escribio|escribió)\s+(?:el|la|un|una)?\s*(?:señor|señora|don|doña|sr|sra)?\s*([A-Za-z][A-Za-z\s]{2,25}?)(?:\s*[,.]|$|\s+para|\s+de|\s+en)/i,
-    // "ir a la casa de García", "trabajo para Pérez"
-    /(?:trabajo para|servicio para|instalacion para|instalación para|reparacion para|reparación para)\s+(?:el|la|un|una)?\s*(?:señor|señora|don|doña)?\s*([A-Za-z][A-Za-z\s]{2,25}?)(?:\s*[,.]|$|\s+en|\s+de)/i,
+    // "a la señora Leonor", "al señor Pedro", "a don Carlos", "a doña María"
+    /\ba\s+(?:la\s+|el\s+)?(?:señora?|don|doña|sr\.?|sra\.?)\s+([A-Za-z][A-Za-z\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
+    // "para la señora Leonor", "para el señor García"
+    /para\s+(?:la\s+|el\s+)?(?:señora?|don|doña|sr\.?|sra\.?)\s+([A-Za-z][A-Za-z\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
+    // "con la señora / con el señor"
+    /con\s+(?:la\s+|el\s+)?(?:señora?|don|doña)\s+([A-Za-z][A-Za-z\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
+    // "donde la señora / donde el señor"
+    /donde\s+(?:la\s+|el\s+)?(?:señora?|don|doña)?\s+([A-Za-z][A-Za-z\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
+    // "al cliente / para el cliente"
+    /(?:al|para el|para la)\s+(?:cliente|clienta)\s+([A-Za-z][A-Za-z\s]{1,25}?)(?:\s+en\b|\s*[,.]|$)/i,
+    // "llamó/contactó/pidió Juan García"
+    /(?:llamo|contacto|pidio|solicito|escribio)\s+(?:el|la)?\s*(?:señora?|don|doña)?\s*([A-Za-z][A-Za-z\s]{2,25}?)(?:\s+para|\s+de|\s+en|\s*[,.]|$)/i,
+    // trabajo/visita para Pérez
+    /(?:trabajo|visita|servicio|instalacion|reparacion)\s+para\s+(?:el|la)?\s*(?:señora?|don|doña)?\s*([A-Za-z][A-Za-z\s]{2,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
   ];
+  const stopWords = /^(en|de|del|al|la|el|por|para|con|que|fue|era|los|las|un|una|dia|mañana|manana|hoy|ayer)$/i;
   for(const p of patterns){
     const m=t2.match(p);
     if(m&&m[1]){
-      const nombre=m[1].trim().replace(/\b(en|de|del|al|la|el|por|para|con|que|fue|era)\b/gi,'').trim();
-      if(nombre.length>2) return nombre;
+      const nombre=m[1].trim()
+        .split(/\s+/)
+        .filter(w=>!stopWords.test(w))
+        .join(' ')
+        .trim();
+      if(nombre.length>1) return nombre;
     }
   }
   return null;
 }
 
+// Normalizar label del servicio para que coincida exactamente con AGENDA_SERVICIOS
+function normalizeServicioLabel(label){
+  if(!label) return '';
+  const lNorm = label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  // 1. Coincidencia exacta
+  const exact = AGENDA_SERVICIOS.find(s => {
+    return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') === lNorm;
+  });
+  if(exact) return exact;
+  // 2. El label está contenido en el nombre del servicio
+  const contains = AGENDA_SERVICIOS.find(s => {
+    const sn = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return sn.includes(lNorm) || lNorm.includes(sn.split('/')[0].trim());
+  });
+  if(contains) return contains;
+  // 3. Primera palabra coincide
+  const firstWord = lNorm.split(' ')[0];
+  if(firstWord.length >= 4){
+    const byFirst = AGENDA_SERVICIOS.find(s => {
+      const sn = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      return sn.split(' ')[0] === firstWord || sn.includes(firstWord);
+    });
+    if(byFirst) return byFirst;
+  }
+  return label;
+}
+
 function parseAgendaVoz(text){
+  // Limpiar palabras de activación que confunden al parser
+  let text2 = text
+    .replace(/\b(agenda|agend[aá])\b/gi, '')
+    .replace(/\b(construccion|construcción|construcion)\b/gi, '')
+    .replace(/\b(oye|hey|escucha|ok|mira|anota|registra|apunta|guarda|crea)\b/gi, '')
+    .replace(/\b(para el dia de|para el dia|el dia de|día de mañana|dia de manana)\b/gi, 'mañana')
+    .replace(/\bservicio\s+(punto|terma|cocina|horno|calefon|reparacion|instalacion|conexion|gasfiteria|documentacion|conversion|modificacion|parrilla|secadora)/gi, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if(!text2) text2 = text;
+  text = text2;
   const t = nrm(text);
   const orig = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
   // ── Tipo: visita vs trabajo ──
   // Visita = ir a ver/revisar/cotizar sin hacer trabajo aún
-  const visitaKws = [
-    'visita','visitar','pasar a ver','pasar por','ir a ver','ir a revisar',
-    'ir a cotizar','cotizacion','cotización','presupuesto','dar presupuesto',
-    'ir a checar','ir a chequear','dar una vuelta','revisar','ver al',
-    'ver a la','ver al señor','ver a la señora','cita','pasar donde'
+  // Palabras que fuerzan tipo TRABAJO (mayor prioridad)
+  const trabajoKws = [
+    'construccion','construcción','construcion','trabajo de','obra',
+    'instalacion','instalación','conexion','conexión','reparacion','reparación',
+    'punto adicional','terma','cocina','horno','calefon','calefón',
+    'secadora','parrilla','gasfiteria','gasfitería','documentacion','documentación',
+    'conversion','conversión','modificacion','modificación',
   ];
-  const isVisita = visitaKws.some(k=>t.includes(nrm(k)));
+  const esTrabajoExplicito = trabajoKws.some(k=>t.includes(nrm(k)));
+
+  const visitaKws = [
+    // Palabras exactas y variantes fonéticas del speech recognizer
+    'visita','vista','vistar','visitar','bisita',
+    'agenda visita','agenda vista','una visita','hacer visita',
+    'pasar a ver','pasar por','pasar donde','pasaré','pasare',
+    'ir a ver','ir a revisar','ir a cotizar','ir donde',
+    'cotizacion','cotización','presupuesto','dar presupuesto',
+    'ver al','ver a la','ver al señor','ver a la señora',
+    'cita','tengo cita','una cita',
+    'revisar','chequear','checar',
+    'solo ver','nada mas ver','solo mirar',
+  ];
+  const isVisita = !esTrabajoExplicito && visitaKws.some(k=>t.includes(nrm(k)));
   const tipo = isVisita ? 'visita' : 'trabajo';
   // Fecha
   const fecha = extractDate(text);
@@ -3141,9 +3239,35 @@ function parseAgendaVoz(text){
   // Cliente — múltiples patrones desordenados
   const cliente = extractCliente(text) || extractClienteAgenda(text) || '';
 
-  // Servicio (solo para trabajo) — buscar en toda la frase
+  // Servicio — primero buscar con detectServicioNegocio,
+  // si no encuentra usar extractor directo de agenda por nombre exacto
   const svcNeg = detectServicioNegocio(text);
-  const servicio = svcNeg ? svcNeg.label : '';
+  let servicio = svcNeg ? svcNeg.label : '';
+
+  if(!servicio){
+    // Extractor directo: mapa de palabras clave → label
+    const SERVICIO_DIRECTO = [
+      // ── Artefactos concretos primero (evitan falsos match con "conexion de cocina") ──
+      { keys:['cocina','cocinilla','cocina a gas','instalar cocina','servicio cocina','cobré cocina','por cocina'], label:'Cocina / Cocinilla' },
+      { keys:['horno','horno a gas','horno de gas','instalar horno','servicio horno','por horno'], label:'Horno a Gas' },
+      { keys:['terma','terma a gas','terma de gas','instalar terma','servicio terma','cobré terma','por terma'], label:'Terma' },
+      { keys:['secadora','secadora a gas','instalar secadora','servicio secadora'], label:'Secadora a Gas' },
+      { keys:['calefon','calefón','calefon a gas','instalar calefon','servicio calefon'], label:'Calefón' },
+      { keys:['parrilla','parrilla a gas','instalar parrilla','servicio parrilla'], label:'Parrilla a Gas' },
+      // ── Servicios de instalación y reparación ──
+      { keys:['punto adicional','punto extra','punto de gas','boca nueva','salida nueva','toma nueva','un punto adicional','servicio punto adicional','hacer un punto','poner un punto'], label:'Punto Adicional' },
+      { keys:['modificacion de red','modificacion red','modificar red','cambio de red','rediseño de red','modificacion','modificar la red','mod de red','servicio modificacion','modificacion interna'], label:'Modificación Red' },
+      { keys:['instalacion nueva','instalacion de gas','obra nueva','proyecto nuevo','instalacion completa','instalar gas nuevo'], label:'Instalación Nueva' },
+      { keys:['conversion de artefacto','conversion a gas','converti artefacto','convertir artefacto','adaptar artefacto'], label:'Conversión Artefacto' },
+      { keys:['conexion de artefacto','conectar artefacto','conexion nueva de artefacto'], label:'Conexión Artefacto' },
+      { keys:['reparacion de tuberia','reparar tuberia','tuberia rota','fuga de gas','escape de gas','arreglar tuberia','perdida de gas'], label:'Reparación Tubería' },
+      { keys:['gasfiteria','gasfitería','desague','plomeria','tuberia de agua','trabajo de agua','gasfiter'], label:'Gasfitería' },
+      { keys:['documentacion','documentación','tramite','certificado','planos','expediente','inspeccion','habilitacion'], label:'Documentación' },
+    ];
+    for(const s of SERVICIO_DIRECTO){
+      if(s.keys.some(k=>t.includes(nrm(k)))){ servicio=s.label; break; }
+    }
+  }
 
   // Ubicación — buscar distrito o dirección
   const ubicacion = extractUbicacion(text) || '';
@@ -3159,7 +3283,7 @@ function parseAgendaVoz(text){
   const notasMatch = text.match(/(?:nota[:\s]+|apuntar que|avisar que|recordar que|importante[:\s]+)(.{5,60}?)(?:[,.]|$)/i);
   const notas = notasMatch ? notasMatch[1].trim() : '';
 
-  window._avParsed = { tipo, fecha, hora, cliente, servicio, ubicacion, precio, telefono, notas };
+  window._avParsed = { tipo, fecha, hora, cliente, servicio: normalizeServicioLabel(servicio), ubicacion, precio, telefono, notas };
 
   const prev=document.getElementById('av-preview');
   if(prev){
@@ -3937,14 +4061,25 @@ function extractDate(text) {
       }
     }
   }
-    // días de la semana → busca el más reciente (pasado)
+    // Días de la semana
   const DIAS = [['domingo',0],['lunes',1],['martes',2],['miercoles',3],['jueves',4],['viernes',5],['sabado',6]];
+  const esFuturo = /\b(este|esta|el proximo|el próximo|proximo|próximo|para el|para esta|para este)\b/.test(t);
   for (const [nombre,num] of DIAS) {
     if(new RegExp('\\b'+nombre+'\\b').test(t)){
       const d=new Date(today);
-      let diff=d.getDay()-num;
-      if(diff<=0) diff+=7;
-      d.setDate(d.getDate()-diff);
+      const hoy=d.getDay();
+      if(esFuturo){
+        // Siempre ir hacia adelante
+        let diff=(num-hoy+7)%7;
+        if(diff===0) diff=7; // mismo día = próxima semana
+        d.setDate(d.getDate()+diff);
+      } else {
+        // Sin indicador: si el día aún no llegó esta semana → futuro próximo
+        //                si ya pasó → la semana que viene igual
+        let diff=(num-hoy+7)%7;
+        if(diff===0) diff=7;
+        d.setDate(d.getDate()+diff);
+      }
       return toStr(d);
     }
   }
@@ -4081,11 +4216,13 @@ const SERVICIOS_NEGOCIO = [
          'me pagaron por un punto','hice punto','puse un punto','conecté un punto',
          'salida nueva','boca nueva','toma nueva','salida adicional','boca adicional',
          'toma adicional','derivación nueva','derivacion nueva','derivación adicional',
-         'cobré hoy por punto','punto gas natural','cobré un punto adicional'] },
+         'cobré hoy por punto','punto gas natural','cobré un punto adicional',
+         'servicio punto adicional','servicio de punto','un punto','el punto'] },
   { id:'modificacion_red',  label:'Modificación de red',
     kws:['modificacion de red','modificación de red','modifique la red','modifiqué la red',
          'cambio de red','modificacion interna','modificación interna','rediseño de red',
-         'cambie la tuberia','cambié la tubería','modificar red'] },
+         'cambie la tuberia','cambié la tubería','modificar red','modificacion',
+         'servicio modificacion','modificar la instalacion','modificar instalacion'] },
   { id:'instalacion_nueva', label:'Instalación nueva',
     kws:['instalacion nueva','instalación nueva','nueva instalacion',
          'nueva instalación','instalacion de gas','instalación de gas','instalacion completa',
@@ -4155,31 +4292,30 @@ function extractUbicacion(text){
   const norm = text.toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
-  // 1. Coincidencia directa con distrito normalizado
-  const distritoNorm = DISTRITOS_LIMA.find(d=>
-    norm.includes(d.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))
-  );
-  if(distritoNorm) return distritoNorm;
+  // Ordenar distritos de mayor a menor longitud para que "San Juan de Miraflores"
+  // tenga prioridad sobre "Miraflores" o "San Juan de Lurigancho"
+  const distritosOrdenados = [...DISTRITOS_LIMA].sort((a,b)=>b.length-a.length);
 
-  // 2. Patrones contextuales: "en X", "por X", "en el/la X", "del distrito de X", "zona de X"
+  // 1. Coincidencia directa (buscar el distrito más largo primero)
+  for(const d of distritosOrdenados){
+    const dn = d.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if(norm.includes(dn)) return d;
+  }
+
+  // 2. Patrones contextuales con captura amplia (hasta 35 chars)
   const patterns = [
-    /(?:en el distrito de|en la zona de|distrito de|zona de)\s+([a-záéíóúñ\s]{3,30}?)(?:\s*[,.]|$)/i,
-    /(?:en|por|del|de la zona de|en la|en el|hacia|cerca de|por el lado de)\s+([a-záéíóúñ\s]{3,25}?)(?:\s*[,.]|$)/i,
-    /(?:ubicado en|ubicada en|queda en|está en|vive en|domicilio en)\s+([a-záéíóúñ\s]{3,25}?)(?:\s*[,.]|$)/i,
+    /(?:en el distrito de|en la zona de|distrito de|zona de)\s+([a-z\s]{3,35}?)(?:\s*[,.]|\s+a las|\s+\d|$)/i,
+    /(?:en|por|en la|en el|hacia|queda en|vive en|domicilio en|ubicado en)\s+([a-z][a-z\s]{2,33}?)(?:\s*[,.]|\s+a las|\s+\d|\s+precio|\s+soles|\s+servicio|$)/i,
   ];
   for(const p of patterns){
     const m = norm.match(p);
     if(m){
       const candidate = m[1].trim();
-      const found = DISTRITOS_LIMA.find(d=>
-        d.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') === candidate
-      );
-      if(found) return found;
-      // Buscar coincidencia parcial (el candidato empieza con el distrito)
-      const partial = DISTRITOS_LIMA.find(d=>
-        candidate.startsWith(d.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').substring(0,5))
-      );
-      if(partial) return partial;
+      // Buscar el distrito más largo que sea substring del candidato
+      for(const d of distritosOrdenados){
+        const dn = d.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        if(candidate.includes(dn) || dn.includes(candidate)) return d;
+      }
     }
   }
   return null;
@@ -4188,19 +4324,20 @@ function extractUbicacion(text){
 // Extraer nombre del cliente desde la voz
 function extractCliente(text) {
   const t = text;
+  // Palabras que NO son parte del nombre
+  const STOP_CLIENTE = /\b(precio|soles|sol|pesos|en|de|del|al|la|el|por|para|con|que|fue|era|los|las|un|una|dia|mañana|manana|hoy|ayer|servicio|trabajo|visita|agenda|lunes|martes|miercoles|jueves|viernes|sabado|domingo|mañana|manana|hoy|ayer|pasado|proximo|proxima|siguiente|esta|este)\b/gi;
+
   const patterns = [
     // "al señor / señora / don / doña / sr / sra / ing / prof / doc"
-    /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,30}?)(?:\s*[,.]|$|\s+de\s|\s+en\s|\s+\d|\s+del\s|\s+por\s|\s+a las)/i,
+    /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+\d|\s+en\b|\s+de\b|\s+del\b|\s+por\b|\s+a las|\s+precio|\s+soles|\s+servicio|$)/i,
     // "al cliente / a la clienta / al vecino"
-    /(?:para|al|a|con)\s+(?:el|la)\s+(?:cliente|clienta|señor|señora|vecino|vecina|casero|casera|propietario|propietaria|dueño|dueña)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|$|\s+de\s|\s+en\s|\s+del\s|\s+a las)/i,
-    // "cliente: nombre"
-    /(?:cliente|para|con)[:\s]+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|$)/i,
-    // "casa de / domicilio de / vivienda de / propiedad de"
-    /(?:casa de|domicilio de|vivienda de|propiedad de|hogar de|inmueble de)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,30}?)(?:\s*[,.]|$|\s+en\s|\s+de\s)/i,
-    // "del señor / de la señora" (posesivo)
-    /de(?:l|\s+la)?\s+(?:señor|señora|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,30}?)(?:\s*[,.]|$|\s+en\s|\s+de\s|\s+por\s)/i,
-    // "para Juan Pérez en..." — nombre propio sin título (2 palabras capitalizadas)
-    /(?:para|al|con)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+en\s|\s+de\s|\s*[,.]|$)/,
+    /(?:para|al|a|con)\s+(?:el|la)\s+(?:cliente|clienta|señor|señora|vecino|vecina|casero|casera|propietario|propietaria|dueño|dueña)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+servicio|$)/i,
+    // "casa de / domicilio de"
+    /(?:casa de|domicilio de|vivienda de|propiedad de)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|$)/i,
+    // "del señor / de la señora"
+    /de(?:l|\s+la)?\s+(?:señor|señora|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+por\b|\s+precio|$)/i,
+    // "para Juan Pérez en..." — 2 palabras capitalizadas
+    /(?:para|al|con)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+en\b|\s+de\b|\s*[,.]|\s+precio|$)/,
   ];
   for (const p of patterns) {
     const m = t.match(p);
@@ -4261,8 +4398,8 @@ function detectNegocioAmbiguidad(text, catId) {
 function isAgendaCommand(text){
   const t = nrm(text);
   const agendaKws = [
-    // Visita explícita
-    'visita','tengo visita','hacer una visita','ir a visitar','pasar a ver',
+    // Visita explícita (incluir variantes fonéticas)
+    'visita','vista','vistar','tengo visita','hacer una visita','ir a visitar','pasar a ver','agenda visita','agenda vista',
     'pasar donde','pasar por donde','ir a ver','ir a revisar','ir a checar',
     'ir a chequear','ir a cotizar','ir a dar presupuesto','dar una vuelta',
     'pasaré a ver','pasare a ver','voy a visitar','voy a pasar',
@@ -4283,7 +4420,7 @@ function isAgendaCommand(text){
     'trabajo la próxima semana','trabajo la proxima semana',
     'tengo un trabajo','tengo trabajo','hay trabajo','me llamaron para',
     'me contactaron para','me pidieron','me encargaron','me solicitaron',
-    'construccion','construcción','obra','instalacion pendiente','instalación pendiente',
+    'construccion','construcción','construcion','obra','trabajo de','servicio de','instalacion pendiente','instalación pendiente','agenda construccion','agenda trabajo','agenda servicio',
     'proyecto para el','proyecto para la','proyecto nuevo',
     // Ir donde cliente
     'voy a trabajar','voy a ir donde','ir donde el','ir donde la',
@@ -4439,7 +4576,7 @@ function toggleListening() {
 let micSilenceTimer  = null;  // temporizador de silencio
 let micFullTranscript = '';   // acumula todo lo dicho
 let micRestartLock   = false; // evita reinicios en cadena
-const MIC_SILENCE_MS = 2200;  // ms de silencio antes de procesar (ajusta si quieres más)
+const MIC_SILENCE_MS = 3500;  // ms de silencio antes de procesar
 
 function startListening() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -4586,6 +4723,9 @@ function processVoiceResult(text) {
   processVoiceResult._busy = true;
   stopListening();
 
+  // Limpiar palabras de activación antes de evaluar
+  const cleanText = text.replace(/^(oye|hey|ok|escucha|mira)\b/gi,'').trim();
+  if(cleanText) text = cleanText;
   // Si es comando de agenda, redirigir al formulario prellenado
   if(isAgendaCommand(text)){
     processVoiceResult._busy = false;
@@ -4593,30 +4733,8 @@ function processVoiceResult(text) {
     parseAgendaVoz(text);
     const p = window._avParsed;
     if(p){
-      openAddAgenda(p.tipo);
-      setTimeout(()=>{
-        const set=(id,v)=>{ const el=document.getElementById(id); if(el&&v!==undefined&&v!=='') el.value=v; };
-        set('ag-cliente',   p.cliente);
-        set('ag-fecha',     p.fecha);
-        // Set hora AM/PM fields
-        if(p.hora){
-          const [hh,mm]=p.hora.split(':');
-          const h24=parseInt(hh);
-          const period=h24>=12?'PM':'AM';
-          let h12=h24%12||12;
-          const txtEl=document.getElementById('ag-hora-txt');
-          if(txtEl) txtEl.value=h12+':'+(mm||'00');
-          setAgAmpm(period);
-        }
-        set('ag-servicio',  p.servicio);
-        if(p.precio) set('ag-precio', p.precio);
-        set('ag-ubicacion', p.ubicacion);
-        // Marcar en rojo campos faltantes
-        if(p.telefono) set('ag-telefono', p.telefono);
-        if(p.notas) set('ag-notas', p.notas);
-        if(!p.ubicacion){ const el=document.getElementById('ag-ubicacion'); if(el){ el.style.borderColor='#E05252'; const lbl=el.closest('.field')?.querySelector('.field-label'); if(lbl) lbl.style.color='#E05252'; }}
-        if(!p.telefono){  const el=document.getElementById('ag-telefono');  if(el){ el.style.borderColor='#E05252'; const lbl=el.closest('.field')?.querySelector('.field-label'); if(lbl) lbl.style.color='#E05252'; }}
-      },150);
+      // Pasar todo como preData → se pre-selecciona directo en el HTML del modal
+      openAddAgenda(p.tipo, null, p);
     }
     return;
   }
