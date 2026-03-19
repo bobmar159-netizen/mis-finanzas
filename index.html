@@ -5788,149 +5788,120 @@ function toggleListening() {
   else startListening();
 }
 
-// ── Motor de micrófono v5 — patrón commit-por-sesión ──
-// Cada sesión captura SOLO texto nuevo, lo guarda al terminar.
-// Nueva sesión empieza vacía → cero duplicados garantizado.
-
-let micSilenceTimer      = null;
-let micFullTranscript    = ''; // texto total acumulado entre sesiones
-let micSessionTranscript = ''; // texto de la sesión actual (se resetea en cada reinicio)
-let micRestartLock       = false;
-let _micLastProcessed    = '';
-const MIC_SILENCE_MS     = 2500;
-
-function _micHandlers(rec) {
-  micSessionTranscript = ''; // ★ nueva sesión = sin texto previo
-
-  rec.onresult = (e) => {
-    let newFinal = '';
-    let interim  = '';
-
-    // ★ Desde e.resultIndex — solo resultados NUEVOS de este evento
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      if (e.results[i].isFinal) newFinal += e.results[i][0].transcript.trim() + ' ';
-      else interim += e.results[i][0].transcript;
-    }
-
-    // Acumular solo el texto nuevo de esta sesión
-    if (newFinal.trim()) micSessionTranscript = (micSessionTranscript + ' ' + newFinal).trim();
-
-    // Mostrar: lo ya guardado + lo de esta sesión + interim
-    const display = [micFullTranscript, micSessionTranscript, interim].filter(Boolean).join(' ').trim();
-    const el = document.getElementById('micText');
-    if (el) { el.textContent = display || '...'; el.style.color = '#1E293B'; }
-
-    // ★ Mostrar botón Guardar en cuanto hay texto
-    const totalText = [micFullTranscript, micSessionTranscript].filter(Boolean).join(' ').trim();
-    const saveBtn = document.getElementById('micSaveBtn');
-    if (saveBtn && totalText) saveBtn.style.display = 'block';
-
-    // Timer de silencio sobre el total
-    clearTimeout(micSilenceTimer);
-    if (totalText) {
-      micSilenceTimer = setTimeout(() => {
-        if (micListening && totalText !== _micLastProcessed) {
-          _micLastProcessed = totalText;
-          micFullTranscript = totalText;
-          micSessionTranscript = '';
-          processVoiceResult(totalText);
-        }
-      }, MIC_SILENCE_MS);
-    }
-  };
-
-  rec.onerror = (e) => {
-    if (e.error === 'aborted' || e.error === 'no-speech') return;
-    if (e.error === 'not-allowed') {
-      const el = document.getElementById('micText');
-      if (el) { el.textContent = '⚠ Permiso de micrófono denegado.'; el.style.color = '#E05252'; }
-      stopListening();
-    }
-  };
-
-  rec.onend = () => {
-    if (!micListening) return;
-    // Commit texto de esta sesión
-    if (micSessionTranscript.trim()) {
-      micFullTranscript = [micFullTranscript, micSessionTranscript].filter(Boolean).join(' ').trim();
-      micSessionTranscript = '';
-    }
-    const totalText = micFullTranscript.trim();
-    if (totalText && totalText !== _micLastProcessed) {
-      // ★ Hay texto → esperar 2.5s de silencio real antes de procesar
-      // Si en ese tiempo no llega más texto, guardar
-      clearTimeout(micSilenceTimer);
-      micSilenceTimer = setTimeout(() => {
-        const txt = micFullTranscript.trim();
-        if (micListening && txt && txt !== _micLastProcessed) {
-          _micLastProcessed = txt;
-          processVoiceResult(txt);
-        }
-      }, MIC_SILENCE_MS);
-      // Reiniciar para seguir escuchando mientras corre el timer
-      if (!micRestartLock) _micReiniciar();
-    } else {
-      // Sin texto aún → reiniciar directo
-      if (!micRestartLock) _micReiniciar();
-    }
-  };
-}
-
-function _micReiniciar() {
-  if (!micListening || micRestartLock) return;
-  micRestartLock = true;
-  try { if (recognition) { recognition.onend = null; recognition.abort(); } } catch(e) {}
-  setTimeout(() => {
-    if (!micListening) { micRestartLock = false; return; }
-    micRestartLock = false;
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-    try {
-      recognition = new SR();
-      recognition.lang            = 'es-PE';
-      recognition.interimResults  = true;
-      recognition.maxAlternatives = 1;
-      recognition.continuous      = false; // ★ false: sesiones limpias, sin reenvío
-      _micHandlers(recognition);           // nueva instancia = micSessionTranscript = ''
-      recognition.start();
-    } catch(err) { micRestartLock = false; }
-  }, 150);
-}
+// ── Variables de control del micrófono ──
+let micSilenceTimer  = null;
+let micFullTranscript = '';
+let micRestartLock   = false;
+let micSessionTranscript = '';
+let _micLastProcessed = '';
+const MIC_SILENCE_MS = 3500;
 
 function startListening() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
-    const el = document.getElementById('micText');
-    if (el) { el.textContent = '⚠ Necesitas Chrome para usar el micrófono.'; el.style.color = '#E05252'; }
+    document.getElementById('micText').textContent='⚠ Tu navegador no soporta reconocimiento de voz. Usa Chrome.';
+    document.getElementById('micText').style.color='#E05252';
     return;
   }
-  micFullTranscript        = '';
-  micSessionTranscript     = '';
-  micRestartLock           = false;
-  _micLastProcessed        = '';
+
+  micFullTranscript = '';
+  micRestartLock    = false;
   processVoiceResult._busy = false;
   clearTimeout(micSilenceTimer);
-  micListening = true;
-  _micSetUI(true);
 
   recognition = new SR();
   recognition.lang            = 'es-PE';
   recognition.interimResults  = true;
-  recognition.maxAlternatives = 1;
-  recognition.continuous      = false;
-  _micHandlers(recognition);
-  try { recognition.start(); } catch(e) {}
+  recognition.maxAlternatives = 3;
+  recognition.continuous      = true;
+
+  micListening = true;
+  _micSetUI(true);
+
+  recognition.onresult = (e) => {
+    let interim = '';
+    let newFinal = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) newFinal += e.results[i][0].transcript + ' ';
+      else interim += e.results[i][0].transcript;
+    }
+    if (newFinal) micFullTranscript = appendWithoutOverlap(micFullTranscript, newFinal);
+    const display = (micFullTranscript + interim).trim();
+    document.getElementById('micText').textContent = display || '...';
+    const saveBtn = document.getElementById('micSaveBtn');
+    if (saveBtn && micFullTranscript.trim()) saveBtn.style.display = 'block';
+    clearTimeout(micSilenceTimer);
+    if (micFullTranscript.trim()) {
+      micSilenceTimer = setTimeout(() => {
+        if (micListening && micFullTranscript.trim()) {
+          processVoiceResult(micFullTranscript.trim());
+        }
+      }, MIC_SILENCE_MS);
+    }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'no-speech') { if (micListening && !micRestartLock) restartListening(); return; }
+    if (e.error === 'aborted') return;
+    let msg = '⚠ ';
+    if (e.error === 'not-allowed') msg += 'Permiso de micrófono denegado.';
+    else msg += 'Error: ' + e.error;
+    document.getElementById('micText').textContent = msg;
+    document.getElementById('micText').style.color = '#E05252';
+    stopListening();
+  };
+
+  recognition.onend = () => { if (micListening && !micRestartLock) restartListening(); };
+  recognition.start();
 }
 
-function restartListening()          { _micReiniciar(); }
-function startListeningHandlers(rec) { _micHandlers(rec); }
+function restartListening() {
+  if (!micListening) return;
+  micRestartLock = true;
+  try { recognition.stop(); } catch(e) {}
+  setTimeout(() => {
+    if (!micListening) return;
+    micRestartLock = false;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SR();
+    recognition.lang           = 'es-PE';
+    recognition.interimResults = true;
+    recognition.maxAlternatives= 3;
+    recognition.continuous     = true;
+    startListeningHandlers(recognition);
+    try { recognition.start(); } catch(e) {}
+  }, 150);
+}
+
+function startListeningHandlers(rec) {
+  rec.onresult = (e) => {
+    let interim='', newFinal='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal) newFinal+=e.results[i][0].transcript+' ';
+      else interim+=e.results[i][0].transcript;
+    }
+    if(newFinal) micFullTranscript = appendWithoutOverlap(micFullTranscript, newFinal);
+    const display=(micFullTranscript+interim).trim();
+    document.getElementById('micText').textContent=display||'...';
+    const saveBtn = document.getElementById('micSaveBtn');
+    if (saveBtn && micFullTranscript.trim()) saveBtn.style.display = 'block';
+    clearTimeout(micSilenceTimer);
+    if(micFullTranscript.trim()){
+      micSilenceTimer=setTimeout(()=>{
+        if(micListening&&micFullTranscript.trim()) processVoiceResult(micFullTranscript.trim());
+      }, MIC_SILENCE_MS);
+    }
+  };
+  rec.onerror=(e)=>{ if(e.error==='no-speech'||e.error==='aborted') return; stopListening(); };
+  rec.onend=()=>{ if(micListening&&!micRestartLock) restartListening(); };
+}
 
 function stopListening() {
-  micListening   = false;
-  micRestartLock = true;
+  micListening    = false;
+  micRestartLock  = true;
   processVoiceResult._busy = false;
   clearTimeout(micSilenceTimer);
-  try { if (recognition) { recognition.onend = null; recognition.abort(); } } catch(e) {}
+  if(recognition){ try{ recognition.stop(); }catch(e){} }
   _micSetUI(false);
 }
 
@@ -5946,7 +5917,7 @@ function _micSetUI(on) {
     if (btnTxt)  btnTxt.textContent='Detener';
     if (fab)     fab.classList.add('listening');
     document.querySelectorAll('.wave-bar').forEach(b=>b.classList.add('active'));
-    if (hint) hint.innerHTML='<em>Escuchando... habla con calma 🎙</em>';
+    if (hint) hint.innerHTML='<em>Escuchando... tómate tu tiempo 🎙</em>';
   } else {
     if (btn)     btn.style.background='linear-gradient(135deg,#C9A84C,#E8C96A)';
     if (btnIcon) btnIcon.textContent='🎙';
@@ -5957,12 +5928,7 @@ function _micSetUI(on) {
   }
 }
 
-
-function processVoiceResult(text) {
-  if (processVoiceResult._busy) return;
-  processVoiceResult._busy = true;
-  stopListening();
-
+function _micReiniciar() { restartListening(); }
   // Limpiar palabras de activación
   const cleanText = text.replace(/^(oye|hey|ok|escucha|mira)\b/gi,'').trim();
   if (cleanText) text = cleanText;
