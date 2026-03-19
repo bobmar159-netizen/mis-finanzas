@@ -5788,50 +5788,48 @@ function toggleListening() {
   else startListening();
 }
 
-// ── Motor de micrófono v4 — Android/Chrome confiable ──
-let micSilenceTimer   = null;
-let micFullTranscript = '';
-let micRestartLock    = false;
-let _micLastProcessed = '';
-const MIC_SILENCE_MS  = 2500;
+// ── Motor de micrófono v5 — patrón commit-por-sesión ──
+// Cada sesión captura SOLO texto nuevo, lo guarda al terminar.
+// Nueva sesión empieza vacía → cero duplicados garantizado.
+
+let micSilenceTimer      = null;
+let micFullTranscript    = ''; // texto total acumulado entre sesiones
+let micSessionTranscript = ''; // texto de la sesión actual (se resetea en cada reinicio)
+let micRestartLock       = false;
+let _micLastProcessed    = '';
+const MIC_SILENCE_MS     = 2500;
 
 function _micHandlers(rec) {
-  // ★ Cada instancia tiene su propio Set de índices procesados
-  const processed = new Set();
+  micSessionTranscript = ''; // ★ nueva sesión = sin texto previo
 
   rec.onresult = (e) => {
     let newFinal = '';
     let interim  = '';
 
+    // ★ Desde e.resultIndex — solo resultados NUEVOS de este evento
     for (let i = e.resultIndex; i < e.results.length; i++) {
-      if (e.results[i].isFinal) {
-        // ★ Solo procesar cada índice UNA VEZ por instancia
-        if (!processed.has(i)) {
-          processed.add(i);
-          newFinal += e.results[i][0].transcript.trim() + ' ';
-        }
-      } else {
-        interim += e.results[i][0].transcript;
-      }
+      if (e.results[i].isFinal) newFinal += e.results[i][0].transcript.trim() + ' ';
+      else interim += e.results[i][0].transcript;
     }
 
-    if (newFinal.trim()) {
-      micFullTranscript = (micFullTranscript + ' ' + newFinal).trim();
-    }
+    // Acumular solo el texto nuevo de esta sesión
+    if (newFinal.trim()) micSessionTranscript = (micSessionTranscript + ' ' + newFinal).trim();
 
+    // Mostrar: lo ya guardado + lo de esta sesión + interim
+    const display = [micFullTranscript, micSessionTranscript, interim].filter(Boolean).join(' ').trim();
     const el = document.getElementById('micText');
-    if (el) {
-      el.textContent = (micFullTranscript + (interim ? ' ' + interim : '')).trim() || '...';
-      el.style.color = '#1E293B';
-    }
+    if (el) { el.textContent = display || '...'; el.style.color = '#1E293B'; }
 
+    // Timer de silencio sobre el total
     clearTimeout(micSilenceTimer);
-    if (micFullTranscript.trim()) {
+    const totalText = [micFullTranscript, micSessionTranscript].filter(Boolean).join(' ').trim();
+    if (totalText) {
       micSilenceTimer = setTimeout(() => {
-        const txt = micFullTranscript.trim();
-        if (micListening && txt && txt !== _micLastProcessed) {
-          _micLastProcessed = txt;
-          processVoiceResult(txt);
+        if (micListening && totalText !== _micLastProcessed) {
+          _micLastProcessed = totalText;
+          micFullTranscript = totalText;   // commit antes de procesar
+          micSessionTranscript = '';
+          processVoiceResult(totalText);
         }
       }, MIC_SILENCE_MS);
     }
@@ -5848,7 +5846,12 @@ function _micHandlers(rec) {
 
   rec.onend = () => {
     if (!micListening) return;
-    // Chrome cortó — reiniciar transparentemente (mantiene micFullTranscript)
+    // ★ Commit: guardar texto de esta sesión antes de reiniciar
+    if (micSessionTranscript.trim()) {
+      micFullTranscript = [micFullTranscript, micSessionTranscript].filter(Boolean).join(' ').trim();
+      micSessionTranscript = '';
+    }
+    // Reiniciar para seguir escuchando
     if (!micRestartLock) _micReiniciar();
   };
 }
@@ -5863,13 +5866,12 @@ function _micReiniciar() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
     try {
-      // ★ Nueva instancia = nuevo Set de índices = sin duplicados
       recognition = new SR();
       recognition.lang            = 'es-PE';
       recognition.interimResults  = true;
       recognition.maxAlternatives = 1;
-      recognition.continuous      = true;
-      _micHandlers(recognition);
+      recognition.continuous      = false; // ★ false: sesiones limpias, sin reenvío
+      _micHandlers(recognition);           // nueva instancia = micSessionTranscript = ''
       recognition.start();
     } catch(err) { micRestartLock = false; }
   }, 150);
@@ -5883,6 +5885,7 @@ function startListening() {
     return;
   }
   micFullTranscript        = '';
+  micSessionTranscript     = '';
   micRestartLock           = false;
   _micLastProcessed        = '';
   processVoiceResult._busy = false;
@@ -5894,7 +5897,7 @@ function startListening() {
   recognition.lang            = 'es-PE';
   recognition.interimResults  = true;
   recognition.maxAlternatives = 1;
-  recognition.continuous      = true;
+  recognition.continuous      = false;
   _micHandlers(recognition);
   try { recognition.start(); } catch(e) {}
 }
