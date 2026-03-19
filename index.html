@@ -3689,6 +3689,13 @@ function editAgendaItem(id){ const item=(state.agenda||[]).find(x=>x.id===id); i
 
 function deleteAgendaItem(id){
   if(!confirm('¿Eliminar este registro?')) return;
+  // Notificar al Apps Script para eliminar el evento de Calendar
+  const url=localStorage.getItem('fnz_sheets_url')||'';
+  if(url){
+    const payload={ type:'agenda_delete', id };
+    const img=new Image();
+    img.src=url+'?data='+encodeURIComponent(JSON.stringify(payload));
+  }
   state.agenda=(state.agenda||[]).filter(x=>x.id!==id);
   save('fnz_agenda',state.agenda); render(); toast('Eliminado');
 }
@@ -3698,10 +3705,10 @@ function cambiarEstadoAgenda(id, estado){
   if(!item) return;
   item.estado=estado;
   save('fnz_agenda',state.agenda);
-  // Notificar Apps Script para actualizar Google Calendar
+  // Notificar Apps Script → actualiza Google Calendar y Sheets
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(url){
-    const payload={ agenda_estado:{ id:item.id, estado, tipo:item.tipo } };
+    const payload={ type:'agenda_estado', agenda_estado:{ id:item.id, estado, tipo:item.tipo } };
     const img=new Image();
     img.src=url+'?data='+encodeURIComponent(JSON.stringify(payload));
   }
