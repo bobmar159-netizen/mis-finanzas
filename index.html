@@ -4043,6 +4043,7 @@ function parseAgendaVoz(text){
 
   window._avParsed = { tipo, fecha, hora, cliente, servicio: servicioFinal, ubicacion, precio, telefono, notas };
 
+  // Solo renderizar el preview si el elemento existe (modal agenda abierto)
   const prev=document.getElementById('av-preview');
   if(prev){
     prev.style.display='block';
@@ -4524,55 +4525,102 @@ render();
 (function(){
   const fab = document.getElementById('micFab');
   if(!fab) return;
+
+  // Restaurar posición guardada
   const saved = localStorage.getItem('fnz_fab_pos');
   if(saved){ try{ const p=JSON.parse(saved); fab.style.bottom=p.b; fab.style.right=p.r; }catch(e){} }
 
   let _drag=false, _moved=false, _hold=null;
-  let _sx=0,_sy=0,_ox=0,_oy=0;
+  let _sx=0, _sy=0, _ox=0, _oy=0;
 
-  function startDrag(cx,cy){
-    _drag=true; _moved=false;
+  function _startDrag(cx, cy){
+    _drag = true;
+    _moved = false;
     fab.classList.add('dragging');
-    const r=fab.getBoundingClientRect();
-    fab.style.top=r.top+'px'; fab.style.left=r.left+'px';
-    fab.style.bottom='auto'; fab.style.right='auto';
-    _ox=r.left; _oy=r.top; _sx=cx; _sy=cy;
+    const r = fab.getBoundingClientRect();
+    // Convertir a top/left absoluto para mover libremente
+    fab.style.position = 'fixed';
+    fab.style.top      = r.top  + 'px';
+    fab.style.left     = r.left + 'px';
+    fab.style.bottom   = 'auto';
+    fab.style.right    = 'auto';
+    fab.style.transition = 'none';
+    _ox = r.left;
+    _oy = r.top;
+    _sx = cx;
+    _sy = cy;
   }
-  function moveDrag(cx,cy){
+
+  function _moveDrag(cx, cy){
     if(!_drag) return;
-    const dx=cx-_sx, dy=cy-_sy;
-    if(Math.abs(dx)>4||Math.abs(dy)>4) _moved=true;
-    fab.style.left=Math.max(0,Math.min(window.innerWidth-64,_ox+dx))+'px';
-    fab.style.top =Math.max(0,Math.min(window.innerHeight-64,_oy+dy))+'px';
+    const dx = cx - _sx;
+    const dy = cy - _sy;
+    if(Math.abs(dx) > 4 || Math.abs(dy) > 4) _moved = true;
+    const newX = Math.max(0, Math.min(window.innerWidth  - 64, _ox + dx));
+    const newY = Math.max(0, Math.min(window.innerHeight - 64, _oy + dy));
+    fab.style.left = newX + 'px';
+    fab.style.top  = newY + 'px';
   }
-  function endDrag(){
+
+  function _endDrag(){
     if(!_drag) return;
-    _drag=false; fab.classList.remove('dragging'); clearTimeout(_hold);
+    _drag = false;
+    fab.classList.remove('dragging');
+    fab.style.transition = '';
+    clearTimeout(_hold);
     if(_moved){
-      const r=fab.getBoundingClientRect();
-      const b=Math.max(8,window.innerHeight-r.bottom);
-      const ri=Math.max(8,window.innerWidth-r.right);
-      fab.style.bottom=b+'px'; fab.style.right=ri+'px';
-      fab.style.top=''; fab.style.left='';
-      localStorage.setItem('fnz_fab_pos',JSON.stringify({b:fab.style.bottom,r:fab.style.right}));
+      const r = fab.getBoundingClientRect();
+      const b  = Math.max(8, window.innerHeight - r.bottom);
+      const ri = Math.max(8, window.innerWidth  - r.right);
+      fab.style.bottom = b  + 'px';
+      fab.style.right  = ri + 'px';
+      fab.style.top    = '';
+      fab.style.left   = '';
+      localStorage.setItem('fnz_fab_pos', JSON.stringify({ b: fab.style.bottom, r: fab.style.right }));
     }
   }
-  // Touch
-  fab.addEventListener('touchstart',(e)=>{
-    const t=e.touches[0]; _sx=t.clientX; _sy=t.clientY; _moved=false;
-    _hold=setTimeout(()=>{ startDrag(t.clientX,t.clientY); if(navigator.vibrate)navigator.vibrate(30); },400);
-  },{passive:true});
-  fab.addEventListener('touchmove',(e)=>{
-    const t=e.touches[0];
-    if(_drag){ e.preventDefault(); moveDrag(t.clientX,t.clientY); }
-    else if(Math.abs(t.clientX-_sx)>8||Math.abs(t.clientY-_sy)>8) clearTimeout(_hold);
-  },{passive:false});
-  fab.addEventListener('touchend',(e)=>{ clearTimeout(_hold); if(_drag){ endDrag(); e.preventDefault(); } },{passive:false});
-  // Mouse
-  fab.addEventListener('mousedown',(e)=>{ _sx=e.clientX; _sy=e.clientY; _moved=false; _hold=setTimeout(()=>startDrag(e.clientX,e.clientY),400); });
-  document.addEventListener('mousemove',(e)=>{ if(_drag) moveDrag(e.clientX,e.clientY); });
-  document.addEventListener('mouseup',()=>{ clearTimeout(_hold); if(_drag) endDrag(); });
-  fab.addEventListener('click',(e)=>{ if(_moved) e.stopImmediatePropagation(); },true);
+
+  // ── Touch: el touchstart en el FAB, move y end en el document ──
+  fab.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    _sx = t.clientX; _sy = t.clientY; _moved = false;
+    _hold = setTimeout(() => {
+      _startDrag(t.clientX, t.clientY);
+      if(navigator.vibrate) navigator.vibrate(40);
+    }, 400);
+  }, { passive: true });
+
+  // ★ Clave: listeners en document para capturar el movimiento aunque el dedo salga del botón
+  document.addEventListener('touchmove', (e) => {
+    if(!_drag) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    _moveDrag(t.clientX, t.clientY);
+  }, { passive: false });
+
+  document.addEventListener('touchend', (e) => {
+    clearTimeout(_hold);
+    if(_drag){
+      _endDrag();
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  document.addEventListener('touchcancel', () => {
+    clearTimeout(_hold);
+    if(_drag) _endDrag();
+  });
+
+  // ── Mouse (escritorio) ──
+  fab.addEventListener('mousedown', (e) => {
+    _sx = e.clientX; _sy = e.clientY; _moved = false;
+    _hold = setTimeout(() => _startDrag(e.clientX, e.clientY), 400);
+  });
+  document.addEventListener('mousemove', (e) => { if(_drag) _moveDrag(e.clientX, e.clientY); });
+  document.addEventListener('mouseup',   () => { clearTimeout(_hold); if(_drag) _endDrag(); });
+
+  // Evitar que click se dispare si hubo arrastre
+  fab.addEventListener('click', (e) => { if(_moved) e.stopImmediatePropagation(); }, true);
 })();
 
 // ─────────────────────────────────────────────
@@ -5915,9 +5963,12 @@ function processVoiceResult(text) {
   if (section === 'agenda' || isAgendaCommand(text)) {
     processVoiceResult._busy = false;
     document.getElementById('micModal').style.display = 'none';
-    parseAgendaVoz(text);
+    try {
+      parseAgendaVoz(text);
+    } catch(e) {}
     const p = window._avParsed;
-    if (p) openAddAgenda(p.tipo, null, p);
+    // ★ Siempre abrir — con datos o vacío
+    openAddAgenda(p ? p.tipo : 'trabajo', null, p || {});
     return;
   }
 
