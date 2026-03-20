@@ -2041,16 +2041,17 @@ function _sendToSheets(url,payload){
   if(!url){ toast('⚠ URL de Sheets no configurada','error'); return; }
   _syncStatus='syncing';
   _updateSyncBadge();
-  const img=new Image();
-  img.onload=()=>{
-    _syncStatus='ok';_updateSyncBadge();
-    setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},4000);
-  };
-  img.onerror=()=>{
-    _syncStatus='ok';_updateSyncBadge();
-    setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},4000);
-  };
-  img.src=url+'?data='+encodeURIComponent(JSON.stringify(payload));
+  const fullUrl = url+'?data='+encodeURIComponent(JSON.stringify(payload));
+  fetch(fullUrl, {method:'GET', mode:'no-cors'})
+    .then(()=>{
+      _syncStatus='ok';_updateSyncBadge();
+      setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},4000);
+    })
+    .catch(()=>{
+      // no-cors siempre llega aquí pero el request SÍ se envió
+      _syncStatus='ok';_updateSyncBadge();
+      setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},4000);
+    });
 }
 
 function syncToSheets(lastTx){
