@@ -1953,7 +1953,8 @@ function appendWithoutOverlap(existing, newText) {
 
 function syncAgendaToSheets(item){
   const url=localStorage.getItem('fnz_sheets_url')||'';
-  if(!url) return;
+  if(!url){ toast('⚠ Configura la URL de Sheets en Ajustes','error'); return; }
+  toast('↑ Enviando a Sheets...','info');
   _sendToSheets(url,{type:'agenda',item,modo:state.modo,timestamp:new Date().toISOString()});
 }
 
@@ -1964,9 +1965,18 @@ function syncSeccionToSheets(type,item){
 }
 
 function _sendToSheets(url,payload){
+  if(!url){ toast('⚠ URL de Sheets no configurada','error'); return; }
+  _syncStatus='syncing';
+  _updateSyncBadge();
   const img=new Image();
-  img.onload=()=>{_syncStatus='ok';_updateSyncBadge();setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},3000);};
-  img.onerror=()=>{_syncStatus='ok';_updateSyncBadge();setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},3000);};
+  img.onload=()=>{
+    _syncStatus='ok';_updateSyncBadge();
+    setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},4000);
+  };
+  img.onerror=()=>{
+    _syncStatus='ok';_updateSyncBadge();
+    setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},4000);
+  };
   img.src=url+'?data='+encodeURIComponent(JSON.stringify(payload));
 }
 
@@ -3730,7 +3740,10 @@ let toastTimer;
 function toast(msg,type='success'){
   const el=document.getElementById('toast');
   el.textContent=msg;
-  el.style.cssText=`display:block;background:${type==='error'?'#FEF2F2':'#F0FDF4'};border:1px solid ${type==='error'?'#E0525255':'#4CAF8555'};color:${type==='error'?'var(--red)':'var(--green)'};bottom:90px;left:50%;transform:translateX(-50%);z-index:200;padding:11px 22px;border-radius:30px;font-size:13px;font-weight:500;white-space:nowrap;animation:fadeUp .3s ease;pointer-events:none;position:fixed`;
+  const bg=type==='error'?'#FEF2F2':type==='info'?'#EFF6FF':'#F0FDF4';
+  const border=type==='error'?'#E0525255':type==='info'?'#378ADD55':'#4CAF8555';
+  const color=type==='error'?'var(--red)':type==='info'?'#185FA5':'var(--green)';
+  el.style.cssText=`display:block;background:${bg};border:1px solid ${border};color:${color};bottom:90px;left:50%;transform:translateX(-50%);z-index:200;padding:11px 22px;border-radius:30px;font-size:13px;font-weight:500;white-space:nowrap;animation:fadeUp .3s ease;pointer-events:none;position:fixed`;
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>el.style.display='none',3000);
 }
