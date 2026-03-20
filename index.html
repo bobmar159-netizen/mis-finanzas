@@ -2309,8 +2309,9 @@ function saveDebt(editId){
   if(editId)state.debts=state.debts.map(d=>d.id===editId?item:d);
   else state.debts.push(item);
   saveAll();
+  console.log('Sincronizando deuda:', item.name, item.id);
   syncSeccionToSheets('deuda', item);
-  closeModal();render();toast(editId?'Deuda actualizada':'Deuda registrada ✓');
+  closeModal();render();toast(editId?'Deuda actualizada':'Deuda registrada ✓ · Enviando a Sheets...');
 }
 function deleteDebt(id){if(!confirm('¿Eliminar esta deuda?'))return;state.debts=state.debts.filter(d=>d.id!==id);saveAll();render();toast('Eliminado');}
 function pagarCuota(id){
