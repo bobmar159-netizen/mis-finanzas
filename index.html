@@ -467,7 +467,7 @@ function saveAll(){
   save('fnz_agenda',          state.agenda);
   save('fnz_notas',           state.notas);
   save(k.presupuesto,         state.presupuesto);
-  syncToSheets();
+  // NO llamar syncToSheets() aquí — cada función llama su propio sync
 }
 
 // ── Cambiar de modo ──
@@ -2061,7 +2061,8 @@ function syncToSheets(lastTx){
     _syncStatus='syncing';
     _updateSyncBadge();
     const tx = lastTx || (state.transactions.length ? state.transactions[0] : null);
-    const payload={type:'tx',modo:state.modo,timestamp:new Date().toISOString(),tx};
+    if(!tx) return;
+    const payload={type:'tx',modo:state.modo,timestamp:'tx_'+tx.id+'_'+Date.now(),tx};
     _sendToSheets(url,payload);
   },1200);
 }
@@ -3698,6 +3699,8 @@ function cambiarEstadoAgenda(id, estado){
 function registrarIngresoAgenda(id){
   const item=(state.agenda||[]).find(x=>x.id===id);
   if(!item||!item.precio) return;
+  // Evitar doble registro
+  if(item._ingresoRegistrado) return toast('Ingreso ya registrado','error');
   const tx={
     id:Date.now()+'',
     type:'ingreso',
@@ -3713,7 +3716,10 @@ function registrarIngresoAgenda(id){
   if(!state.transactions) state.transactions=[];
   state.transactions.unshift(tx);
   item.estado='completado';
-  saveAll(); render();
+  item._ingresoRegistrado=true;
+  saveAll();
+  syncToSheets(tx);
+  render();
   toast('Ingreso de '+fmt(item.precio)+' registrado en Mi Negocio ✓');
 }
 
