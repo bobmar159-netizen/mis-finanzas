@@ -4877,57 +4877,8 @@ function startListening() {
   document.getElementById('micText').style.color='#1E293B';
   document.getElementById('micText').textContent='...';
 
-  recognition.onresult = (e) => {
-    let interim = '';
-    let newFinal = '';
-
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      if (e.results[i].isFinal) {
-        newFinal += e.results[i][0].transcript + ' ';
-      } else {
-        interim += e.results[i][0].transcript;
-      }
-    }
-
-    // Acumular texto final sin solapamientos entre reinicios de sesión
-    if (newFinal) micFullTranscript = appendWithoutOverlap(micFullTranscript, newFinal);
-
-    // Mostrar lo acumulado + lo que está escuchando en tiempo real
-    const display = (micFullTranscript + interim).trim();
-    document.getElementById('micText').textContent = display || '...';
-
-    // Reiniciar el temporizador de silencio cada vez que llega algo
-    clearTimeout(micSilenceTimer);
-    if (micFullTranscript.trim()) {
-      // Tiene texto → espera silencio antes de procesar
-      micSilenceTimer = setTimeout(() => {
-        if (micListening && micFullTranscript.trim()) {
-          processVoiceResult(micFullTranscript.trim());
-        }
-      }, MIC_SILENCE_MS);
-    }
-  };
-
-  recognition.onerror = (e) => {
-    // "no-speech" no es error grave: reiniciar si sigue escuchando
-    if (e.error === 'no-speech') {
-      if (micListening && !micRestartLock) restartListening();
-      return;
-    }
-    let msg = '⚠ ';
-    if (e.error === 'not-allowed') msg += 'Permiso de micrófono denegado. Habilítalo en ajustes del navegador.';
-    else if (e.error === 'aborted') return; // corte intencional, ignorar
-    else msg += 'Error: ' + e.error;
-    document.getElementById('micText').textContent = msg;
-    document.getElementById('micText').style.color = '#E05252';
-    stopListening();
-  };
-
-  // Si el navegador corta solo (Chrome lo hace cada ~60s) → reiniciar transparentemente
-  recognition.onend = () => {
-    if (micListening && !micRestartLock) restartListening();
-  };
-
+  // Usar el mismo handler que restartListening — evita duplicados
+  startListeningHandlers(recognition);
   recognition.start();
 }
 
@@ -4967,7 +4918,12 @@ function startListeningHandlers(rec) {
     }
   };
   rec.onerror=(e)=>{
-    if(e.error==='no-speech'||e.error==='aborted') return;
+    if(e.error==='no-speech'){ if(micListening&&!micRestartLock) restartListening(); return; }
+    if(e.error==='aborted') return;
+    if(e.error==='not-allowed'){
+      document.getElementById('micText').textContent='⚠ Permiso de micrófono denegado.';
+      document.getElementById('micText').style.color='#E05252';
+    }
     stopListening();
   };
   rec.onend=()=>{ if(micListening&&!micRestartLock) restartListening(); };
