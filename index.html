@@ -662,9 +662,41 @@ function renderDashboard(){
   const filtered=filteredTx();
   const urgent=state.servicios.filter(s=>!s.pagado&&daysUntil(s.venceDia)<=5);
 
+  // Alerta cuotas de deuda próximas
+  const hoy=new Date();
+  const deudaUrgente=(state.debts||[]).filter(d=>{
+    if(d.cuotasPagadas>=d.cuotasTotales) return false;
+    // Si tiene fecha de vencimiento, avisar con 5 días de anticipación
+    if(d.fechaVencimiento){
+      const fv=new Date(d.fechaVencimiento);
+      const diff=Math.ceil((fv-hoy)/(1000*60*60*24));
+      return diff>=0&&diff<=5;
+    }
+    return false;
+  });
+
   const urgentHtml=urgent.length?`<div class="card pulse" style="border-color:#E0525244;background:#FEF2F2;margin-bottom:12px">
     <div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:8px">⚠ Servicios próximos a vencer</div>
     ${urgent.map(s=>`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>${s.icon} ${s.name}</span><span style="color:var(--red)">${daysUntil(s.venceDia)} día(s) · ${fmt(s.monto)}</span></div>`).join('')}
+  </div>`:'';
+
+  const deudaUrgHtml=deudaUrgente.length?`<div class="card pulse" style="border-color:#9B59B644;background:#F3F0FF;margin-bottom:12px">
+    <div style="font-size:12px;color:#6C3483;font-weight:600;margin-bottom:8px">⚠ Cuota de deuda próxima</div>
+    ${deudaUrgente.map(d=>`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>🏦 ${d.name}</span><span style="color:#6C3483">${fmt(d.cuotaMonto)}/mes</span></div>`).join('')}
+  </div>`:'';
+
+  // Trabajos pendientes hoy y mañana
+  const manana=new Date(hoy); manana.setDate(hoy.getDate()+1);
+  const hoyStr=hoy.toISOString().split('T')[0];
+  const manStr=manana.toISOString().split('T')[0];
+  const proximosTrab=(state.agenda||[]).filter(a=>a.estado!=='completado'&&(a.fecha===hoyStr||a.fecha===manStr));
+  const trabHtml=proximosTrab.length?`<div class="card" style="border-color:#E6510033;background:#FFF8F0;margin-bottom:12px">
+    <div style="font-size:12px;color:#E65100;font-weight:600;margin-bottom:8px">🔧 Trabajos próximos</div>
+    ${proximosTrab.slice(0,3).map(a=>`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;align-items:center">
+      <span>${a.tipo==='visita'?'👁':'🔧'} ${a.cliente||'Sin cliente'}</span>
+      <span style="color:#E65100;font-size:11px">${a.fecha===hoyStr?'Hoy':'Mañana'} ${a.hora?'· '+horaTo12(a.hora):''}</span>
+    </div>`).join('')}
+    ${proximosTrab.length>3?`<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:4px;cursor:pointer" onclick="switchPage('agenda')">+${proximosTrab.length-3} más →</div>`:''}
   </div>`:'';
 
   const recentHtml=filtered.length?`<div class="card" style="margin-bottom:12px">
@@ -691,6 +723,10 @@ function renderDashboard(){
         <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Egresos</div><div style="color:var(--red);font-weight:600">-${fmt(exp)}</div></div>
       </div>
     </div>
+    <!-- Acceso rápido al micrófono -->
+    <button onclick="document.getElementById('micFab').click()" style="width:100%;margin-bottom:12px;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:14px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px">
+      🎙 Registrar por voz
+    </button>
     <div class="stat-row">
       <div class="stat-mini" style="background:#EFF6FF;border-color:#2E86AB33">
         <div class="stat-mini-label" style="color:#2E86AB88">Deuda total</div>
@@ -704,7 +740,9 @@ function renderDashboard(){
       </div>
     </div>
     ${renderResumenSemanal()}
+    ${trabHtml}
     ${urgentHtml}
+    ${deudaUrgHtml}
     ${renderNegocioCard()}
     <div class="btn-row" style="margin-bottom:8px">
       <button class="btn-gold" onclick="openAddTx()">＋ Movimiento</button>
@@ -717,7 +755,20 @@ function renderDashboard(){
 }
 
 function renderMovimientos(){
-  const filtered=filteredTx();
+  if(!window._movBusqueda) window._movBusqueda='';
+  let filtered=filteredTx();
+
+  // Aplicar búsqueda
+  if(window._movBusqueda.trim()){
+    const q=window._movBusqueda.toLowerCase();
+    filtered=filtered.filter(t=>
+      (t.description||'').toLowerCase().includes(q)||
+      (t.category||'').toLowerCase().includes(q)||
+      (t.cliente||'').toLowerCase().includes(q)||
+      String(t.amount).includes(q)
+    );
+  }
+
   const inc=totalIncome(),exp=totalExpense();
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -725,6 +776,15 @@ function renderMovimientos(){
       <button class="btn-gold" style="padding:8px 14px;font-size:13px" onclick="openAddTx()">＋ Agregar</button>
     </div>
     <div class="month-nav"><button onclick="prevMonth()">‹</button><span>${monthName()}</span><button onclick="nextMonth()">›</button></div>
+    <!-- Buscador -->
+    <div style="position:relative;margin-bottom:12px">
+      <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)">🔍</span>
+      <input type="text" placeholder="Buscar por descripción, cliente o monto..."
+        value="${window._movBusqueda}"
+        oninput="window._movBusqueda=this.value;render()"
+        style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px 10px 36px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">
+      ${window._movBusqueda?`<button onclick="window._movBusqueda='';render()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px">✕</button>`:''}
+    </div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <div style="flex:1;background:#F0FDF4;border:1px solid #4CAF8533;border-radius:10px;padding:12px">
         <div style="font-size:10px;color:#4CAF8588;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ingresos</div>
@@ -736,7 +796,7 @@ function renderMovimientos(){
       </div>
     </div>
     <div class="card">
-      ${filtered.length===0?`<div style="text-align:center;color:var(--dim);padding:30px 0;font-size:14px">Sin movimientos este mes</div>`
+      ${filtered.length===0?`<div style="text-align:center;color:var(--dim);padding:30px 0;font-size:14px">${window._movBusqueda?'Sin resultados para "'+window._movBusqueda+'"':'Sin movimientos este mes'}</div>`
       :filtered.map(t=>{
         const cat=getCatByName(t.category,t.type);
         return `<div class="tx-row">
@@ -2336,7 +2396,8 @@ function renderNotas(){
       ${f.label}${f.count>0?` <span style="font-size:10px;opacity:.7">${f.count}</span>`:''}
     </button>`
   ).join('');
-  const notas = _notaFilter==='todas' ? todas : todas.filter(n=>n.tipo===_notaFilter);
+  const notas = (_notaFilter==='todas' ? todas : todas.filter(n=>n.tipo===_notaFilter))
+    .sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)); // ancladas primero
   const notasHtml = notas.length===0
     ? `<div style="text-align:center;padding:36px 20px;color:var(--muted)">
         <div style="font-size:36px;margin-bottom:10px">📝</div>
@@ -2383,6 +2444,8 @@ function renderNotaCard(n){
   const TXTBADGE = {lista:'#C9A84C',texto:'#1565C0',foto:'#15803D',recordatorio:'#DC2626'};
   const color = COLORES[n.tipo]||'#C9A84C';
   const ts = n.creado ? new Date(n.creado).toLocaleDateString('es-PE',{day:'numeric',month:'short'}) : '';
+  const pinBtn=`<button onclick="pinNota('${n.id}')" title="${n.pinned?'Desanclar':'Anclar'}" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;opacity:${n.pinned?1:.35}">${n.pinned?'📌':'📍'}</button>`;
+  const delBtn=`<button onclick="deleteNota('${n.id}')" style="width:28px;height:28px;background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;flex-shrink:0">✕</button>`;
   let cuerpo = '';
   if(n.tipo==='lista'||n.tipo==='recordatorio'){
     const its = n.items||[];
@@ -2401,28 +2464,30 @@ function renderNotaCard(n){
       <div style="display:flex;gap:6px;margin-top:6px;padding-top:6px;border-top:0.5px solid var(--border);align-items:center">
         <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="editNota('${n.id}')">✏️ Editar</button>
         <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="openNotaVozAgregar('${n.id}')">🎙 Agregar</button>
-        <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="deleteNota('${n.id}')">🗑</button>
         <span style="margin-left:auto;font-size:11px;color:var(--muted)">${hechos}/${its.length} hechos</span>
+        ${delBtn}
       </div>`;
   } else if(n.tipo==='foto'){
     const thumbs=(n.fotos||[]).map(f=>`<img class="nota-img-thumb" src="${f}" onclick="verFotoNota('${f}')" />`).join('');
     cuerpo = `${n.texto?`<div style="font-size:13px;color:var(--muted);margin-bottom:8px;line-height:1.5">${n.texto}</div>`:''}
       <div class="nota-imgs-row">${thumbs}<div class="nota-img-thumb add-btn" onclick="agregarFotoNota('${n.id}')">+</div></div>
-      <div style="display:flex;gap:6px;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--border)">
+      <div style="display:flex;gap:6px;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--border);align-items:center">
         <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="editNota('${n.id}')">✏️ Editar</button>
-        <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="deleteNota('${n.id}')">🗑</button>
         <span style="margin-left:auto;font-size:11px;color:var(--muted)">${(n.fotos||[]).length} foto(s)</span>
+        ${delBtn}
       </div>`;
   } else {
     cuerpo = `<div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:4px">${n.texto||''}</div>
-      <div style="display:flex;gap:6px;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--border)">
+      <div style="display:flex;gap:6px;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--border);align-items:center">
         <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="editNota('${n.id}')">✏️ Editar</button>
-        <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="deleteNota('${n.id}')">🗑</button>
+        <span style="margin-left:auto"></span>
+        ${delBtn}
       </div>`;
   }
-  return `<div class="nota-card">
+  return `<div class="nota-card" style="${n.pinned?'border-color:#C9A84C66;':''}">
     <div class="nota-accent" style="background:${color}"></div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      ${pinBtn}
       <span class="nota-tipo-badge" style="background:${BGBADGE[n.tipo]||'#FFF8EC'};color:${TXTBADGE[n.tipo]||'#C9A84C'}">${LABELS[n.tipo]||'Nota'}</span>
       <span style="font-size:14px;font-weight:600;color:var(--text);flex:1">${n.titulo||'Sin título'}</span>
       <span style="font-size:11px;color:var(--muted)">${ts}</span>
@@ -2431,7 +2496,32 @@ function renderNotaCard(n){
 
 function setNotaFilter(f){ _notaFilter=f; render(); }
 function toggleNotaItem(notaId,idx){ if(!state.notas)return; const n=state.notas.find(x=>x.id===notaId); if(!n||!n.items)return; n.items[idx].done=!n.items[idx].done; save('fnz_notas',state.notas); render(); }
-function deleteNota(id){ if(!confirm('¿Eliminar esta nota?'))return; state.notas=state.notas.filter(n=>n.id!==id); save('fnz_notas',state.notas); render(); toast('Nota eliminada'); }
+function deleteNota(id){
+  const n=state.notas.find(x=>x.id===id);
+  if(!n)return;
+  document.getElementById('modal-content').innerHTML=`
+    <div class="modal-title" style="color:var(--red)">🗑 Eliminar nota</div>
+    <div style="font-size:14px;color:var(--text);margin-bottom:6px">"${n.titulo||'Sin título'}"</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Esta acción no se puede deshacer.</div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button style="flex:2;background:#E05252;color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="confirmDeleteNota('${id}')">Sí, eliminar</button>
+    </div>`;
+  showModal();
+}
+function confirmDeleteNota(id){
+  state.notas=state.notas.filter(n=>n.id!==id);
+  save('fnz_notas',state.notas);
+  closeModal(); render(); toast('Nota eliminada');
+}
+function pinNota(id){
+  const n=state.notas.find(x=>x.id===id);
+  if(!n)return;
+  n.pinned=!n.pinned;
+  save('fnz_notas',state.notas);
+  render();
+  toast(n.pinned?'📌 Nota anclada':'Nota desanclada');
+}
 function verFotoNota(src){ document.getElementById('modal-content').innerHTML=`<img src="${src}" style="width:100%;border-radius:12px;max-height:70vh;object-fit:contain"><div class="btn-row" style="margin-top:12px"><button class="btn-ghost" onclick="closeModal()">Cerrar</button></div>`; showModal(); }
 function agregarFotoNota(id){ const input=document.createElement('input'); input.type='file'; input.accept='image/*,application/pdf'; input.onchange=e=>{ const file=e.target.files[0]; if(!file)return; const reader=new FileReader(); reader.onload=ev=>{ const n=state.notas.find(x=>x.id===id); if(!n)return; if(!n.fotos)n.fotos=[]; n.fotos.push(ev.target.result); save('fnz_notas',state.notas); render(); toast('Foto agregada ✓'); }; reader.readAsDataURL(file); }; input.click(); }
 function editNota(id){
@@ -3161,12 +3251,51 @@ function parseUbicacionLink(ubicacion){
 }
 
 function renderAgenda(){
-  const items = (state.agenda||[]).slice().sort((a,b)=>{
+  if(!window._agendaFiltro) window._agendaFiltro='todos';
+  if(!window._agendaVista) window._agendaVista='lista';
+
+  const todos = (state.agenda||[]).slice().sort((a,b)=>{
     const da=a.fecha+(a.hora||'00:00'), db=b.fecha+(b.hora||'00:00');
     return da.localeCompare(db);
   });
-  const visitas   = items.filter(x=>x.tipo==='visita');
-  const trabajos  = items.filter(x=>x.tipo==='trabajo');
+
+  // Aplicar filtro
+  const items = todos.filter(x=>{
+    if(window._agendaFiltro==='pendientes') return x.estado!=='completado';
+    if(window._agendaFiltro==='completados') return x.estado==='completado';
+    return true;
+  });
+  const visitas  = items.filter(x=>x.tipo==='visita');
+  const trabajos = items.filter(x=>x.tipo==='trabajo');
+
+  // Vista semanal
+  const hoy=new Date();
+  const semana=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(hoy);d.setDate(hoy.getDate()+i);
+    semana.push(d);
+  }
+  const DIAS_CORTO=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const semanaHtml=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:14px">
+    ${semana.map(d=>{
+      const ds=d.toISOString().split('T')[0];
+      const hayTrab=todos.some(a=>a.fecha===ds&&a.tipo==='trabajo');
+      const hayVis=todos.some(a=>a.fecha===ds&&a.tipo==='visita');
+      const esHoy=ds===hoy.toISOString().split('T')[0];
+      return `<div style="background:${esHoy?'var(--gold)':'var(--card)'};border:1px solid ${esHoy?'var(--gold)':'var(--border)'};border-radius:10px;padding:6px 2px;text-align:center;cursor:pointer" onclick="switchPage('agenda')">
+        <div style="font-size:9px;color:${esHoy?'#0D0D0F':'var(--muted)'};text-transform:uppercase;letter-spacing:.04em">${DIAS_CORTO[d.getDay()]}</div>
+        <div style="font-size:15px;font-weight:600;color:${esHoy?'#0D0D0F':'var(--text)'};margin:2px 0">${d.getDate()}</div>
+        <div style="display:flex;justify-content:center;gap:2px;min-height:8px">
+          ${hayTrab?`<div style="width:6px;height:6px;border-radius:50%;background:#6C3483"></div>`:''}
+          ${hayVis?`<div style="width:6px;height:6px;border-radius:50%;background:#1565C0"></div>`:''}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="display:flex;gap:12px;margin-bottom:14px;font-size:11px;color:var(--muted)">
+    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6C3483;margin-right:4px"></span>Trabajo</span>
+    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1565C0;margin-right:4px"></span>Visita</span>
+  </div>`;
 
   function agendaCard(item){
     const est = AGENDA_ESTADOS[item.estado||'pendiente'];
@@ -3202,29 +3331,36 @@ function renderAgenda(){
     </div>`;
   }
 
+  // Filtros
+  const filtroHtml=`<div style="display:flex;gap:6px;margin-bottom:14px">
+    ${[['todos','Todos'],['pendientes','Pendientes'],['completados','Completados']].map(([k,l])=>
+      `<button onclick="window._agendaFiltro='${k}';render()" style="font-size:11px;padding:5px 12px;border-radius:20px;border:1px solid ${window._agendaFiltro===k?'var(--gold)':'var(--border)'};background:${window._agendaFiltro===k?'#FFF8EC':'transparent'};color:${window._agendaFiltro===k?'var(--gold)':'var(--muted)'};font-weight:${window._agendaFiltro===k?'600':'400'};cursor:pointer;font-family:'DM Sans',sans-serif">${l}</button>`
+    ).join('')}
+  </div>`;
+
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold)">Agenda</div>
       <div style="display:flex;gap:6px">
         <button onclick="openAddAgenda('visita')" style="background:#EFF6FF;border:1px solid #1565C044;color:#0C447C;border-radius:8px;padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">＋ Visita</button>
         <button onclick="openAddAgenda('trabajo')" style="background:#F3F0FF;border:1px solid #9B59B644;color:#6C3483;border-radius:8px;padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">＋ Trabajo</button>
       </div>
     </div>
-
+    ${semanaHtml}
+    ${filtroHtml}
     <!-- VISITAS -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div style="font-size:13px;font-weight:600;color:#1565C0">👁 Visitas (${visitas.length})</div>
     </div>
     ${visitas.length===0
-      ?`<div class="card" style="text-align:center;color:var(--dim);padding:16px 0;font-size:13px;margin-bottom:14px">Sin visitas programadas</div>`
+      ?`<div class="card" style="text-align:center;color:var(--dim);padding:16px 0;font-size:13px;margin-bottom:14px">Sin visitas</div>`
       :visitas.map(agendaCard).join('')}
-
     <!-- TRABAJOS -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">
       <div style="font-size:13px;font-weight:600;color:#6C3483">🔧 Trabajos / Construcciones (${trabajos.length})</div>
     </div>
     ${trabajos.length===0
-      ?`<div class="card" style="text-align:center;color:var(--dim);padding:16px 0;font-size:13px">Sin trabajos programados</div>`
+      ?`<div class="card" style="text-align:center;color:var(--dim);padding:16px 0;font-size:13px">Sin trabajos</div>`
       :trabajos.map(agendaCard).join('')}`;
 }
 
