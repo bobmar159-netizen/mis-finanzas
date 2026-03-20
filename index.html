@@ -2032,8 +2032,9 @@ function syncAgendaToSheets(item){
 
 function syncSeccionToSheets(type,item){
   const url=localStorage.getItem('fnz_sheets_url')||'';
-  if(!url) return;
-  const ts = type+'_'+(item.id||'')+'_'+Date.now();
+  if(!url){ toast('⚠ Configura la URL de Sheets en Ajustes','error'); return; }
+  toast('↑ Enviando a Sheets...','info');
+  const ts=type+'_'+(item.id||'')+'_'+Date.now();
   _sendToSheets(url,{type,item,modo:state.modo,timestamp:ts});
 }
 
