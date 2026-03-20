@@ -2083,19 +2083,24 @@ function _updateSyncBadge(){
 function saveSheetsUrl(){
   const url=document.getElementById('sheets-url-input').value.trim();
   localStorage.setItem('fnz_sheets_url',url);
-  toast(url?'URL de Google Sheets guardada ✓':'URL eliminada');
-  syncToSheets();
+  toast(url?'URL guardada ✓':'URL eliminada');
 }
 
 function testSheetsSync(){
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(!url)return toast('Primero guarda la URL del script','error');
-  toast('Enviando prueba...');
-  const testUrl = url + '?data=' + encodeURIComponent(JSON.stringify({test:true,timestamp:new Date().toISOString()}));
-  const img2 = new Image();
-  img2.onload = ()=>toast('✓ Solicitud enviada — abrí tu Google Sheet y verificá');
-  img2.onerror = ()=>toast('✓ Solicitud enviada — abrí tu Google Sheet y verificá');
-  img2.src = testUrl;
+  // Prueba con deuda real
+  const payload={
+    type:'deuda',
+    item:{id:'test_'+Date.now(),name:'🧪 Prueba Deuda',totalAmount:999,cuotaMonto:100,cuotasTotales:10,cuotasPagadas:0,categoria:'Prueba'},
+    modo:'personal',
+    timestamp:'test_'+Date.now()
+  };
+  const fullUrl=url+'?data='+encodeURIComponent(JSON.stringify(payload));
+  toast('↑ Enviando prueba de deuda...','info');
+  fetch(fullUrl,{method:'GET',mode:'no-cors'})
+    .then(()=>{ toast('✓ Enviado — verifica la hoja Deudas y Movimientos','success'); })
+    .catch(()=>{ toast('✓ Enviado — verifica la hoja Deudas y Movimientos','success'); });
 }
 
 
