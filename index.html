@@ -3073,6 +3073,7 @@ function renderAgenda(){
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${item.estado==='pendiente'?`<button onclick="cambiarEstadoAgenda('${item.id}','completado')" style="flex:1;min-width:100px;background:#EAF3DE;border:1px solid #63992244;color:#27500A;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">✓ Completado</button>`:''}
         ${item.estado==='pendiente'&&!isVisita&&item.precio?`<button onclick="registrarIngresoAgenda('${item.id}')" style="flex:1;min-width:100px;background:#EFF6FF;border:1px solid #1565C044;color:#0C447C;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">💰 Registrar ingreso</button>`:''}
+        ${isVisita?`<button onclick="convertirVisitaAConstruccion('${item.id}')" style="flex:1;min-width:130px;background:#FFF3E0;border:1px solid #E6510044;color:#BF360C;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">🔨 Convertir a Construcción</button>`:''}
         <button onclick="editAgendaItem('${item.id}')" style="width:32px;height:32px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:12px">✎</button>
         <button onclick="deleteAgendaItem('${item.id}')" style="width:32px;height:32px;background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">✕</button>
       </div>
@@ -3303,6 +3304,100 @@ function saveAgendaItem(editId, tipo){
 
 
 function editAgendaItem(id){ const item=(state.agenda||[]).find(x=>x.id===id); if(item) openAddAgenda(item.tipo,id); }
+
+function convertirVisitaAConstruccion(id){
+  const visita=(state.agenda||[]).find(x=>x.id===id);
+  if(!visita) return;
+  const hoy=todayStr();
+  document.getElementById('modal-content').innerHTML=`
+    <div class="modal-title" style="color:#BF360C">🔨 Convertir a Construcción</div>
+    <div style="background:#FFF3E0;border:1px solid #E6510033;border-radius:10px;padding:10px 14px;font-size:12px;color:#BF360C;margin-bottom:14px">
+      <strong>Visita original:</strong> ${visita.cliente} · ${visita.fecha}${visita.ubicacion?' · '+visita.ubicacion:''}
+    </div>
+    <div class="field"><label class="field-label">Servicio / Trabajo a realizar</label>
+      <select id="cv-servicio" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+        <option value="">Seleccionar servicio...</option>
+        ${(state.serviciosNeg||[
+          {label:'Instalación Terma'},{label:'Instalación Cocina'},{label:'Instalación Calefón'},
+          {label:'Modificación Red'},{label:'Punto Adicional'},{label:'Conexión Artefacto'},
+          {label:'Reparación'},{label:'Conversión Artefacto'},{label:'Instalación Horno'},
+          {label:'Instalación Secadora'},{label:'Construcción Parrilla'},{label:'Gasfitería General'},
+          {label:'Documentación Técnica'}
+        ]).map(s=>`<option value="${s.label}">${s.label}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label class="field-label">Precio acordado (S/.)</label>
+      <input id="cv-precio" type="number" min="0" placeholder="0.00" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+    </div>
+    <div class="field"><label class="field-label">Nueva fecha</label>
+      <input id="cv-fecha" type="date" value="${visita.fecha||hoy}" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+    </div>
+    <div class="field"><label class="field-label">Hora</label>
+      <input id="cv-hora" type="time" value="${visita.hora||'09:00'}" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+    </div>
+    <div class="field"><label class="field-label">Notas adicionales</label>
+      <input id="cv-notas" type="text" placeholder="Observaciones del cliente, materiales, etc." value="${visita.notas||''}" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button onclick="guardarConversion('${id}')" style="flex:2;background:linear-gradient(135deg,#E65100,#FF7043);color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">🔨 Confirmar conversión</button>
+    </div>`;
+  showModal();
+}
+
+function guardarConversion(id){
+  const visita=(state.agenda||[]).find(x=>x.id===id);
+  if(!visita) return;
+
+  const servicio=document.getElementById('cv-servicio').value;
+  const precio=parseFloat(document.getElementById('cv-precio').value)||0;
+  const fecha=document.getElementById('cv-fecha').value;
+  const hora=document.getElementById('cv-hora').value;
+  const notas=document.getElementById('cv-notas').value.trim();
+
+  if(!servicio){ toast('Selecciona el servicio','error'); return; }
+  if(!fecha){ toast('Selecciona la fecha','error'); return; }
+
+  // Historial de conversión
+  const fechaConversion=new Date().toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const historial=`Convertido de Visita el ${fechaConversion}${visita.fecha?' (visita original: '+visita.fecha+')':''}`;
+
+  // Actualizar el item existente
+  const itemActualizado={
+    ...visita,
+    tipo:'trabajo',
+    servicio,
+    precio,
+    fecha,
+    hora,
+    notas: notas ? notas+' · '+historial : historial,
+    estado:'pendiente',
+    convertidoDeVisita: true,
+    fechaVisitaOriginal: visita.fecha,
+    fechaConversion: todayStr()
+  };
+
+  state.agenda=state.agenda.map(x=>x.id===id?itemActualizado:x);
+  save('fnz_agenda',state.agenda);
+
+  // Sync a Sheets — actualiza la fila existente
+  const url=localStorage.getItem('fnz_sheets_url')||'';
+  if(url){
+    const payload={
+      type:'agenda_conversion',
+      id,
+      item:itemActualizado,
+      modo:state.modo,
+      timestamp:id+'_conv_'+Date.now()
+    };
+    const img=new Image();
+    img.src=url+'?data='+encodeURIComponent(JSON.stringify(payload));
+  }
+
+  closeModal();
+  render();
+  toast('✓ Visita convertida a Construcción');
+}
 
 function deleteAgendaItem(id){
   if(!confirm('¿Eliminar este registro?')) return;
