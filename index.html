@@ -20,7 +20,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:4px}
 #app{height:100vh;display:flex;flex-direction:column;max-width:430px;margin:0 auto}
 #header{background:var(--bg);border-bottom:1px solid var(--border);padding:16px 20px 0;flex-shrink:0}
-#content{flex:1;overflow-y:auto;padding:18px 18px 24px}
+#content{flex:1;overflow-y:auto;padding:18px 18px 100px}
 .h-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
 .h-title{font-family:'Playfair Display',serif;font-size:24px;font-weight:700;color:var(--gold)}
 .h-subtitle{font-size:11px;color:var(--muted);margin-top:2px}
@@ -165,15 +165,16 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 /* ── MIC FAB ── */
 #micFab {
   position: fixed;
-  bottom: 28px;
-  right: 20px;
-  width: 64px;
-  height: 64px;
+  bottom: 24px;
+  left: 16px;
+  right: auto;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: linear-gradient(135deg, #C9A84C, #E8C96A);
   color: #0D0D0F;
   border: none;
-  font-size: 24px;
+  font-size: 22px;
   cursor: grab;
   box-shadow: 0 4px 16px #C9A84C55;
   z-index: 90;
@@ -1972,7 +1973,8 @@ function syncAgendaToSheets(item){
 function syncSeccionToSheets(type,item){
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(!url) return;
-  _sendToSheets(url,{type,item,modo:state.modo,timestamp:new Date().toISOString()});
+  const ts = type+'_'+(item.id||'')+'_'+Date.now();
+  _sendToSheets(url,{type,item,modo:state.modo,timestamp:ts});
 }
 
 function _sendToSheets(url,payload){
@@ -2432,7 +2434,64 @@ function toggleNotaItem(notaId,idx){ if(!state.notas)return; const n=state.notas
 function deleteNota(id){ if(!confirm('¿Eliminar esta nota?'))return; state.notas=state.notas.filter(n=>n.id!==id); save('fnz_notas',state.notas); render(); toast('Nota eliminada'); }
 function verFotoNota(src){ document.getElementById('modal-content').innerHTML=`<img src="${src}" style="width:100%;border-radius:12px;max-height:70vh;object-fit:contain"><div class="btn-row" style="margin-top:12px"><button class="btn-ghost" onclick="closeModal()">Cerrar</button></div>`; showModal(); }
 function agregarFotoNota(id){ const input=document.createElement('input'); input.type='file'; input.accept='image/*,application/pdf'; input.onchange=e=>{ const file=e.target.files[0]; if(!file)return; const reader=new FileReader(); reader.onload=ev=>{ const n=state.notas.find(x=>x.id===id); if(!n)return; if(!n.fotos)n.fotos=[]; n.fotos.push(ev.target.result); save('fnz_notas',state.notas); render(); toast('Foto agregada ✓'); }; reader.readAsDataURL(file); }; input.click(); }
-function editNota(id){ const n=state.notas.find(x=>x.id===id); if(!n)return; if(n.tipo==='texto')return openNotaTexto(n); openNotaVoz(id); }
+function editNota(id){
+  const n=state.notas.find(x=>x.id===id);
+  if(!n) return;
+  // Siempre abrir editor manual — nunca el micrófono al editar
+  if(n.tipo==='lista'||n.tipo==='recordatorio') return openEditNotaLista(n);
+  if(n.tipo==='foto') return openNotaFoto(n);
+  openNotaTexto(n);
+}
+
+function openEditNotaLista(n){
+  const items=(n.items||[]).map((it,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">
+      <input type="checkbox" id="eli-${i}" ${it.done?'checked':''} style="width:16px;height:16px;cursor:pointer">
+      <input type="text" id="elt-${i}" value="${it.texto||''}" style="flex:1;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">
+    </div>`).join('');
+  document.getElementById('modal-content').innerHTML=`
+    <div class="modal-title" style="color:var(--gold)">✏️ Editar ${n.tipo==='recordatorio'?'Recordatorio':'Lista'}</div>
+    <div class="field"><label class="field-label">Título</label>
+      <input id="el-titulo" type="text" value="${n.titulo||''}" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+    </div>
+    <div class="field"><label class="field-label">Ítems</label>
+      <div id="el-items">${items}</div>
+      <button onclick="agregarItemEdicion()" style="margin-top:8px;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;width:100%">+ Agregar ítem</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn-gold" onclick="saveEditNotaLista('${n.id}',${(n.items||[]).length})">Guardar</button>
+    </div>`;
+  window._editNotaItemCount=(n.items||[]).length;
+  showModal();
+}
+
+function agregarItemEdicion(){
+  const cont=document.getElementById('el-items');
+  if(!cont) return;
+  const idx=cont.querySelectorAll('[id^="elt-"]').length;
+  const div=document.createElement('div');
+  div.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)';
+  div.innerHTML=`<input type="checkbox" id="eli-${idx}" style="width:16px;height:16px;cursor:pointer"><input type="text" id="elt-${idx}" placeholder="Nuevo ítem..." style="flex:1;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">`;
+  cont.appendChild(div);
+}
+
+function saveEditNotaLista(id){
+  const n=state.notas.find(x=>x.id===id);
+  if(!n) return;
+  const titulo=document.getElementById('el-titulo')?.value.trim()||n.titulo;
+  const inputs=document.getElementById('el-items')?.querySelectorAll('[id^="elt-"]')||[];
+  const checks=document.getElementById('el-items')?.querySelectorAll('[id^="eli-"]')||[];
+  const items=[];
+  inputs.forEach((inp,i)=>{
+    const texto=inp.value.trim();
+    if(texto) items.push({texto, done: checks[i]?checks[i].checked:false});
+  });
+  state.notas=state.notas.map(x=>x.id===id?{...x,titulo,items}:x);
+  save('fnz_notas',state.notas);
+  syncSeccionToSheets('nota', state.notas.find(x=>x.id===id));
+  closeModal(); render(); toast('Nota actualizada ✓');
+}
 
 function openNotaTexto(preData){
   const pre=preData||{}; const isEdit=!!pre.id;
@@ -3938,7 +3997,7 @@ render();
   const fab=document.getElementById('micFab');
   if(!fab)return;
   const saved=localStorage.getItem('fnz_fab_pos');
-  if(saved){try{const p=JSON.parse(saved);fab.style.bottom=p.b;fab.style.right=p.r;}catch(e){}}
+  if(saved){try{const p=JSON.parse(saved);fab.style.bottom=p.b;if(p.l){fab.style.left=p.l;fab.style.right='auto';}else if(p.r){fab.style.right=p.r;fab.style.left='auto';}}catch(e){}}
   let _drag=false,_moved=false,_hold=null,_sx=0,_sy=0,_ox=0,_oy=0;
 
   function _start(cx,cy){
@@ -3972,10 +4031,10 @@ render();
     if(_moved){
       const r=fab.getBoundingClientRect();
       const b=Math.max(8,window.innerHeight-r.bottom);
-      const ri=Math.max(8,window.innerWidth-r.right);
-      fab.style.bottom=b+'px';fab.style.right=ri+'px';
-      fab.style.top='';fab.style.left='';
-      localStorage.setItem('fnz_fab_pos',JSON.stringify({b:fab.style.bottom,r:fab.style.right}));
+      const l=Math.max(8,r.left);
+      fab.style.bottom=b+'px';fab.style.left=l+'px';
+      fab.style.right='auto';fab.style.top='';
+      localStorage.setItem('fnz_fab_pos',JSON.stringify({b:fab.style.bottom,l:fab.style.left}));
     }
   }
 
