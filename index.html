@@ -2535,9 +2535,10 @@ function editNota(id){
 
 function openEditNotaLista(n){
   const items=(n.items||[]).map((it,i)=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">
-      <input type="checkbox" id="eli-${i}" ${it.done?'checked':''} style="width:16px;height:16px;cursor:pointer">
+    <div id="eli-row-${i}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">
+      <input type="checkbox" id="eli-${i}" ${it.done?'checked':''} style="width:16px;height:16px;cursor:pointer;flex-shrink:0">
       <input type="text" id="elt-${i}" value="${it.texto||''}" style="flex:1;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">
+      <button onclick="eliminarItemEdicion('eli-row-${i}')" style="width:28px;height:28px;background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;flex-shrink:0">✕</button>
     </div>`).join('');
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:var(--gold)">✏️ Editar ${n.tipo==='recordatorio'?'Recordatorio':'Lista'}</div>
@@ -2550,33 +2551,47 @@ function openEditNotaLista(n){
     </div>
     <div class="btn-row">
       <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn-gold" onclick="saveEditNotaLista('${n.id}',${(n.items||[]).length})">Guardar</button>
+      <button class="btn-gold" onclick="saveEditNotaLista('${n.id}')">Guardar</button>
     </div>`;
-  window._editNotaItemCount=(n.items||[]).length;
   showModal();
+}
+
+function eliminarItemEdicion(rowId){
+  const row=document.getElementById(rowId);
+  if(row) row.remove();
 }
 
 function agregarItemEdicion(){
   const cont=document.getElementById('el-items');
   if(!cont) return;
-  const idx=cont.querySelectorAll('[id^="elt-"]').length;
+  const idx=Date.now(); // usar timestamp como ID único para evitar colisiones
   const div=document.createElement('div');
+  div.id='eli-row-'+idx;
   div.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)';
-  div.innerHTML=`<input type="checkbox" id="eli-${idx}" style="width:16px;height:16px;cursor:pointer"><input type="text" id="elt-${idx}" placeholder="Nuevo ítem..." style="flex:1;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">`;
+  div.innerHTML=`
+    <input type="checkbox" id="eli-${idx}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0">
+    <input type="text" id="elt-${idx}" placeholder="Nuevo ítem..." style="flex:1;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">
+    <button onclick="eliminarItemEdicion('eli-row-${idx}')" style="width:28px;height:28px;background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;flex-shrink:0">✕</button>`;
   cont.appendChild(div);
+  // Enfocar el nuevo campo
+  setTimeout(()=>document.getElementById('elt-'+idx)?.focus(),50);
 }
 
 function saveEditNotaLista(id){
   const n=state.notas.find(x=>x.id===id);
   if(!n) return;
   const titulo=document.getElementById('el-titulo')?.value.trim()||n.titulo;
-  const inputs=document.getElementById('el-items')?.querySelectorAll('[id^="elt-"]')||[];
-  const checks=document.getElementById('el-items')?.querySelectorAll('[id^="eli-"]')||[];
+  // Leer ítems leyendo cada fila del contenedor
+  const cont=document.getElementById('el-items');
   const items=[];
-  inputs.forEach((inp,i)=>{
-    const texto=inp.value.trim();
-    if(texto) items.push({texto, done: checks[i]?checks[i].checked:false});
-  });
+  if(cont){
+    cont.querySelectorAll('div[id^="eli-row-"]').forEach(row=>{
+      const inp=row.querySelector('input[type="text"]');
+      const chk=row.querySelector('input[type="checkbox"]');
+      const texto=(inp?.value||'').trim();
+      if(texto) items.push({texto, done: chk?.checked||false});
+    });
+  }
   state.notas=state.notas.map(x=>x.id===id?{...x,titulo,items}:x);
   save('fnz_notas',state.notas);
   syncSeccionToSheets('nota', state.notas.find(x=>x.id===id));
