@@ -3990,14 +3990,20 @@ function extractClienteAgenda(text){
     /(?:al|para el|para la)\s+(?:cliente|clienta)\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,25}?)(?:\s+en\b|\s*[,.]|$)/i,
     // trabajo/visita para Pérez
     /(?:trabajo|visita|servicio|instalacion|reparacion)\s+para\s+(?:el|la)?\s*(?:señora?|don|doña)?\s*([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{2,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
+    // ★ Sin preposición: "señora Paty Los Olivos", "señor Carlos jueves"
+    /(?:señora?|doña|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|$)/i,
   ];
   // ★ Palabras que nunca son parte del nombre — incluyendo preposiciones de lugar
   const stopWords = /^(en|de|del|al|la|el|por|para|con|que|fue|era|los|las|un|una|dia|mañana|manana|hoy|ayer|servicio|precio|monto|cobro|costo|trabajo|visita|agenda|lunes|martes|miercoles|jueves|viernes|sabado|domingo|soles|sol|a|las|modificacion|instalacion|conexion|reparacion|gasfiteria|documentacion|conversion|construccion|construcion|terma|cocina|horno|secadora|calefon|parrilla|punto|adicional|tuberia|red|el|este|esta|para|desde|hasta|hacia|cerca|queda|vive)$/i;
+  // ★ Palabras de inicio de distrito — no son apellidos
+  const distWords = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|lurín|chorrillos|breña|brena|miraflores|independencia|carabayllo|ventanilla|bellavista)$/i;
+  const diasStop = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana|ayer)$/i;
   for(const p of patterns){
     const m=t2.match(p);
     if(m&&m[1]){
-      const partes = m[1].trim().split(/\s+/).filter(w=>!stopWords.test(w));
-      // ★ Máximo 2 palabras para el nombre (evita capturar ubicación)
+      let partes = m[1].trim().split(/\s+/).filter(w=>!stopWords.test(w));
+      // ★ Si la segunda palabra es inicio de distrito o día → solo primera
+      if(partes.length>1 && (distWords.test(partes[1])||diasStop.test(partes[1]))) partes=[partes[0]];
       const nombre = partes.slice(0,2).join(' ').trim();
       if(nombre.length>1) return nombre;
     }
@@ -5175,11 +5181,14 @@ function extractCliente(text) {
   const SERVICIO_STOP = /\b(punto\s+adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|punto|adicional|tuberia|red|boca|servicio)\b/i;
 
   const patterns = [
+    // Con preposición explícita — máxima prioridad
     /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+\d|\s+en\b|\s+de\b|\s+del\b|\s+por\b|\s+a las|\s+precio|\s+soles|\s+servicio|$)/i,
     /(?:para|al|a|con)\s+(?:el|la)\s+(?:cliente|clienta|señor|señora|vecino|vecina|casero|casera|propietario|propietaria|dueño|dueña)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+servicio|$)/i,
     /(?:casa de|domicilio de|vivienda de|propiedad de)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|$)/i,
     /de(?:l|\s+la)?\s+(?:señor|señora|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+por\b|\s+precio|$)/i,
     /(?:para|al|con)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+en\b|\s+de\b|\s*[,.]|\s+precio|$)/,
+    // ★ Sin preposición: "señora Carmen Lince", "señor Pedro viernes"
+    /(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+la\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|$)/i,
   ];
   for (const p of patterns) {
     const m = t.match(p);
@@ -5188,10 +5197,14 @@ function extractCliente(text) {
       // ★ Cortar en la primera palabra de servicio
       const svcIdx = nombre.search(SERVICIO_STOP);
       if(svcIdx > 0) nombre = nombre.slice(0, svcIdx).trim();
-      // Limpiar preposiciones
-      nombre = nombre.replace(/\b(en|de|del|al|la|el|por|para|con|que|fue|era|un|una)\b/gi,'').trim();
-      // ★ Máximo 2 palabras
-      nombre = nombre.split(/\s+/).filter(Boolean).slice(0,2).join(' ');
+      // Limpiar preposiciones y días de semana
+      nombre = nombre.replace(/\b(en|de|del|al|la|el|por|para|con|que|fue|era|un|una|este|esta|lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana)\b/gi,'').trim();
+      // ★ Si segunda palabra es inicio de distrito → solo primera
+      const partes = nombre.split(/\s+/).filter(Boolean);
+      const DISTW = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|breña|brena|miraflores|independencia|carabayllo|ventanilla)$/i;
+      const DIASW = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana)$/i;
+      if(partes.length>1 && (DISTW.test(partes[1])||DIASW.test(partes[1]))) nombre=partes[0];
+      else nombre=partes.slice(0,2).join(' ');
       if (nombre.length > 1) return nombre;
     }
   }
