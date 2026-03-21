@@ -4064,6 +4064,9 @@ function parseAgendaVoz(text){
     'punto adicional','terma','cocina','horno','calefon','calefón',
     'secadora','parrilla','gasfiteria','gasfitería','documentacion','documentación',
     'conversion','conversión','modificacion','modificación',
+    // ★ Variantes fonéticas Chrome Android
+    'coneccion','conección','combersion','comversion','combersión','comversión',
+    'conbersion','conbersión','combercion','convercion',
   ];
   const esTrabajoExplicito = trabajoKws.some(k=>t.includes(nrm(k)));
 
@@ -4154,8 +4157,10 @@ function parseAgendaVoz(text){
       { keys:['punto adicional','punto extra','punto de gas','boca nueva','boca de gas','salida nueva','toma nueva','un punto adicional','servicio punto adicional','hacer un punto','poner un punto','un punto','hacer punto','poner punto','nuevo punto','instalar punto'], label:'Punto Adicional' },
       { keys:['modificacion de red','modificacion red','modificar red','cambio de red','rediseño de red','modificacion','modificar la red','mod de red','servicio modificacion','modificacion interna'], label:'Modificación Red' },
       { keys:['instalacion nueva','instalacion de gas','obra nueva','proyecto nuevo','instalacion completa','instalar gas nuevo'], label:'Instalación Nueva' },
-      { keys:['conversion de artefacto','conversion a gas','converti artefacto','convertir artefacto','adaptar artefacto'], label:'Conversión Artefacto' },
-      { keys:['conexion de artefacto','conectar artefacto','conexion nueva de artefacto'], label:'Conexión Artefacto' },
+      { keys:['conversion de artefacto','conversion a gas','converti artefacto','convertir artefacto','adaptar artefacto',
+               'combersion','comversion','combersión','comversión','combercion','convercion','conbersion','conbersión'], label:'Conversión Artefacto' },
+      { keys:['conexion de artefacto','conectar artefacto','conexion nueva de artefacto',
+               'coneccion','conección','coneccion de artefacto','konexion','conectar nueva','hice la conexion','hice la coneccion'], label:'Conexión Artefacto' },
       { keys:['reparacion de tuberia','reparar tuberia','tuberia rota','fuga de gas','escape de gas','arreglar tuberia','perdida de gas'], label:'Reparación Tubería' },
       { keys:['gasfiteria','gasfitería','desague','plomeria','tuberia de agua','trabajo de agua','gasfiter'], label:'Gasfitería' },
       { keys:['documentacion','documentación','tramite','certificado','planos','expediente','inspeccion','habilitacion'], label:'Documentación' },
@@ -5083,11 +5088,19 @@ const SERVICIOS_NEGOCIO = [
   { id:'conversion_artefacto', label:'Conversión de artefacto',
     kws:['conversion de artefacto','conversión de artefacto','converti','convertí',
          'conversion a gas','conversión a gas','converti cocina','convertí cocina',
-         'conversion de horno','converti artefacto','adaptar artefacto'] },
+         'conversion de horno','converti artefacto','adaptar artefacto',
+         // ★ Variantes fonéticas de Chrome Android
+         'combersion','comversion','combersión','comversión',
+         'combercion','convercion','combersion de artefacto','comversion de artefacto',
+         'conbersion','conbersión','conbersion de artefacto'] },
   { id:'conexion_artefacto',label:'Conexión de artefacto',
     kws:['conexion de artefacto','conexión de artefacto','conecte','conecté','conectar artefacto',
          'conexion de cocina','conexión de cocina','conecte el artefacto','conectar equipo',
-         'conecte la cocina','conecté la cocina','conexion nueva de artefacto'] },
+         'conecte la cocina','conecté la cocina','conexion nueva de artefacto',
+         // ★ Variantes fonéticas de Chrome Android
+         'coneccion','conección','coneccion de artefacto','conección de artefacto',
+         'konexion','konección','coneccion de cocina','coneccion nueva',
+         'conexión nueva','conectar nueva','hice la conexion','hice la coneccion'] },
   { id:'reparacion_tuberia',label:'Reparación de tubería',
     kws:['reparacion de tuberia','reparación de tubería','repare','reparé','tuberia rota',
          'tubería rota','fuga de gas','filtración de gas','filtracion de gas',
