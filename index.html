@@ -5171,27 +5171,27 @@ function extractUbicacion(text){
 // Extraer nombre del cliente desde la voz
 function extractCliente(text) {
   const t = text;
-  // Palabras que NO son parte del nombre
-  const STOP_CLIENTE = /\b(precio|monto|costo|cobro|soles|sol|pesos|en|de|del|al|la|el|por|para|con|que|fue|era|los|las|un|una|dia|mañana|manana|hoy|ayer|servicio|trabajo|visita|agenda|lunes|martes|miercoles|jueves|viernes|sabado|domingo|mañana|manana|hoy|ayer|pasado|proximo|proxima|siguiente|esta|este|modificacion|instalacion|conexion|reparacion|gasfiteria|documentacion|conversion|construccion|construcion|terma|cocina|horno|secadora|calefon|parrilla|punto|adicional|tuberia|red)\b/gi;
+  // ★ Palabras de servicio — cortar el nombre aquí
+  const SERVICIO_STOP = /\b(punto\s+adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|punto|adicional|tuberia|red|boca|servicio)\b/i;
 
   const patterns = [
-    // "al señor / señora / don / doña / sr / sra / ing / prof / doc"
     /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+\d|\s+en\b|\s+de\b|\s+del\b|\s+por\b|\s+a las|\s+precio|\s+soles|\s+servicio|$)/i,
-    // "al cliente / a la clienta / al vecino"
     /(?:para|al|a|con)\s+(?:el|la)\s+(?:cliente|clienta|señor|señora|vecino|vecina|casero|casera|propietario|propietaria|dueño|dueña)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+servicio|$)/i,
-    // "casa de / domicilio de"
     /(?:casa de|domicilio de|vivienda de|propiedad de)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|$)/i,
-    // "del señor / de la señora"
     /de(?:l|\s+la)?\s+(?:señor|señora|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+por\b|\s+precio|$)/i,
-    // "para Juan Pérez en..." — 2 palabras capitalizadas
     /(?:para|al|con)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+en\b|\s+de\b|\s*[,.]|\s+precio|$)/,
   ];
   for (const p of patterns) {
     const m = t.match(p);
     if (m && m[1]) {
       let nombre = m[1].trim().replace(/\s+/g,' ');
-      // Limpiar palabras que no son nombres
-      nombre = nombre.replace(/(en|de|del|al|la|el|por|para|con|que|fue|era|un|una)/gi,'').trim();
+      // ★ Cortar en la primera palabra de servicio
+      const svcIdx = nombre.search(SERVICIO_STOP);
+      if(svcIdx > 0) nombre = nombre.slice(0, svcIdx).trim();
+      // Limpiar preposiciones
+      nombre = nombre.replace(/\b(en|de|del|al|la|el|por|para|con|que|fue|era|un|una)\b/gi,'').trim();
+      // ★ Máximo 2 palabras
+      nombre = nombre.split(/\s+/).filter(Boolean).slice(0,2).join(' ');
       if (nombre.length > 1) return nombre;
     }
   }
