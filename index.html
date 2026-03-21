@@ -5647,12 +5647,11 @@ function openMicModal() {
   document.getElementById('micModal').style.display='flex';
   document.getElementById('micPreview').style.display='none';
   document.getElementById('micSaveBtn').style.display='none';
-  document.getElementById('micText').textContent='Presiona el micrófono y habla...';
+  document.getElementById('micText').textContent='Escuchando...';
   document.getElementById('micText').style.color='#94A3B8';
   micParsed=null;
-  processVoiceResult._busy = false;  // reset guard para nueva sesión
+  processVoiceResult._busy = false;
   updateCatSelect(state.modo==='negocio'?'ingreso':'egreso');
-  // Hint según modo
   const hint = document.getElementById('micHintText');
   const negHints = [
     '"Hice un punto adicional de 400 soles al señor Juan en La Victoria"',
@@ -5678,6 +5677,8 @@ function openMicModal() {
     const list = state.modo==='negocio' ? negHints : perHints;
     hint.textContent = list[Math.floor(Math.random()*list.length)];
   }
+  // ★ Arrancar el micrófono automáticamente — sin necesidad de tocar "Escuchar"
+  setTimeout(()=>startListening(), 300);
 }
 
 function closeMicModal(e) {
@@ -5695,7 +5696,7 @@ function toggleListening() {
 let micSilenceTimer  = null;  // temporizador de silencio
 let micFullTranscript = '';   // acumula todo lo dicho
 let micRestartLock   = false; // evita reinicios en cadena
-const MIC_SILENCE_MS = 3500;  // ms de silencio antes de procesar
+const MIC_SILENCE_MS = 2000;  // ms de silencio antes de procesar (reducido para más rapidez)
 
 function startListening() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -5727,6 +5728,11 @@ function startListening() {
 
   // Usar el mismo handler que restartListening — evita duplicados
   startListeningHandlers(recognition);
+  // ★ onstart — feedback inmediato cuando Chrome activa el mic
+  recognition.onstart = () => {
+    document.getElementById('micText').textContent='🎙 Habla ahora...';
+    document.getElementById('micText').style.color='#2E7D32';
+  };
   recognition.start();
 }
 
