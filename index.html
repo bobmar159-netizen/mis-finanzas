@@ -1352,8 +1352,11 @@ function savePrestPers(){
   };
   if(!state.prestamosPersonales) state.prestamosPersonales=[];
   state.prestamosPersonales.unshift(p);
-  saveAll();closeModal();render();
-  toast('Préstamo personal registrado ✓');
+  saveAll();
+  console.log('Sincronizando préstamo personal:', p.nombre, p.id);
+  syncSeccionToSheets('prestamo', p);
+  closeModal();render();
+  toast('Préstamo personal registrado ✓ · Enviando a Sheets...');
 }
 
 function pagarPrestPers(id){
