@@ -4158,9 +4158,15 @@ function parseAgendaVoz(text){
       { keys:['modificacion de red','modificacion red','modificar red','cambio de red','rediseño de red','modificacion','modificar la red','mod de red','servicio modificacion','modificacion interna'], label:'Modificación Red' },
       { keys:['instalacion nueva','instalacion de gas','obra nueva','proyecto nuevo','instalacion completa','instalar gas nuevo'], label:'Instalación Nueva' },
       { keys:['conversion de artefacto','conversion a gas','converti artefacto','convertir artefacto','adaptar artefacto',
-               'combersion','comversion','combersión','comversión','combercion','convercion','conbersion','conbersión'], label:'Conversión Artefacto' },
+               'combersion','comversion','combersión','comversión','combercion','convercion','conbersion','conbersión',
+               // ★ Claves cortas — solo la palabra sola ya es suficiente
+               'conversion','conversión','hice una conversion','hice una conversión',
+               'hice conversion','hice conversión','realice conversion','realicé conversión'], label:'Conversión Artefacto' },
       { keys:['conexion de artefacto','conectar artefacto','conexion nueva de artefacto',
-               'coneccion','conección','coneccion de artefacto','konexion','conectar nueva','hice la conexion','hice la coneccion'], label:'Conexión Artefacto' },
+               'coneccion','conección','coneccion de artefacto','konexion','conectar nueva','hice la conexion','hice la coneccion',
+               // ★ Claves cortas
+               'conexion','conexión','hice la conexión','hice conexion','hice conexión',
+               'realice conexion','realicé conexión','nueva conexion','nueva conexión'], label:'Conexión Artefacto' },
       { keys:['reparacion de tuberia','reparar tuberia','tuberia rota','fuga de gas','escape de gas','arreglar tuberia','perdida de gas'], label:'Reparación Tubería' },
       { keys:['gasfiteria','gasfitería','desague','plomeria','tuberia de agua','trabajo de agua','gasfiter'], label:'Gasfitería' },
       { keys:['documentacion','documentación','tramite','certificado','planos','expediente','inspeccion','habilitacion'], label:'Documentación' },
@@ -5089,18 +5095,22 @@ const SERVICIOS_NEGOCIO = [
     kws:['conversion de artefacto','conversión de artefacto','converti','convertí',
          'conversion a gas','conversión a gas','converti cocina','convertí cocina',
          'conversion de horno','converti artefacto','adaptar artefacto',
-         // ★ Variantes fonéticas de Chrome Android
+         // ★ Clave corta — palabra sola
+         'conversion','conversión','hice conversion','hice conversión',
+         'hice una conversion','hice una conversión','realice conversion','realicé conversión',
+         // ★ Variantes fonéticas Chrome
          'combersion','comversion','combersión','comversión',
-         'combercion','convercion','combersion de artefacto','comversion de artefacto',
-         'conbersion','conbersión','conbersion de artefacto'] },
+         'combercion','convercion','conbersion','conbersión'] },
   { id:'conexion_artefacto',label:'Conexión de artefacto',
     kws:['conexion de artefacto','conexión de artefacto','conecte','conecté','conectar artefacto',
          'conexion de cocina','conexión de cocina','conecte el artefacto','conectar equipo',
          'conecte la cocina','conecté la cocina','conexion nueva de artefacto',
-         // ★ Variantes fonéticas de Chrome Android
-         'coneccion','conección','coneccion de artefacto','conección de artefacto',
-         'konexion','konección','coneccion de cocina','coneccion nueva',
-         'conexión nueva','conectar nueva','hice la conexion','hice la coneccion'] },
+         // ★ Clave corta — palabra sola
+         'conexion','conexión','hice conexion','hice conexión',
+         'hice la conexion','hice la conexión','nueva conexion','nueva conexión',
+         // ★ Variantes fonéticas Chrome
+         'coneccion','conección','konexion','coneccion de artefacto',
+         'coneccion de cocina','coneccion nueva','conectar nueva','hice la coneccion'] },
   { id:'reparacion_tuberia',label:'Reparación de tubería',
     kws:['reparacion de tuberia','reparación de tubería','repare','reparé','tuberia rota',
          'tubería rota','fuga de gas','filtración de gas','filtracion de gas',
