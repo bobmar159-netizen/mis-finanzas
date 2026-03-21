@@ -467,6 +467,7 @@ function saveAll(){
   save('fnz_agenda',          state.agenda);
   save('fnz_notas',           state.notas);
   save(k.presupuesto,         state.presupuesto);
+  save('fnz_nombre_usuario',  state.nombreUsuario||'');
   // NO llamar syncToSheets() aquí — cada función llama su propio sync
 }
 
@@ -509,6 +510,7 @@ function save(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch{
 
 let state = {
   modo:         load('fnz_modo','personal'),
+  nombreUsuario: load('fnz_nombre_usuario',''),
   transactions: [],
   debts:        [],
   servicios:    [],
@@ -1350,11 +1352,8 @@ function savePrestPers(){
   };
   if(!state.prestamosPersonales) state.prestamosPersonales=[];
   state.prestamosPersonales.unshift(p);
-  saveAll();
-  console.log('Sincronizando préstamo personal:', p.nombre, p.id);
-  syncSeccionToSheets('prestamo', p);
-  closeModal();render();
-  toast('Préstamo personal registrado ✓ · Enviando a Sheets...');
+  saveAll();closeModal();render();
+  toast('Préstamo personal registrado ✓');
 }
 
 function pagarPrestPers(id){
@@ -1633,8 +1632,12 @@ function savePresup(){
 }
 
 function deletePresup(id){
-  state.presupuesto=state.presupuesto.filter(p=>p.id!==id);
-  saveAll();render();toast('Eliminado');
+  const p=state.presupuesto.find(x=>x.id===id);
+  state.presupuesto=state.presupuesto.filter(x=>x.id!==id);
+  saveAll();
+  // FIX: sync eliminación a Sheets marcando gastado como -1 para indicar borrado
+  if(p){ syncSeccionToSheets('presupuesto',{...p,gastado:-1,semana:getWeekLabel()}); }
+  render();toast('Eliminado');
 }
 
 function renderServicios(){
@@ -2069,7 +2072,7 @@ function syncToSheets(lastTx){
     if(!tx) return;
     const payload={type:'tx',modo:state.modo,timestamp:'tx_'+tx.id+'_'+Date.now(),tx};
     _sendToSheets(url,payload);
-  },1200);
+  },200);
 }
 
 function _updateSyncBadge(){
@@ -2081,6 +2084,14 @@ function _updateSyncBadge(){
   el.style.background=s.bg;
   el.style.color=s.c;
   el.style.border='1px solid '+(s.c==='transparent'?'transparent':s.c+'44');
+}
+
+function guardarNombreUsuario(){
+  const v=document.getElementById('input-nombre-usuario')?.value.trim();
+  if(!v) return toast('Escribe tu nombre','error');
+  state.nombreUsuario=v;
+  saveAll();
+  toast('Nombre guardado: '+v);
 }
 
 function saveSheetsUrl(){
@@ -2814,6 +2825,15 @@ function renderAjustes(){
   return `
     <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:20px">Ajustes</div>
 
+    <!-- NOMBRE USUARIO -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text)">Tu nombre (para el asistente de voz)</div>
+      <div style="display:flex;gap:8px">
+        <input id="input-nombre-usuario" type="text" placeholder="Ej: Omar" value="${state.nombreUsuario||''}" style="flex:1">
+        <button onclick="guardarNombreUsuario()" style="background:var(--gold);color:#0D0D0F;border:none;border-radius:10px;padding:10px 16px;font-weight:600;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">Guardar</button>
+      </div>
+    </div>
+
     <!-- GOOGLE SHEETS CARD -->
     <div class="card" style="margin-bottom:12px;border-color:#1565C033;background:linear-gradient(135deg,#EFF6FF,#FFFFFF)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
@@ -3232,10 +3252,19 @@ function checkNotifBtn(){
 // AGENDA — VISITAS Y TRABAJOS
 // ═══════════════════════════════════════════════════════
 
+// Estados del TRABAJO (qué pasó con el trabajo)
 const AGENDA_ESTADOS = {
-  pendiente:  { label:'Pendiente',  bg:'#FFFBEB', color:'#854F0B', border:'#EF9F27' },
-  completado: { label:'Completado', bg:'#EAF3DE', color:'#27500A', border:'#639922' },
-  cancelado:  { label:'Cancelado',  bg:'#FCEBEB', color:'#791F1F', border:'#E24B4A' },
+  agendado:      { label:'Agendado',      bg:'#E6F1FB', color:'#0C447C', border:'#378ADD' },
+  pendiente:     { label:'Pendiente',     bg:'#FAEEDA', color:'#633806', border:'#EF9F27' },
+  reprogramo:    { label:'Reprogramó',    bg:'#EEEDFE', color:'#3C3489', border:'#7F77DD' },
+  se_desanimo:   { label:'Se desanimó',   bg:'#F1EFE8', color:'#444441', border:'#888780' },
+  se_finalizo:   { label:'Se finalizó',   bg:'#EAF3DE', color:'#27500A', border:'#639922' },
+};
+// Estados del PAGO (solo aplica cuando estado=se_finalizo)
+const AGENDA_PAGO = {
+  completo:  { label:'Cobro completo',  bg:'#EAF3DE', color:'#27500A' },
+  parcial:   { label:'Cobro parcial',   bg:'#FAEEDA', color:'#633806' },
+  sin_cobro: { label:'Sin cobro',       bg:'#FCEBEB', color:'#791F1F' },
 };
 
 const AGENDA_SERVICIOS = [
@@ -3349,8 +3378,13 @@ function renderAgenda(){
       ${item.telefono?`<a href="tel:${item.telefono}" style="display:inline-flex;align-items:center;gap:5px;background:#F0FDF4;border:1px solid #4CAF8533;border-radius:8px;padding:5px 10px;font-size:12px;color:#27500A;text-decoration:none;margin-bottom:8px">📞 ${item.telefono}</a>`:''}
       ${item.notas?`<div style="background:#FFFBEB;border:1px solid #EF9F2733;border-radius:8px;padding:7px 10px;font-size:12px;color:#633806;margin-bottom:8px">📝 ${item.notas}</div>`:''}
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${item.estado==='pendiente'?`<button onclick="cambiarEstadoAgenda('${item.id}','completado')" style="flex:1;min-width:100px;background:#EAF3DE;border:1px solid #63992244;color:#27500A;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">✓ Completado</button>`:''}
-        ${item.estado==='pendiente'&&!isVisita&&item.precio?`<button onclick="registrarIngresoAgenda('${item.id}')" style="flex:1;min-width:100px;background:#EFF6FF;border:1px solid #1565C044;color:#0C447C;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">💰 Registrar ingreso</button>`:''}
+        ${['agendado','pendiente','reprogramo'].includes(item.estado||'agendado')?`
+          <button onclick="cambiarEstadoAgenda('${item.id}','reprogramo')" style="flex:1;min-width:88px;background:#EEEDFE;border:1px solid #7F77DD44;color:#3C3489;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer">↻ Reprogramó</button>
+          <button onclick="cambiarEstadoAgenda('${item.id}','se_desanimo')" style="flex:1;min-width:88px;background:#F1EFE8;border:1px solid #88878044;color:#444441;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer">✗ Se desanimó</button>
+          ${!isVisita?`<button onclick="abrirModalCobro('${item.id}')" style="flex:1;min-width:105px;background:#EAF3DE;border:1px solid #63992244;color:#27500A;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer">✓ Se finalizó</button>`:''}
+        `:''}
+        ${item.estadoPago?`<span style="background:${(AGENDA_PAGO[item.estadoPago]||{}).bg||'#F5F5F5'};color:${(AGENDA_PAGO[item.estadoPago]||{}).color||'#333'};font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px">${(AGENDA_PAGO[item.estadoPago]||{}).label||''}</span>`:''}
+        ${item.montoPendienteCobro>0?`<span style="background:#FAEEDA;color:#633806;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px">Pendiente cobrar: ${fmt(item.montoPendienteCobro)}</span>`:''}
         ${isVisita?`<button onclick="convertirVisitaAConstruccion('${item.id}')" style="flex:1;min-width:130px;background:#FFF3E0;border:1px solid #E6510044;color:#BF360C;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">🔨 Convertir a Construcción</button>`:''}
         <button onclick="editAgendaItem('${item.id}')" style="width:32px;height:32px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:12px">✎</button>
         <button onclick="deleteAgendaItem('${item.id}')" style="width:32px;height:32px;background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">✕</button>
@@ -3360,7 +3394,7 @@ function renderAgenda(){
 
   // Filtros
   const filtroHtml=`<div style="display:flex;gap:6px;margin-bottom:14px">
-    ${[['todos','Todos'],['pendientes','Pendientes'],['completados','Completados']].map(([k,l])=>
+    ${[['todos','Todos'],['activos','Activos'],['finalizados','Finalizados'],['no_realizados','No realizados']].map(([k,l])=>
       `<button onclick="window._agendaFiltro='${k}';render()" style="font-size:11px;padding:5px 12px;border-radius:20px;border:1px solid ${window._agendaFiltro===k?'var(--gold)':'var(--border)'};background:${window._agendaFiltro===k?'#FFF8EC':'transparent'};color:${window._agendaFiltro===k?'var(--gold)':'var(--muted)'};font-weight:${window._agendaFiltro===k?'600':'400'};cursor:pointer;font-family:'DM Sans',sans-serif">${l}</button>`
     ).join('')}
   </div>`;
@@ -3403,7 +3437,7 @@ function openAddAgenda(tipo, editId, preData){
     const isSelected = (item&&item.servicio===s) || (!item&&pre.servicio&&s===pre.servicio);
     return `<option value="${s}" ${isSelected?'selected':''}>${s}</option>`;
   }).join('');
-  const estadosOpts = Object.entries(AGENDA_ESTADOS).map(([k,v])=>`<option value="${k}" ${item&&item.estado===k?'selected':k==='pendiente'&&!item?'selected':''}>${v.label}</option>`).join('');
+  const estadosOpts = Object.entries(AGENDA_ESTADOS).map(([k,v])=>`<option value="${k}" ${item&&item.estado===k?'selected':k==='agendado'&&!item?'selected':''}>${v.label}</option>`).join('');
 
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:${colorTitle}">${isEdit?'Editar':(isVisita?'Nueva':'Nuevo')} ${isVisita?'Visita':'Trabajo'}</div>
@@ -3697,14 +3731,91 @@ function cambiarEstadoAgenda(id, estado){
   if(!item) return;
   item.estado=estado;
   save('fnz_agenda',state.agenda);
+  // FIX: usar _sendToSheets en lugar de new Image() — más confiable
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(url){
-    const payload={ type:'agenda_estado', agenda_estado:{ id:item.id, estado, tipo:item.tipo } };
-    const img=new Image();
-    img.src=url+'?data='+encodeURIComponent(JSON.stringify(payload));
+    const payload={ type:'agenda_estado', agenda_estado:{ id:item.id, estado, estadoPago:item.estadoPago||'-', montoPagado:item.montoPagado||0, montoPendienteCobro:item.montoPendienteCobro||0, tipo:item.tipo } };
+    _sendToSheets(url, payload);
   }
   render();
-  toast('Estado actualizado a '+AGENDA_ESTADOS[estado].label);
+  toast('Estado: '+(AGENDA_ESTADOS[estado]?.label||estado));
+}
+
+function abrirModalCobro(id){
+  const item=(state.agenda||[]).find(x=>x.id===id);
+  if(!item) return;
+  const precio=item.precio||0;
+  document.getElementById('modal-content').innerHTML=`
+    <div class="modal-title" style="color:#27500A">Finalizar trabajo</div>
+    <div style="background:#F3F0FF;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px">
+      <div style="font-weight:600">${item.cliente||'Cliente'}</div>
+      <div style="color:#6C3483;margin-top:2px">${item.servicio||''} · Precio acordado: <strong>${fmt(precio)}</strong></div>
+    </div>
+    <div class="field"><label class="field-label">¿Cuánto cobró? (S/)</label>
+      <input id="cobro-monto" type="number" inputmode="decimal" placeholder="0.00" value="${precio}" style="font-size:16px;font-weight:600">
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button onclick="setCobro(${precio})" style="flex:1;background:#EAF3DE;border:1px solid #63992244;color:#27500A;border-radius:8px;padding:8px;font-size:12px;font-weight:600;cursor:pointer">Cobro completo (${fmt(precio)})</button>
+      <button onclick="setCobro(0)" style="flex:1;background:#FCEBEB;border:1px solid #E24B4A44;color:#791F1F;border-radius:8px;padding:8px;font-size:12px;font-weight:600;cursor:pointer">Sin cobro</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn-gold" onclick="guardarFinalizacion('${id}')">Guardar</button>
+    </div>`;
+  showModal();
+}
+
+function setCobro(v){ document.getElementById('cobro-monto').value=v; }
+
+function guardarFinalizacion(id){
+  const item=(state.agenda||[]).find(x=>x.id===id);
+  if(!item) return;
+  const cobrado=parseFloat(document.getElementById('cobro-monto').value)||0;
+  const precio=parseFloat(item.precio)||0;
+  const pendiente=parseFloat((precio-cobrado).toFixed(2));
+
+  item.estado='se_finalizo';
+  item.montoPagado=cobrado;
+  item.montoPendienteCobro=Math.max(pendiente,0);
+
+  if(cobrado>=precio) item.estadoPago='completo';
+  else if(cobrado>0)  item.estadoPago='parcial';
+  else                item.estadoPago='sin_cobro';
+
+  // Registrar ingreso si cobró algo
+  if(cobrado>0){
+    const tx={id:Date.now()+'_ag',type:'ingreso',amount:cobrado,
+      category:item.servicio||'Servicio Gas',date:item.fecha,
+      description:(item.servicio||'Servicio')+' — '+(item.cliente||''),
+      cliente:item.cliente||'',ubicacion:item.ubicacion||'',negocio:true};
+    state.transactions.unshift(tx);
+    syncToSheets(tx);
+  }
+
+  // Si cobro parcial → crear deuda automáticamente
+  if(item.estadoPago==='parcial' && pendiente>0){
+    const deudaAuto={id:Date.now()+'_dag',name:'Saldo pendiente — '+(item.cliente||''),
+      totalAmount:pendiente,cuotaMonto:pendiente,cuotasTotales:1,cuotasPagadas:0,
+      categoria:'Servicio',color:'#9B59B6'};
+    if(!state.debts) state.debts=[];
+    state.debts.push(deudaAuto);
+    syncSeccionToSheets('deuda',deudaAuto);
+    toast('⚠ Cobro parcial · Deuda de '+fmt(pendiente)+' creada automáticamente','info');
+  }
+
+  save('fnz_agenda',state.agenda);
+  saveAll();
+
+  // Sync estado a Sheets
+  const url=localStorage.getItem('fnz_sheets_url')||'';
+  if(url){
+    const payload={type:'agenda_estado',agenda_estado:{id:item.id,estado:'se_finalizo',
+      estadoPago:item.estadoPago,montoPagado:cobrado,montoPendienteCobro:item.montoPendienteCobro,tipo:item.tipo}};
+    _sendToSheets(url,payload);
+  }
+  closeModal();render();
+  if(item.estadoPago==='completo') toast('✓ Trabajo finalizado · '+fmt(cobrado)+' cobrado');
+  else if(item.estadoPago==='sin_cobro') toast('Trabajo finalizado · Sin cobro registrado');
 }
 
 function registrarIngresoAgenda(id){
@@ -4089,17 +4200,27 @@ function clearTransactions(){
 }
 
 function resetAllData(){
-  if(!confirm('⚠️ ¿Borrar ABSOLUTAMENTE TODOS los datos?\n\nMovimientos, deudas, servicios y categorías. Esta acción NO se puede deshacer.'))return;
-  if(!confirm('¿Estás completamente seguro?'))return;
+  if(!confirm('⚠️ ¿Borrar ABSOLUTAMENTE TODOS los datos?\n\nMovimientos, deudas, agenda, notas, metas, servicios y categorías. Esta acción NO se puede deshacer.'))return;
+  if(!confirm('¿Estás completamente seguro? Se borrará TODO incluyendo agenda y notas.'))return;
+  // FIX: borrar todos los estados, no solo transacciones y deudas
   state.transactions=[];
   state.debts=[];
   state.servicios=DEFAULT_SERVICES;
   state.catsIn=DEFAULT_CATS_IN;
   state.catsEx=DEFAULT_CATS_EX;
+  state.agenda=[];
+  state.notas=[];
+  state.metas=[];
+  state.prestamos=[];
+  state.prestamosPersonales=[];
+  state.presupuesto=[];
+  state.recordatorios=[];
   saveAll();render();toast('Todos los datos fueron borrados');
 }
 
 function descargarAppsScript(){
+  // AVISO: este código embebido puede estar desactualizado.
+  // Siempre usa el GAS más reciente desde tu repositorio.
   const codigo="// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// MIS FINANZAS \u2014 Google Apps Script v6.4\n// Dise\u00f1o estilo Notion \u2014 limpio y moderno\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n// Hojas v\u00e1lidas \u2014 cualquier otra se elimina autom\u00e1ticamente\nvar HOJAS_VALIDAS = ['Construcciones y Visitas', 'Movimientos Negocio', 'Deudas y Movimientos', 'Servicios Fijos', 'Metas de Ahorro', 'Prestamos', 'Notas'];\n\nfunction autorizarCalendar() {\n  try {\n    var cal = CalendarApp.getDefaultCalendar();\n    Logger.log('Calendar autorizado OK: ' + cal.getName());\n    return 'OK: ' + cal.getName();\n  } catch (e) { return 'Error: ' + e.message; }\n}\n\nfunction probarCalendar() {\n  try {\n    var cal = CalendarApp.getDefaultCalendar();\n    var ahora = new Date();\n    var ev = cal.createEvent('TEST Mis Finanzas', ahora, new Date(ahora.getTime() + 3600000));\n    ev.deleteEvent();\n    return 'OK';\n  } catch (e) { return 'Error: ' + e.message; }\n}\n\nfunction inicializarHojas() {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sh1 = getOrCreate(ss, 'Construcciones y Visitas');\n  var sh2 = getOrCreate(ss, 'Movimientos Negocio');\n  var sh3 = getOrCreate(ss, 'Deudas y Movimientos');\n  var sh4 = getOrCreate(ss, 'Notas');\n  initConstrucciones(sh1);\n  initMovNegocio(sh2);\n  initDeudasSheet(sh3);\n  // Init Notas\n  if (sh4.getLastRow() === 0) {\n    sh4.appendRow(['  Fecha','  Tipo','  T\u00edtulo','  Contenido / \u00cdtems','  Recordatorio','  Estado']);\n    aplicarEstiloNotion(sh4, {header:'#1C1C1C'}, 6);\n    sh4.setColumnWidth(1,110);sh4.setColumnWidth(2,130);sh4.setColumnWidth(3,200);\n    sh4.setColumnWidth(4,340);sh4.setColumnWidth(5,150);sh4.setColumnWidth(6,120);\n  }\n  limpiarHojasViejas();\n  Logger.log('Hojas inicializadas correctamente');\n}\n\nfunction limpiarHojasViejas() {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var hojas = ss.getSheets();\n  for (var i = hojas.length - 1; i >= 0; i--) {\n    var nombre = hojas[i].getName();\n    var esValida = false;\n    for (var j = 0; j < HOJAS_VALIDAS.length; j++) {\n      if (nombre === HOJAS_VALIDAS[j]) { esValida = true; break; }\n    }\n    if (!esValida && ss.getSheets().length > 1) {\n      try { ss.deleteSheet(hojas[i]); } catch(e) {}\n    }\n  }\n}\n\n// \u2605 Anti-duplicado via PropertiesService \u2014 ver doGet\n\nfunction doGet(e) {\n  try {\n    var raw = e && e.parameter && e.parameter.data ? e.parameter.data : null;\n    if (!raw) return ContentService.createTextOutput('Mis Finanzas v6.4 activo');\n    var data = JSON.parse(decodeURIComponent(raw));\n    if (data.test) return jsonOk({ ok: true, version: '6.4' });\n\n    // Sin anti-duplicado \u2014 cada request se procesa siempre\n\n    var ss = SpreadsheetApp.getActiveSpreadsheet();\n\n    if      (data.type === 'agenda')            { handleAgenda(ss, data); }\n    else if (data.type === 'agenda_estado')     { handleAgendaEstado(ss, data); }\n    else if (data.type === 'agenda_delete')     { handleAgendaDelete(ss, data); }\n    else if (data.type === 'agenda_conversion') { handleAgendaConversion(ss, data); }\n    else if (data.type === 'tx')                { handleTx(ss, data); }\n    else if (data.type === 'deuda')             { handleDeuda(ss, data); }\n    else if (data.type === 'servicio')          { handleServicio(ss, data); }\n    else if (data.type === 'meta')              { handleMeta(ss, data); }\n    else if (data.type === 'prestamo')          { handlePrestamo(ss, data); }\n    else if (data.type === 'nota')              { handleNota(ss, data); }\n\n    return jsonOk({ ok: true });\n  } catch (err) {\n    Logger.log('Error: ' + err.message);\n    return jsonOk({ ok: false, error: err.message });\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// DISE\u00d1O NOTION \u2014 funciones de estilo\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n// Colores por hoja\nvar TEMAS = {\n  'Construcciones y Visitas': { header: '#1C1C1C', alt: '#FAFAFA', badge_a: '#FFF3E0', badge_b: '#E3F2FD', badge_ok: '#E8F5E9', badge_pen: '#FFF8E1' },\n  'Movimientos Negocio':      { header: '#1C1C1C', alt: '#FAFAFA', badge_ing: '#E8F5E9', badge_egr: '#FCE4EC' },\n  'Deudas y Movimientos':     { header: '#1C1C1C', alt: '#FAFAFA' }\n};\n\nfunction aplicarEstiloNotion(sh, tema, numCols) {\n  // Fila de encabezado\n  var hRange = sh.getRange(1, 1, 1, numCols);\n  hRange.setBackground(tema.header)\n        .setFontColor('#FFFFFF')\n        .setFontWeight('bold')\n        .setFontSize(11)\n        .setFontFamily('Arial')\n        .setHorizontalAlignment('left')\n        .setVerticalAlignment('middle')\n        .setBorder(false, false, false, false, false, false);\n  sh.setRowHeight(1, 36);\n  sh.setFrozenRows(1);\n\n  // Ocultar l\u00edneas de cuadr\u00edcula\n  sh.setHiddenGridlines(true);\n}\n\nfunction aplicarFilaNotion(sh, row, numCols, altBg) {\n  var bg = (row % 2 === 0) ? altBg : '#FFFFFF';\n  sh.getRange(row, 1, 1, numCols)\n    .setBackground(bg)\n    .setFontSize(10)\n    .setFontFamily('Arial')\n    .setVerticalAlignment('middle')\n    .setBorder(false, false, true, false, false, false, '#F0F0F0', SpreadsheetApp.BorderStyle.SOLID);\n  sh.setRowHeight(row, 32);\n}\n\nfunction badgeCell(sh, row, col, texto, bgColor, textColor) {\n  var cell = sh.getRange(row, col);\n  cell.setValue(texto);\n  cell.setBackground(bgColor || '#F5F5F5');\n  cell.setFontColor(textColor || '#333333');\n  cell.setFontWeight('bold');\n  cell.setFontSize(10);\n  cell.setHorizontalAlignment('center');\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// HOJA 1 \u2014 CONSTRUCCIONES Y VISITAS\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction initConstrucciones(sh) {\n  if (sh.getLastRow() > 0) { return; }\n  var headers = ['  Fecha', '  Hora', '  Tipo', '  Cliente', '  Servicio', '  Ubicaci\u00f3n', '  Precio S/.', '  Estado', '  Tel\u00e9fono', '  Notas', 'CalID'];\n  sh.appendRow(headers);\n  aplicarEstiloNotion(sh, TEMAS['Construcciones y Visitas'], 11);\n  // Anchos estilo Notion\n  sh.setColumnWidth(1, 110);  // Fecha\n  sh.setColumnWidth(2, 80);   // Hora\n  sh.setColumnWidth(3, 120);  // Tipo\n  sh.setColumnWidth(4, 160);  // Cliente\n  sh.setColumnWidth(5, 170);  // Servicio\n  sh.setColumnWidth(6, 140);  // Ubicaci\u00f3n\n  sh.setColumnWidth(7, 110);  // Precio\n  sh.setColumnWidth(8, 120);  // Estado\n  sh.setColumnWidth(9, 120);  // Tel\u00e9fono\n  sh.setColumnWidth(10, 200); // Notas\n  sh.setColumnWidth(11, 20);  // CalID oculto\n  sh.hideColumns(11);\n}\n\nfunction handleAgenda(ss, data) {\n  var item = data.item || data.agenda;\n  if (!item) { return; }\n  var sh = getOrCreate(ss, 'Construcciones y Visitas');\n  initConstrucciones(sh);\n\n  var esVisita = item.tipo === 'visita';\n\n  // Buscar fila existente por ID\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === item.id) { foundRow = i; break; }\n  }\n\n  var calId = '-';\n  if (foundRow > 0) {\n    // Edici\u00f3n \u2014 conservar CalID existente\n    calId = sh.getRange(foundRow, 11).getValue() || '-';\n    // Actualizar Calendar si existe\n    try {\n      if (calId && calId !== '-') {\n        var ev = CalendarApp.getEventById(calId);\n        if (ev) {\n          var p2 = item.fecha.split('-'), h2 = (item.hora||'09:00').split(':');\n          var inicio2 = new Date(Number(p2[0]),Number(p2[1])-1,Number(p2[2]),Number(h2[0]),Number(h2[1]||0),0);\n          ev.setTime(inicio2, new Date(inicio2.getTime()+7200000));\n          if (!esVisita && item.servicio) ev.setTitle(item.servicio+' \u2014 '+(item.cliente||'Cliente'));\n          if (item.ubicacion) ev.setLocation(item.ubicacion);\n        }\n      }\n    } catch(e) {}\n  } else {\n    // Nuevo \u2014 crear evento Calendar\n    try { calId = crearEventoCalendar(item) || '-'; } catch(e) {}\n  }\n\n  var valores = [\n    '  ' + fmtDate(item.fecha),\n    '  ' + (item.hora || '-'),\n    esVisita ? 'Visita' : 'Construcci\u00f3n',\n    '  ' + (item.cliente || '-'),\n    '  ' + (esVisita ? '-' : (item.servicio || '-')),\n    '  ' + (item.ubicacion || '-'),\n    esVisita ? '-' : (item.precio ? toNum(item.precio) : '-'),\n    item.estado === 'completado' ? 'Completado' : 'Pendiente',\n    '  ' + (item.telefono || '-'),\n    '  ' + (item.notas || '-'),\n    calId\n  ];\n\n  if (foundRow > 0) {\n    sh.getRange(foundRow, 1, 1, 11).setValues([valores]);\n    aplicarFilaNotion(sh, foundRow, 11, '#FAFAFA');\n    var row = foundRow;\n  } else {\n    sh.appendRow(valores);\n    var row = sh.getLastRow();\n    sh.getRange(row, 1).setNote(item.id || '');\n  }\n\n  if (esVisita) {\n    badgeCell(sh, row, 3, 'Visita', '#E3F2FD', '#1565C0');\n  } else {\n    badgeCell(sh, row, 3, 'Construcci\u00f3n', '#FFF3E0', '#E65100');\n  }\n  var esComp = item.estado === 'completado';\n  badgeCell(sh, row, 8, esComp ? '\u2713 Completado' : '\u25cb Pendiente', esComp ? '#E8F5E9' : '#FFF8E1', esComp ? '#2E7D32' : '#F57F17');\n  if (!esVisita && item.precio) {\n    sh.getRange(row, 7).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#2E7D32');\n  }\n}\n\nfunction handleAgendaEstado(ss, data) {\n  var ae = data.agenda_estado; if (!ae) { return; }\n  var sh = ss.getSheetByName('Construcciones y Visitas'); if (!sh) { return; }\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === ae.id) {\n      var esComp = ae.estado === 'completado';\n      badgeCell(sh, i, 8, esComp ? '\u2713 Completado' : '\u25cb Pendiente', esComp ? '#E8F5E9' : '#FFF8E1', esComp ? '#2E7D32' : '#F57F17');\n      try {\n        var calId = sh.getRange(i, 11).getValue();\n        if (calId && calId !== '-') {\n          var ev = CalendarApp.getEventById(calId);\n          if (ev) {\n            var t = ev.getTitle();\n            if (esComp) { if (t.indexOf('[OK] ') < 0) ev.setTitle('[OK] ' + t); }\n            else { ev.setTitle(t.replace('[OK] ', '')); }\n          }\n        }\n      } catch(e) {}\n      break;\n    }\n  }\n}\n\nfunction handleAgendaDelete(ss, data) {\n  if (!data.id) { return; }\n  var sh = ss.getSheetByName('Construcciones y Visitas'); if (!sh) { return; }\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === data.id) {\n      try {\n        var calId = sh.getRange(i, 11).getValue();\n        if (calId && calId !== '-') { var ev = CalendarApp.getEventById(calId); if (ev) ev.deleteEvent(); }\n      } catch(e) {}\n      badgeCell(sh, i, 8, '\u2717 Eliminado', '#F5F5F5', '#9E9E9E');\n      sh.getRange(i, 1, 1, 11).setBackground('#F9F9F9').setFontColor('#BDBDBD');\n      break;\n    }\n  }\n}\n\nfunction handleAgendaConversion(ss, data) {\n  var item = data.item;\n  if (!item || !data.id) { return; }\n  var sh = ss.getSheetByName('Construcciones y Visitas');\n  if (!sh) { handleAgenda(ss, data); return; } // si no existe la hoja, crear normal\n\n  // Buscar la fila por id (guardado en nota de celda A)\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === data.id) { foundRow = i; break; }\n  }\n\n  var fechaConv = fmtDate(new Date().toISOString().split('T')[0]);\n\n  if (foundRow > 0) {\n    // Actualizar fila existente\n    sh.getRange(foundRow, 1, 1, 10).setValues([[\n      '  ' + fmtDate(item.fecha),\n      '  ' + (item.hora || '-'),\n      'Construcci\u00f3n',\n      '  ' + (item.cliente || '-'),\n      '  ' + (item.servicio || '-'),\n      '  ' + (item.ubicacion || '-'),\n      item.precio ? toNum(item.precio) : '-',\n      '\u25cb Pendiente',\n      '  ' + (item.telefono || '-'),\n      '  Convertido de Visita el ' + fechaConv + (item.fechaVisitaOriginal ? ' (visita: ' + fmtDate(item.fechaVisitaOriginal) + ')' : '')\n    ]]);\n    aplicarFilaNotion(sh, foundRow, 11, '#FAFAFA');\n    badgeCell(sh, foundRow, 3, 'Construcci\u00f3n', '#FFF3E0', '#E65100');\n    badgeCell(sh, foundRow, 8, '\u25cb Pendiente', '#FFF8E1', '#F57F17');\n    if (item.precio) {\n      sh.getRange(foundRow, 7).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#2E7D32');\n    }\n    // Actualizar Calendar si existe\n    try {\n      var calId = sh.getRange(foundRow, 11).getValue();\n      if (calId && calId !== '-') {\n        var ev = CalendarApp.getEventById(calId);\n        if (ev) {\n          var iconoConv = '\ud83d\udd27';\n          var servConv = (item.servicio || '').toLowerCase();\n          if (servConv.indexOf('terma') >= 0 || servConv.indexOf('calef') >= 0)       { iconoConv = '\ud83d\udebf'; }\n          else if (servConv.indexOf('cocina') >= 0 || servConv.indexOf('horno') >= 0) { iconoConv = '\ud83c\udf73'; }\n          else if (servConv.indexOf('parrilla') >= 0)                                 { iconoConv = '\ud83d\udd25'; }\n          else if (servConv.indexOf('punto') >= 0 || servConv.indexOf('conexi') >= 0) { iconoConv = '\u26a1'; }\n          else if (servConv.indexOf('modific') >= 0 || servConv.indexOf('red') >= 0)  { iconoConv = '\ud83d\udd29'; }\n          else if (servConv.indexOf('reparac') >= 0)                                  { iconoConv = '\ud83d\udee0\ufe0f'; }\n          else if (servConv.indexOf('gasfiter') >= 0)                                 { iconoConv = '\ud83d\udca7'; }\n          ev.setTitle(iconoConv + ' ' + (item.servicio || 'Construcci\u00f3n') + ' \u2014 ' + (item.cliente || 'Cliente'));\n          var p2 = item.fecha.split('-'), h2 = (item.hora || '09:00').split(':');\n          var inicio2 = new Date(Number(p2[0]), Number(p2[1])-1, Number(p2[2]), Number(h2[0]), Number(h2[1]||0), 0);\n          ev.setTime(inicio2, new Date(inicio2.getTime() + 7200000));\n          var desc2 = '\ud83d\udc64 ' + (item.cliente||'-') + '\\n' +\n                      iconoConv + ' ' + (item.servicio||'-') + '\\n' +\n                      (item.precio ? '\ud83d\udcb0 S/ ' + toNum(item.precio).toFixed(2) + '\\n' : '') +\n                      (item.ubicacion ? '\ud83d\udccd ' + item.ubicacion + '\\n' : '') +\n                      (item.hora ? '\ud83d\udd50 ' + item.hora + '\\n' : '') +\n                      (item.telefono ? '\ud83d\udcde ' + item.telefono + '\\n' : '') +\n                      '\ud83d\udd04 Convertido de Visita el ' + fechaConv;\n          ev.setDescription(desc2);\n        }\n      }\n    } catch(e) { Logger.log('Cal conversion error: ' + e.message); }\n  } else {\n    // No encontr\u00f3 la fila \u2014 crear como nueva construcci\u00f3n\n    handleAgenda(ss, data);\n  }\n}\n\nfunction crearEventoCalendar(item) {\n  var cal = CalendarApp.getDefaultCalendar();\n  if (!item.fecha) { return null; }\n  var p = item.fecha.split('-'), h = (item.hora || '09:00').split(':');\n  var inicio = new Date(Number(p[0]), Number(p[1])-1, Number(p[2]), Number(h[0]), Number(h[1]||0), 0);\n  var fin = new Date(inicio.getTime() + 7200000);\n  var esVisita = item.tipo === 'visita';\n\n  // \u00cdcono seg\u00fan servicio\n  var iconoServicio = '\ud83d\udd27';\n  var serv = (item.servicio || '').toLowerCase();\n  if (serv.indexOf('terma') >= 0 || serv.indexOf('calef') >= 0)      { iconoServicio = '\ud83d\udebf'; }\n  else if (serv.indexOf('cocina') >= 0 || serv.indexOf('horno') >= 0) { iconoServicio = '\ud83c\udf73'; }\n  else if (serv.indexOf('parrilla') >= 0)                             { iconoServicio = '\ud83d\udd25'; }\n  else if (serv.indexOf('secadora') >= 0)                             { iconoServicio = '\ud83c\udf00'; }\n  else if (serv.indexOf('punto') >= 0 || serv.indexOf('conexi') >= 0) { iconoServicio = '\u26a1'; }\n  else if (serv.indexOf('document') >= 0)                             { iconoServicio = '\ud83d\udccb'; }\n  else if (serv.indexOf('modific') >= 0 || serv.indexOf('red') >= 0)  { iconoServicio = '\ud83d\udd29'; }\n  else if (serv.indexOf('reparac') >= 0)                              { iconoServicio = '\ud83d\udee0\ufe0f'; }\n  else if (serv.indexOf('gasfiter') >= 0 || serv.indexOf('tuber') >= 0){ iconoServicio = '\ud83d\udca7'; }\n  else if (serv.indexOf('instalac') >= 0)                             { iconoServicio = '\ud83d\udd27'; }\n\n  // T\u00edtulo del evento\n  var titulo = esVisita\n    ? '\ud83d\udc41\ufe0f Visita \u2014 ' + (item.cliente || 'Cliente')\n    : iconoServicio + ' ' + (item.servicio || 'Construcci\u00f3n') + ' \u2014 ' + (item.cliente || 'Cliente');\n\n  // Hora formateada\n  var horaStr = item.hora || '09:00';\n  var hNum = Number(h[0]), mNum = Number(h[1] || 0);\n  var ampm = hNum >= 12 ? 'PM' : 'AM';\n  var h12 = hNum > 12 ? hNum - 12 : (hNum === 0 ? 12 : hNum);\n  var horaFmt = h12 + ':' + (mNum < 10 ? '0' : '') + mNum + ' ' + ampm;\n\n  // Descripci\u00f3n con \u00edconos por campo\n  var desc = '';\n  if (item.cliente)   { desc += '\ud83d\udc64 ' + item.cliente + '\\n'; }\n  if (!esVisita && item.servicio) { desc += iconoServicio + ' ' + item.servicio + '\\n'; }\n  if (!esVisita && item.precio)   { desc += '\ud83d\udcb0 S/ ' + toNum(item.precio).toFixed(2) + '\\n'; }\n  if (item.ubicacion) { desc += '\ud83d\udccd ' + item.ubicacion + '\\n'; }\n  if (item.hora)      { desc += '\ud83d\udd50 ' + horaFmt + '\\n'; }\n  if (item.telefono)  { desc += '\ud83d\udcde ' + item.telefono + '\\n'; }\n  if (item.notas)     { desc += '\ud83d\udcdd ' + item.notas + '\\n'; }\n  if (esVisita)       { desc += '\\n\u26a0\ufe0f Visita \u2014 pendiente confirmar trabajo'; }\n\n  var ev = cal.createEvent(titulo, inicio, fin, {\n    description: desc.trim(),\n    location: item.ubicacion || ''\n  });\n  return ev.getId();\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// HOJA 2 \u2014 MOVIMIENTOS NEGOCIO\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction initMovNegocio(sh) {\n  if (sh.getLastRow() > 0) { return; }\n  var headers = ['  Fecha', '  Tipo', '  Categor\u00eda / Servicio', '  Cliente', '  Descripci\u00f3n', '  Monto S/.', '  Ubicaci\u00f3n'];\n  sh.appendRow(headers);\n  aplicarEstiloNotion(sh, TEMAS['Movimientos Negocio'], 7);\n  sh.setColumnWidth(1, 110); sh.setColumnWidth(2, 100);\n  sh.setColumnWidth(3, 180); sh.setColumnWidth(4, 160);\n  sh.setColumnWidth(5, 200); sh.setColumnWidth(6, 120); sh.setColumnWidth(7, 140);\n}\n\nfunction handleTx(ss, data) {\n  var tx = data.tx; if (!tx) { return; }\n  var neg = data.modo === 'negocio';\n  var esIng = tx.type === 'ingreso';\n  var monto = toNum(tx.amount);\n\n  if (neg) {\n    var sh = getOrCreate(ss, 'Movimientos Negocio');\n    initMovNegocio(sh);\n    var row = sh.getLastRow() + 1;\n    sh.appendRow(['  '+fmtDate(tx.date), esIng?'Ingreso':'Egreso', '  '+(tx.category||'-'), '  '+(tx.cliente||'-'), '  '+(tx.description||'-'), monto, '  '+(tx.ubicacion||'-')]);\n    aplicarFilaNotion(sh, row, 7, '#FAFAFA');\n    badgeCell(sh, row, 2, esIng ? '\u2191 Ingreso' : '\u2193 Egreso', esIng ? '#E8F5E9' : '#FCE4EC', esIng ? '#2E7D32' : '#C62828');\n    sh.getRange(row, 6).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor(esIng ? '#2E7D32' : '#C62828');\n  } else {\n    handleMovimientoPersonal(ss, data);\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// HOJA 3 \u2014 DEUDAS Y MOVIMIENTOS\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction initDeudasSheet(sh) {\n  if (sh.getLastRow() > 0) { return; }\n  var headers = ['  Fecha', '  Tipo', '  Descripci\u00f3n / Entidad', '  Monto S/.', '  Cuotas', '  Saldo Pendiente', '  Estado', '  Inter\u00e9s'];\n  sh.appendRow(headers);\n  aplicarEstiloNotion(sh, TEMAS['Deudas y Movimientos'], 8);\n  sh.setColumnWidth(1, 110); sh.setColumnWidth(2, 120);\n  sh.setColumnWidth(3, 200); sh.setColumnWidth(4, 120);\n  sh.setColumnWidth(5, 160); sh.setColumnWidth(6, 140);\n  sh.setColumnWidth(7, 130); sh.setColumnWidth(8, 110);\n}\n\nfunction handleMovimientoPersonal(ss, data) {\n  var tx = data.tx; if (!tx) { return; }\n  var sh = getOrCreate(ss, 'Deudas y Movimientos');\n  initDeudasSheet(sh);\n  var esIng = tx.type === 'ingreso';\n  var row = sh.getLastRow() + 1;\n  sh.appendRow(['  '+fmtDate(tx.date), esIng?'Ingreso':'Egreso', '  '+(tx.description||tx.category||'-'), toNum(tx.amount), '-', '-', '-', '-']);\n  aplicarFilaNotion(sh, row, 8, '#FAFAFA');\n  badgeCell(sh, row, 2, esIng ? '\u2191 Ingreso' : '\u2193 Egreso', esIng ? '#E8F5E9' : '#FCE4EC', esIng ? '#2E7D32' : '#C62828');\n  sh.getRange(row, 4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor(esIng ? '#2E7D32' : '#C62828');\n}\n\nfunction handleDeuda(ss, data) {\n  var d = data.item; if (!d) { return; }\n  var sh = getOrCreate(ss, 'Deudas y Movimientos');\n  initDeudasSheet(sh);\n  var nc = toNum(d.cuotasTotales), np = toNum(d.cuotasPagadas);\n  var total = toNum(d.totalAmount) || (toNum(d.cuotaMonto) * nc);\n  var saldo = toNum(d.cuotaMonto) * (nc - np);\n  var interes = total > (toNum(d.cuotaMonto) * nc) ? total - (toNum(d.cuotaMonto) * nc) : 0;\n  var pct = nc > 0 ? Math.round(np/nc*100) : 0;\n\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i,1).getNote() === (d.id||d.name)) { foundRow = i; break; }\n  }\n  var valores = ['  '+fmtDate(new Date().toISOString().split('T')[0]), 'Deuda', '  '+(d.name||'-'), total, np+'/'+nc+' cuotas \u00b7 S/ '+toNum(d.cuotaMonto).toFixed(2)+' c/u', saldo, pct+'% pagado', interes > 0 ? interes : '-'];\n  if (foundRow > 0) {\n    sh.getRange(foundRow, 1, 1, 8).setValues([valores]);\n    _formatDeudasRow(sh, foundRow);\n  } else {\n    var row = sh.getLastRow() + 1;\n    sh.appendRow(valores);\n    aplicarFilaNotion(sh, row, 8, '#FAFAFA');\n    sh.getRange(row, 1).setNote(d.id||d.name||'');\n    _formatDeudasRow(sh, row);\n  }\n}\n\nfunction _formatDeudasRow(sh, row) {\n  badgeCell(sh, row, 2, '\u26a1 Deuda', '#EDE7F6', '#4527A0');\n  sh.getRange(row, 4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#C62828');\n  sh.getRange(row, 6).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#E65100');\n  if (typeof sh.getRange(row, 8).getValue() === 'number') {\n    sh.getRange(row, 8).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right');\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// OTRAS SECCIONES\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction handleServicio(ss, data) {\n  var s = data.item; if (!s) { return; }\n  var sh = getOrCreate(ss, 'Servicios Fijos');\n  if (sh.getLastRow() === 0) {\n    sh.appendRow(['  Servicio', '  Monto Mensual S/.', '  D\u00eda Vencimiento', '  Estado', '  Actualizado']);\n    aplicarEstiloNotion(sh, { header: '#1C1C1C' }, 5);\n    sh.setColumnWidth(1,160);sh.setColumnWidth(2,150);sh.setColumnWidth(3,150);sh.setColumnWidth(4,120);sh.setColumnWidth(5,130);\n  }\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) { if (sh.getRange(i,1).getValue().toString().trim() === s.name) { foundRow=i; break; } }\n  var vals = ['  '+s.name, toNum(s.monto), 'D\u00eda '+s.venceDia, s.pagado?'Pagado':'No pagado', '  '+fmtDate(new Date().toISOString().split('T')[0])];\n  if (foundRow > 0) { sh.getRange(foundRow,1,1,5).setValues([vals]); }\n  else { sh.appendRow(vals); aplicarFilaNotion(sh, sh.getLastRow(), 5, '#FAFAFA'); }\n  var r = foundRow > 0 ? foundRow : sh.getLastRow();\n  sh.getRange(r,2).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold');\n  badgeCell(sh, r, 4, s.pagado?'\u2713 Pagado':'\u25cb Pendiente', s.pagado?'#E8F5E9':'#FFF8E1', s.pagado?'#2E7D32':'#F57F17');\n}\n\nfunction handleMeta(ss, data) {\n  var m = data.item; if (!m) { return; }\n  var sh = getOrCreate(ss, 'Metas de Ahorro');\n  if (sh.getLastRow() === 0) {\n    sh.appendRow(['  Meta','  Objetivo S/.','  Ahorrado S/.','  Pendiente S/.','  Progreso','  Fecha L\u00edmite']);\n    aplicarEstiloNotion(sh, {header:'#1C1C1C'}, 6);\n    sh.setColumnWidth(1,180);sh.setColumnWidth(2,130);sh.setColumnWidth(3,130);sh.setColumnWidth(4,130);sh.setColumnWidth(5,120);sh.setColumnWidth(6,130);\n  }\n  var obj=toNum(m.objetivo),aho=toNum(m.ahorrado),pct=obj>0?Math.round(aho/obj*100):0;\n  var foundRow=-1;\n  for(var i=2;i<=sh.getLastRow();i++){if(sh.getRange(i,1).getValue().toString().trim()===m.nombre){foundRow=i;break;}}\n  var vals=['  '+(m.nombre||'-'),obj,aho,obj-aho,pct+'%','  '+(m.fechaLimite||'-')];\n  if(foundRow>0){sh.getRange(foundRow,1,1,6).setValues([vals]);}\n  else{sh.appendRow(vals);aplicarFilaNotion(sh,sh.getLastRow(),6,'#FAFAFA');}\n  var r=foundRow>0?foundRow:sh.getLastRow();\n  sh.getRange(r,2).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right');\n  sh.getRange(r,3).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#2E7D32').setFontWeight('bold');\n  sh.getRange(r,4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#E65100');\n  badgeCell(sh,r,5,pct+'% logrado',pct>=100?'#E8F5E9':pct>=50?'#FFF8E1':'#FCE4EC',pct>=100?'#2E7D32':pct>=50?'#F57F17':'#C62828');\n}\n\nfunction handlePrestamo(ss, data) {\n  var p = data.item; if (!p) { return; }\n  var sh = getOrCreate(ss, 'Prestamos');\n  if (sh.getLastRow() === 0) {\n    sh.appendRow(['  Acreedor','  Tipo','  Capital S/.','  Pendiente S/.','  Tasa Mensual','  Inter\u00e9s Mensual S/.','  Fecha Inicio']);\n    aplicarEstiloNotion(sh, {header:'#1C1C1C'}, 7);\n    sh.setColumnWidth(1,160);sh.setColumnWidth(2,100);sh.setColumnWidth(3,130);sh.setColumnWidth(4,140);sh.setColumnWidth(5,120);sh.setColumnWidth(6,160);sh.setColumnWidth(7,130);\n  }\n  var intMes=toNum(p.capitalPendiente)*toNum(p.tasaMensual)/100;\n  var foundRow=-1;\n  for(var i=2;i<=sh.getLastRow();i++){if(sh.getRange(i,1).getValue().toString().trim()===(p.nombre||'')){foundRow=i;break;}}\n  var vals=['  '+(p.nombre||'-'),'  '+(p.tipo||'Persona'),toNum(p.capital),toNum(p.capitalPendiente),toNum(p.tasaMensual)+'%',intMes,'  '+fmtDate(p.fechaInicio)];\n  if(foundRow>0){sh.getRange(foundRow,1,1,7).setValues([vals]);}\n  else{sh.appendRow(vals);aplicarFilaNotion(sh,sh.getLastRow(),7,'#FAFAFA');}\n  var r=foundRow>0?foundRow:sh.getLastRow();\n  sh.getRange(r,3).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#C62828');\n  sh.getRange(r,4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#E65100');\n  sh.getRange(r,6).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right');\n}\n\nfunction handleNota(ss, data) {\n  var n = data.item; if (!n) { return; }\n  var sh = getOrCreate(ss, 'Notas');\n\n  if (sh.getLastRow() === 0) {\n    var headers = ['  Fecha', '  Tipo', '  T\u00edtulo', '  Contenido / \u00cdtems', '  Recordatorio', '  Estado'];\n    sh.appendRow(headers);\n    aplicarEstiloNotion(sh, {header:'#1C1C1C'}, 6);\n    sh.setColumnWidth(1, 110);\n    sh.setColumnWidth(2, 130);\n    sh.setColumnWidth(3, 200);\n    sh.setColumnWidth(4, 340);\n    sh.setColumnWidth(5, 150);\n    sh.setColumnWidth(6, 120);\n  }\n\n  // Contenido formateado\n  var contenido = '';\n  var totalItems = 0, hechos = 0;\n  if (n.tipo === 'lista' || n.tipo === 'recordatorio') {\n    var its = n.items || [];\n    totalItems = its.length;\n    for (var i = 0; i < its.length; i++) {\n      if (its[i].done) hechos++;\n      contenido += (its[i].done ? '\u2611 ' : '\u2610 ') + its[i].texto + '\\n';\n    }\n  } else {\n    contenido = n.texto || '';\n  }\n\n  // Badge tipo\n  var TIPO_LABELS = { lista:'\u2713 Lista', recordatorio:'\u23f0 Recordatorio', foto:'\ud83d\udcf7 Foto', texto:'\ud83d\udcdd Texto' };\n  var TIPO_BG     = { lista:'#FFF8E1', recordatorio:'#FCE4EC', foto:'#E8F5E9', texto:'#E3F2FD' };\n  var TIPO_COLOR  = { lista:'#F57F17', recordatorio:'#C62828', foto:'#2E7D32', texto:'#1565C0' };\n  var tipoLabel = TIPO_LABELS[n.tipo] || n.tipo;\n\n  // Estado para listas\n  var estadoLabel = '-';\n  if (totalItems > 0) {\n    estadoLabel = hechos + '/' + totalItems + ' hechos';\n  } else if (n.tipo === 'recordatorio' && n.recordatorio) {\n    estadoLabel = '\u23f0 ' + n.recordatorio;\n  }\n\n  var row = sh.getLastRow() + 1;\n  sh.appendRow([\n    '  ' + fmtDate(n.creado || new Date().toISOString()),\n    tipoLabel,\n    '  ' + (n.titulo || '-'),\n    '  ' + contenido.trim(),\n    '  ' + (n.recordatorio || '-'),\n    estadoLabel\n  ]);\n\n  aplicarFilaNotion(sh, row, 6, '#FAFAFA');\n  sh.getRange(row, 4).setWrap(true).setVerticalAlignment('top');\n  sh.setRowHeight(row, Math.max(32, Math.min(120, 20 + (contenido.split('\\n').length * 18))));\n\n  // Badge tipo con color\n  badgeCell(sh, row, 2, tipoLabel,\n    TIPO_BG[n.tipo] || '#F5F5F5',\n    TIPO_COLOR[n.tipo] || '#333333');\n\n  // Estado con color si es lista completa\n  if (totalItems > 0 && hechos === totalItems) {\n    sh.getRange(row, 6).setFontColor('#2E7D32').setFontWeight('bold');\n  } else if (totalItems > 0) {\n    sh.getRange(row, 6).setFontColor('#F57F17');\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// UTILIDADES\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction getOrCreate(ss, name) {\n  var sh = ss.getSheetByName(name);\n  if (!sh) { sh = ss.insertSheet(name); }\n  return sh;\n}\n\nfunction fmtDate(dateStr) {\n  if (!dateStr) { return '-'; }\n  try {\n    var d = new Date(dateStr.length === 10 ? dateStr + 'T12:00:00' : dateStr);\n    return Utilities.formatDate(d, 'America/Lima', 'dd/MM/yyyy');\n  } catch(e) { return dateStr; }\n}\n\nfunction toNum(v) { var n=Number(v); return isNaN(n)?0:n; }\n\nfunction jsonOk(obj) {\n  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);\n}\n";
   const blob=new Blob([codigo],{type:'text/plain'});
   const url=URL.createObjectURL(blob);
@@ -4533,6 +4654,8 @@ function nrm(s) {
 
 // ── Extraer monto (robusto) ──
 function extractAmount(text) {
+  // FIX: normalizar punto de miles (1.500 → 1500) antes de parsear
+  text = text.replace(/(\d+)\.(\d{3})(?!\d)/g, '$1$2');
   const t = text;
   // S/. 400 | S/ 400 | S/.400
   let m = t.match(/s\/\.?\s*(\d[\d.,]*)/i);
@@ -5396,7 +5519,7 @@ function processVoiceResult(text) {
 
   preview.style.display = 'block';
   if (!parsed.needsNegocioConfirm) {
-    saveBtn.style.display = parsed.amount && parsed.amount>0 ? 'block' : 'block';
+    saveBtn.style.display = (parsed.amount && parsed.amount>0) ? 'block' : 'none';
     if (!parsed.amount || parsed.amount<=0)
       document.getElementById('micText').textContent += ' ⚠ No detecté el monto, escríbelo abajo.';
   }
@@ -5415,7 +5538,8 @@ function processVoiceResult(text) {
 function askMissingData(faltantes, idx){
   if(idx >= faltantes.length) return;
   const {campo, pregunta} = faltantes[idx];
-  const msg = `Omar, falta ${pregunta}`;
+  const nombreApp = (typeof state !== "undefined" && state.nombreUsuario) ? state.nombreUsuario : "Oye";
+  const msg = `${nombreApp}, falta ${pregunta}`;
   speakAndListen(msg, campo, ()=>askMissingData(faltantes, idx+1));
 }
 
