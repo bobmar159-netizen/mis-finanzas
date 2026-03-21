@@ -1380,7 +1380,9 @@ function pagarPrestPers(id){
 function deletePrestPers(id){
   if(!confirm('¿Eliminar este préstamo?')) return;
   state.prestamosPersonales=state.prestamosPersonales.filter(p=>p.id!==id);
-  saveAll();render();toast('Eliminado');
+  saveAll();
+  syncSeccionToSheets('prestamo_delete',{id});
+  render();toast('Eliminado');
 }
 
 function editPrestPers(id){
@@ -1543,8 +1545,11 @@ function abonarMeta(id){
 
 function deleteMeta(id){
   if(!confirm('¿Eliminar esta meta?')) return;
+  const meta=state.metas.find(x=>x.id===id);
   state.metas=state.metas.filter(x=>x.id!==id);
-  saveAll();render();toast('Meta eliminada');
+  saveAll();
+  if(meta) syncSeccionToSheets('meta_delete',{id,nombre:meta.nombre});
+  render();toast('Meta eliminada');
 }
 
 
@@ -2284,8 +2289,11 @@ function saveTx(editId){
 
 function deleteTx(id){
   if(!confirm('¿Eliminar este movimiento?'))return;
+  const tx=state.transactions.find(t=>t.id===id);
   state.transactions=state.transactions.filter(t=>t.id!==id);
-  saveAll();render();toast('Eliminado');
+  saveAll();
+  if(tx&&tx.negocio) syncSeccionToSheets('tx_delete',{id});
+  render();toast('Eliminado');
 }
 
 // ─────────────────────────────────────────────
@@ -2330,7 +2338,13 @@ function saveDebt(editId){
   syncSeccionToSheets('deuda', item);
   closeModal();render();toast(editId?'Deuda actualizada':'Deuda registrada ✓ · Enviando a Sheets...');
 }
-function deleteDebt(id){if(!confirm('¿Eliminar esta deuda?'))return;state.debts=state.debts.filter(d=>d.id!==id);saveAll();render();toast('Eliminado');}
+function deleteDebt(id){
+  if(!confirm('¿Eliminar esta deuda?'))return;
+  state.debts=state.debts.filter(d=>d.id!==id);
+  saveAll();
+  syncSeccionToSheets('deuda_delete',{id});
+  render();toast('Eliminado');
+}
 function pagarCuota(id){
   const d=state.debts.find(d=>d.id===id);if(!d)return;
   if(d.cuotasPagadas>=d.cuotasTotales)return toast('Deuda ya completada');
@@ -2376,7 +2390,14 @@ function saveService(editId){
   syncSeccionToSheets('servicio', item);
   closeModal();render();toast(editId?'Servicio actualizado':'Servicio agregado ✓');
 }
-function deleteService(id){if(!confirm('¿Eliminar?'))return;state.servicios=state.servicios.filter(s=>s.id!==id);saveAll();render();toast('Eliminado');}
+function deleteService(id){
+  if(!confirm('¿Eliminar?'))return;
+  const svc=state.servicios.find(s=>s.id===id);
+  state.servicios=state.servicios.filter(s=>s.id!==id);
+  saveAll();
+  if(svc) syncSeccionToSheets('servicio_delete',{id,name:svc.name});
+  render();toast('Eliminado');
+}
 function toggleService(id){
   state.servicios=state.servicios.map(s=>s.id===id?{...s,pagado:!s.pagado}:s);
   saveAll();
@@ -2537,8 +2558,10 @@ function deleteNota(id){
   showModal();
 }
 function confirmDeleteNota(id){
+  const nota=state.notas.find(n=>n.id===id);
   state.notas=state.notas.filter(n=>n.id!==id);
   save('fnz_notas',state.notas);
+  if(nota) syncSeccionToSheets('nota_delete',{id,titulo:nota.titulo||''});
   closeModal(); render(); toast('Nota eliminada');
 }
 function pinNota(id){
@@ -3770,7 +3793,7 @@ function guardarConversion(id){
 function deleteAgendaItem(id){
   if(!confirm('¿Eliminar este registro?')) return;
   const url=localStorage.getItem('fnz_sheets_url')||'';
-  if(url){ const img=new Image(); img.src=url+'?data='+encodeURIComponent(JSON.stringify({type:'agenda_delete',id})); }
+  if(url){ _sendToSheets(url,{type:'agenda_delete',id}); }
   state.agenda=(state.agenda||[]).filter(x=>x.id!==id);
   save('fnz_agenda',state.agenda); render(); toast('Eliminado');
 }
