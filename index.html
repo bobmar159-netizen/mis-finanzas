@@ -3979,29 +3979,26 @@ function extractClienteAgenda(text){
   const t2 = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const patterns = [
     // "a la señora Leonor", "al señor Pedro", "a don Carlos", "a doña María"
-    /\ba\s+(?:la\s+|el\s+)?(?:señora?|don|doña|sr\.?|sra\.?)\s+([A-Za-z][A-Za-z\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
+    /\ba\s+(?:la\s+|el\s+)?(?:señora?|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
     // "para la señora Leonor", "para el señor García"
-    /para\s+(?:la\s+|el\s+)?(?:señora?|don|doña|sr\.?|sra\.?)\s+([A-Za-z][A-Za-z\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
+    /para\s+(?:la\s+|el\s+)?(?:señora?|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
     // "con la señora / con el señor"
-    /con\s+(?:la\s+|el\s+)?(?:señora?|don|doña)\s+([A-Za-z][A-Za-z\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
+    /con\s+(?:la\s+|el\s+)?(?:señora?|don|doña)\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
     // "donde la señora / donde el señor"
-    /donde\s+(?:la\s+|el\s+)?(?:señora?|don|doña)?\s+([A-Za-z][A-Za-z\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
+    /donde\s+(?:la\s+|el\s+)?(?:señora?|don|doña)?\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
     // "al cliente / para el cliente"
-    /(?:al|para el|para la)\s+(?:cliente|clienta)\s+([A-Za-z][A-Za-z\s]{1,25}?)(?:\s+en\b|\s*[,.]|$)/i,
-    // "llamó/contactó/pidió Juan García"
-    /(?:llamo|contacto|pidio|solicito|escribio)\s+(?:el|la)?\s*(?:señora?|don|doña)?\s*([A-Za-z][A-Za-z\s]{2,25}?)(?:\s+para|\s+de|\s+en|\s*[,.]|$)/i,
+    /(?:al|para el|para la)\s+(?:cliente|clienta)\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,25}?)(?:\s+en\b|\s*[,.]|$)/i,
     // trabajo/visita para Pérez
-    /(?:trabajo|visita|servicio|instalacion|reparacion)\s+para\s+(?:el|la)?\s*(?:señora?|don|doña)?\s*([A-Za-z][A-Za-z\s]{2,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
+    /(?:trabajo|visita|servicio|instalacion|reparacion)\s+para\s+(?:el|la)?\s*(?:señora?|don|doña)?\s*([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{2,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
   ];
-  const stopWords = /^(en|de|del|al|la|el|por|para|con|que|fue|era|los|las|un|una|dia|mañana|manana|hoy|ayer|servicio|precio|monto|cobro|costo|trabajo|visita|agenda|lunes|martes|miercoles|jueves|viernes|sabado|domingo|soles|sol|a|las|modificacion|instalacion|conexion|reparacion|gasfiteria|documentacion|conversion|construccion|construcion|terma|cocina|horno|secadora|calefon|parrilla|punto|adicional|tuberia|red)$/i;
+  // ★ Palabras que nunca son parte del nombre — incluyendo preposiciones de lugar
+  const stopWords = /^(en|de|del|al|la|el|por|para|con|que|fue|era|los|las|un|una|dia|mañana|manana|hoy|ayer|servicio|precio|monto|cobro|costo|trabajo|visita|agenda|lunes|martes|miercoles|jueves|viernes|sabado|domingo|soles|sol|a|las|modificacion|instalacion|conexion|reparacion|gasfiteria|documentacion|conversion|construccion|construcion|terma|cocina|horno|secadora|calefon|parrilla|punto|adicional|tuberia|red|el|este|esta|para|desde|hasta|hacia|cerca|queda|vive)$/i;
   for(const p of patterns){
     const m=t2.match(p);
     if(m&&m[1]){
-      const nombre=m[1].trim()
-        .split(/\s+/)
-        .filter(w=>!stopWords.test(w))
-        .join(' ')
-        .trim();
+      const partes = m[1].trim().split(/\s+/).filter(w=>!stopWords.test(w));
+      // ★ Máximo 2 palabras para el nombre (evita capturar ubicación)
+      const nombre = partes.slice(0,2).join(' ').trim();
       if(nombre.length>1) return nombre;
     }
   }
@@ -4148,7 +4145,7 @@ function parseAgendaVoz(text){
       { keys:['calefon','calefón','calefon a gas','instalar calefon','servicio calefon'], label:'Calefón' },
       { keys:['parrilla','parrilla a gas','instalar parrilla','servicio parrilla'], label:'Parrilla a Gas' },
       // ── Servicios de instalación y reparación ──
-      { keys:['punto adicional','punto extra','punto de gas','boca nueva','salida nueva','toma nueva','un punto adicional','servicio punto adicional','hacer un punto','poner un punto'], label:'Punto Adicional' },
+      { keys:['punto adicional','punto extra','punto de gas','boca nueva','boca de gas','salida nueva','toma nueva','un punto adicional','servicio punto adicional','hacer un punto','poner un punto','un punto','hacer punto','poner punto','nuevo punto','instalar punto'], label:'Punto Adicional' },
       { keys:['modificacion de red','modificacion red','modificar red','cambio de red','rediseño de red','modificacion','modificar la red','mod de red','servicio modificacion','modificacion interna'], label:'Modificación Red' },
       { keys:['instalacion nueva','instalacion de gas','obra nueva','proyecto nuevo','instalacion completa','instalar gas nuevo'], label:'Instalación Nueva' },
       { keys:['conversion de artefacto','conversion a gas','converti artefacto','convertir artefacto','adaptar artefacto'], label:'Conversión Artefacto' },
