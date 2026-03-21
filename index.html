@@ -3318,10 +3318,13 @@ function renderAgenda(){
     return da.localeCompare(db);
   });
 
-  // Aplicar filtro
+  // Aplicar filtro con nuevos estados
+  const _migEst = s => ({completado:'se_finalizo',cancelado:'se_desanimo'}[s]||s||'agendado');
   const items = todos.filter(x=>{
-    if(window._agendaFiltro==='pendientes') return x.estado!=='completado';
-    if(window._agendaFiltro==='completados') return x.estado==='completado';
+    const est = _migEst(x.estado);
+    if(window._agendaFiltro==='activos')       return ['agendado','pendiente','reprogramo'].includes(est);
+    if(window._agendaFiltro==='finalizados')   return est==='se_finalizo';
+    if(window._agendaFiltro==='no_realizados') return est==='se_desanimo';
     return true;
   });
   const visitas  = items.filter(x=>x.tipo==='visita');
@@ -3357,7 +3360,9 @@ function renderAgenda(){
   </div>`;
 
   function agendaCard(item){
-    const est = AGENDA_ESTADOS[item.estado||'pendiente'];
+    // Migrar estados viejos al nuevo sistema
+    const _migrarEstado = s => ({completado:'se_finalizo',cancelado:'se_desanimo'}[s]||s||'agendado');
+    const est = AGENDA_ESTADOS[_migrarEstado(item.estado)] || AGENDA_ESTADOS['agendado'];
     const dias = diasHastaLabel(item.fecha);
     const ubic = parseUbicacionLink(item.ubicacion);
     const isVisita = item.tipo==='visita';
