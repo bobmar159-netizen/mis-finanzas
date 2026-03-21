@@ -2268,13 +2268,19 @@ function saveTx(editId){
   if(!amount||!date)return toast('Completa monto y fecha','error');
   const clienteEl=document.getElementById('tx-cliente');
   const ubicEl=document.getElementById('tx-ubicacion');
+  const catId = document.getElementById('tx-cat').value;
+  const allCatsTx = [...state.catsIn,...state.catsEx,...DEFAULT_CATS_NEG_IN,...DEFAULT_CATS_NEG_EX,...DEFAULT_CATS_IN,...DEFAULT_CATS_EX];
+  const catObj = allCatsTx.find(c=>c.id===catId);
+  // ★ Siempre usar el nombre legible — nunca el ID
+  const catName = catObj?.name || (window._txType==='ingreso'?'Otro ingreso':'Otro gasto');
   const item={
     id:editId||Date.now()+'',
     type:window._txType,
     amount,
-    category:document.getElementById('tx-cat').value,
+    category: catName,
+    catId,
     date,
-    description:document.getElementById('tx-desc').value,
+    description:document.getElementById('tx-desc').value.trim() || catName,
     cliente:clienteEl?clienteEl.value.trim():'',
     ubicacion:ubicEl?ubicEl.value.trim():'',
     negocio:state.modo==='negocio',
@@ -6068,12 +6074,15 @@ function saveMicTx() {
   const catId  = document.getElementById('pvCatEdit').value;
   const desc   = document.getElementById('pvDescEdit').value.trim();
   if(!amount || amount<=0){ toast('Escribe un monto válido','error'); return; }
-  const allCats=[...state.catsIn,...state.catsEx];
+  const allCats=[...state.catsIn,...state.catsEx,
+    ...DEFAULT_CATS_NEG_IN,...DEFAULT_CATS_NEG_EX,
+    ...DEFAULT_CATS_IN,...DEFAULT_CATS_EX];
   const cat = allCats.find(c=>c.id===catId);
+  const catName = cat?.name || (type==='ingreso'?'Otro ingreso':'Otro gasto');
   const tx = {
     id: Date.now()+'', type, amount,
-    category: cat?.name||(type==='ingreso'?'Otro ingreso':'Otro gasto'),
-    description: desc||(cat?.name||''),
+    category: catName,
+    description: desc || catName,
     date: document.getElementById('pvDateEdit').value||todayStr(),
     catId,
     cliente:      micParsed?.cliente      ||null,
