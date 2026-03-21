@@ -11,11 +11,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root {
-  --gold:#C9A84C;--gold2:#E8C96A;--red:#E05252;--green:#4CAF85;--blue:#2E86AB;
-  --bg:#F9F7F3;--card:#FFFFFF;--border:#E8E4DC;--text:#1E293B;--muted:#94A3B8;--dim:#CBD5E1;
+  --gold:#2E7D32;--gold2:#4CAF50;--red:#E05252;--green:#4CAF85;--blue:#2E86AB;
+  --bg:#F4F7F4;--card:#FFFFFF;--border:#C8E6C9;--text:#1E293B;--muted:#81C784;--dim:#A5D6A7;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;overflow:hidden;background:linear-gradient(150deg,#FAF8F4 0%,#F3EFE8 60%,#EEF2F8 100%);background-attachment:fixed}
+html,body{height:100%;overflow:hidden;background:linear-gradient(150deg,#F4F7F4 0%,#E8F5E9 60%,#F1F8F1 100%);background-attachment:fixed}
 body{font-family:'DM Sans',sans-serif;color:var(--text)}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:4px}
 #app{height:100vh;display:flex;flex-direction:column;max-width:430px;margin:0 auto}
@@ -30,9 +30,9 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:0;padding-bottom:0;border-bottom:1px solid var(--border)}
 .tabs-row2{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-bottom:1px solid var(--border)}
 .tab{width:100%;padding:9px 4px 10px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:2px}
-.tab.active{color:var(--gold);border-bottom-color:var(--gold);background:#FFF8EC}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold);background:#E8F5E9}
 .tabs-row2 .tab{background:transparent}
-.tabs-row2 .tab.active{background:#FFF8EC}
+.tabs-row2 .tab.active{background:#E8F5E9}
 .tab-icon{font-size:20px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 2px 8px #00000008}
 .section-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--gold);margin-bottom:6px}
@@ -75,7 +75,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .tx-actions{display:flex;gap:4px;flex-shrink:0}
 .tx-btn{background:none;border:none;cursor:pointer;font-size:13px;padding:4px;opacity:.6}
 .tx-btn:hover{opacity:1}
-.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0D0D0F;border:none;border-radius:12px;padding:15px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;transition:opacity .2s}
+.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#fff;border:none;border-radius:12px;padding:15px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;transition:opacity .2s}
 .btn-gold:hover{opacity:.85}
 .btn-blue{background:linear-gradient(135deg,#1A6B8A,var(--blue));color:#fff;border:none;border-radius:10px;padding:13px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer}
 .btn-green{background:linear-gradient(135deg,#2d7a57,var(--green));color:#fff;border:none;border-radius:10px;padding:13px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer}
@@ -89,7 +89,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .field{margin-bottom:16px}
 .field-label{font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;display:block}
 .field input,.field select,.field textarea{background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:14px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;width:100%;transition:border-color .2s}
-.field input:focus,.field select:focus{outline:none;border-color:#C9A84C66}
+.field input:focus,.field select:focus{outline:none;border-color:#2E7D3266}
 .field select option{background:#FFFFFF}
 .type-toggle{display:flex;gap:8px}
 .type-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;cursor:pointer;transition:all .2s}
@@ -110,7 +110,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
 .cat-chip{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:all .2s;position:relative}
 .cat-chip:active{transform:scale(.96)}
-.cat-chip.selected{border-color:var(--gold);background:#FFFBEB}
+.cat-chip.selected{border-color:var(--gold);background:#E8F5E9}
 .cat-chip-icon{font-size:26px;line-height:1}
 .cat-chip-name{font-size:11px;color:var(--text);font-weight:500;text-align:center;line-height:1.2;word-break:break-word}
 .cat-chip-del{position:absolute;top:4px;right:4px;background:none;border:none;color:#E0525266;font-size:12px;cursor:pointer;padding:2px;display:none}
@@ -126,7 +126,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .emoji-grid{display:flex;flex-wrap:wrap;gap:4px}
 .emoji-btn{width:38px;height:38px;border-radius:8px;border:1px solid transparent;background:#F8FAFC;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .emoji-btn:hover{background:#F1F5F9}
-.emoji-btn.picked{border-color:var(--gold);background:#FFFBEB}
+.emoji-btn.picked{border-color:var(--gold);background:#E8F5E9}
 .emoji-preview{width:56px;height:56px;border-radius:14px;background:#F8FAFC;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0}
 .color-dot{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
 .color-dot.picked{border-color:#fff;transform:scale(1.15)}
@@ -139,7 +139,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .ubic-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #C9A84C66;border-radius:10px;max-height:180px;overflow-y:auto;z-index:300;box-shadow:0 4px 16px #0000001a}
 .ubic-opt{padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:0.5px solid var(--border)}
 .ubic-opt:last-child{border-bottom:none}
-.ubic-opt:hover{background:#FFFBEB}
+.ubic-opt:hover{background:#E8F5E9}
 
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
@@ -157,10 +157,10 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 #app.modo-negocio .btn-gold:hover { opacity:.85; }
 
 /* ── MODO TOGGLE ── */
-.modo-toggle { display:flex; align-items:center; background:#F1F5F9; border-radius:20px; padding:3px; gap:2px; margin-bottom:10px; }
-.modo-btn { flex:1; padding:6px 10px; border:none; border-radius:16px; font-family:'DM Sans',sans-serif; font-size:11px; font-weight:700; cursor:pointer; transition:all .25s; background:transparent; color:#94A3B8; }
-.modo-btn.active-personal { background:#C9A84C; color:#0D0D0F; box-shadow:0 2px 8px #C9A84C44; }
-.modo-btn.active-negocio  { background:#1565C0; color:#fff;    box-shadow:0 2px 8px #1565C044; }
+.modo-toggle { display:flex; align-items:center; background:#E8F5E9; border-radius:20px; padding:3px; gap:2px; margin-bottom:10px; }
+.modo-btn { flex:1; padding:6px 10px; border:none; border-radius:16px; font-family:'DM Sans',sans-serif; font-size:11px; font-weight:700; cursor:pointer; transition:all .25s; background:transparent; color:#81C784; }
+.modo-btn.active-personal { background:#2E7D32; color:#fff; box-shadow:0 2px 8px #2E7D3244; }
+.modo-btn.active-negocio  { background:#1565C0; color:#fff; box-shadow:0 2px 8px #1565C044; }
 
 /* ── MIC FAB ── */
 #micFab {
@@ -171,7 +171,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #C9A84C, #E8C96A);
+  background: linear-gradient(135deg, #2E7D32, #4CAF50);
   color: #0D0D0F;
   border: none;
   font-size: 22px;
@@ -186,8 +186,8 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
   user-select: none;
   -webkit-user-select: none;
 }
-#micFab.dragging { cursor: grabbing; opacity:.85; box-shadow:0 8px 28px #C9A84C88; }
-#micFab:not(.dragging):hover { transform: scale(1.08); box-shadow: 0 6px 24px #C9A84C77; }
+#micFab.dragging { cursor: grabbing; opacity:.85; box-shadow:0 8px 28px #2E7D3288; }
+#micFab:not(.dragging):hover { transform: scale(1.08); box-shadow: 0 6px 24px #2E7D3277; }
 #micFab.listening { background: linear-gradient(135deg, #E05252, #f87171); box-shadow: 0 4px 20px #E0525266; animation: micPulse 1s infinite; }
 
 @keyframes micPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
@@ -716,17 +716,17 @@ function renderDashboard(){
 
   return `
     <div class="month-nav"><button onclick="prevMonth()">‹</button><span>${monthName()}</span><button onclick="nextMonth()">›</button></div>
-    <div class="summary-card" style="background:linear-gradient(135deg,#FFFBEB,#F8FAFC);border:1px solid #C9A84C33;text-align:center;margin-bottom:12px">
-      <div class="summary-label" style="color:#C9A84C88">Balance del mes</div>
+    <div class="summary-card" style="background:linear-gradient(135deg,#1B5E20,#2E7D32);border:1px solid #2E7D3233;text-align:center;margin-bottom:12px">
+      <div class="summary-label" style="color:#A5D6A7">Balance del mes</div>
       <div class="summary-amount" style="color:${balColor}">${fmtSign(bal)}</div>
       <div style="display:flex;gap:24px;justify-content:center;margin-top:14px">
-        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ingresos</div><div style="color:var(--green);font-weight:600">+${fmt(inc)}</div></div>
-        <div style="width:1px;background:var(--border)"></div>
-        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Egresos</div><div style="color:var(--red);font-weight:600">-${fmt(exp)}</div></div>
+        <div><div style="font-size:10px;color:#A5D6A7;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ingresos</div><div style="color:#81C784;font-weight:600">+${fmt(inc)}</div></div>
+        <div style="width:1px;background:#ffffff22"></div>
+        <div><div style="font-size:10px;color:#A5D6A7;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Egresos</div><div style="color:#EF9A9A;font-weight:600">-${fmt(exp)}</div></div>
       </div>
     </div>
     <!-- Acceso rápido al micrófono -->
-    <button onclick="document.getElementById('micFab').click()" style="width:100%;margin-bottom:12px;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:14px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px">
+    <button onclick="document.getElementById('micFab').click()" style="width:100%;margin-bottom:12px;background:#fff;color:#2E7D32;border:2px solid #2E7D32;border-radius:14px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px">
       🎙 Registrar por voz
     </button>
     <div class="stat-row">
@@ -735,8 +735,8 @@ function renderDashboard(){
         <div class="stat-mini-val" style="color:var(--blue)">${fmt(totalDebt())}</div>
         <div style="font-size:10px;color:var(--muted);margin-top:3px">${pendingDebts().length} deuda(s)</div>
       </div>
-      <div class="stat-mini" style="background:#FFFBEB;border-color:#C9A84C33">
-        <div class="stat-mini-label" style="color:#C9A84C88">Servicios</div>
+      <div class="stat-mini" style="background:#E8F5E9;border-color:#2E7D3233">
+        <div class="stat-mini-label" style="color:#2E7D3288">Servicios</div>
         <div class="stat-mini-val" style="color:var(--gold)">${fmt(totalPendingServices())}</div>
         <div style="font-size:10px;color:var(--muted);margin-top:3px">${pendingServices().length} pendiente(s)</div>
       </div>
@@ -2324,19 +2324,22 @@ function openDebtModal(debt, preData){
 }
 function selectDebtColor(el,color){document.querySelectorAll('[data-dcolor]').forEach(e=>e.style.borderColor='transparent');el.style.borderColor='#fff';window._debtColor=color;}
 function saveDebt(editId){
+  // ★ Android a veces devuelve "450,00" con coma — limpiar antes de parsear
+  const cleanNum = s => parseFloat((s||'').replace(',','.')) || 0;
   const name=document.getElementById('d-name').value.trim();
-  const cuotaMonto=parseFloat(document.getElementById('d-cuota').value);
-  const cuotasTotales=parseInt(document.getElementById('d-ntotal').value);
+  const cuotaMonto=cleanNum(document.getElementById('d-cuota').value);
+  const cuotasTotales=parseInt(document.getElementById('d-ntotal').value)||0;
   const cuotasPagadas=parseInt(document.getElementById('d-npag').value)||0;
-  const totalAmount=parseFloat(document.getElementById('d-total').value)||cuotaMonto*cuotasTotales;
-  if(!name||!cuotaMonto||!cuotasTotales)return toast('Completa los campos requeridos','error');
+  const totalAmount=cleanNum(document.getElementById('d-total').value)||cuotaMonto*cuotasTotales;
+  if(!name) return toast('Escribe el nombre de la deuda','error');
+  if(!cuotaMonto) return toast('Escribe la cuota mensual','error');
+  if(!cuotasTotales) return toast('Escribe el número de cuotas','error');
   const item={id:editId||Date.now()+'',name,totalAmount,cuotaMonto,cuotasTotales,cuotasPagadas,categoria:document.getElementById('d-cat').value,color:window._debtColor||DEBT_COLORS[0]};
   if(editId)state.debts=state.debts.map(d=>d.id===editId?item:d);
   else state.debts.push(item);
   saveAll();
-  console.log('Sincronizando deuda:', item.name, item.id);
   syncSeccionToSheets('deuda', item);
-  closeModal();render();toast(editId?'Deuda actualizada':'Deuda registrada ✓ · Enviando a Sheets...');
+  closeModal();render();toast(editId?'Deuda actualizada ✓':'Deuda registrada ✓');
 }
 function deleteDebt(id){
   if(!confirm('¿Eliminar esta deuda?'))return;
@@ -5374,7 +5377,276 @@ function parseVoiceCommand(text) {
 }
 
 // ─── MIC UI ───
+// ════════════════════════════════════════════════
+// ★ FORMULARIO FANTASMA — Modal de voz reactivo
+// ════════════════════════════════════════════════
+
+const MIC_CONTEXTS = {
+  agenda_visita: {
+    icon: '👁', title: 'Visita', sub: 'Di: cliente, fecha, hora, ubicación',
+    color: '#1565C0', bg: '#0D47A1',
+    fields: [
+      {id:'cliente',   icon:'👤', label:'Cliente',    req:true},
+      {id:'fecha',     icon:'📅', label:'Fecha',      req:true},
+      {id:'hora',      icon:'🕐', label:'Hora',       req:false},
+      {id:'ubicacion', icon:'📍', label:'Ubicación',  req:false},
+      {id:'telefono',  icon:'📞', label:'Teléfono',   req:false},
+      {id:'notas',     icon:'📝', label:'Notas',      req:false},
+    ]
+  },
+  agenda_construccion: {
+    icon: '🔧', title: 'Construcción', sub: 'Di: cliente, servicio, precio, fecha, hora, ubicación',
+    color: '#E65100', bg: '#BF360C',
+    fields: [
+      {id:'cliente',   icon:'👤', label:'Cliente',    req:true},
+      {id:'servicio',  icon:'🔧', label:'Servicio',   req:true},
+      {id:'precio',    icon:'💰', label:'Precio',     req:true},
+      {id:'fecha',     icon:'📅', label:'Fecha',      req:true},
+      {id:'hora',      icon:'🕐', label:'Hora',       req:false},
+      {id:'ubicacion', icon:'📍', label:'Ubicación',  req:false},
+      {id:'telefono',  icon:'📞', label:'Teléfono',   req:false},
+      {id:'notas',     icon:'📝', label:'Notas',      req:false},
+    ]
+  },
+  tx: {
+    icon: '💰', title: 'Movimiento', sub: 'Di: tipo, monto, categoría, fecha',
+    color: '#C9A84C', bg: '#7D5E0F',
+    fields: [
+      {id:'tipo',      icon:'↕',  label:'Ingreso/Egreso', req:true},
+      {id:'monto',     icon:'💰', label:'Monto',          req:true},
+      {id:'categoria', icon:'🏷', label:'Categoría',      req:true},
+      {id:'fecha',     icon:'📅', label:'Fecha',          req:false},
+      {id:'cliente',   icon:'👤', label:'Cliente',        req:false},
+      {id:'descripcion',icon:'📝',label:'Descripción',    req:false},
+    ]
+  },
+  deuda: {
+    icon: '🏦', title: 'Deuda', sub: 'Di: nombre, monto total, cuota mensual, cuotas',
+    color: '#6C3483', bg: '#4A235A',
+    fields: [
+      {id:'nombre',    icon:'🏦', label:'Entidad/Nombre', req:true},
+      {id:'total',     icon:'💰', label:'Monto Total',    req:true},
+      {id:'cuota',     icon:'📆', label:'Cuota Mensual',  req:true},
+      {id:'ncuotas',   icon:'🔢', label:'N° Cuotas',      req:true},
+    ]
+  },
+  nota: {
+    icon: '📝', title: 'Nota', sub: 'Di: tipo de nota (lista, recordatorio, texto)',
+    color: '#2E7D32', bg: '#1B5E20',
+    fields: [
+      {id:'tipo',      icon:'📝', label:'Tipo',      req:true},
+      {id:'titulo',    icon:'📌', label:'Título',    req:true},
+      {id:'contenido', icon:'✏️', label:'Contenido', req:false},
+    ]
+  }
+};
+
+let _micContext = null;       // contexto actual detectado
+let _ghostData  = {};         // datos detectados {campo: valor}
+let _ghostHistory = [];       // historial para "rectifica" [{campo, valor}]
+
+function detectMicContext(text) {
+  const t = text.toLowerCase();
+  if(/agenda\s*(visita|cita|vista)/.test(t))       return 'agenda_visita';
+  if(/agenda\s*(construc|trabajo|instal|servicio|obra)/.test(t)) return 'agenda_construccion';
+  if(/\b(gast[eé]|pagu[eé]|cobr[eé]|ingres|egres|compr[eé]|deposit|sueldo|bono|transfer)\b/.test(t)) return 'tx';
+  if(/\b(deuda|cuota|pr[eé]stamo|banco|tarjeta|debo|me cobran)\b/.test(t)) return 'deuda';
+  if(/\b(nota|lista|recordatorio|apunta|anota|no olvides)\b/.test(t)) return 'nota';
+  return null;
+}
+
+function setMicContext(ctx) {
+  if(_micContext === ctx) return; // ya está configurado
+  _micContext = ctx;
+  _ghostData = {};
+  _ghostHistory = [];
+  const def = MIC_CONTEXTS[ctx];
+  if(!def) return;
+
+  // Cambiar colores del header
+  const header = document.getElementById('micHeader');
+  const box    = document.getElementById('micBox');
+  if(header) header.style.background = def.bg;
+  if(box)    box.style.borderTop = '3px solid '+def.color;
+
+  document.getElementById('micContextIcon').textContent  = def.icon;
+  document.getElementById('micContextTitle').textContent = def.title;
+  document.getElementById('micContextSub').textContent   = def.sub;
+
+  // Renderizar campos fantasma
+  renderGhostFields(ctx);
+  document.getElementById('micGhostForm').style.display='block';
+}
+
+function renderGhostFields(ctx) {
+  const def = MIC_CONTEXTS[ctx];
+  if(!def) return;
+  const container = document.getElementById('micGhostFields');
+  container.innerHTML = def.fields.map(f=>`
+    <div id="ghost-${f.id}" style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;transition:all .25s">
+      <span style="font-size:15px;min-width:20px">${f.icon}</span>
+      <span class="ghost-label" style="font-size:12px;font-weight:500;color:#CBD5E1;flex:1">${f.label}${f.req?' *':''}</span>
+      <span class="ghost-value" style="font-size:12px;font-weight:600;color:#CBD5E1"></span>
+    </div>`).join('');
+  updateMissingFields(ctx);
+}
+
+function fillGhostField(fieldId, value) {
+  const el = document.getElementById('ghost-'+fieldId);
+  if(!el) return;
+  // Guardar historial para rectifica
+  if(_ghostData[fieldId]) {
+    _ghostHistory.push({campo: fieldId, valor: _ghostData[fieldId]});
+  }
+  _ghostData[fieldId] = value;
+  _ghostHistory.push({campo: fieldId, valor: value});
+
+  // Animar campo: gris → amarillo
+  el.style.background    = '#FFFBEB';
+  el.style.borderColor   = '#C9A84C';
+  el.querySelector('.ghost-label').style.color = '#92400E';
+  el.querySelector('.ghost-value').style.color = '#92400E';
+  el.querySelector('.ghost-value').textContent = value;
+  updateMissingFields(_micContext);
+  _checkGhostSaveReady();
+}
+
+function clearLastGhostField() {
+  if(_ghostHistory.length === 0) {
+    toast('No hay datos para borrar','error'); return;
+  }
+  // Sacar el último del historial
+  const last = _ghostHistory.pop();
+  delete _ghostData[last.campo];
+
+  // Resetear visualmente
+  const el = document.getElementById('ghost-'+last.campo);
+  if(el){
+    el.style.background  = '#F8FAFC';
+    el.style.borderColor = '#E2E8F0';
+    el.querySelector('.ghost-label').style.color = '#CBD5E1';
+    el.querySelector('.ghost-value').style.color = '#CBD5E1';
+    el.querySelector('.ghost-value').textContent = '';
+  }
+  toast('Dato borrado — sigue hablando','info');
+  updateMissingFields(_micContext);
+}
+
+function updateMissingFields(ctx) {
+  const def = MIC_CONTEXTS[ctx]; if(!def) return;
+  const cont = document.getElementById('micMissingFields'); if(!cont) return;
+  const faltantes = def.fields.filter(f=>f.req && !_ghostData[f.id]);
+  if(faltantes.length===0){
+    cont.innerHTML='<span style="font-size:11px;color:#4CAF85;font-weight:600">✓ Listo para guardar</span>';
+  } else {
+    cont.innerHTML = faltantes.map(f=>
+      `<span style="font-size:10px;background:#FEF9EE;border:1px solid #C9A84C33;border-radius:6px;padding:2px 8px;color:#92400E">${f.icon} Falta: ${f.label}</span>`
+    ).join('');
+  }
+}
+
+function updateGhostFromText(text) {
+  // Detectar contexto si aún no está definido
+  if(!_micContext){
+    const ctx = detectMicContext(text);
+    if(ctx) setMicContext(ctx);
+    else return;
+  }
+
+  const t = text.toLowerCase();
+
+  // ★ Detectar comando rectifica/borra/corrije
+  if(/\b(rectifica|rectifca|corrij[ae]|corrige|borra|cancela|eso no|no eso|error|elimina)\b/.test(t)){
+    clearLastGhostField();
+    return;
+  }
+
+  // Extraer datos según contexto
+  if(_micContext==='agenda_visita'||_micContext==='agenda_construccion'){
+    // Cliente: "para el señor/señora X" o "al señor X"
+    const cl = text.match(/(?:para (?:el |la )?(?:señor|señora|sr\.?|sra\.?)?\s*)([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)/i);
+    if(cl && !_ghostData.cliente) fillGhostField('cliente', cl[1]);
+
+    // Fecha
+    const fecha = extractDate(text);
+    if(fecha && !_ghostData.fecha) fillGhostField('fecha', fmtDateLabel(fecha));
+
+    // Hora: "a las X" 
+    const hr = text.match(/a\s+las?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+    if(hr && !_ghostData.hora){
+      let h=parseInt(hr[1]), m=parseInt(hr[2]||0);
+      const ap=(hr[3]||'').toLowerCase();
+      if(ap==='pm'&&h<12) h+=12;
+      if(ap==='am'&&h===12) h=0;
+      fillGhostField('hora', `${h}:${m<10?'0'+m:m} ${h>=12?'PM':'AM'}`);
+    }
+
+    // Ubicación: "en X" (excluir horario)
+    const ub = text.match(/\ben\s+((?!las?\s+\d)[A-Za-záéíóúñÁÉÍÓÚÑ][a-záéíóúñ\s]{3,20})/i);
+    if(ub && !_ghostData.ubicacion) fillGhostField('ubicacion', ub[1].trim());
+
+    // Teléfono
+    const tel = text.match(/\b(9\d{8})\b/);
+    if(tel && !_ghostData.telefono) fillGhostField('telefono', tel[1]);
+
+    // Servicio (solo construcción)
+    if(_micContext==='agenda_construccion'){
+      const servicios=['terma','calefón','cafelon','cocina','horno','parrilla','punto adicional','tubería','tuberia','gasfitería','gasfiteria','reparación','reparacion','instalación','instalacion','conexión','conexion'];
+      for(const sv of servicios){
+        if(t.includes(sv) && !_ghostData.servicio){
+          fillGhostField('servicio', sv.charAt(0).toUpperCase()+sv.slice(1));
+          break;
+        }
+      }
+      // Precio
+      const pr = extractAmount(text);
+      if(pr && !_ghostData.precio) fillGhostField('precio', 'S/ '+pr.toFixed(2));
+    }
+
+  } else if(_micContext==='tx'){
+    // Tipo
+    if(/\b(gast[eé]|pagu[eé]|compr[eé]|egres|salió)\b/.test(t) && !_ghostData.tipo)
+      fillGhostField('tipo','↓ Egreso');
+    if(/\b(cobr[eé]|ingres[oó]|deposit|sueldo|bono|gané)\b/.test(t) && !_ghostData.tipo)
+      fillGhostField('tipo','↑ Ingreso');
+    // Monto
+    const am = extractAmount(text);
+    if(am && !_ghostData.monto) fillGhostField('monto','S/ '+am.toFixed(2));
+    // Fecha
+    const fe = extractDate(text);
+    if(fe && !_ghostData.fecha) fillGhostField('fecha', fmtDateLabel(fe));
+
+  } else if(_micContext==='deuda'){
+    const am = extractAmount(text);
+    if(am && !_ghostData.total) fillGhostField('total','S/ '+am.toFixed(2));
+    const nc = text.match(/(\d+)\s*cuotas?/i);
+    if(nc && !_ghostData.ncuotas) fillGhostField('ncuotas', nc[1]+' cuotas');
+
+  } else if(_micContext==='nota'){
+    if(/\blista\b/.test(t) && !_ghostData.tipo)        fillGhostField('tipo','✓ Lista');
+    if(/\brecordatorio\b/.test(t) && !_ghostData.tipo) fillGhostField('tipo','⏰ Recordatorio');
+    if(/\btexto\b/.test(t) && !_ghostData.tipo)        fillGhostField('tipo','📝 Texto');
+  }
+}
+
+function resetMicModal() {
+  _micContext = null;
+  _ghostData  = {};
+  _ghostHistory = [];
+  const header = document.getElementById('micHeader');
+  const box    = document.getElementById('micBox');
+  if(header){ header.style.background='#1E293B'; }
+  if(box)   { box.style.borderTop='none'; }
+  document.getElementById('micContextIcon').textContent  = '🎙';
+  document.getElementById('micContextTitle').textContent = 'Registro por Voz';
+  document.getElementById('micContextSub').textContent   = 'Habla y detecto qué registrar';
+  document.getElementById('micGhostForm').style.display  = 'none';
+  document.getElementById('micGhostFields').innerHTML    = '';
+  document.getElementById('micMissingFields').innerHTML  = '';
+}
+
 function openMicModal() {
+  resetMicModal();
   document.getElementById('micModal').style.display='flex';
   document.getElementById('micPreview').style.display='none';
   document.getElementById('micSaveBtn').style.display='none';
@@ -5489,6 +5761,8 @@ function startListeningHandlers(rec) {
     if(newFinal) micFullTranscript = appendWithoutOverlap(micFullTranscript, newFinal);
     const display=(micFullTranscript+interim).trim();
     document.getElementById('micText').textContent=display||'...';
+    // ★ Actualizar formulario fantasma con el texto acumulado
+    if(display) try { updateGhostFromText(display); } catch(e){}
     clearTimeout(micSilenceTimer);
     if(micFullTranscript.trim()){
       micSilenceTimer=setTimeout(()=>{
@@ -5522,9 +5796,10 @@ function stopListening() {
 }
 
 function processVoiceResult(text) {
-  if (processVoiceResult._busy) return;  // evitar doble llamada
+  if (processVoiceResult._busy) return;
   processVoiceResult._busy = true;
   stopListening();
+  try {
 
   // Limpiar palabras de activación antes de evaluar
   const cleanText = text.replace(/^(oye|hey|ok|escucha|mira)\b/gi,'').trim();
@@ -5604,6 +5879,10 @@ function processVoiceResult(text) {
     if (faltantes.length > 0) {
       setTimeout(() => askMissingData(faltantes, 0), 800);
     }
+  }
+  } catch(err) {
+    console.error('processVoiceResult error:', err);
+    processVoiceResult._busy = false;
   }
 }
 
@@ -5738,51 +6017,115 @@ function updateCatSelect(type, selectedId) {
 }
 
 function saveMicTx() {
+  // ★ Si hay contexto de formulario fantasma, usar ese flujo
+  if(_micContext && _micContext !== 'tx'){
+    _saveMicByContext();
+    return;
+  }
+  // Flujo original para transacciones
   const amount = parseFloat(document.getElementById('pvAmtEdit').value);
-  const type = document.getElementById('pvTypeEdit').value;
-  const catId = document.getElementById('pvCatEdit').value;
-  const desc = document.getElementById('pvDescEdit').value.trim();
-
-  if(!amount || amount<=0) { alert('Escribe un monto válido'); return; }
-
+  const type   = document.getElementById('pvTypeEdit').value;
+  const catId  = document.getElementById('pvCatEdit').value;
+  const desc   = document.getElementById('pvDescEdit').value.trim();
+  if(!amount || amount<=0){ toast('Escribe un monto válido','error'); return; }
   const allCats=[...state.catsIn,...state.catsEx];
   const cat = allCats.find(c=>c.id===catId);
-
   const tx = {
-    id: Date.now()+'',
-    type,
-    amount,
-    category: cat?.name || (type==='ingreso'?'Otro ingreso':'Otro gasto'),
-    description: desc || (cat?.name || ''),
-    date: document.getElementById('pvDateEdit').value || todayStr(),
+    id: Date.now()+'', type, amount,
+    category: cat?.name||(type==='ingreso'?'Otro ingreso':'Otro gasto'),
+    description: desc||(cat?.name||''),
+    date: document.getElementById('pvDateEdit').value||todayStr(),
     catId,
-    // Campos del negocio
-    cliente:      micParsed?.cliente      || null,
-    servicioTipo: micParsed?.servicioNeg?.label || null,
+    cliente:      micParsed?.cliente      ||null,
+    servicioTipo: micParsed?.servicioNeg?.label||null,
     negocio:      !!(micParsed?.negocio),
   };
   state.transactions.push(tx);
-
-  // ── Auto-marcar servicio como pagado si se detectó uno ──
-  let servicioMarcado = null;
-  if (micParsed && micParsed.serviceMatch) {
-    const svcId = micParsed.serviceMatch.id;
-    const svc = state.servicios.find(s=>s.id===svcId);
-    if (svc && !svc.pagado) {
-      svc.pagado = true;
-      servicioMarcado = svc.name;
-    }
+  let servicioMarcado=null;
+  if(micParsed&&micParsed.serviceMatch){
+    const svc=state.servicios.find(s=>s.id===micParsed.serviceMatch.id);
+    if(svc&&!svc.pagado){svc.pagado=true;servicioMarcado=svc.name;}
   }
+  saveAll(); syncToSheets(tx); render();
+  document.getElementById('micModal').style.display='none';
+  let msg=`✓ ${type==='ingreso'?'Ingreso':'Gasto'} de S/ ${amount.toFixed(2)} registrado`;
+  if(servicioMarcado) msg+=` · ✅ ${servicioMarcado} pagado`;
+  toast(msg);
+}
 
-  saveAll();
-  syncToSheets(tx);
-  render();
+function _saveMicByContext(){
+  const ctx = _micContext;
+  const d   = _ghostData;
   document.getElementById('micModal').style.display='none';
 
-  const tipoLabel = type==='ingreso'?'Ingreso':'Gasto';
-  let msg = `✓ ${tipoLabel} de S/ ${amount.toFixed(2)} registrado por voz`;
-  if (servicioMarcado) msg += ` · ✅ ${servicioMarcado} marcado como pagado`;
-  toast(msg);
+  if(ctx==='agenda_visita'||ctx==='agenda_construccion'){
+    // Construir objeto pre-datos para openAddAgenda
+    // Extraer fecha real del texto si está en _ghostData como label
+    let fechaISO = todayStr();
+    if(micParsed && micParsed.date) fechaISO = micParsed.date;
+    else if(window._avParsed && window._avParsed.fecha) fechaISO = window._avParsed.fecha;
+
+    // Extraer hora limpia
+    let horaLimpia = '';
+    if(d.hora) horaLimpia = d.hora.replace(/\s*(AM|PM)/i,'').trim();
+    if(window._avParsed && window._avParsed.hora) horaLimpia = window._avParsed.hora;
+
+    const preData = {
+      cliente:   d.cliente  || (window._avParsed&&window._avParsed.cliente)  || '',
+      ubicacion: d.ubicacion|| (window._avParsed&&window._avParsed.ubicacion)|| '',
+      telefono:  d.telefono || '',
+      hora:      horaLimpia,
+      fecha:     fechaISO,
+      servicio:  d.servicio || (window._avParsed&&window._avParsed.servicio) || '',
+      precio:    d.precio   ? parseFloat(d.precio.replace('S/ ','')) : (window._avParsed&&window._avParsed.precio)||'',
+      notas:     d.notas    || '',
+    };
+    const tipo = ctx==='agenda_visita' ? 'visita' : 'trabajo';
+    // Mostrar campos faltantes en un toast informativo
+    const def = MIC_CONTEXTS[ctx];
+    const faltan = def.fields.filter(f=>f.req&&!d[f.id]&&!preData[f.id]).map(f=>f.label);
+    if(faltan.length) toast('⚠ Falta: '+faltan.join(', ')+' — completa en el formulario','info');
+    setTimeout(()=>openAddAgenda(tipo, null, preData), 200);
+    return;
+  }
+
+  if(ctx==='deuda'){
+    // Abrir modal de deuda prellenado con datos detectados
+    const nombre = d.nombre || '';
+    const total  = d.total  ? parseFloat(d.total.replace('S/ ','')) : '';
+    const cuota  = d.cuota  ? parseFloat(d.cuota.replace('S/ ','')) : '';
+    const nc     = d.ncuotas? parseInt(d.ncuotas) : '';
+    // Abrir el modal de deuda con pre-datos
+    openAddDebt({name:nombre, totalAmount:total, cuotaMonto:cuota, cuotasTotales:nc, cuotasPagadas:0, categoria:DEBT_CATS[0], color:DEBT_COLORS[0]});
+    toast('Completa los datos faltantes','info');
+    return;
+  }
+
+  if(ctx==='nota'){
+    const tipo   = d.tipo==='✓ Lista'?'lista': d.tipo==='⏰ Recordatorio'?'recordatorio':'texto';
+    const titulo = d.titulo || 'Nota de voz';
+    // Abrir el modal de nota correspondiente
+    if(tipo==='texto') openNotaTexto();
+    else openNotaVoz();
+    toast('Nota lista — agrega el contenido','info');
+    return;
+  }
+
+  // Fallback — tx normal
+  saveMicTx();
+}
+
+// Mostrar botón guardar cuando hay suficientes datos en el ghost form
+function _checkGhostSaveReady(){
+  const saveBtn=document.getElementById('micSaveBtn');
+  if(!saveBtn||!_micContext) return;
+  const def=MIC_CONTEXTS[_micContext];
+  if(!def) return;
+  const reqs=def.fields.filter(f=>f.req);
+  const ready=reqs.every(f=>_ghostData[f.id]);
+  // Mostrar guardar si hay al menos 1 campo requerido lleno (no exigimos todos)
+  const anyFilled=reqs.some(f=>_ghostData[f.id]);
+  saveBtn.style.display=anyFilled?'block':'none';
 }
 
 // ══════════════════════════════════════════════
@@ -6058,14 +6401,17 @@ function closeNegocioModal() {
 
 <!-- ── MIC MODAL ── -->
 <div class="overlay" id="micModal" style="display:none" onclick="closeMicModal(event)">
-  <div class="modal" id="micBox" onclick="event.stopPropagation()" style="background:#FFFFFF;padding-bottom:40px">
-    <div style="text-align:center;margin-bottom:20px">
-      <div style="font-family:'Playfair Display',serif;font-size:20px;color:#1E293B;margin-bottom:4px">Registro por Voz</div>
-      <div style="font-size:12px;color:#94A3B8" id="micHint">Di algo como: <em id="micHintText">"Gasté 50 soles en comida"</em></div>
+  <div class="modal" id="micBox" onclick="event.stopPropagation()" style="padding-bottom:24px;transition:background .3s">
+
+    <!-- Header dinámico -->
+    <div id="micHeader" style="text-align:center;margin-bottom:14px;padding:14px 16px;border-radius:12px;background:#1E293B;transition:background .3s">
+      <div id="micContextIcon" style="font-size:28px;margin-bottom:4px">🎙</div>
+      <div id="micContextTitle" style="font-family:'Playfair Display',serif;font-size:17px;color:#fff;margin-bottom:2px">Registro por Voz</div>
+      <div id="micContextSub" style="font-size:11px;color:#ffffff88" id="micHint">Di algo como: <em id="micHintText">"Gasté 50 soles en comida"</em></div>
     </div>
 
     <!-- Visualizador de onda -->
-    <div id="micWave" style="display:flex;align-items:center;justify-content:center;gap:4px;height:48px;margin-bottom:16px">
+    <div id="micWave" style="display:flex;align-items:center;justify-content:center;gap:4px;height:36px;margin-bottom:10px">
       <span class="wave-bar" style="--d:0s"></span>
       <span class="wave-bar" style="--d:.1s"></span>
       <span class="wave-bar" style="--d:.2s"></span>
@@ -6075,13 +6421,21 @@ function closeNegocioModal() {
       <span class="wave-bar" style="--d:.08s"></span>
     </div>
 
-    <!-- Texto reconocido -->
-    <div id="micText" style="min-height:50px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:14px;font-size:14px;color:#94A3B8;text-align:center;margin-bottom:16px;line-height:1.5">
+    <!-- Texto reconocido en tiempo real -->
+    <div id="micText" style="min-height:44px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:12px 14px;font-size:13px;color:#94A3B8;text-align:center;margin-bottom:12px;line-height:1.5">
       Presiona el micrófono y habla...
     </div>
 
-    <!-- Preview del resultado parseado -->
-    <div id="micPreview" style="display:none;background:#F0FDF4;border:1px solid #4CAF8533;border-radius:12px;padding:14px;margin-bottom:16px">
+    <!-- ★ FORMULARIO FANTASMA — campos en gris, se llenan en tiempo real -->
+    <div id="micGhostForm" style="display:none;margin-bottom:12px">
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#94A3B8;margin-bottom:8px">📋 Datos detectados</div>
+      <div id="micGhostFields" style="display:flex;flex-direction:column;gap:6px"></div>
+      <!-- Campos faltantes -->
+      <div id="micMissingFields" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px"></div>
+    </div>
+
+    <!-- Preview resultado final (igual que antes) -->
+    <div id="micPreview" style="display:none;background:#F0FDF4;border:1px solid #4CAF8533;border-radius:12px;padding:14px;margin-bottom:12px">
       <div style="font-size:11px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Interpreté esto:</div>
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div>
@@ -6092,7 +6446,6 @@ function closeNegocioModal() {
           <div id="pvClienteBadge" style="display:none;margin-top:5px;background:#EFF6FF;border:1px solid #2E86AB44;border-radius:8px;padding:4px 10px;font-size:11px;color:#1565C0;font-weight:600"></div>
           <div id="pvNegocioBadge" style="display:none;margin-top:5px;background:#FFF8E1;border:1px solid #C9A84C44;border-radius:8px;padding:4px 10px;font-size:11px;color:#E65100;font-weight:600"></div>
           <div id="pvServiceBadge" style="display:none;margin-top:6px;background:#EFF6FF;border:1px solid #2E86AB33;border-radius:8px;padding:5px 10px;font-size:11px;color:#2E86AB;font-weight:600"></div>
-          <!-- Pregunta ambigüedad negocio/personal -->
           <div id="pvAmbiguityRow" style="display:none;margin-top:10px;flex-direction:column;gap:6px">
             <div style="font-size:11px;color:#E65100;font-weight:700;text-align:center">⚠ ¿Este gasto es para tu negocio o personal?</div>
             <div style="display:flex;gap:8px">
@@ -6103,12 +6456,10 @@ function closeNegocioModal() {
         </div>
         <div id="pvAmt" style="font-family:'Playfair Display',serif;font-size:26px"></div>
       </div>
-      <!-- Edición rápida inline -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
         <div>
           <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;margin-bottom:4px">Monto</div>
-          <input id="pvAmtEdit" type="number" inputmode="decimal" placeholder="0.00"
-            style="width:100%;background:#FFF;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:14px;color:#1E293B;font-family:'DM Sans',sans-serif">
+          <input id="pvAmtEdit" type="number" inputmode="decimal" placeholder="0.00" style="width:100%;background:#FFF;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:14px;color:#1E293B;font-family:'DM Sans',sans-serif">
         </div>
         <div>
           <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;margin-bottom:4px">Tipo</div>
@@ -6123,26 +6474,24 @@ function closeNegocioModal() {
         </div>
         <div>
           <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;margin-bottom:4px">Descripción</div>
-          <input id="pvDescEdit" type="text" placeholder="Descripción opcional"
-            style="width:100%;background:#FFF;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:14px;color:#1E293B;font-family:'DM Sans',sans-serif">
+          <input id="pvDescEdit" type="text" placeholder="Descripción opcional" style="width:100%;background:#FFF;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:14px;color:#1E293B;font-family:'DM Sans',sans-serif">
         </div>
         <div style="grid-column:1/-1">
           <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;margin-bottom:4px">📅 Fecha</div>
-          <input id="pvDateEdit" type="date"
-            style="width:100%;background:#FFF;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:14px;color:#1E293B;font-family:'DM Sans',sans-serif">
+          <input id="pvDateEdit" type="date" style="width:100%;background:#FFF;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:14px;color:#1E293B;font-family:'DM Sans',sans-serif">
         </div>
       </div>
     </div>
 
-    <!-- Botones de acción -->
-    <div style="display:flex;gap:10px;margin-bottom:12px">
+    <!-- Botones -->
+    <div style="display:flex;gap:10px;margin-bottom:10px">
       <button id="micBtn" onclick="toggleListening()" style="flex:1;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:12px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s">
         <span id="micBtnIcon">🎙</span> <span id="micBtnTxt">Escuchar</span>
       </button>
     </div>
-    <div style="display:flex;gap:8px" id="micConfirmRow" style="display:none">
+    <div style="display:flex;gap:8px" id="micConfirmRow">
       <button class="btn-ghost" onclick="closeMicModal()" style="flex:1">Cancelar</button>
-      <button id="micSaveBtn" class="btn-green" onclick="saveMicTx()" style="flex:2;display:none">✓ Guardar registro</button>
+      <button id="micSaveBtn" class="btn-green" onclick="saveMicTx()" style="flex:2;display:none;font-size:15px;padding:14px;font-weight:700">✓ Guardar</button>
     </div>
   </div>
 </div>
