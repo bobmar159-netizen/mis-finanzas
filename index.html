@@ -5787,7 +5787,7 @@ function stopListening() {
   micRestartLock  = true;
   clearTimeout(micSilenceTimer);
   if(recognition){ try{ recognition.stop(); }catch(e){} }
-  document.getElementById('micBtn').style.background='linear-gradient(135deg,#C9A84C,#E8C96A)';
+  document.getElementById('micBtn').style.background='linear-gradient(135deg,#2E7D32,#4CAF50)';
   document.getElementById('micBtnIcon').textContent='🎙';
   document.getElementById('micBtnTxt').textContent='Escuchar de nuevo';
   document.getElementById('micFab').classList.remove('listening');
@@ -6408,7 +6408,8 @@ function closeNegocioModal() {
     <div id="micHeader" style="text-align:center;margin-bottom:14px;padding:14px 16px;border-radius:12px;background:#1E293B;transition:background .3s">
       <div id="micContextIcon" style="font-size:28px;margin-bottom:4px">🎙</div>
       <div id="micContextTitle" style="font-family:'Playfair Display',serif;font-size:17px;color:#fff;margin-bottom:2px">Registro por Voz</div>
-      <div id="micContextSub" style="font-size:11px;color:#ffffff88" id="micHint">Di algo como: <em id="micHintText">"Gasté 50 soles en comida"</em></div>
+      <div id="micContextSub" style="font-size:11px;color:#ffffff88">Habla y detecto qué registrar</div>
+      <div id="micHint" style="font-size:11px;color:#ffffff88;display:none">Di algo como: <em id="micHintText">"Gasté 50 soles en comida"</em></div>
     </div>
 
     <!-- Visualizador de onda -->
