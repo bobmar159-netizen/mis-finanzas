@@ -2784,7 +2784,7 @@ function _procesarFragmentoNota(texto){
           if(el){el.textContent='Lista "'+_notaVozTitulo+'" creada — di los ítems uno por uno';el.style.color='#16A34A';}
           _refreshNotaPreview();
           return;
-        }}}}}
+        }}}}
   if(_notaVozTipo==='lista'||_notaVozTipo==='recordatorio'){
     const SEP=/\b(?:aparte|a\s+parte|siguiente|despu[eé]s|y\s+despu[eé]s|tambi[eé]n|y\s+tambi[eé]n|adem[aá]s|y\s+luego|luego|finalmente|otro\s+(?:es|ser[ií]a)|el\s+(?:siguiente|otro|pr[oó]ximo)|por\s+[uú]ltimo|uno\s+m[aá]s|y\s+por\s+[uú]ltimo|igualmente|por\s+otra\s+parte)\b/gi;
     const partes=t.split(SEP).map(p=>p.trim()).filter(p=>p.length>0);
