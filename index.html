@@ -5880,6 +5880,7 @@ function processVoiceResult(text) {
       setTimeout(() => askMissingData(faltantes, 0), 800);
     }
   }
+  processVoiceResult._busy = false; // ★ siempre resetear al terminar
   } catch(err) {
     console.error('processVoiceResult error:', err);
     processVoiceResult._busy = false;
