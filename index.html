@@ -5284,9 +5284,22 @@ function loadFromSheets(forzar) {
         const m = _mergeById(load('fnz_agenda',[]), data.agenda);
         save('fnz_agenda', m); state.agenda = m;
       }
-      // Movimientos negocio
+      // Movimientos negocio — merge por id Y huella (evita duplicados de Notion)
       if (data.movimientos && data.movimientos.length) {
-        const m = _mergeById(load('fnz_neg_tx',[]), data.movimientos);
+        const local = load('fnz_neg_tx',[]);
+        const _normCat = cat => _mapearCategoriaNotion(cat||'').toLowerCase().trim();
+        const _h = t => [t.date||'',t.type||'',Math.round((t.amount||0)*100),_normCat(t.category),(t.cliente||'').toLowerCase().trim()].join('|');
+        const idsSeen = new Set(local.map(t=>t.id));
+        const huellasSeen = new Set(local.map(_h));
+        const toAdd = (data.movimientos||[]).filter(t => {
+          if(!t||!t.id) return false;
+          if(idsSeen.has(t.id)) return false;
+          const h = _h(t);
+          if(huellasSeen.has(h)) return false;
+          idsSeen.add(t.id); huellasSeen.add(h);
+          return true;
+        });
+        const m = [...local, ...toAdd];
         save('fnz_neg_tx', m);
         if (state.modo === 'negocio') state.transactions = m;
       }
