@@ -11,11 +11,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root {
-  --gold:#2E7D32;--gold2:#4CAF50;--red:#E05252;--green:#4CAF85;--blue:#2E86AB;
-  --bg:#F4F7F4;--card:#FFFFFF;--border:#C8E6C9;--text:#1E293B;--muted:#81C784;--dim:#A5D6A7;
+  --gold:#3A7D44;--gold2:#52A85A;--red:#E05252;--green:#4CAF85;--blue:#2E86AB;
+  --bg:#F2F7F2;--card:#FFFFFF;--border:#D4E8D4;--text:#1A2E1A;--muted:#7BAE7F;--dim:#A8C9AB;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;overflow:hidden;background:linear-gradient(150deg,#F4F7F4 0%,#E8F5E9 60%,#F1F8F1 100%);background-attachment:fixed}
+html,body{height:100%;overflow:hidden;background:linear-gradient(150deg,#EEF5EE 0%,#E3F0E3 60%,#EDF4ED 100%);background-attachment:fixed}
 body{font-family:'DM Sans',sans-serif;color:var(--text)}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:4px}
 #app{height:100vh;display:flex;flex-direction:column;max-width:430px;margin:0 auto}
@@ -89,7 +89,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .field{margin-bottom:16px}
 .field-label{font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;display:block}
 .field input,.field select,.field textarea{background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:14px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;width:100%;transition:border-color .2s}
-.field input:focus,.field select:focus{outline:none;border-color:#2E7D3266}
+.field input:focus,.field select:focus{outline:none;border-color:#3A7D4466}
 .field select option{background:#FFFFFF}
 .type-toggle{display:flex;gap:8px}
 .type-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;cursor:pointer;transition:all .2s}
@@ -157,9 +157,9 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 #app.modo-negocio .btn-gold:hover { opacity:.85; }
 
 /* ── MODO TOGGLE ── */
-.modo-toggle { display:flex; align-items:center; background:#E8F5E9; border-radius:20px; padding:3px; gap:2px; margin-bottom:10px; }
+.modo-toggle { display:flex; align-items:center; background:#DFF0DF; border-radius:20px; padding:3px; gap:2px; margin-bottom:10px; }
 .modo-btn { flex:1; padding:6px 10px; border:none; border-radius:16px; font-family:'DM Sans',sans-serif; font-size:11px; font-weight:700; cursor:pointer; transition:all .25s; background:transparent; color:#81C784; }
-.modo-btn.active-personal { background:#2E7D32; color:#fff; box-shadow:0 2px 8px #2E7D3244; }
+.modo-btn.active-personal { background:#3A7D44; color:#fff; box-shadow:0 2px 8px #3A7D4444; }
 .modo-btn.active-negocio  { background:#1565C0; color:#fff; box-shadow:0 2px 8px #1565C044; }
 
 /* ── MIC FAB ── */
@@ -171,7 +171,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2E7D32, #4CAF50);
+  background: linear-gradient(135deg, #3A7D44, #52A85A);
   color: #0D0D0F;
   border: none;
   font-size: 22px;
@@ -186,8 +186,8 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
   user-select: none;
   -webkit-user-select: none;
 }
-#micFab.dragging { cursor: grabbing; opacity:.85; box-shadow:0 8px 28px #2E7D3288; }
-#micFab:not(.dragging):hover { transform: scale(1.08); box-shadow: 0 6px 24px #2E7D3277; }
+#micFab.dragging { cursor: grabbing; opacity:.85; box-shadow:0 8px 28px #3A7D4488; }
+#micFab:not(.dragging):hover { transform: scale(1.08); box-shadow: 0 6px 24px #3A7D4477; }
 #micFab.listening { background: linear-gradient(135deg, #E05252, #f87171); box-shadow: 0 4px 20px #E0525266; animation: micPulse 1s infinite; }
 
 @keyframes micPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
@@ -716,17 +716,17 @@ function renderDashboard(){
 
   return `
     <div class="month-nav"><button onclick="prevMonth()">‹</button><span>${monthName()}</span><button onclick="nextMonth()">›</button></div>
-    <div class="summary-card" style="background:linear-gradient(135deg,#1B5E20,#2E7D32);border:1px solid #2E7D3233;text-align:center;margin-bottom:12px">
-      <div class="summary-label" style="color:#A5D6A7">Balance del mes</div>
+    <div class="summary-card" style="background:linear-gradient(135deg,#3A7D44,#52A85A);border:1px solid #3A7D4433;text-align:center;margin-bottom:12px">
+      <div class="summary-label" style="color:#C8E6C9">Balance del mes</div>
       <div class="summary-amount" style="color:${balColor}">${fmtSign(bal)}</div>
       <div style="display:flex;gap:24px;justify-content:center;margin-top:14px">
-        <div><div style="font-size:10px;color:#A5D6A7;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ingresos</div><div style="color:#81C784;font-weight:600">+${fmt(inc)}</div></div>
+        <div><div style="font-size:10px;color:#C8E6C9;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ingresos</div><div style="color:#A5D6A7;font-weight:600">+${fmt(inc)}</div></div>
         <div style="width:1px;background:#ffffff22"></div>
         <div><div style="font-size:10px;color:#A5D6A7;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Egresos</div><div style="color:#EF9A9A;font-weight:600">-${fmt(exp)}</div></div>
       </div>
     </div>
     <!-- Acceso rápido al micrófono -->
-    <button onclick="document.getElementById('micFab').click()" style="width:100%;margin-bottom:12px;background:#fff;color:#2E7D32;border:2px solid #2E7D32;border-radius:14px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px">
+    <button onclick="document.getElementById('micFab').click()" style="width:100%;margin-bottom:12px;background:#fff;color:#3A7D44;border:2px solid #3A7D44;border-radius:14px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px">
       🎙 Registrar por voz
     </button>
     <div class="stat-row">
@@ -735,8 +735,8 @@ function renderDashboard(){
         <div class="stat-mini-val" style="color:var(--blue)">${fmt(totalDebt())}</div>
         <div style="font-size:10px;color:var(--muted);margin-top:3px">${pendingDebts().length} deuda(s)</div>
       </div>
-      <div class="stat-mini" style="background:#E8F5E9;border-color:#2E7D3233">
-        <div class="stat-mini-label" style="color:#2E7D3288">Servicios</div>
+      <div class="stat-mini" style="background:#FFFDE7;border-color:#F9A82533">
+        <div class="stat-mini-label" style="color:#F9A82588">Servicios</div>
         <div class="stat-mini-val" style="color:var(--gold)">${fmt(totalPendingServices())}</div>
         <div style="font-size:10px;color:var(--muted);margin-top:3px">${pendingServices().length} pendiente(s)</div>
       </div>
@@ -5866,7 +5866,7 @@ function stopListening() {
   micRestartLock  = true;
   clearTimeout(micSilenceTimer);
   if(recognition){ try{ recognition.stop(); }catch(e){} }
-  document.getElementById('micBtn').style.background='linear-gradient(135deg,#2E7D32,#4CAF50)';
+  document.getElementById('micBtn').style.background='linear-gradient(135deg,#3A7D44,#52A85A)';
   document.getElementById('micBtnIcon').textContent='🎙';
   document.getElementById('micBtnTxt').textContent='Escuchar de nuevo';
   document.getElementById('micFab').classList.remove('listening');
