@@ -2470,21 +2470,21 @@ function importarNotion(input) {
       };
 
       const iDate     = col(['fecha','date']);
-      const iCliente  = col(['cue','cliente','client','nombre']);
-      const iContacto = col(['conta','contact','tel','celular']);
+      const iCliente  = col(['cliente','cue','client','nombre']);
+      const iContacto = col(['contacto','conta','contact','tel','celular']);
       const iSvc1     = col(['servicio 1','service 1','servicio1']);
       const iSvc2     = col(['servicio 2','service 2','servicio2']);
       const iSvc3     = col(['servicio 3','service 3','servicio3']);
       const iSvc4     = col(['servicio 4','service 4','servicio4']);
       const iDistrito = col(['distrito','district','zona','ubicacion']);
-      const iForma    = col(['for','forma','pago','payment']);
-      const iMovil    = col(['movil','movilidad','transport']);
-      const iMaterial = col(['materi','material']);
+      const iForma    = col(['forma de pago','forma','pago','payment']);
+      const iMovil    = col(['movilidad','movil','transport']);
+      const iMaterial = col(['materiales','material','materi']);
       const iOtros    = col(['otros','other','extra']);
-      // ★ Precio del servicio (columna real) — NO usar ganancia
+      // ★ Precio del servicio — columna exacta del CSV de Notion
       const iPrecio   = col(['precio del servicio','precio serv','precio s','precio']);
-      const iGanancia = col(['ganancia']); // solo referencia, no se importa
-      const iObs      = col(['observ','nota','comment','descripcion']);
+      const iGanancia = col(['ganancia']); // ignorado — es columna calculada
+      const iObs      = col(['observaciones','observ','nota','comment','descripcion']);
 
       let txImportadas = 0;
       let egresosMov = 0;
@@ -2522,8 +2522,8 @@ function importarNotion(input) {
         }
 
         // Precio / ingreso principal
-        const precioRaw = iPrecio >= 0 ? r[iPrecio]?.toString().replace(/[^0-9.,]/g,'').replace(',','.') : '';
-        const precio = parseFloat(precioRaw) || 0;
+        // ★ Parsear formato Notion: "10,00 PEN" o "1.200,00 PEN" → número
+        const precio = _parseMonto(iPrecio >= 0 ? r[iPrecio] : '');
 
         // Observaciones
         const obs = iObs >= 0 ? r[iObs]?.trim() : '';
@@ -2552,8 +2552,7 @@ function importarNotion(input) {
         }
 
         // ── Crear egreso de MOVILIDAD si tiene valor ──
-        const movilRaw = iMovil >= 0 ? r[iMovil]?.toString().replace(/[^0-9.,]/g,'').replace(',','.') : '';
-        const movil = parseFloat(movilRaw) || 0;
+        const movil = _parseMonto(iMovil >= 0 ? r[iMovil] : '');
         if (movil > 0) {
           nuevasTx.push({
             id: 'not_' + fecha + '_mov_r' + i,
@@ -2571,8 +2570,7 @@ function importarNotion(input) {
         }
 
         // ── Crear egreso de MATERIALES si tiene valor ──
-        const matRaw = iMaterial >= 0 ? r[iMaterial]?.toString().replace(/[^0-9.,]/g,'').replace(',','.') : '';
-        const mat = parseFloat(matRaw) || 0;
+        const mat = _parseMonto(iMaterial >= 0 ? r[iMaterial] : '');
         if (mat > 0) {
           nuevasTx.push({
             id: 'not_' + fecha + '_mat_r' + i,
@@ -2590,8 +2588,7 @@ function importarNotion(input) {
         }
 
         // ── Crear egreso de OTROS si tiene valor ──
-        const otrosRaw = iOtros >= 0 ? r[iOtros]?.toString().replace(/[^0-9.,]/g,'').replace(',','.') : '';
-        const otros = parseFloat(otrosRaw) || 0;
+        const otros = _parseMonto(iOtros >= 0 ? r[iOtros] : '');
         if (otros > 0) {
           nuevasTx.push({
             id: 'not_' + fecha + '_otr_r' + i,
@@ -2663,31 +2660,40 @@ function importarNotion(input) {
 // ★ Mapear texto de Notion (truncado o completo) → categoría real de la app
 function _mapearCategoriaNotion(texto) {
   if (!texto) return 'Servicio Gas';
-  const t = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  if (t.includes('punto adi') || t.includes('punto add') || t.includes('punto extra') || t.includes('punto de gas') || t.includes('boca')) return 'Punto Adicional';
-  if (t.includes('terma') || t.includes('calefon') || t.includes('calef')) return 'Terma';
-  if (t.includes('cocina') || t.includes('cocinilla')) return 'Cocina / Cocinilla';
-  if (t.includes('horno')) return 'Horno a Gas';
-  if (t.includes('parrilla')) return 'Parrilla a Gas';
-  if (t.includes('secadora')) return 'Secadora a Gas';
-  if (t.includes('instalac') && t.includes('nueva')) return 'Instalación Nueva';
-  if (t.includes('instalac')) return 'Instalación Nueva';
-  if (t.includes('conexion') || t.includes('conec') || t.includes('conectar')) return 'Conexión Artefacto';
-  if (t.includes('conversion') || t.includes('convert')) return 'Conversión Artefacto';
-  if (t.includes('modific') || t.includes('mod de red') || t.includes('red')) return 'Modificación Red';
-  if (t.includes('reparac') || t.includes('repara') || t.includes('tuberia') || t.includes('fuga')) return 'Reparación Tubería';
-  if (t.includes('gasfiter') || t.includes('plomeria') || t.includes('desague')) return 'Gasfitería';
-  if (t.includes('document') || t.includes('tramite') || t.includes('certif')) return 'Documentación';
-  if (t.includes('movilidad') || t.includes('movil') || t.includes('transport')) return 'Movilidad';
-  if (t.includes('material') || t.includes('insumo')) return 'Materiales';
-  // Si tiene múltiples servicios concatenados, usar el primero mapeado
-  if (texto.includes(' + ')) {
-    for (const parte of texto.split(' + ')) {
-      const mapped = _mapearCategoriaNotion(parte.trim());
-      if (mapped !== 'Servicio Gas') return mapped;
-    }
-  }
-  return texto; // devolver el original si no hay mapeo
+  const t = texto.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  // ★ Valores exactos del CSV de Notion (mayúsculas normalizadas)
+  if (t === 'punto adicional')  return 'Punto Adicional';
+  if (t === 'conexion')         return 'Conexión Artefacto';
+  if (t === 'conversion')       return 'Conversión Artefacto';
+  if (t === 'modificacion')     return 'Modificación Red';
+  if (t === 'reparacion')       return 'Reparación Tubería';
+  if (t === 'instalacion nueva')return 'Instalación Nueva';
+  if (t === 'instalacion')      return 'Instalación Nueva';
+  if (t === 'gasfiteria')       return 'Gasfitería';
+  if (t === 'documentacion')    return 'Documentación';
+  if (t === 'terma')            return 'Terma';
+  if (t === 'cocina')           return 'Cocina / Cocinilla';
+  if (t === 'horno')            return 'Horno a Gas';
+  if (t === 'parrilla')         return 'Parrilla a Gas';
+  if (t === 'secadora')         return 'Secadora a Gas';
+  if (t === 'calefon')          return 'Calefón';
+  if (t === 'rejilla')          return 'Otro Servicio';
+  if (t === 'gestion')          return 'Documentación';
+  // Búsqueda parcial como respaldo
+  if (t.includes('punto adi'))  return 'Punto Adicional';
+  if (t.includes('conexion'))   return 'Conexión Artefacto';
+  if (t.includes('conversion')) return 'Conversión Artefacto';
+  if (t.includes('modific'))    return 'Modificación Red';
+  if (t.includes('reparac'))    return 'Reparación Tubería';
+  if (t.includes('instalac'))   return 'Instalación Nueva';
+  if (t.includes('gasfiter'))   return 'Gasfitería';
+  if (t.includes('document'))   return 'Documentación';
+  if (t.includes('terma') || t.includes('calefon')) return 'Terma';
+  if (t.includes('cocina'))     return 'Cocina / Cocinilla';
+  if (t.includes('horno'))      return 'Horno a Gas';
+  if (t.includes('parrilla'))   return 'Parrilla a Gas';
+  if (t.includes('secadora'))   return 'Secadora a Gas';
+  return texto.trim(); // devolver original si no hay mapeo
 }
 
 // ★ Forzar sincronización a Sheets de todos los movimientos importados de Notion
@@ -2761,6 +2767,24 @@ function _getCatIdByName(nombre) {
   if(n.includes('herramienta')) return 'cne4';
   if(n.includes('gnv')||n.includes('gasolina')) return 'cne2';
   return 'cn9';
+}
+
+// ★ Parsear montos de Notion: "10,00 PEN", "1.200,00 PEN", "1200.00" → número
+function _parseMonto(val) {
+  if (!val) return 0;
+  let s = val.toString().replace(/[^0-9.,]/g, '').trim();
+  if (!s) return 0;
+  // Detectar si la coma es separador decimal (ej: "10,00") o de miles (ej: "1,200")
+  const comaIdx = s.lastIndexOf(',');
+  const puntoIdx = s.lastIndexOf('.');
+  if (comaIdx > puntoIdx) {
+    // Coma es decimal: "1.200,00" o "10,00"
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (puntoIdx > comaIdx) {
+    // Punto es decimal: "1,200.00" o "10.00"
+    s = s.replace(/,/g, '');
+  }
+  return parseFloat(s) || 0;
 }
 
 function _parseCsv(text) {
