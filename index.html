@@ -2610,26 +2610,33 @@ function importarNotion(input) {
         return;
       }
 
-      // ── Guardar sin duplicar ──
-      // Primero limpiar duplicados existentes por huella (fecha+monto+categoría)
+      // ── Importar: REEMPLAZA todos los de Notion, conserva los manuales ──
       const existing = load('fnz_neg_tx', []);
-      
-      // Crear set de huellas de los existentes
-      const huellas = new Set(existing.map(t => 
-        `${t.date}_${t.type}_${Math.round(t.amount)}_${(t.category||'').slice(0,10)}_${(t.cliente||'').slice(0,8)}`
-      ));
+      // Separar: registros creados manualmente vs importados de Notion
+      const manuales = existing.filter(t => !t._importadoDeNotion);
 
-      // Solo agregar los que no existen por ID ni por huella
-      const existingIds = new Set(existing.map(t => t.id));
-      const sinDuplicar = nuevasTx.filter(t => {
-        if (existingIds.has(t.id)) return false; // mismo ID
-        const huella = `${t.date}_${t.type}_${Math.round(t.amount)}_${(t.category||'').slice(0,10)}_${(t.cliente||'').slice(0,8)}`;
-        if (huellas.has(huella)) return false; // mismo contenido
-        huellas.add(huella); // agregar para no duplicar dentro del mismo CSV
-        return true;
-      });
+      // Verificar duplicados solo contra los manuales (para no pisar trabajo manual)
+      const _normCat = cat => _mapearCategoriaNotion(cat||'').toLowerCase().trim();
+      const _huella = t => [
+        t.date||'', t.type||'',
+        Math.round((t.amount||0)*100),
+        _normCat(t.category),
+        (t.cliente||'').toLowerCase().trim()
+      ].join('|');
 
-      const merged = [...existing, ...sinDuplicar];
+      const huellasManuales = new Set(manuales.map(_huella));
+      const sinDuplicar = [];
+      const vistasEnCSV = new Set();
+      for (const t of nuevasTx) {
+        const h = _huella(t);
+        if (huellasManuales.has(h)) continue; // ya existe como manual
+        if (vistasEnCSV.has(h)) continue;     // duplicado dentro del mismo CSV
+        vistasEnCSV.add(h);
+        sinDuplicar.push(t);
+      }
+
+      // ★ Resultado final: manuales + nueva importación limpia
+      const merged = [...manuales, ...sinDuplicar];
       save('fnz_neg_tx', merged);
       if (state.modo === 'negocio') state.transactions = merged;
 
@@ -2734,15 +2741,33 @@ function limpiarDuplicadosNotion() {
   const vistas = new Set();
   const limpias = [];
   let borrados = 0;
+
   txs.forEach(t => {
-    const huella = `${t.date}_${t.type}_${Math.round(t.amount)}_${(t.category||'').slice(0,10)}_${(t.cliente||'').slice(0,8)}`;
-    if (vistas.has(huella)) { borrados++; }
-    else { vistas.add(huella); limpias.push(t); }
+    // Huella: fecha + tipo + monto + categoría normalizada + cliente
+    const huella = [
+      t.date || '',
+      t.type || '',
+      Math.round((t.amount||0) * 100),
+      _mapearCategoriaNotion(t.category||'').toLowerCase().trim(),
+      (t.cliente||'').toLowerCase().trim()
+    ].join('|');
+
+    if (vistas.has(huella)) {
+      borrados++;
+    } else {
+      vistas.add(huella);
+      limpias.push(t);
+    }
   });
-  if (borrados === 0) { toast('✓ No hay duplicados — todo limpio'); return; }
+
+  if (borrados === 0) {
+    toast('✓ No hay duplicados — todo limpio');
+    return;
+  }
   if (!confirm(`Se encontraron ${borrados} registros duplicados.\n¿Eliminarlos?`)) return;
   state.transactions = limpias;
-  saveAll(); render();
+  saveAll();
+  render();
   toast(`✓ ${borrados} duplicados eliminados`);
 }
 
