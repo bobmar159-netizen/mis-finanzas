@@ -138,7 +138,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .mv-chevron{font-size:10px;color:var(--muted);transition:transform .2s}
 .mv-card.open .mv-chevron{transform:rotate(180deg)}
 .mv-expand{max-height:0;overflow:hidden;transition:max-height .28s ease}
-.mv-card.open .mv-expand{max-height:160px}
+.mv-card.open .mv-expand{max-height:300px}
 .mv-detail{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;padding-top:10px;margin-top:10px;border-top:0.5px solid var(--border)}
 .mv-d-item{display:flex;flex-direction:column;gap:2px}
 .mv-d-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
@@ -2549,9 +2549,26 @@ function importarNotion(input) {
         return;
       }
 
-      // Agregar sin duplicar (por id)
+      // ── Guardar sin duplicar ──
+      // Primero limpiar duplicados existentes por huella (fecha+monto+categoría)
       const existing = load('fnz_neg_tx', []);
-      const merged = _mergeById(existing, nuevasTx);
+      
+      // Crear set de huellas de los existentes
+      const huellas = new Set(existing.map(t => 
+        `${t.date}_${t.type}_${Math.round(t.amount)}_${(t.category||'').slice(0,10)}_${(t.cliente||'').slice(0,8)}`
+      ));
+
+      // Solo agregar los que no existen por ID ni por huella
+      const existingIds = new Set(existing.map(t => t.id));
+      const sinDuplicar = nuevasTx.filter(t => {
+        if (existingIds.has(t.id)) return false; // mismo ID
+        const huella = `${t.date}_${t.type}_${Math.round(t.amount)}_${(t.category||'').slice(0,10)}_${(t.cliente||'').slice(0,8)}`;
+        if (huellas.has(huella)) return false; // mismo contenido
+        huellas.add(huella); // agregar para no duplicar dentro del mismo CSV
+        return true;
+      });
+
+      const merged = [...existing, ...sinDuplicar];
       save('fnz_neg_tx', merged);
       if (state.modo === 'negocio') state.transactions = merged;
 
@@ -2639,6 +2656,24 @@ function sincronizarNotionASheets() {
         .catch(() => { enviados++; });
     }, idx * 200); // 200ms entre cada envío para no saturar
   });
+}
+
+// ★ Limpiar duplicados de movimientos importados de Notion
+function limpiarDuplicadosNotion() {
+  const txs = state.transactions || [];
+  const vistas = new Set();
+  const limpias = [];
+  let borrados = 0;
+  txs.forEach(t => {
+    const huella = `${t.date}_${t.type}_${Math.round(t.amount)}_${(t.category||'').slice(0,10)}_${(t.cliente||'').slice(0,8)}`;
+    if (vistas.has(huella)) { borrados++; }
+    else { vistas.add(huella); limpias.push(t); }
+  });
+  if (borrados === 0) { toast('✓ No hay duplicados — todo limpio'); return; }
+  if (!confirm(`Se encontraron ${borrados} registros duplicados.\n¿Eliminarlos?`)) return;
+  state.transactions = limpias;
+  saveAll(); render();
+  toast(`✓ ${borrados} duplicados eliminados`);
 }
 
 function _getCatIdByName(nombre) {
@@ -3579,6 +3614,9 @@ function renderAjustes(){
       </button>
       <button onclick="enviarTodoASheets()" style="width:100%;margin-top:6px;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">
         ⬆ Enviar TODO a Sheets ahora
+      </button>
+      <button onclick="limpiarDuplicadosNotion()" style="width:100%;margin-top:6px;background:#FEF2F2;border:1px solid #C6282833;color:#C62828;border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">
+        🧹 Limpiar duplicados importados
       </button>
       <div id="notion-import-status" style="margin-top:8px;font-size:12px;color:var(--muted);text-align:center;min-height:16px"></div>
       <div id="notion-sync-status" style="font-size:12px;color:var(--muted);text-align:center;min-height:16px"></div>
