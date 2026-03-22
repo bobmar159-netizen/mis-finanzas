@@ -656,12 +656,16 @@ function circleProgress(pct,size,stroke,color,labelHtml){
 // ─────────────────────────────────────────────
 // CATEGORY SELECTOR HTML
 // ─────────────────────────────────────────────
-function catSelectHtml(id, type, selected){
+function catSelectHtml(id, type, selected, selectedCatId){
   const cats = type==='ingreso' ? state.catsIn : state.catsEx;
-  const selNorm = (selected||'').toLowerCase().trim();
+  const norm = s => (s||'').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const selNorm = norm(selected);
   const opts = cats.map(c=>{
-    const isSelected = c.id===selected || c.name===selected ||
-      c.name.toLowerCase().trim()===selNorm;
+    const isSelected =
+      c.id === selectedCatId ||          // por catId exacto
+      c.id === selected ||               // selected es el id
+      c.name === selected ||             // nombre exacto
+      norm(c.name) === selNorm;          // nombre sin tildes
     return `<option value="${c.id}" ${isSelected?'selected':''}>${c.icon||''} ${c.name}</option>`;
   }).join('');
   return `<select id="${id}" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">${opts}</select>`;
@@ -2796,7 +2800,7 @@ function openTxModal(tx, preData){
     <div class="field"><label class="field-label">Monto (S/)</label><input id="tx-amount" type="number" inputmode="decimal" placeholder="0.00" value="${t.amount||''}"></div>
     <div class="field" id="tx-cat-wrap">
       <label class="field-label">Categoría</label>
-      ${catSelectHtml('tx-cat',t.type,t.category)}
+      ${catSelectHtml('tx-cat',t.type,t.category,t.catId)}
     </div>
     <div class="field"><label class="field-label">Moneda</label>
       <div style="display:flex;gap:8px">
