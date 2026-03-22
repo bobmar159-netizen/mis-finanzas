@@ -219,20 +219,14 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .pulse{animation:pulse 2s infinite}
 
-/* ── MODO NEGOCIO — tema azul ── */
-#app.modo-negocio { --gold:#1565C0; --gold2:#2E86AB; --bg:#F4F8FF; --border:#C5D8F0; }
-#app.modo-negocio #header { background:#F4F8FF; border-bottom-color:#C5D8F0; }
-#app.modo-negocio .h-title { color:#1565C0; }
-#app.modo-negocio .tab.active { color:#1565C0; border-bottom-color:#1565C0; background:#EFF6FF; }
-#app.modo-negocio .section-title { color:#1565C0; }
-#app.modo-negocio .btn-gold { background:linear-gradient(135deg,#1565C0,#2E86AB); color:#fff; }
-#app.modo-negocio .btn-gold:hover { opacity:.85; }
+/* ── MODO NEGOCIO — solo badge del toggle, no pisa el tema ── */
+#app.modo-negocio .active-negocio { background:var(--gold); color:#fff; box-shadow:0 2px 8px var(--gold)44; }
 
 /* ── MODO TOGGLE ── */
 .modo-toggle { display:flex; align-items:center; background:#DFF0DF; border-radius:20px; padding:3px; gap:2px; margin-bottom:10px; }
 .modo-btn { flex:1; padding:6px 10px; border:none; border-radius:16px; font-family:'DM Sans',sans-serif; font-size:11px; font-weight:700; cursor:pointer; transition:all .25s; background:transparent; color:var(--muted); }
 .modo-btn.active-personal { background:var(--gold); color:#fff; box-shadow:0 2px 8px var(--gold)44; }
-.modo-btn.active-negocio  { background:#1565C0; color:#fff; box-shadow:0 2px 8px #1565C044; }
+.modo-btn.active-negocio  { background:var(--gold); color:#fff; box-shadow:0 2px 8px var(--gold)44; }
 
 /* ── MIC FAB ── */
 #micFab {
@@ -499,8 +493,9 @@ function loadStateForModo(modo){
   state.notas               = load('fnz_notas', []);
   state.presupuesto         = load(k.presupuesto, []);
 
-  // ── Migración: inyectar categorías nuevas que no existan en localStorage ──
+  // ── Migración: inyectar categorías negocio que no existan ──
   if(isNeg){
+    // ★ Siempre asegurar que los defaults de negocio estén presentes
     const defaults = [...DEFAULT_CATS_NEG_IN, ...DEFAULT_CATS_NEG_EX];
     defaults.forEach(def => {
       const inIn = state.catsIn.some(c=>c.id===def.id);
@@ -510,6 +505,9 @@ function loadStateForModo(modo){
         else state.catsEx.push(def);
       }
     });
+    // ★ También guardar para que estén disponibles la próxima vez
+    save(getKeys('negocio').catsIn, state.catsIn);
+    save(getKeys('negocio').catsEx, state.catsEx);
   } else {
     const defaults = [...DEFAULT_CATS_IN, ...DEFAULT_CATS_EX];
     defaults.forEach(def => {
@@ -683,8 +681,10 @@ function catSelectHtml(id, type, selected, selectedCatId){
       norm(c.name) === selNorm;
     return `<option value="${c.id}" ${isSelected?'selected':''}>${c.icon||''} ${c.name}</option>`;
   }).join('');
-  return `<div class="cat-select-wrap"><select id="${id}" onchange="updateCatSelectIcon('${id}')" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">${opts}</select></div>`;
+  return `<div class="cat-select-wrap"><select id="${id}" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">${opts}</select></div>`;
 }
+
+function updateCatSelectIcon(selId){ /* icon update handled by card render */ }
 
 function updateCatIcon(selId, type){
   const sel=document.getElementById(selId);
@@ -778,19 +778,49 @@ function renderDashboard(){
     ${deudaUrgente.map(d=>`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>🏦 ${d.name}</span><span style="color:#6C3483">${fmt(d.cuotaMonto)}/mes</span></div>`).join('')}
   </div>`:'';
 
-  // Trabajos pendientes hoy y mañana
+  // Próximo trabajo — el más cercano con fecha futura
   const manana=new Date(hoy); manana.setDate(hoy.getDate()+1);
   const hoyStr=hoy.toISOString().split('T')[0];
   const manStr=manana.toISOString().split('T')[0];
-  const proximosTrab=(state.agenda||[]).filter(a=>a.estado!=='completado'&&(a.fecha===hoyStr||a.fecha===manStr));
-  const trabHtml=proximosTrab.length?`<div class="card" style="border-color:#E6510033;background:#FFF8F0;margin-bottom:12px">
-    <div style="font-size:12px;color:#E65100;font-weight:600;margin-bottom:8px">🔧 Trabajos próximos</div>
-    ${proximosTrab.slice(0,3).map(a=>`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;align-items:center">
-      <span>${a.tipo==='visita'?'👁':'🔧'} ${a.cliente||'Sin cliente'}</span>
-      <span style="color:#E65100;font-size:11px">${a.fecha===hoyStr?'Hoy':'Mañana'} ${a.hora?'· '+horaTo12(a.hora):''}</span>
-    </div>`).join('')}
-    ${proximosTrab.length>3?`<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:4px;cursor:pointer" onclick="switchPage('agenda')">+${proximosTrab.length-3} más →</div>`:''}
-  </div>`:'';
+  const meses2=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const fmtAgFecha=(f)=>{
+    if(!f)return '';
+    if(f===hoyStr)return 'Hoy';
+    if(f===manStr)return 'Mañana';
+    try{const [y,m,d]=f.split('-');return `${parseInt(d)} ${meses2[parseInt(m)-1]}`;}catch(e){return f;}
+  };
+  const proxFechas=(state.agenda||[])
+    .filter(a=>a.estado!=='completado'&&a.fecha>=hoyStr)
+    .sort((a,b)=>a.fecha.localeCompare(b.fecha)||(a.hora||'').localeCompare(b.hora||''));
+  const proxTrab=proxFechas[0];
+  const otrosTrab=proxFechas.slice(1,4);
+  const trabHtml=proxTrab?`
+    <div class="card" style="margin-bottom:12px;border-color:var(--gold)44;overflow:hidden">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:10px">📅 Próximo trabajo</div>
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <div style="background:var(--gold);border-radius:10px;padding:8px 10px;text-align:center;flex-shrink:0;min-width:48px">
+          <div style="font-size:20px;font-weight:700;color:#fff;line-height:1">${proxTrab.fecha?parseInt(proxTrab.fecha.split('-')[2]):'?'}</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.7);text-transform:uppercase">${proxTrab.fecha?meses2[parseInt(proxTrab.fecha.split('-')[1])-1]:''}</div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px">${proxTrab.servicio||'Sin servicio'}</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px">👤 ${proxTrab.cliente||'Sin cliente'}${proxTrab.ubicacion?' · '+proxTrab.ubicacion:''}</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            ${proxTrab.hora?`<span style="font-size:11px;background:var(--ing-bg,#EAF3DE);color:var(--gold);padding:2px 8px;border-radius:20px;font-weight:600">🕐 ${horaTo12(proxTrab.hora)}</span>`:''}
+            <span style="font-size:11px;background:${proxTrab.fecha===hoyStr?'#FFF3E0':'var(--bg)'};color:${proxTrab.fecha===hoyStr?'#E65100':'var(--muted)'};padding:2px 8px;border-radius:20px;font-weight:600">${fmtAgFecha(proxTrab.fecha)}</span>
+            ${proxTrab.precio?`<span style="font-size:11px;color:var(--gold);font-weight:700">S/ ${proxTrab.precio}</span>`:''}
+          </div>
+        </div>
+      </div>
+      ${proxTrab.telefono?`<button onclick="abrirWhatsAppAgenda('${proxTrab.id}')" style="width:100%;margin-top:10px;background:#25D366;color:#fff;border:none;border-radius:10px;padding:9px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">💬 Confirmar por WhatsApp</button>`:''}
+      ${otrosTrab.length?`<div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border)">
+        ${otrosTrab.map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:3px 0;color:var(--muted)">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.tipo==='visita'?'👁':'🔧'} ${a.cliente||''} — ${a.servicio||''}</span>
+          <span style="flex-shrink:0;margin-left:8px">${fmtAgFecha(a.fecha)}${a.hora?' '+horaTo12(a.hora):''}</span>
+        </div>`).join('')}
+        <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:6px;cursor:pointer" onclick="switchPage('agenda')">Ver agenda completa →</div>
+      </div>`:''}
+    </div>`:'';
 
   const recentHtml=filtered.length?`<div class="card" style="margin-bottom:12px">
     <div class="section-title">Últimos movimientos</div>
@@ -849,7 +879,12 @@ function renderDashboard(){
 
 function renderMovimientos(){
   if(!window._movBusqueda) window._movBusqueda='';
+  if(!window._movFiltro) window._movFiltro='todos';
   let filtered=filteredTx();
+  // Filtro por tipo
+  if(window._movFiltro==='ingresos') filtered=filtered.filter(t=>t.type==='ingreso');
+  if(window._movFiltro==='egresos')  filtered=filtered.filter(t=>t.type==='egreso');
+  // Filtro por búsqueda
   if(window._movBusqueda.trim()){
     const q=window._movBusqueda.toLowerCase();
     filtered=filtered.filter(t=>
@@ -904,6 +939,16 @@ function renderMovimientos(){
       <button class="btn-gold" style="padding:8px 14px;font-size:13px" onclick="openAddTx()">＋ Agregar</button>
     </div>
     <div class="month-nav"><button onclick="prevMonth()">‹</button><span>${monthName()}</span><button onclick="nextMonth()">›</button></div>
+    <!-- Filtros rápidos -->
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      ${['todos','ingresos','egresos'].map(f=>`
+        <button onclick="window._movFiltro='${f}';render()" style="flex:1;padding:7px 4px;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;
+          border:1px solid ${window._movFiltro===f?'var(--gold)':'var(--border)'};
+          background:${window._movFiltro===f?'var(--gold)':'transparent'};
+          color:${window._movFiltro===f?'#fff':'var(--muted)'}">
+          ${f==='todos'?'Todos':f==='ingresos'?'↑ Ingresos':'↓ Egresos'}
+        </button>`).join('')}
+    </div>
     <div style="position:relative;margin-bottom:12px">
       <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)">🔍</span>
       <input type="text" placeholder="Buscar por descripción, cliente o monto..."
@@ -913,11 +958,11 @@ function renderMovimientos(){
       ${window._movBusqueda?`<button onclick="window._movBusqueda='';render()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px">✕</button>`:''}
     </div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      <div style="flex:1;background:#EAF3DE;border:1px solid #4CAF8533;border-radius:10px;padding:12px">
+      <div onclick="window._movFiltro='ingresos';render()" style="flex:1;background:${window._movFiltro==='ingresos'?'var(--ing-bg,#EAF3DE)':'#EAF3DE'};border:1px solid ${window._movFiltro==='ingresos'?'var(--gold)':'#4CAF8533'};border-radius:10px;padding:12px;cursor:pointer;transition:all .2s">
         <div style="font-size:10px;color:#27500A88;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ingresos</div>
         <div style="color:#3A7D44;font-weight:700;font-size:15px">+${fmt(inc)}</div>
       </div>
-      <div style="flex:1;background:#FFEBEE;border:1px solid #E0525233;border-radius:10px;padding:12px">
+      <div onclick="window._movFiltro='egresos';render()" style="flex:1;background:${window._movFiltro==='egresos'?'#FFCDD2':'#FFEBEE'};border:1px solid ${window._movFiltro==='egresos'?'#C62828':'#E0525233'};border-radius:10px;padding:12px;cursor:pointer;transition:all .2s">
         <div style="font-size:10px;color:#C6282888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Egresos</div>
         <div style="color:#C62828;font-weight:700;font-size:15px">-${fmt(exp)}</div>
       </div>
@@ -2840,10 +2885,14 @@ function openTxModal(tx, preData){
     </div>`;
   showModal();
   setTimeout(()=>{
-    // Asegurar que tipo y categoría estén correctos
-    if(t.type) setTxType(t.type);
-    // Si hay moneda pre-seteada
+    // Solo actualizar botones tipo — NO regenerar el selector de categoría
+    const btnIn = document.getElementById('btn-in');
+    const btnOut = document.getElementById('btn-out');
+    if(btnIn) btnIn.className='type-btn'+(t.type==='ingreso'?' sel-in':'');
+    if(btnOut) btnOut.className='type-btn'+(t.type==='egreso'?' sel-out':'');
+    window._txType = t.type;
     if(pre.moneda) setTxMoneda(pre.moneda, null);
+    else if(t.moneda) setTxMoneda(t.moneda, null);
   }, 30);
 }
 
@@ -2892,7 +2941,7 @@ function setTxType(type){
   window._txType=type;
   document.getElementById('btn-in').className='type-btn'+(type==='ingreso'?' sel-in':'');
   document.getElementById('btn-out').className='type-btn'+(type==='egreso'?' sel-out':'');
-  document.getElementById('tx-cat-wrap').innerHTML=`<label class="field-label">Categoría</label>${catSelectHtml('tx-cat',type,null)}`;
+  document.getElementById('tx-cat-wrap').innerHTML=`<label class="field-label">Categoría</label>${catSelectHtml('tx-cat',type,null,null)}`;
 }
 
 function saveTx(editId){
@@ -4183,6 +4232,7 @@ function renderAgenda(){
         ${item.montoPendienteCobro>0?`<span style="background:#FAEEDA;color:#633806;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px">Pendiente cobrar: ${fmt(item.montoPendienteCobro)}</span>`:''}
         ${isVisita?`<button onclick="convertirVisitaAConstruccion('${item.id}')" style="flex:1;min-width:130px;background:#FFF3E0;border:1px solid #E6510044;color:#BF360C;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">🔨 Convertir a Construcción</button>`:''}
         <button onclick="editAgendaItem('${item.id}')" style="width:32px;height:32px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:12px">✎</button>
+        ${item.telefono?`<button onclick="abrirWhatsAppAgenda('${item.id}')" style="width:32px;height:32px;background:#E8F5E2;border:1px solid #25D36644;color:#128C5E;border-radius:8px;cursor:pointer;font-size:15px" title="Confirmar por WhatsApp">💬</button>`:''}
         <button onclick="deleteAgendaItem('${item.id}')" style="width:32px;height:32px;background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">✕</button>
       </div>
     </div>`;
@@ -4424,6 +4474,31 @@ function saveAgendaItem(editId, tipo){
 
 
 function editAgendaItem(id){ const item=(state.agenda||[]).find(x=>x.id===id); if(item) openAddAgenda(item.tipo,id); }
+
+// ★ WhatsApp recordatorio para agenda
+function abrirWhatsAppAgenda(id) {
+  const item = (state.agenda||[]).find(x=>x.id===id);
+  if(!item||!item.telefono) return toast('Este trabajo no tiene teléfono registrado','error');
+
+  const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const fechaLabel = (() => {
+    const hoy = new Date().toISOString().split('T')[0];
+    const man = new Date(new Date().setDate(new Date().getDate()+1)).toISOString().split('T')[0];
+    if(item.fecha===hoy) return 'hoy';
+    if(item.fecha===man) return 'mañana';
+    try{ const[y,m,d]=item.fecha.split('-'); return `el ${parseInt(d)} de ${meses[parseInt(m)-1]}`; }
+    catch(e){ return item.fecha; }
+  })();
+  const hora = item.hora ? ` a las ${horaTo12(item.hora)}` : '';
+  const servicio = item.servicio || 'el servicio';
+  const cliente = item.cliente ? `Hola ${item.cliente.split(' ')[0]}` : 'Hola';
+
+  const msg = `${cliente}, le confirmo mi visita ${fechaLabel}${hora} para ${servicio}.${item.ubicacion?' En '+item.ubicacion+'.':''} Cualquier consulta estoy a sus órdenes. - ${state.nombreUsuario||'Servicio Gas'}`;
+
+  const tel = item.telefono.replace(/\D/g,'');
+  const url = `https://wa.me/51${tel}?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+}
 
 function convertirVisitaAConstruccion(id){
   const visita=(state.agenda||[]).find(x=>x.id===id);
@@ -6655,6 +6730,7 @@ function startListeningHandlers(rec) {
       document.getElementById('micText').textContent='⚠ Permiso de micrófono denegado.';
       document.getElementById('micText').style.color='#E05252';
     }
+    micRestartLock = false; // ★ siempre resetear para no quedar bloqueado
     stopListening();
   };
   rec.onend=()=>{ if(micListening&&!micRestartLock) restartListening(); };
