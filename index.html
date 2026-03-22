@@ -2111,7 +2111,6 @@ function saveSheetsUrl(){
 function testSheetsSync(){
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(!url)return toast('Primero guarda la URL del script','error');
-  // Prueba con deuda real
   const payload={
     type:'deuda',
     item:{id:'test_'+Date.now(),name:'🧪 Prueba Deuda',totalAmount:999,cuotaMonto:100,cuotasTotales:10,cuotasPagadas:0,categoria:'Prueba'},
@@ -2123,6 +2122,227 @@ function testSheetsSync(){
   fetch(fullUrl,{method:'GET',mode:'no-cors'})
     .then(()=>{ toast('✓ Enviado — verifica la hoja Deudas y Movimientos','success'); })
     .catch(()=>{ toast('✓ Enviado — verifica la hoja Deudas y Movimientos','success'); });
+}
+
+// ★ Forzar carga de datos desde Sheets (útil si se borró caché o en otro dispositivo)
+function reloadFromSheets(){
+  const url=localStorage.getItem('fnz_sheets_url')||'';
+  if(!url) return toast('Primero configura la URL de Sheets','error');
+  if(!confirm('¿Restaurar datos desde Sheets?\n\nSe agregarán los datos de Sheets a los que ya tienes. No se borra nada local.')) return;
+  loadFromSheets(true);
+}
+
+// ══════════════════════════════════════════════════════
+// IMPORTADOR DE NOTION CSV
+// Mapea columnas del CSV "Reporte Diario- Servicios Gas Natural"
+// al formato interno de transacciones de la app
+// ══════════════════════════════════════════════════════
+function importarNotion(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('notion-import-status');
+  if (status) status.textContent = '⏳ Leyendo archivo...';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const csv = e.target.result;
+      const rows = _parseCsv(csv);
+      if (rows.length < 2) {
+        if (status) status.textContent = '⚠ El archivo está vacío o no es válido';
+        return;
+      }
+
+      // ── Detectar columnas automáticamente ──
+      const headers = rows[0].map(h => h.trim().toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+      
+      const col = (names) => {
+        for (const n of names) {
+          const idx = headers.findIndex(h => h.includes(n));
+          if (idx >= 0) return idx;
+        }
+        return -1;
+      };
+
+      const iDate     = col(['fecha','date']);
+      const iCliente  = col(['cue','cliente','client','nombre']);
+      const iContacto = col(['conta','contact','tel','celular']);
+      const iSvc1     = col(['servicio 1','service 1','servicio1']);
+      const iSvc2     = col(['servicio 2','service 2','servicio2']);
+      const iSvc3     = col(['servicio 3','service 3','servicio3']);
+      const iSvc4     = col(['servicio 4','service 4','servicio4']);
+      const iDistrito = col(['distrito','district','zona','ubicacion']);
+      const iForma    = col(['for','forma','pago','payment']);
+      const iMovil    = col(['movil','movilidad','transport']);
+      const iMaterial = col(['materi','material','material']);
+      const iOtros    = col(['otros','other','extra']);
+      const iPrecio   = col(['pre','precio','price','monto','ganancia','total']);
+      const iObs      = col(['observ','nota','comment','descripcion']);
+
+      let txImportadas = 0;
+      let egresosMov = 0;
+      let egresosMat = 0;
+      const nuevasTx = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (r.length < 2) continue;
+
+        // Fecha
+        const fechaRaw = iDate >= 0 ? r[iDate]?.trim() : '';
+        const fecha = _parseFechaNotion(fechaRaw) || todayStr();
+
+        // Cliente
+        const cliente = iCliente >= 0 ? r[iCliente]?.trim().replace(/^\s+/,'') : '';
+        if (!cliente) continue; // saltar filas sin cliente
+
+        // Servicio — combinar servicio 1,2,3,4
+        const svcs = [iSvc1,iSvc2,iSvc3,iSvc4]
+          .filter(i => i >= 0)
+          .map(i => r[i]?.trim())
+          .filter(v => v && v !== '-' && v !== '');
+        const servicio = svcs.join(' + ') || 'Servicio';
+
+        // Precio / ingreso principal
+        const precioRaw = iPrecio >= 0 ? r[iPrecio]?.toString().replace(/[^0-9.,]/g,'').replace(',','.') : '';
+        const precio = parseFloat(precioRaw) || 0;
+
+        // Observaciones
+        const obs = iObs >= 0 ? r[iObs]?.trim() : '';
+
+        // Forma de pago
+        const forma = iForma >= 0 ? r[iForma]?.trim() : '';
+
+        // ── Crear tx de INGRESO ──
+        if (precio > 0) {
+          nuevasTx.push({
+            id: 'not_' + i + '_' + Date.now(),
+            type: 'ingreso',
+            amount: precio,
+            category: servicio,
+            description: (obs || servicio) + (cliente ? ' — ' + cliente : ''),
+            date: fecha,
+            cliente: cliente,
+            ubicacion: iDistrito >= 0 ? r[iDistrito]?.trim() : '',
+            negocio: true,
+            moneda: 'PEN',
+            _importadoDeNotion: true,
+          });
+          txImportadas++;
+        }
+
+        // ── Crear egreso de MOVILIDAD si tiene valor ──
+        const movilRaw = iMovil >= 0 ? r[iMovil]?.toString().replace(/[^0-9.,]/g,'').replace(',','.') : '';
+        const movil = parseFloat(movilRaw) || 0;
+        if (movil > 0) {
+          nuevasTx.push({
+            id: 'not_mov_' + i + '_' + Date.now(),
+            type: 'egreso',
+            amount: movil,
+            category: 'Movilidad',
+            description: 'Movilidad — ' + (cliente || fecha),
+            date: fecha,
+            negocio: true,
+            moneda: 'PEN',
+            _importadoDeNotion: true,
+          });
+          egresosMov++;
+        }
+
+        // ── Crear egreso de MATERIALES si tiene valor ──
+        const matRaw = iMaterial >= 0 ? r[iMaterial]?.toString().replace(/[^0-9.,]/g,'').replace(',','.') : '';
+        const mat = parseFloat(matRaw) || 0;
+        if (mat > 0) {
+          nuevasTx.push({
+            id: 'not_mat_' + i + '_' + Date.now(),
+            type: 'egreso',
+            amount: mat,
+            category: 'Materiales',
+            description: 'Materiales — ' + (cliente || fecha),
+            date: fecha,
+            negocio: true,
+            moneda: 'PEN',
+            _importadoDeNotion: true,
+          });
+          egresosMat++;
+        }
+      }
+
+      if (nuevasTx.length === 0) {
+        if (status) status.textContent = '⚠ No se encontraron datos válidos. Revisa el CSV.';
+        return;
+      }
+
+      // Agregar sin duplicar (por id)
+      const existing = load('fnz_neg_tx', []);
+      const merged = _mergeById(existing, nuevasTx);
+      save('fnz_neg_tx', merged);
+      if (state.modo === 'negocio') state.transactions = merged;
+
+      // Sincronizar cada tx a Sheets si hay URL
+      const url = localStorage.getItem('fnz_sheets_url') || '';
+      if (url) {
+        nuevasTx.forEach((tx, idx) => {
+          setTimeout(() => syncToSheets(tx), idx * 150);
+        });
+      }
+
+      saveAll(); render();
+      const msg = `✓ Importado: ${txImportadas} ingresos · ${egresosMov} movilidad · ${egresosMat} materiales`;
+      if (status) status.textContent = msg;
+      toast(msg);
+
+      // Reset input
+      input.value = '';
+
+    } catch(err) {
+      console.error('Error importando Notion:', err);
+      if (status) status.textContent = '⚠ Error al leer el CSV: ' + err.message;
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+// Parser CSV simple — maneja comas dentro de comillas
+function _parseCsv(text) {
+  const rows = [];
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (c === ',' && !inQ) {
+        cols.push(cur); cur = '';
+      } else {
+        cur += c;
+      }
+    }
+    cols.push(cur);
+    rows.push(cols);
+  }
+  return rows;
+}
+
+// Parsear fechas de Notion: "16/03/2026", "2026-03-16", "March 16, 2026"
+function _parseFechaNotion(str) {
+  if (!str) return null;
+  str = str.trim();
+  // DD/MM/YYYY
+  let m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[2].padStart(2,'0') + '-' + m[1].padStart(2,'0');
+  // YYYY-MM-DD
+  m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[0];
+  // MM/DD/YYYY
+  m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[1].padStart(2,'0') + '-' + m[2].padStart(2,'0');
+  return null;
 }
 
 
@@ -2929,6 +3149,9 @@ function renderAjustes(){
         <button onclick="saveSheetsUrl()" style="flex:2;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">💾 Guardar URL</button>
         <button onclick="testSheetsSync()" style="flex:1;background:transparent;border:1px solid #1565C044;color:#1565C0;border-radius:10px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Probar</button>
       </div>
+      <button onclick="reloadFromSheets()" style="width:100%;margin-top:8px;background:#F0FDF4;border:1px solid #3A7D4444;color:#3A7D44;border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+        ☁️ Restaurar datos desde Sheets
+      </button>
       <div style="margin-top:12px;background:#F0FDF4;border:1px solid #4CAF8533;border-radius:8px;padding:10px;font-size:11px;color:var(--muted);line-height:1.7">
         <strong style="color:var(--text)">Paso a paso para configurar:</strong><br>
         1. Abre <strong>Google Sheets</strong> y crea una hoja nueva<br>
@@ -2939,6 +3162,29 @@ function renderAjustes(){
         6. Copia la URL y pégala arriba
       </div>
       <button onclick="descargarAppsScript()" style="width:100%;margin-top:10px;background:#F0FDF4;border:1px solid #4CAF8544;color:var(--green);border-radius:10px;padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">⬇ Descargar código Apps Script</button>
+    </div>
+
+    <!-- IMPORTAR DESDE NOTION -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div style="width:42px;height:42px;border-radius:12px;background:#F3F0FF;display:flex;align-items:center;justify-content:center;font-size:22px">🔄</div>
+        <div>
+          <div style="font-family:'Playfair Display',serif;font-size:15px;color:var(--text)">Importar desde Notion</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Sube tu CSV exportado de Notion</div>
+        </div>
+      </div>
+      <div style="background:#F8F7FF;border:1px solid #7C3AED22;border-radius:8px;padding:10px;font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">
+        <strong style="color:var(--text)">Cómo exportar de Notion:</strong><br>
+        1. Abre tu base de datos "Reporte Diario"<br>
+        2. Click en <strong>···</strong> (tres puntos arriba a la derecha)<br>
+        3. <strong>Exportar → Exportar como CSV</strong><br>
+        4. Sube ese archivo aquí abajo
+      </div>
+      <label style="display:block;width:100%;background:linear-gradient(135deg,#7C3AED,#9F5AE5);color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;text-align:center">
+        📂 Seleccionar archivo CSV de Notion
+        <input type="file" accept=".csv" onchange="importarNotion(this)" style="display:none">
+      </label>
+      <div id="notion-import-status" style="margin-top:10px;font-size:12px;color:var(--muted);text-align:center;min-height:16px"></div>
     </div>
 
     <!-- BACKUP CARD -->
@@ -4408,7 +4654,90 @@ function render(){
   setTimeout(()=>{ renderSoundsList(); renderRemindersList(); checkNotifBtn(); },50);
 }
 
-render();
+// ══════════════════════════════════════════════════════
+// CARGA INICIAL DESDE SHEETS
+// Si localStorage está vacío O el usuario fuerza recarga,
+// restaura todos los datos desde Google Sheets automáticamente
+// ══════════════════════════════════════════════════════
+
+function loadFromSheets(forzar) {
+  const url = localStorage.getItem('fnz_sheets_url') || '';
+  if (!url) { render(); return; }
+
+  // Solo cargar si forzar=true O si el localStorage está vacío (caché borrado)
+  const hayDatos = (
+    (load('fnz_neg_tx', []).length > 0) ||
+    (load('fnz_agenda', []).length > 0)
+  );
+  if (!forzar && hayDatos) { render(); return; }
+
+  // Mostrar pantalla de carga
+  document.getElementById('content').innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;padding:20px">
+      <div style="font-size:40px">☁️</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;color:var(--text)">Restaurando desde Sheets...</div>
+      <div style="font-size:12px;color:var(--muted);text-align:center">Tu caché fue borrado — recuperando datos</div>
+      <div class="pulse" style="width:48px;height:4px;background:var(--gold);border-radius:2px;margin-top:4px"></div>
+    </div>`;
+
+  const fullUrl = url + '?data=' + encodeURIComponent(JSON.stringify({ action: 'load' }));
+  fetch(fullUrl, { method: 'GET' })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) { render(); return; }
+
+      // Agenda
+      if (data.agenda && data.agenda.length) {
+        const m = _mergeById(load('fnz_agenda',[]), data.agenda);
+        save('fnz_agenda', m); state.agenda = m;
+      }
+      // Movimientos negocio
+      if (data.movimientos && data.movimientos.length) {
+        const m = _mergeById(load('fnz_neg_tx',[]), data.movimientos);
+        save('fnz_neg_tx', m);
+        if (state.modo === 'negocio') state.transactions = m;
+      }
+      // Deudas
+      if (data.deudas && data.deudas.length) {
+        const m = _mergeById(load('fnz_neg_debts',[]), data.deudas);
+        save('fnz_neg_debts', m);
+        if (state.modo === 'negocio') state.debts = m;
+      }
+      // Servicios
+      if (data.servicios && data.servicios.length) {
+        const m = _mergeById(load('fnz_neg_services',[]), data.servicios);
+        save('fnz_neg_services', m);
+        if (state.modo === 'negocio') state.servicios = m;
+      }
+      // Metas
+      if (data.metas && data.metas.length) {
+        const m = _mergeById(load('fnz_neg_metas',[]), data.metas);
+        save('fnz_neg_metas', m);
+        if (state.modo === 'negocio') state.metas = m;
+      }
+      // Notas
+      if (data.notas && data.notas.length) {
+        const m = _mergeById(load('fnz_notas',[]), data.notas);
+        save('fnz_notas', m); state.notas = m;
+      }
+
+      save('fnz_last_load', new Date().toISOString());
+      toast('✓ Datos restaurados desde Sheets');
+      render();
+    })
+    .catch(() => render()); // Si falla, mostrar lo que hay en localStorage
+}
+
+// Merge por id: local tiene prioridad, agrega remote solo si id no existe
+function _mergeById(local, remote) {
+  const map = {};
+  (local  || []).forEach(x => { if (x && x.id) map[x.id] = x; });
+  (remote || []).forEach(x => { if (x && x.id && !map[x.id]) map[x.id] = x; });
+  return Object.values(map);
+}
+
+// ── Arranque: cargar desde Sheets si localStorage vacío ──
+loadFromSheets(false);
 
 // ── FAB arrastrable — mantener presionado 400ms ──
 (function(){
