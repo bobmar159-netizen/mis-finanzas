@@ -657,18 +657,33 @@ function circleProgress(pct,size,stroke,color,labelHtml){
 // CATEGORY SELECTOR HTML
 // ─────────────────────────────────────────────
 function catSelectHtml(id, type, selected, selectedCatId){
-  const cats = type==='ingreso' ? state.catsIn : state.catsEx;
+  // En modo negocio usar las categorías del negocio (state + defaults)
+  const isNeg = state.modo === 'negocio';
+  let cats;
+  if(type==='ingreso'){
+    cats = isNeg
+      ? [...state.catsIn, ...DEFAULT_CATS_NEG_IN.filter(d => !state.catsIn.some(c=>c.id===d.id))]
+      : state.catsIn;
+  } else {
+    cats = isNeg
+      ? [...state.catsEx, ...DEFAULT_CATS_NEG_EX.filter(d => !state.catsEx.some(c=>c.id===d.id))]
+      : state.catsEx;
+  }
+  // Eliminar duplicados por id
+  const seen = new Set();
+  cats = cats.filter(c => { if(seen.has(c.id)) return false; seen.add(c.id); return true; });
+
   const norm = s => (s||'').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const selNorm = norm(selected);
   const opts = cats.map(c=>{
     const isSelected =
-      c.id === selectedCatId ||          // por catId exacto
-      c.id === selected ||               // selected es el id
-      c.name === selected ||             // nombre exacto
-      norm(c.name) === selNorm;          // nombre sin tildes
+      (selectedCatId && c.id === selectedCatId) ||
+      c.id === selected ||
+      c.name === selected ||
+      norm(c.name) === selNorm;
     return `<option value="${c.id}" ${isSelected?'selected':''}>${c.icon||''} ${c.name}</option>`;
   }).join('');
-  return `<select id="${id}" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">${opts}</select>`;
+  return `<div class="cat-select-wrap"><select id="${id}" onchange="updateCatSelectIcon('${id}')" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">${opts}</select></div>`;
 }
 
 function updateCatIcon(selId, type){
@@ -2887,28 +2902,43 @@ function saveTx(editId){
   const clienteEl=document.getElementById('tx-cliente');
   const ubicEl=document.getElementById('tx-ubicacion');
   const catId = document.getElementById('tx-cat').value;
-  const allCatsTx = [...state.catsIn,...state.catsEx,...DEFAULT_CATS_NEG_IN,...DEFAULT_CATS_NEG_EX,...DEFAULT_CATS_IN,...DEFAULT_CATS_EX];
-  const catObj = allCatsTx.find(c=>c.id===catId);
-  // ★ Siempre usar el nombre legible — nunca el ID
-  const catName = catObj?.name || (window._txType==='ingreso'?'Otro ingreso':'Otro gasto');
-  const item={
-    id:editId||Date.now()+'',
-    type:window._txType,
+
+  // Buscar la categoría en TODAS las listas disponibles
+  const allCatsTx = [
+    ...state.catsIn, ...state.catsEx,
+    ...DEFAULT_CATS_NEG_IN, ...DEFAULT_CATS_NEG_EX,
+    ...DEFAULT_CATS_IN, ...DEFAULT_CATS_EX
+  ];
+  const catObj = allCatsTx.find(c => c.id === catId);
+  const catName = catObj ? catObj.name : (window._txType==='ingreso' ? 'Otro ingreso' : 'Otro gasto');
+
+  // Preservar campos del registro original si es edición
+  const original = editId ? state.transactions.find(t => t.id === editId) : null;
+
+  const item = {
+    ...(original || {}),               // preservar campos como _importadoDeNotion, etc.
+    id: editId || (Date.now() + ''),   // mantener ID original en edición
+    type: window._txType,
     amount,
     category: catName,
     catId,
     date,
-    description:document.getElementById('tx-desc').value.trim() || catName,
-    cliente:clienteEl?clienteEl.value.trim():'',
-    ubicacion:ubicEl?ubicEl.value.trim():'',
-    negocio:state.modo==='negocio',
-    moneda: window._txMoneda||'PEN',
+    description: document.getElementById('tx-desc').value.trim() || catName,
+    cliente: clienteEl ? clienteEl.value.trim() : (original?.cliente || ''),
+    ubicacion: ubicEl ? ubicEl.value.trim() : (original?.ubicacion || ''),
+    negocio: state.modo === 'negocio',
+    moneda: window._txMoneda || original?.moneda || 'PEN',
   };
-  if(editId)state.transactions=state.transactions.map(t=>t.id===editId?item:t);
-  else state.transactions.unshift(item);
+
+  if(editId) {
+    state.transactions = state.transactions.map(t => t.id === editId ? item : t);
+  } else {
+    state.transactions.unshift(item);
+  }
   saveAll();
   syncToSheets(item);
-  closeModal();render();toast(editId?'Actualizado':'Movimiento guardado ✓');
+  closeModal(); render();
+  toast(editId ? 'Movimiento actualizado ✓' : 'Movimiento guardado ✓');
 }
 
 function deleteTx(id){
