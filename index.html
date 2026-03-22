@@ -14,6 +14,76 @@
   --gold:#3A7D44;--gold2:#52A85A;--red:#E05252;--green:#4CAF85;--blue:#2E86AB;
   --bg:#F2F7F2;--card:#FFFFFF;--border:#D4E8D4;--text:#1A2E1A;--muted:#7BAE7F;--dim:#A8C9AB;
 }
+
+/* ── 6 TEMAS DE COLOR ── */
+/* Tema 1: Esmeralda (default) — ya está en :root */
+
+/* Tema 2: Océano */
+#app.tema-oceano {
+  --gold:#1565C0;--gold2:#2E86AB;--red:#E05252;--green:#1D9E75;--blue:#2E86AB;
+  --bg:#F0F4FF;--card:#FFFFFF;--border:#BBDEFB;--text:#0D1B3E;--muted:#5B8DB8;--dim:#90CAF9;
+}
+#app.tema-oceano .tab.active{background:#E6F1FB}
+#app.tema-oceano .mv-icon-ing{background:#E6F1FB}
+#app.tema-oceano .mv-badge-ing{background:#E6F1FB;color:#0C447C}
+#app.tema-oceano .mv-amt-ing{color:#185FA5}
+#app.tema-oceano html,#app.tema-oceano body{background:#EBF2FC}
+
+/* Tema 3: Ámbar — borde izquierdo, sin borde completo */
+#app.tema-ambar {
+  --gold:#854F0B;--gold2:#EF9F27;--red:#C62828;--green:#0F6E56;--blue:#185FA5;
+  --bg:#FFF8F0;--card:#FFFFFF;--border:#FAC77544;--text:#2C1A00;--muted:#BA7517;--dim:#EF9F27;
+}
+#app.tema-ambar .mv-card{border-left:3px solid #EF9F27;border-radius:0 14px 14px 0}
+#app.tema-ambar .mv-card.open{border-left-color:#854F0B}
+#app.tema-ambar .mv-icon-ing{background:#FAEEDA}
+#app.tema-ambar .mv-badge-ing{background:#FAEEDA;color:#633806}
+#app.tema-ambar .mv-amt-ing{color:#854F0B}
+#app.tema-ambar .tab.active{background:#FAEEDA}
+
+/* Tema 4: Noche (modo oscuro) */
+#app.tema-noche {
+  --gold:#9F5AE5;--gold2:#7C3AED;--red:#EF5350;--green:#1D9E75;--blue:#378ADD;
+  --bg:#0F0F1A;--card:#1A1A2E;--border:#534AB744;--text:#E8E6FF;--muted:#7F77DD;--dim:#534AB7;
+}
+#app.tema-noche #header{background:#0F0F1A}
+#app.tema-noche .mv-card{background:#1A1A2E;border-color:#534AB744}
+#app.tema-noche .mv-icon-ing{background:#262640}
+#app.tema-noche .mv-icon-egr{background:#2E1A1A}
+#app.tema-noche .mv-badge-ing{background:#262640;color:#CECBF6}
+#app.tema-noche .mv-badge-egr{background:#2E1A1A;color:#F09595}
+#app.tema-noche .mv-amt-ing{color:#9FE1CB}
+#app.tema-noche .mv-amt-egr{color:#EF5350}
+#app.tema-noche .tab.active{background:#1A1A2E}
+#app.tema-noche .card{background:#1A1A2E;border-color:#534AB744}
+#app.tema-noche .field input,#app.tema-noche .field select,#app.tema-noche .field textarea{background:#262640;border-color:#534AB766;color:#E8E6FF}
+#app.tema-noche .modal{background:#1A1A2E;border-color:#534AB744}
+#app.tema-noche .modo-toggle{background:#262640}
+
+/* Tema 5: Rosa — tarjetas pill (muy redondeadas) */
+#app.tema-rosa {
+  --gold:#993556;--gold2:#D4537E;--red:#C62828;--green:#0F6E56;--blue:#185FA5;
+  --bg:#FDF0F5;--card:#FFFFFF;--border:#F4C0D144;--text:#2C0A18;--muted:#D4537E;--dim:#ED93B1;
+}
+#app.tema-rosa .mv-card{border-radius:24px}
+#app.tema-rosa .mv-icon-box{border-radius:50%}
+#app.tema-rosa .mv-icon-ing{background:#FBEAF0}
+#app.tema-rosa .mv-badge-ing{background:#FBEAF0;color:#72243E}
+#app.tema-rosa .mv-amt-ing{color:#993556}
+#app.tema-rosa .tab.active{background:#FBEAF0}
+#app.tema-rosa .card{border-radius:24px}
+
+/* Tema 6: Slate — minimalista, solo borde inferior */
+#app.tema-slate {
+  --gold:#3B6D11;--gold2:#639922;--red:#A32D2D;--green:#0F6E56;--blue:#185FA5;
+  --bg:#F5F5F0;--card:#FFFFFF;--border:#D3D1C7;--text:#2C2C2A;--muted:#5F5E5A;--dim:#B4B2A9;
+}
+#app.tema-slate .mv-card{border:none;border-bottom:2px solid #D3D1C7;border-radius:4px;background:transparent}
+#app.tema-slate .mv-card.open{border-bottom-color:var(--gold)}
+#app.tema-slate .mv-icon-ing{background:#EAF3DE}
+#app.tema-slate .mv-badge-ing{background:#EAF3DE;color:#27500A}
+#app.tema-slate .mv-amt-ing{color:#3B6D11}
+#app.tema-slate .tab.active{background:transparent;border-bottom-color:var(--gold)}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden;background:linear-gradient(150deg,#EEF5EE 0%,#E3F0E3 60%,#EDF4ED 100%);background-attachment:fixed}
 body{font-family:'DM Sans',sans-serif;color:var(--text)}
@@ -75,6 +145,37 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .tx-actions{display:flex;gap:4px;flex-shrink:0}
 .tx-btn{background:none;border:none;cursor:pointer;font-size:13px;padding:4px;opacity:.6}
 .tx-btn:hover{opacity:1}
+
+/* ── Nueva tarjeta de movimiento desplegable ── */
+.mv-card{background:var(--card);border:0.5px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .2s}
+.mv-card:active{opacity:.92}
+.mv-card.open{border-color:var(--gold)}
+.mv-top{display:flex;align-items:center;gap:10px}
+.mv-icon-box{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.mv-icon-ing{background:#EAF3DE}
+.mv-icon-egr{background:#FFEBEE}
+.mv-main{flex:1;min-width:0}
+.mv-row1{display:flex;align-items:center;gap:5px;margin-bottom:2px}
+.mv-svc{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+.mv-badge-ing{background:#EAF3DE;color:#27500A;font-size:8px;font-weight:700;padding:2px 6px;border-radius:20px;flex-shrink:0;white-space:nowrap}
+.mv-badge-egr{background:#FFEBEE;color:#791F1F;font-size:8px;font-weight:700;padding:2px 6px;border-radius:20px;flex-shrink:0;white-space:nowrap}
+.mv-cli{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mv-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.mv-amt{font-size:14px;font-weight:700}
+.mv-amt-ing{color:#3A7D44}
+.mv-amt-egr{color:#C62828}
+.mv-chevron{font-size:9px;color:var(--muted);transition:transform .2s}
+.mv-card.open .mv-chevron{transform:rotate(180deg)}
+.mv-expand{max-height:0;overflow:hidden;transition:max-height .28s ease}
+.mv-card.open .mv-expand{max-height:160px}
+.mv-detail{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;padding-top:10px;margin-top:10px;border-top:0.5px solid var(--border)}
+.mv-d-item{display:flex;flex-direction:column;gap:1px}
+.mv-d-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.mv-d-val{font-size:11px;font-weight:600;color:var(--text)}
+.mv-d-actions{display:flex;gap:6px;padding-top:8px;margin-top:4px;border-top:0.5px solid var(--border);grid-column:1/-1}
+.mv-d-btn{flex:1;padding:6px;border-radius:8px;font-size:11px;font-weight:600;border:0.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer}
+.mv-d-btn:active{opacity:.7}
+.mv-d-btn.del{color:#C62828;border-color:#C6282833}
 .btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#fff;border:none;border-radius:12px;padding:15px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;transition:opacity .2s}
 .btn-gold:hover{opacity:.85}
 .btn-blue{background:linear-gradient(135deg,#1A6B8A,var(--blue));color:#fff;border:none;border-radius:10px;padding:13px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer}
@@ -759,8 +860,6 @@ function renderDashboard(){
 function renderMovimientos(){
   if(!window._movBusqueda) window._movBusqueda='';
   let filtered=filteredTx();
-
-  // Aplicar búsqueda
   if(window._movBusqueda.trim()){
     const q=window._movBusqueda.toLowerCase();
     filtered=filtered.filter(t=>
@@ -770,15 +869,51 @@ function renderMovimientos(){
       String(t.amount).includes(q)
     );
   }
-
   const inc=totalIncome(),exp=totalExpense();
+
+  // ── Icono y color según categoría ──
+  const getIconAndColor=(t)=>{
+    const allCats=[...state.catsIn,...state.catsEx,...DEFAULT_CATS_NEG_IN,...DEFAULT_CATS_NEG_EX,...DEFAULT_CATS_IN,...DEFAULT_CATS_EX];
+    const cat=allCats.find(c=>c.name===t.category||(c.id&&c.id===t.catId));
+    if(cat) return {icon:iconHtml(cat.icon), color:cat.color};
+    const c=(t.category||'').toLowerCase();
+    if(c.includes('movilidad')||c.includes('transport')||c.includes('viatico')) return {icon:'🚗',color:'#3498DB'};
+    if(c.includes('material')||c.includes('insumo')) return {icon:'🧰',color:'#E65100'};
+    if(c.includes('herramienta')) return {icon:'🔨',color:'#4E342E'};
+    if(c.includes('gnv')||c.includes('gasolina')) return {icon:'⛽',color:'#1A237E'};
+    if(c.includes('punto adi')||c.includes('punto adicional')) return {icon:'🔵',color:'#1565C0'};
+    if(c.includes('terma')) return {icon:'♨️',color:'#0288D1'};
+    if(c.includes('conexion')||c.includes('conexión')) return {icon:'🔌',color:'#039BE5'};
+    if(c.includes('modificacion')||c.includes('modificación')||c.includes('red')) return {icon:'🔧',color:'#0277BD'};
+    if(c.includes('reparacion')||c.includes('reparación')||c.includes('tuberia')) return {icon:'🚿',color:'#00838F'};
+    if(c.includes('gasfiter')) return {icon:'🪠',color:'#00695C'};
+    if(c.includes('cocina')) return {icon:'🍳',color:'#FF6B35'};
+    if(c.includes('horno')) return {icon:'🔥',color:'#E65100'};
+    if(c.includes('calefon')||c.includes('calefón')) return {icon:'🌡️',color:'#2E86AB'};
+    if(c.includes('parrilla')) return {icon:'🥩',color:'#C0392B'};
+    if(c.includes('secadora')) return {icon:'💨',color:'#607D8B'};
+    if(c.includes('instalac')) return {icon:'🏗️',color:'#01579B'};
+    if(c.includes('conversion')||c.includes('conversión')) return {icon:'🔄',color:'#0288D1'};
+    if(c.includes('document')) return {icon:'📄',color:'#37474F'};
+    return {icon:t.type==='ingreso'?'⬆':'⬇', color:t.type==='ingreso'?'#3A7D44':'#C62828'};
+  };
+
+  // ── Fecha legible ──
+  const fmtFecha=(d)=>{
+    if(!d) return '—';
+    try{
+      const [y,m,day]=d.split('-');
+      const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      return `${parseInt(day)} ${meses[parseInt(m)-1]} ${y}`;
+    }catch(e){return d;}
+  };
+
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold)">Movimientos</div>
       <button class="btn-gold" style="padding:8px 14px;font-size:13px" onclick="openAddTx()">＋ Agregar</button>
     </div>
     <div class="month-nav"><button onclick="prevMonth()">‹</button><span>${monthName()}</span><button onclick="nextMonth()">›</button></div>
-    <!-- Buscador -->
     <div style="position:relative;margin-bottom:12px">
       <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)">🔍</span>
       <input type="text" placeholder="Buscar por descripción, cliente o monto..."
@@ -788,30 +923,79 @@ function renderMovimientos(){
       ${window._movBusqueda?`<button onclick="window._movBusqueda='';render()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px">✕</button>`:''}
     </div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      <div style="flex:1;background:#F0FDF4;border:1px solid #4CAF8533;border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:#4CAF8588;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ingresos</div>
-        <div style="color:var(--green);font-weight:600;font-size:15px">+${fmt(inc)}</div>
+      <div style="flex:1;background:#EAF3DE;border:1px solid #4CAF8533;border-radius:10px;padding:12px">
+        <div style="font-size:10px;color:#27500A88;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ingresos</div>
+        <div style="color:#3A7D44;font-weight:700;font-size:15px">+${fmt(inc)}</div>
       </div>
-      <div style="flex:1;background:#FEF2F2;border:1px solid #E0525233;border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:#E0525288;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Egresos</div>
-        <div style="color:var(--red);font-weight:600;font-size:15px">-${fmt(exp)}</div>
+      <div style="flex:1;background:#FFEBEE;border:1px solid #E0525233;border-radius:10px;padding:12px">
+        <div style="font-size:10px;color:#C6282888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Egresos</div>
+        <div style="color:#C62828;font-weight:700;font-size:15px">-${fmt(exp)}</div>
       </div>
     </div>
-    <div class="card">
-      ${filtered.length===0?`<div style="text-align:center;color:var(--dim);padding:30px 0;font-size:14px">${window._movBusqueda?'Sin resultados para "'+window._movBusqueda+'"':'Sin movimientos este mes'}</div>`
-      :filtered.map(t=>{
-        const cat=getCatByName(t.category,t.type);
-        return `<div class="tx-row">
-          <div class="tx-icon" style="background:${cat?cat.color+'18':'#66666618'}">${cat?iconHtml(cat.icon):(t.type==='ingreso'?'↑':'↓')}</div>
-          <div class="tx-info"><div class="tx-name">${t.description||t.category}</div><div class="tx-sub">${t.category} · ${t.date}</div></div>
-          <div class="tx-amount" style="color:${t.type==='ingreso'?'var(--green)':'var(--red)'}">${t.type==='ingreso'?'+':'-'}${fmt(t.amount)}</div>
-          <div class="tx-actions">
-            <button class="tx-btn" style="color:var(--muted)" onclick="openEditTx('${t.id}')">✎</button>
-            <button class="tx-btn" style="color:#E0525266" onclick="deleteTx('${t.id}')">✕</button>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>`;
+    ${filtered.length===0
+      ?`<div style="text-align:center;color:var(--dim);padding:40px 0;font-size:14px">${window._movBusqueda?'Sin resultados para "'+window._movBusqueda+'"':'Sin movimientos este mes'}</div>`
+      :(() => {
+        // Agrupar por fecha
+        const grupos = {};
+        filtered.forEach(t => {
+          const k = t.date || 'Sin fecha';
+          if(!grupos[k]) grupos[k] = [];
+          grupos[k].push(t);
+        });
+        const fechasOrdenadas = Object.keys(grupos).sort((a,b) => b.localeCompare(a));
+
+        return fechasOrdenadas.map(fecha => {
+          const txs = grupos[fecha];
+          const fechaLabel = fmtFecha(fecha);
+          const cards = txs.map(t => {
+            const esIng = t.type==='ingreso';
+            const {icon, color} = getIconAndColor(t);
+            const clienteTxt = t.cliente ? `👤 ${t.cliente}` : '';
+            const ubicTxt = t.ubicacion ? ` · ${t.ubicacion}` : '';
+            const subTxt = clienteTxt ? (clienteTxt+ubicTxt) : (t.category||'');
+            const cardId = 'mvcard_'+t.id;
+            return `
+            <div class="mv-card" id="${cardId}" onclick="toggleMvCard('${cardId}')">
+              <div class="mv-top">
+                <div class="mv-icon-box ${esIng?'mv-icon-ing':'mv-icon-egr'}" style="background:${color}18">${icon}</div>
+                <div class="mv-main">
+                  <div class="mv-row1">
+                    <span class="mv-svc">${t.category||t.description||'Sin categoría'}</span>
+                    <span class="${esIng?'mv-badge-ing':'mv-badge-egr'}">${esIng?'↑ Ingreso':'↓ Egreso'}</span>
+                  </div>
+                  <div class="mv-cli">${subTxt}</div>
+                </div>
+                <div class="mv-right">
+                  <span class="mv-amt ${esIng?'mv-amt-ing':'mv-amt-egr'}">${esIng?'+':'-'}${fmt(t.amount)}</span>
+                  <span class="mv-chevron">▼</span>
+                </div>
+              </div>
+              <div class="mv-expand">
+                <div class="mv-detail">
+                  <div class="mv-d-item"><span class="mv-d-lbl">Fecha</span><span class="mv-d-val">${fechaLabel}</span></div>
+                  ${t.ubicacion?`<div class="mv-d-item"><span class="mv-d-lbl">Ubicación</span><span class="mv-d-val">${t.ubicacion}</span></div>`:'<div></div>'}
+                  ${t.description&&t.description!==t.category?`<div class="mv-d-item" style="grid-column:1/-1"><span class="mv-d-lbl">Descripción</span><span class="mv-d-val">${t.description}</span></div>`:''}
+                  ${t.cliente?`<div class="mv-d-item"><span class="mv-d-lbl">Cliente</span><span class="mv-d-val">${t.cliente}</span></div>`:''}
+                  <div class="mv-d-actions">
+                    <button class="mv-d-btn" onclick="event.stopPropagation();openEditTx('${t.id}')">✎ Editar</button>
+                    <button class="mv-d-btn del" onclick="event.stopPropagation();deleteTx('${t.id}')">✕ Eliminar</button>
+                  </div>
+                </div>
+              </div>
+            </div>`;
+          }).join('');
+
+          return `
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;padding:8px 2px 6px;margin-top:4px">${fechaLabel}</div>
+            ${cards}`;
+        }).join('');
+      })()}`;
+}
+
+function toggleMvCard(id){
+  const el=document.getElementById(id);
+  if(el) el.classList.toggle('open');
+}
 }
 
 // ── CATEGORIES PAGE ──
@@ -2102,6 +2286,43 @@ function guardarNombreUsuario(){
   toast('Nombre guardado: '+v);
 }
 
+// ══════════════════════════════════════════════════
+// SISTEMA DE TEMAS — 6 diseños
+// ══════════════════════════════════════════════════
+const TEMAS_APP = [
+  { id:'esmeralda', nombre:'Esmeralda', emoji:'🌿', desc:'Verde sage · Actual',      bg:'#F2F7F2', accent:'#3A7D44' },
+  { id:'oceano',    nombre:'Océano',    emoji:'🌊', desc:'Azul profundo',            bg:'#F0F4FF', accent:'#1565C0' },
+  { id:'ambar',     nombre:'Ámbar',     emoji:'🔥', desc:'Borde lateral dorado',     bg:'#FFF8F0', accent:'#854F0B' },
+  { id:'noche',     nombre:'Noche',     emoji:'🌙', desc:'Modo oscuro completo',     bg:'#0F0F1A', accent:'#9F5AE5' },
+  { id:'rosa',      nombre:'Rosa',      emoji:'🌸', desc:'Tarjetas pill redondeadas',bg:'#FDF0F5', accent:'#993556' },
+  { id:'slate',     nombre:'Slate',     emoji:'⬛', desc:'Minimalista sin bordes',   bg:'#F5F5F0', accent:'#3B6D11' },
+];
+
+function applyTheme(id) {
+  const app = document.getElementById('app');
+  TEMAS_APP.forEach(t => app.classList.remove('tema-'+t.id));
+  if (id !== 'esmeralda') app.classList.add('tema-'+id);
+  const tema = TEMAS_APP.find(t=>t.id===id);
+  if (tema) {
+    document.body.style.background = tema.bg;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', tema.bg);
+  }
+  localStorage.setItem('fnz_tema', id);
+  // Re-render ajustes para actualizar la selección activa
+  const content = document.getElementById('content');
+  if(content && document.getElementById('tab-ajustes')?.classList.contains('active')) render();
+  toast((tema?.emoji||'') + ' Tema ' + (tema?.nombre||id) + ' aplicado');
+}
+
+function loadSavedTheme() {
+  const id = localStorage.getItem('fnz_tema') || 'esmeralda';
+  const app = document.getElementById('app');
+  TEMAS_APP.forEach(t => app.classList.remove('tema-'+t.id));
+  if (id !== 'esmeralda') app.classList.add('tema-'+id);
+  const tema = TEMAS_APP.find(t=>t.id===id);
+  if (tema) document.body.style.background = tema.bg;
+}
+
 function saveSheetsUrl(){
   const url=document.getElementById('sheets-url-input').value.trim();
   localStorage.setItem('fnz_sheets_url',url);
@@ -2130,6 +2351,55 @@ function reloadFromSheets(){
   if(!url) return toast('Primero configura la URL de Sheets','error');
   if(!confirm('¿Restaurar datos desde Sheets?\n\nSe agregarán los datos de Sheets a los que ya tienes. No se borra nada local.')) return;
   loadFromSheets(true);
+}
+
+// ★ Enviar TODOS los datos de la app a Sheets de una vez
+function enviarTodoASheets() {
+  const url = localStorage.getItem('fnz_sheets_url') || '';
+  if (!url) return toast('Primero configura la URL de Sheets en Ajustes', 'error');
+
+  const txs    = state.transactions || [];
+  const agenda = state.agenda || [];
+  const deudas = state.debts || [];
+
+  const total = txs.length + agenda.length + deudas.length;
+  if (total === 0) return toast('No hay datos para enviar', 'error');
+
+  if (!confirm(`¿Enviar TODO a Sheets?\n\n· ${txs.length} movimientos\n· ${agenda.length} elementos de agenda\n· ${deudas.length} deudas\n\nSi ya existen en Sheets se actualizarán, no se duplicarán.`)) return;
+
+  const status = document.getElementById('notion-sync-status');
+  let enviados = 0;
+  const todos = [];
+
+  // Movimientos
+  txs.forEach(tx => todos.push({ delay: todos.length * 200, fn: () => {
+    const payload = { type:'tx', modo: tx.negocio?'negocio':'personal', timestamp:'tx_'+tx.id+'_'+Date.now(), tx };
+    fetch(url+'?data='+encodeURIComponent(JSON.stringify(payload)), {method:'GET',mode:'no-cors'})
+      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${total}`; if(enviados===total) done(); });
+  }}));
+
+  // Agenda
+  agenda.forEach(item => todos.push({ delay: todos.length * 200, fn: () => {
+    const payload = { type:'agenda', item, modo:'negocio', timestamp:'ag_'+item.id+'_'+Date.now() };
+    fetch(url+'?data='+encodeURIComponent(JSON.stringify(payload)), {method:'GET',mode:'no-cors'})
+      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${total}`; if(enviados===total) done(); });
+  }}));
+
+  // Deudas
+  deudas.forEach(d => todos.push({ delay: todos.length * 200, fn: () => {
+    const payload = { type:'deuda', item:d, modo:'negocio', timestamp:'deu_'+d.id+'_'+Date.now() };
+    fetch(url+'?data='+encodeURIComponent(JSON.stringify(payload)), {method:'GET',mode:'no-cors'})
+      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${total}`; if(enviados===total) done(); });
+  }}));
+
+  // Disparar con delay para no saturar
+  todos.forEach(({delay, fn}) => setTimeout(fn, delay));
+  if(status) status.textContent = `⬆ Iniciando envío de ${total} registros...`;
+
+  function done() {
+    if(status) status.textContent = `✓ ${total} registros enviados a Sheets`;
+    toast(`✓ Todo enviado a Sheets — ${txs.length} mov · ${agenda.length} agenda · ${deudas.length} deudas`);
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -2197,12 +2467,14 @@ function importarNotion(input) {
         const cliente = iCliente >= 0 ? r[iCliente]?.trim().replace(/^\s+/,'') : '';
         if (!cliente) continue; // saltar filas sin cliente
 
-        // Servicio — combinar servicio 1,2,3,4
+        // Servicio — combinar servicio 1,2,3,4 y mapear a categoría real
         const svcs = [iSvc1,iSvc2,iSvc3,iSvc4]
           .filter(i => i >= 0)
           .map(i => r[i]?.trim())
           .filter(v => v && v !== '-' && v !== '');
-        const servicio = svcs.join(' + ') || 'Servicio';
+        const servicioRaw = svcs.join(' + ') || 'Servicio';
+        // ★ Mapear texto de Notion → categoría real de la app
+        const servicio = _mapearCategoriaNotion(servicioRaw);
 
         // Precio / ingreso principal
         const precioRaw = iPrecio >= 0 ? r[iPrecio]?.toString().replace(/[^0-9.,]/g,'').replace(',','.') : '';
@@ -2304,7 +2576,67 @@ function importarNotion(input) {
   reader.readAsText(file, 'UTF-8');
 }
 
-// Parser CSV simple — maneja comas dentro de comillas
+// ★ Mapear texto de Notion (truncado o completo) → categoría real de la app
+function _mapearCategoriaNotion(texto) {
+  if (!texto) return 'Servicio Gas';
+  const t = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if (t.includes('punto adi') || t.includes('punto add') || t.includes('punto extra') || t.includes('punto de gas') || t.includes('boca')) return 'Punto Adicional';
+  if (t.includes('terma') || t.includes('calefon') || t.includes('calef')) return 'Terma';
+  if (t.includes('cocina') || t.includes('cocinilla')) return 'Cocina / Cocinilla';
+  if (t.includes('horno')) return 'Horno a Gas';
+  if (t.includes('parrilla')) return 'Parrilla a Gas';
+  if (t.includes('secadora')) return 'Secadora a Gas';
+  if (t.includes('instalac') && t.includes('nueva')) return 'Instalación Nueva';
+  if (t.includes('instalac')) return 'Instalación Nueva';
+  if (t.includes('conexion') || t.includes('conec') || t.includes('conectar')) return 'Conexión Artefacto';
+  if (t.includes('conversion') || t.includes('convert')) return 'Conversión Artefacto';
+  if (t.includes('modific') || t.includes('mod de red') || t.includes('red')) return 'Modificación Red';
+  if (t.includes('reparac') || t.includes('repara') || t.includes('tuberia') || t.includes('fuga')) return 'Reparación Tubería';
+  if (t.includes('gasfiter') || t.includes('plomeria') || t.includes('desague')) return 'Gasfitería';
+  if (t.includes('document') || t.includes('tramite') || t.includes('certif')) return 'Documentación';
+  if (t.includes('movilidad') || t.includes('movil') || t.includes('transport')) return 'Movilidad';
+  if (t.includes('material') || t.includes('insumo')) return 'Materiales';
+  // Si tiene múltiples servicios concatenados, usar el primero mapeado
+  if (texto.includes(' + ')) {
+    for (const parte of texto.split(' + ')) {
+      const mapped = _mapearCategoriaNotion(parte.trim());
+      if (mapped !== 'Servicio Gas') return mapped;
+    }
+  }
+  return texto; // devolver el original si no hay mapeo
+}
+
+// ★ Forzar sincronización a Sheets de todos los movimientos importados de Notion
+function sincronizarNotionASheets() {
+  const url = localStorage.getItem('fnz_sheets_url') || '';
+  if (!url) return toast('Primero configura la URL de Sheets en Ajustes', 'error');
+
+  const txNotion = (state.transactions || []).filter(t => t._importadoDeNotion);
+  if (txNotion.length === 0) return toast('No hay movimientos importados de Notion para sincronizar', 'error');
+
+  if (!confirm(`¿Sincronizar ${txNotion.length} movimientos de Notion a Sheets?\n\nSolo se envían los que NO están ya en Sheets (sin duplicaciones).`)) return;
+
+  const status = document.getElementById('notion-sync-status');
+  if (status) status.textContent = `⏳ Enviando ${txNotion.length} registros...`;
+
+  let enviados = 0;
+  txNotion.forEach((tx, idx) => {
+    setTimeout(() => {
+      const payload = { type: 'tx', modo: 'negocio', timestamp: 'tx_' + tx.id + '_' + Date.now(), tx };
+      const fullUrl = url + '?data=' + encodeURIComponent(JSON.stringify(payload));
+      fetch(fullUrl, { method: 'GET', mode: 'no-cors' })
+        .then(() => {
+          enviados++;
+          if (status) status.textContent = `↑ Enviando... ${enviados}/${txNotion.length}`;
+          if (enviados === txNotion.length) {
+            if (status) status.textContent = `✓ ${enviados} registros enviados a Sheets`;
+            toast(`✓ ${enviados} movimientos sincronizados a Sheets`);
+          }
+        })
+        .catch(() => { enviados++; });
+    }, idx * 200); // 200ms entre cada envío para no saturar
+  });
+}
 function _parseCsv(text) {
   const rows = [];
   const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
@@ -3121,7 +3453,38 @@ function renderAjustes(){
   return `
     <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:20px">Ajustes</div>
 
-    <!-- NOMBRE USUARIO -->
+    <!-- PERSONALIZACIÓN — 6 TEMAS -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#3A7D44,#9F5AE5,#1565C0);display:flex;align-items:center;justify-content:center;font-size:22px">🎨</div>
+        <div>
+          <div style="font-family:'Playfair Display',serif;font-size:15px;color:var(--text)">Personalización</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Elige el tema visual de tu app</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        ${(()=>{
+          const temaActivo = localStorage.getItem('fnz_tema')||'esmeralda';
+          return TEMAS_APP.map(t=>`
+            <div onclick="applyTheme('${t.id}')" style="
+              border-radius:12px;padding:10px 8px;cursor:pointer;text-align:center;
+              border:2px solid ${temaActivo===t.id?t.accent:'transparent'};
+              background:${t.bg};
+              transition:all .2s;position:relative
+            ">
+              ${temaActivo===t.id?`<div style="position:absolute;top:4px;right:4px;background:${t.accent};color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:20px">✓</div>`:''}
+              <div style="font-size:22px;margin-bottom:4px">${t.emoji}</div>
+              <div style="font-size:11px;font-weight:700;color:${t.accent};margin-bottom:2px">${t.nombre}</div>
+              <div style="font-size:9px;color:${t.accent}88;line-height:1.3">${t.desc}</div>
+              <div style="display:flex;gap:3px;justify-content:center;margin-top:6px">
+                <div style="width:12px;height:12px;border-radius:50%;background:${t.accent}"></div>
+                <div style="width:12px;height:12px;border-radius:3px;background:${t.accent}44;border:0.5px solid ${t.accent}55"></div>
+                <div style="width:12px;height:12px;border-radius:50%;background:${t.accent}22"></div>
+              </div>
+            </div>`).join('');
+        })()}
+      </div>
+    </div>
     <div class="card" style="margin-bottom:12px">
       <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text)">Tu nombre (para el asistente de voz)</div>
       <div style="display:flex;gap:8px">
@@ -3184,7 +3547,14 @@ function renderAjustes(){
         📂 Seleccionar archivo CSV de Notion
         <input type="file" accept=".csv" onchange="importarNotion(this)" style="display:none">
       </label>
-      <div id="notion-import-status" style="margin-top:10px;font-size:12px;color:var(--muted);text-align:center;min-height:16px"></div>
+      <button onclick="sincronizarNotionASheets()" style="width:100%;margin-top:8px;background:#F3F0FF;border:1px solid #7C3AED44;color:#7C3AED;border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">
+        ☁️ Enviar importados de Notion a Sheets
+      </button>
+      <button onclick="enviarTodoASheets()" style="width:100%;margin-top:6px;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">
+        ⬆ Enviar TODO a Sheets ahora
+      </button>
+      <div id="notion-import-status" style="margin-top:8px;font-size:12px;color:var(--muted);text-align:center;min-height:16px"></div>
+      <div id="notion-sync-status" style="font-size:12px;color:var(--muted);text-align:center;min-height:16px"></div>
     </div>
 
     <!-- BACKUP CARD -->
@@ -4737,6 +5107,7 @@ function _mergeById(local, remote) {
 }
 
 // ── Arranque: cargar desde Sheets si localStorage vacío ──
+loadSavedTheme();
 loadFromSheets(false);
 
 // ── FAB arrastrable — mantener presionado 400ms ──
