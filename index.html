@@ -3800,11 +3800,45 @@ function guardarConversion(id){
 }
 
 function deleteAgendaItem(id){
-  if(!confirm('¿Eliminar este registro?')) return;
+  if(!confirm('¿Eliminar este registro? También se eliminarán los movimientos e ingresos asociados.')) return;
   const url=localStorage.getItem('fnz_sheets_url')||'';
-  if(url){ _sendToSheets(url,{type:'agenda_delete',id}); }
-  state.agenda=(state.agenda||[]).filter(x=>x.id!==id);
-  save('fnz_agenda',state.agenda); render(); toast('Eliminado');
+
+  // ★ Buscar y eliminar transacciones asociadas (sufijo _ag o descripción que contenga el id)
+  const txAsociadas = (state.transactions||[]).filter(t=>
+    t.id === id+'_ag' ||
+    t.id.startsWith(id+'_') ||
+    (t.description && t.description.includes && state.agenda && (() => {
+      const item = (state.agenda||[]).find(x=>x.id===id);
+      return item && t.description.includes(item.cliente||'__NO__') && t.negocio;
+    })())
+  );
+
+  // ★ Eliminar deudas automáticas asociadas (sufijo _dag)
+  const deudasAsociadas = (state.debts||[]).filter(d=>
+    d.id === id+'_dag' || d.id.startsWith(id+'_dag')
+  );
+
+  // Eliminar del state local
+  state.transactions = (state.transactions||[]).filter(t=> !txAsociadas.some(tx=>tx.id===t.id));
+  state.debts        = (state.debts||[]).filter(d=> !deudasAsociadas.some(da=>da.id===d.id));
+  state.agenda       = (state.agenda||[]).filter(x=>x.id!==id);
+
+  // Sync eliminaciones a Sheets
+  if(url){
+    // Eliminar agenda de Construcciones y Visitas
+    _sendToSheets(url,{type:'agenda_delete', id});
+    // Eliminar tx asociadas de Movimientos
+    txAsociadas.forEach(tx=>{
+      setTimeout(()=>_sendToSheets(url,{type:'tx_delete', id:tx.id, modo:'negocio'}), 300);
+    });
+    // Eliminar deudas asociadas de Deudas y Movimientos
+    deudasAsociadas.forEach(d=>{
+      setTimeout(()=>_sendToSheets(url,{type:'deuda_delete', id:d.id}), 600);
+    });
+  }
+
+  saveAll(); render();
+  toast('Eliminado' + (txAsociadas.length||deudasAsociadas.length ? ' · Movimientos e ingresos relacionados también eliminados' : ''));
 }
 
 function cambiarEstadoAgenda(id, estado){
