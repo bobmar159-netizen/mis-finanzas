@@ -6937,21 +6937,20 @@ Para fechas relativas usa hoy (${hoy}) como referencia. "este sábado" = próxim
 }
 
 async function processVoiceWithGemini(text){
-  // Mostrar spinner
   const micText = document.getElementById('micText');
-  if(micText) micText.textContent = '✨ Gemini procesando...';
-  
+  if(micText) micText.textContent = '✨ Gemini analizando...';
+
   const result = await processWithGemini(text);
-  
+
   if(!result){
-    // Fallback al parser manual
+    // Gemini no respondió — mostrar error, NO usar parser manual
     processVoiceResult._busy = false;
-    processVoiceResultManual(text);
+    if(micText) micText.textContent = '⚠ Gemini no respondió. Intentá de nuevo.';
+    toast('Gemini no respondió — intentá de nuevo','error');
     return;
   }
-  
+
   if(result.tipo === 'agenda'){
-    // Agenda via Gemini
     document.getElementById('micModal').style.display='none';
     processVoiceResult._busy = false;
     const pre = {
@@ -6966,9 +6965,8 @@ async function processVoiceWithGemini(text){
     };
     window._avParsed = pre;
     openAddAgenda(pre.tipo, null, pre);
-    
+
   } else if(result.tipo === 'movimiento'){
-    // Movimiento via Gemini — abrir formulario prellenado
     document.getElementById('micModal').style.display='none';
     processVoiceResult._busy = false;
     openTxModal(null, {
@@ -6981,8 +6979,10 @@ async function processVoiceWithGemini(text){
       ubicacion:   result.ubicacion,
     });
   } else {
+    // Gemini devolvió algo pero no reconocible — mostrar error
     processVoiceResult._busy = false;
-    processVoiceResultManual(text);
+    if(micText) micText.textContent = '⚠ No entendí. Intentá de nuevo con más detalle.';
+    toast('No entendí la orden — intentá de nuevo','error');
   }
 }
 
