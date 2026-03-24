@@ -6898,10 +6898,21 @@ async function callGemini(prompt, keyOverride){
 
 async function processWithGemini(text){
   const isNeg = state.modo === 'negocio';
-  const hoy = new Date().toISOString().split('T')[0];
+  // Usar fecha LOCAL (Lima, UTC-5) — no UTC
+  const ahora = new Date();
+  const hoy = ahora.getFullYear()+'-'+
+    String(ahora.getMonth()+1).padStart(2,'0')+'-'+
+    String(ahora.getDate()).padStart(2,'0');
+  const diaSemana = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][ahora.getDay()];
+  const manana = new Date(ahora); manana.setDate(ahora.getDate()+1);
+  const mananaStr = manana.getFullYear()+'-'+
+    String(manana.getMonth()+1).padStart(2,'0')+'-'+
+    String(manana.getDate()).padStart(2,'0');
   
   const prompt = `Eres un asistente de finanzas personales para un gasfitero en Lima, Perú.
-Hoy es ${hoy} (${['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][new Date().getDay()]}).
+Hoy es ${hoy} (${diaSemana}). Mañana es ${mananaStr}.
+IMPORTANTE: "para el día de mañana" o "mañana" = ${mananaStr}. NO uses otra fecha.
+Zona horaria: Lima, Perú (UTC-5).
 
 El usuario dijo: "${text}"
 
@@ -6922,14 +6933,29 @@ ${isNeg?
 'Ingresos: Punto Adicional, Modificacion Red, Instalacion Nueva, Conversion Artefacto, Conexion Artefacto, Reparacion Tuberia, Gasfiteria, Documentacion, Cocina, Horno, Terma, Secadora, Calefon, Parrilla. Egresos: GNV, Materiales, Herramientas, Gasolina, Viaticos, Mantenimiento':
 'Ingresos: Sueldo, Freelance, Bono, Venta, Otro ingreso. Egresos: Alimentacion, Transporte, Servicios, Salud, Educacion, Ocio, Ropa, Deuda, Otro gasto'}
 
-Para fechas relativas usa hoy (${hoy}) como referencia. "este sábado" = próximo sábado.`;
+Para fechas relativas usa hoy (${hoy}) como referencia. "este sábado" = próximo sábado.
+
+REGLAS IMPORTANTES:
+- "cliente": extrae SOLO el nombre propio de la persona. Ejemplos: "señor Mario" → "Mario", "la señora Leonor" → "Leonor", "don Carlos Quispe" → "Carlos Quispe". NUNCA pongas "el", "la", "señor", "señora", "don", "doña" como cliente — solo el nombre.
+- Si no hay nombre de persona mencionado, cliente = null.
+- "ubicacion": solo el nombre del distrito de Lima. Si no hay distrito, null.
+- "hora": formato HH:MM en 24h. "9am" = "09:00", "3pm" = "15:00". Si no hay hora, null.`;
 
   const response = await callGemini(prompt);
   if(!response) return null;
   
   try{
     const clean = response.replace(/```json|```/g,'').trim();
-    return JSON.parse(clean);
+    const parsed = JSON.parse(clean);
+    // Limpiar cliente — quitar títulos como "señor", "señora", "don", "doña", artículos
+    if(parsed.cliente && typeof parsed.cliente === 'string'){
+      parsed.cliente = parsed.cliente
+        .replace(/^(el|la|los|las|un|una)\s+/i, '')
+        .replace(/^(señor|señora|don|doña|sr\.?|sra\.?|ing\.?|dr\.?)\s+/i, '')
+        .trim();
+      if(!parsed.cliente) parsed.cliente = null;
+    }
+    return parsed;
   } catch(e){
     console.error('Gemini parse error:', e, response);
     return null;
