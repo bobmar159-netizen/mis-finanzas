@@ -6887,13 +6887,22 @@ function usarChip(btn){
 function isNotaCommand(text){
   const t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const notaKws = [
-    'crea una nota','crear una nota','nueva nota','haz una nota','hacer una nota',
-    'crea nota','crear nota','anota esto','toma nota','escribe esto',
+    // lista — variantes directas
     'crea una lista','crear una lista','nueva lista','haz una lista','hacer una lista',
+    'has una lista','ase una lista','hase una lista','hazme una lista','hasme una lista',
     'crea lista','crear lista','crea la lista','hagame una lista','hazme una lista',
-    'creame una lista','crea me una lista','lista de compras','lista de materiales',
-    'lista de gastos','lista de tareas','crea una lista de','hacer una lista de',
-    'nueva lista de','abrir lista','iniciar lista','empezar lista',
+    'creame una lista','creamela lista','crea me una lista','armame una lista',
+    'lista de compras','lista de materiales','lista de gastos','lista de tareas',
+    'lista de precios','lista de cosas','lista de productos','lista de items',
+    'crea una lista de','hacer una lista de','nueva lista de','nueva lista con',
+    'abrir lista','iniciar lista','empezar lista','comenzar lista','nueva lista',
+    'quiero una lista','quiero hacer una lista','quiero crear una lista',
+    'abre una lista','ponme una lista','pon una lista',
+    // nota
+    'crea una nota','crear una nota','nueva nota','haz una nota','hacer una nota',
+    'has una nota','crea nota','crear nota','anota esto','toma nota','escribe esto',
+    'quiero una nota','abre una nota','ponme una nota','nueva nota de',
+    // recordatorio
     'crea un recordatorio','nuevo recordatorio','crea recordatorio',
   ];
   return notaKws.some(k => t.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
@@ -6954,9 +6963,9 @@ function abrirModoLista(tipo, tituloInicial){
           ✓ Guardar
         </button>
       </div>
-      <div id="lista-share-row" style="display:none;margin-top:8px">
+      <div id="lista-share-row" style="margin-top:8px">
         <button onclick="compartirListaWhatsApp()" style="width:100%;background:#25D366;color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
-          📱 Compartir por WhatsApp
+          📱 Compartir imagen por WhatsApp
         </button>
       </div>
     </div>`;
@@ -7161,107 +7170,182 @@ function guardarListaFinal(){
 
 // ── Generar nota estilo A (papel amarillo) como imagen ──
 function generarNotaJPG(nota){
+  // Usar los items directos de listaItems si existen (más precisos que nota.items)
+  const rawItems = listaItems.length > 0 ? listaItems : (nota.items||[]).map(it=>({
+    tipo: (it.texto.includes('Subtotal')||it.texto.includes('Total')) ? 'subtotal' : 'item',
+    texto: it.texto.split(' - S/')[0].replace(/:\s*S\/[\d.]+$/,'').trim(),
+    precio: it.texto.includes(' - S/') ? parseFloat(it.texto.split(' - S/')[1]) : null,
+    valor: it.texto.match(/:\s*S\/([\d.]+)/) ? parseFloat(it.texto.match(/:\s*S\/([\d.]+)/)[1]) : null,
+  }));
+
+  const titulo = (document.getElementById('lista-titulo')?.value || nota.titulo || 'Lista').trim();
+  const W = 640;
+  const PAD = 40;
+  const TITLE_AREA = 80;
+  const LINE_H = 38;
+  const FOOTER_H = 50;
+  const MIN_H = 300;
+  const totalH = Math.max(MIN_H, TITLE_AREA + (rawItems.length * LINE_H) + FOOTER_H + PAD);
+
   const canvas = document.createElement('canvas');
-  const W = 600, padding = 40;
-  const lineH = 32, titleH = 60, footerH = 40;
-  const items = nota.items || [];
-  const H = titleH + (items.length * lineH) + footerH + padding*2;
   canvas.width = W;
-  canvas.height = Math.max(H, 300);
+  canvas.height = totalH;
   const ctx = canvas.getContext('2d');
 
-  // Fondo amarillo
-  ctx.fillStyle = '#FFF9C4';
-  ctx.fillRect(0,0,W,canvas.height);
+  // ── Fondo papel amarillo ──
+  ctx.fillStyle = '#FFFDE7';
+  ctx.fillRect(0, 0, W, totalH);
 
-  // Borde
-  ctx.strokeStyle = '#F9A825';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(1.5, 1.5, W-3, canvas.height-3);
-
-  // Franja superior
-  ctx.fillStyle = '#F9A825';
-  ctx.fillRect(0, 0, W, 6);
-
-  // Título
-  ctx.fillStyle = '#5D4037';
-  ctx.font = 'bold 22px Georgia, serif';
-  ctx.fillText(nota.titulo || 'Lista', padding, padding + 32);
-
-  // Línea bajo título
-  ctx.strokeStyle = '#F9A82566';
+  // Líneas de fondo estilo cuaderno
+  ctx.strokeStyle = '#F9A82522';
   ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(padding, titleH);
-  ctx.lineTo(W-padding, titleH);
+  for(let y = TITLE_AREA + 10; y < totalH - FOOTER_H; y += LINE_H){
+    ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W-PAD, y); ctx.stroke();
+  }
+
+  // Borde exterior
+  ctx.strokeStyle = '#F9A825';
+  ctx.lineWidth = 2.5;
+  roundRect(ctx, 2, 2, W-4, totalH-4, 8);
   ctx.stroke();
 
-  // Ítems
-  ctx.font = '16px Georgia, serif';
-  items.forEach((item, i) => {
-    const y = titleH + padding/2 + (i * lineH) + 22;
-    const isSub = item.texto.includes(':') && item.texto.includes('S/');
+  // Franja amarilla superior
+  ctx.fillStyle = '#F9A825';
+  roundRect(ctx, 2, 2, W-4, 7, {tl:8,tr:8,br:0,bl:0});
+  ctx.fill();
+
+  // ── Emoji y título ──
+  ctx.font = 'bold 26px Georgia, serif';
+  ctx.fillStyle = '#4E342E';
+  ctx.fillText('📋 ' + titulo, PAD, 52);
+
+  // Línea bajo título
+  ctx.strokeStyle = '#F9A82599';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(PAD, TITLE_AREA - 8);
+  ctx.lineTo(W - PAD, TITLE_AREA - 8);
+  ctx.stroke();
+
+  // ── Ítems ──
+  rawItems.forEach((item, i) => {
+    const y = TITLE_AREA + (i * LINE_H) + LINE_H * 0.72;
+    const isSub = item.tipo === 'subtotal';
 
     if(isSub){
-      ctx.strokeStyle = '#F9A82588';
+      // Línea punteada antes del subtotal
+      ctx.strokeStyle = '#F9A82577';
       ctx.lineWidth = 1;
-      ctx.setLineDash([4,4]);
+      ctx.setLineDash([5, 4]);
       ctx.beginPath();
-      ctx.moveTo(padding, y-10);
-      ctx.lineTo(W-padding, y-10);
+      ctx.moveTo(PAD, y - LINE_H * 0.6);
+      ctx.lineTo(W - PAD, y - LINE_H * 0.6);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = '#3A7D44';
+
+      // Fondo highlight para subtotal
+      ctx.fillStyle = '#FFF9C4';
+      ctx.fillRect(PAD - 4, y - 22, W - PAD * 2 + 8, 28);
+
+      ctx.font = 'bold 15px Georgia, serif';
+      ctx.fillStyle = '#2E7D32';
+      ctx.fillText(item.texto || 'Total', PAD + 4, y);
+
+      const val = item.valor || 0;
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#1B5E20';
       ctx.font = 'bold 16px Georgia, serif';
+      ctx.fillText('S/ ' + val.toFixed(2), W - PAD, y);
+      ctx.textAlign = 'left';
     } else {
       // Checkbox
-      ctx.strokeStyle = '#8D6E63';
+      ctx.strokeStyle = '#A1887F';
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(padding, y-12, 12, 12);
-      ctx.fillStyle = '#4E342E';
-      ctx.font = '16px Georgia, serif';
-    }
+      ctx.strokeRect(PAD, y - 13, 13, 13);
 
-    // Texto del ítem
-    const parts = item.texto.split(' - S/');
-    ctx.fillText((isSub?'':'    ') + parts[0], isSub?padding:padding+20, y);
-
-    // Precio alineado a la derecha
-    if(parts[1]){
-      const priceText = 'S/ '+parts[1];
-      ctx.textAlign = 'right';
-      ctx.fillStyle = isSub ? '#3A7D44' : '#5D4037';
-      ctx.font = isSub ? 'bold 16px Georgia, serif' : '16px Georgia, serif';
-      ctx.fillText(priceText, W-padding, y);
-      ctx.textAlign = 'left';
+      ctx.font = '15px Georgia, serif';
       ctx.fillStyle = '#4E342E';
+      const textoItem = item.texto || '';
+      ctx.fillText(textoItem, PAD + 22, y);
+
+      if(item.precio){
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#5D4037';
+        ctx.font = '15px Georgia, serif';
+        ctx.fillText('S/ ' + item.precio.toFixed(2), W - PAD, y);
+        ctx.textAlign = 'left';
+      }
     }
   });
 
-  // Footer — solo fecha
-  const fechaStr = new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  ctx.fillStyle = '#8D6E63';
-  ctx.font = '13px Georgia, serif';
+  // ── Footer — solo fecha ──
+  const ahora = new Date();
+  const fechaStr = ahora.toLocaleDateString('es-PE', {
+    weekday:'long', day:'numeric', month:'long', year:'numeric'
+  });
+  ctx.strokeStyle = '#F9A82555';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(PAD, totalH - FOOTER_H + 8);
+  ctx.lineTo(W - PAD, totalH - FOOTER_H + 8);
+  ctx.stroke();
+
+  ctx.font = '12px Georgia, serif';
+  ctx.fillStyle = '#A1887F';
   ctx.textAlign = 'right';
-  ctx.fillText(fechaStr, W-padding, canvas.height - 16);
+  ctx.fillText(fechaStr, W - PAD, totalH - 18);
   ctx.textAlign = 'left';
 
   window._listaCanvas = canvas;
+  return canvas;
+}
+
+// Helper para roundRect compatible con todos los browsers
+function roundRect(ctx, x, y, w, h, r){
+  if(typeof r === 'number') r = {tl:r,tr:r,br:r,bl:r};
+  ctx.beginPath();
+  ctx.moveTo(x + r.tl, y);
+  ctx.lineTo(x + w - r.tr, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r.tr);
+  ctx.lineTo(x+w, y+h-r.br);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r.br, y+h);
+  ctx.lineTo(x+r.bl, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r.bl);
+  ctx.lineTo(x, y+r.tl);
+  ctx.quadraticCurveTo(x, y, x+r.tl, y);
+  ctx.closePath();
 }
 
 function compartirListaWhatsApp(){
-  const canvas = window._listaCanvas;
-  if(!canvas){ toast('Generando imagen...'); return; }
-  canvas.toBlob(blob=>{
+  // Siempre regenerar con los datos actuales
+  const titulo = document.getElementById('lista-titulo')?.value || listaTitulo || 'Lista';
+  const nota = { titulo, items: [], creado: new Date().toISOString() };
+  const canvas = generarNotaJPG(nota);
+
+  canvas.toBlob(blob => {
+    const filename = titulo.replace(/\s+/g,'_') + '.jpg';
+
+    // En móvil — usar Web Share API para compartir directo
+    if(navigator.share && navigator.canShare && navigator.canShare({files:[new File([blob],'a.jpg',{type:'image/jpeg'})]})){
+      const file = new File([blob], filename, {type:'image/jpeg'});
+      navigator.share({
+        title: titulo,
+        files: [file]
+      }).catch(()=>{});
+      return;
+    }
+
+    // En PC — descargar
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = (listaTitulo||'lista').replace(/\s+/g,'_')+'.jpg';
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    toast('Imagen descargada — compartí por WhatsApp 📱');
-  }, 'image/jpeg', 0.92);
+    toast('Imagen descargada — adjuntala en WhatsApp 📱');
+  }, 'image/jpeg', 0.93);
 }
+
 
 function saveGeminiKey(){
   const key = document.getElementById('gemini-key-input')?.value.trim();
@@ -7380,6 +7464,34 @@ REGLAS IMPORTANTES:
 }
 
 async function processVoiceWithGemini(text){
+  // ── Chequeos locales PRIMERO — sin delay, sin Gemini ──
+  const cleanText = text.replace(/^(oye|hey|ok|escucha|mira)\b/gi,'').trim();
+  if(cleanText) text = cleanText;
+
+  // 1. Nota/Lista → abrir modo lista INMEDIATO
+  if(isNotaCommand(text)){
+    processVoiceResult._busy = false;
+    document.getElementById('micModal').style.display='none';
+    const tLow = text.toLowerCase();
+    const tipo = tLow.includes('nota') && !tLow.includes('lista') ? 'nota' : 'lista';
+    let titulo = tipo==='lista' ? 'Lista de compras' : 'Nota';
+    const matchTitulo = text.match(/(?:lista|nota)\s+de\s+([\w\s]+?)(?:\s*$|\s+para)/i);
+    if(matchTitulo) titulo = matchTitulo[1].trim().charAt(0).toUpperCase()+matchTitulo[1].trim().slice(1);
+    abrirModoLista(tipo, titulo);
+    return;
+  }
+
+  // 2. Agenda → abrir formulario INMEDIATO, Gemini rellena los campos
+  if(isAgendaCommand(text)){
+    processVoiceResult._busy = false;
+    document.getElementById('micModal').style.display='none';
+    try{ parseAgendaVoz(text); }catch(e){}
+    const p = window._avParsed;
+    openAddAgenda(p ? p.tipo : 'trabajo', null, p || {});
+    return;
+  }
+
+  // 3. Movimiento → Gemini procesa
   const micText = document.getElementById('micText');
   if(micText) micText.textContent = '✨ Gemini analizando...';
 
