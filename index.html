@@ -6873,7 +6873,7 @@ function testGeminiKey(){
 async function callGemini(prompt, keyOverride){
   const key = keyOverride || localStorage.getItem('fnz_gemini_key');
   if(!key) return null;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`;
   const body = {
     contents:[{role:'user', parts:[{text: prompt}]}],
     generationConfig:{temperature:0.1, maxOutputTokens:600}
