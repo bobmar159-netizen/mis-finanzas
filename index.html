@@ -7059,8 +7059,14 @@ function processVoiceResultManual(text) {
   // Cliente detectado
   const clienteBadge = document.getElementById('pvClienteBadge');
   if (parsed.cliente) {
-    clienteBadge.textContent = `👤 Cliente: ${parsed.cliente}`;
-    clienteBadge.style.display = 'block';
+    const clienteLimpio = parsed.cliente
+      .replace(/^(el|la|los|las|un|una)\s+/i, '')
+      .replace(/^(señor|señora|don|doña|sr\.?|sra\.?|ing\.?|dr\.?)\s+/i, '')
+      .trim();
+    if(clienteLimpio){
+      clienteBadge.textContent = `👤 Cliente: ${clienteLimpio}`;
+      clienteBadge.style.display = 'block';
+    } else { clienteBadge.style.display = 'none'; }
   } else { clienteBadge.style.display = 'none'; }
 
   // Servicio del negocio
