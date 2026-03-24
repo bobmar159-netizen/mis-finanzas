@@ -7048,12 +7048,13 @@ function abrirModoLista(tipo, tituloInicial){
     </div>`;
   document.body.appendChild(overlay);
   renderListaItems();
-  setTimeout(()=>toggleListaMic(), 400);
+  // Auto-iniciar mic
+  setTimeout(()=>iniciarListaMic(), 500);
 }
 
 function cerrarListaModal(){
   listaMicActivo = false;
-  if(listaRec){ try{listaRec.stop();}catch(e){} }
+  if(listaRec){ try{listaRec.stop();}catch(e){} listaRec=null; }
   const m = document.getElementById('listaModal');
   if(m) m.remove();
 }
@@ -7085,12 +7086,15 @@ function borrarItemLista(idx){
 }
 
 function toggleListaMic(){
-  if(listaMicActivo){ detenerListaMic(); return; }
+  if(listaMicActivo){ pararListaMicDefinitivo(); return; }
+  iniciarListaMic();
+}
+
+function iniciarListaMic(){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR){ alert('Necesitás Chrome'); return; }
   listaMicActivo = true;
-  const btn = document.getElementById('lista-mic-btn');
-  if(btn){ btn.style.background='linear-gradient(135deg,#E05252,#f87171)'; btn.textContent='⏹ Detener'; }
+  _setListaMicBtn(true);
 
   listaRec = new SR();
   listaRec.lang = 'es-PE';
@@ -7098,48 +7102,115 @@ function toggleListaMic(){
   listaRec.continuous = false;
 
   listaRec.onresult = (e) => {
-    let txt = '';
-    for(let i=0;i<e.results.length;i++) txt += e.results[i][0].transcript;
+    let interim = '', final = '';
+    for(let i=0;i<e.results.length;i++){
+      if(e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
     const statusEl = document.getElementById('lista-mic-status');
-    if(statusEl) statusEl.textContent = '🎙 ' + txt;
-    if(e.results[e.results.length-1].isFinal){
-      detenerListaMic();
-      procesarEntradaLista(txt.trim());
+    if(statusEl) statusEl.textContent = '🎙 ' + (final||interim);
+    if(final.trim()){
+      // Tiene resultado final — procesar
+      try{ listaRec.stop(); }catch(e){}
+      procesarEntradaLista(final.trim());
     }
   };
-  listaRec.onerror = ()=> detenerListaMic();
-  listaRec.onend = ()=>{ if(listaMicActivo) detenerListaMic(); };
-  listaRec.start();
+
+  listaRec.onerror = (e) => {
+    if(e.error === 'no-speech' && listaMicActivo){
+      // Silencio — reiniciar
+      setTimeout(()=>{ if(listaMicActivo) iniciarListaMic(); }, 200);
+      return;
+    }
+    pararListaMicDefinitivo();
+  };
+
+  listaRec.onend = () => {
+    // No reiniciar aquí — se maneja en onresult o en procesarEntradaLista
+  };
+
+  try{ listaRec.start(); }catch(e){}
+}
+
+function pararListaMicDefinitivo(){
+  listaMicActivo = false;
+  _setListaMicBtn(false);
+  if(listaRec){ try{listaRec.stop();}catch(e){} listaRec=null; }
+  const statusEl = document.getElementById('lista-mic-status');
+  if(statusEl) statusEl.textContent = 'Micrófono pausado — tocá para continuar';
 }
 
 function detenerListaMic(){
-  listaMicActivo = false;
+  // Solo pausa el rec actual sin cambiar el estado de listaMicActivo
+  if(listaRec){ try{listaRec.stop();}catch(e){} listaRec=null; }
+}
+
+function _setListaMicBtn(activo){
   const btn = document.getElementById('lista-mic-btn');
-  if(btn){ btn.style.background='linear-gradient(135deg,#C9A84C,#E8C96A)'; btn.textContent='🎙 Dictar'; }
-  if(listaRec){ try{listaRec.stop();}catch(e){} }
+  if(!btn) return;
+  if(activo){
+    btn.style.background = 'linear-gradient(135deg,#E05252,#f87171)';
+    btn.textContent = '⏹ Pausar';
+  } else {
+    btn.style.background = 'linear-gradient(135deg,#C9A84C,#E8C96A)';
+    btn.textContent = '🎙 Dictar';
+  }
 }
 
 async function procesarEntradaLista(texto){
   const statusEl = document.getElementById('lista-mic-status');
-  if(statusEl) statusEl.textContent = '✨ Procesando...';
+  if(statusEl) statusEl.textContent = '⏳ Procesando...';
 
-  // Verificar si es cierre
+  // ── Cierre local — inmediato sin Gemini ──
   const tNorm = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  if(CERRAR_KWS.some(k=>tNorm.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')))){
+  const esCierre = CERRAR_KWS.some(k=>tNorm.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
+  if(esCierre){
     if(statusEl) statusEl.textContent = '✓ Lista guardada';
     guardarListaFinal();
     return;
   }
 
-  // Usar Gemini si está disponible
+  // ── Operaciones locales simples — sin Gemini ──
+  const esSuma = /\b(suma|sumar|total|cuanto va|cuánto va|cuanto es|cuánto es|suma eso|hace cuanto)\b/.test(tNorm);
+  const esBorra = /\b(borra|borrar|elimina|eliminar|quita|quitar|borra el ultimo|borra lo ultimo|borra eso)\b/.test(tNorm);
+  const esResta = /\b(resta|restar|resta le|réstale|descuento|menos)\b/.test(tNorm);
+
+  if(esSuma && !localStorage.getItem('fnz_gemini_key')){
+    const total = listaItems.filter(i=>i.tipo==='item'&&i.precio).reduce((s,i)=>s+i.precio,0);
+    listaItems.push({tipo:'subtotal', texto:'Total', valor:total});
+    listaTotal = total;
+    renderListaItems();
+    if(statusEl) statusEl.textContent = `✓ Total: S/ ${total.toFixed(2)}`;
+    setTimeout(()=>{ if(listaMicActivo) iniciarListaMic(); }, 800);
+    return;
+  }
+
+  if(esBorra && !localStorage.getItem('fnz_gemini_key')){
+    // Borrar último ítem real (no subtotal)
+    for(let i=listaItems.length-1;i>=0;i--){
+      if(listaItems[i].tipo==='item'){ listaItems.splice(i,1); break; }
+    }
+    renderListaItems();
+    if(statusEl) statusEl.textContent = '✓ Último ítem borrado';
+    setTimeout(()=>{ if(listaMicActivo) iniciarListaMic(); }, 600);
+    return;
+  }
+
+  // ── Gemini procesa ítems, operaciones y correcciones ──
   const geminiKey = localStorage.getItem('fnz_gemini_key');
   if(geminiKey){
     await procesarEntradaListaGemini(texto, geminiKey);
   } else {
     procesarEntradaListaLocal(texto);
   }
+
   renderListaItems();
-  if(statusEl) statusEl.textContent = '✓ Listo — toca el micrófono para seguir';
+
+  // ── Auto-reiniciar mic después de procesar ──
+  if(listaMicActivo){
+    if(statusEl) statusEl.textContent = '🎙 Escuchando...';
+    setTimeout(()=>{ if(listaMicActivo) iniciarListaMic(); }, 600);
+  }
 }
 
 async function procesarEntradaListaGemini(texto, key){
@@ -7162,7 +7233,8 @@ Si es un ítem nuevo (con o sin precio):
 Si es una operación (suma, resta, total, cuánto va):
 {"accion":"operar","operacion":"suma|resta|total|porcentaje","valor":numero_o_null,"descripcion":"texto descriptivo del resultado","resultado":numero_calculado}
 
-Si es corrección (borra X, cambia X a Y):
+Si es corrección (borra X, cambia X a Y, borra el último, borra eso):
+{"accion":"borrar","indice":numero_0_basado_o_null_para_ultimo} o
 {"accion":"corregir","indice":numero_0_basado,"campo":"texto|precio","nuevoValor":"valor"}
 
 Si es cierre (listo, ya, guarda, fin):
@@ -7182,7 +7254,7 @@ Si menciona porcentaje como "descuento de 10%" calcula el monto y réstalo.`;
       listaItems.push({tipo:'item', texto:parsed.texto, precio:parsed.precio||null});
       if(parsed.precio) listaTotal += parsed.precio;
     } else if(parsed.accion === 'operar'){
-      listaItems.push({tipo:'subtotal', texto:parsed.descripcion||'Subtotal', valor:parsed.resultado||0});
+      listaItems.push({tipo:'subtotal', texto:parsed.descripcion||'Total', valor:parsed.resultado||0});
       listaTotal = parsed.resultado || listaTotal;
     } else if(parsed.accion === 'corregir'){
       const idx = parsed.indice;
@@ -7190,8 +7262,13 @@ Si menciona porcentaje como "descuento de 10%" calcula el monto y réstalo.`;
         if(parsed.campo==='precio') listaItems[idx].precio = parseFloat(parsed.nuevoValor)||null;
         else listaItems[idx].texto = parsed.nuevoValor;
       }
+    } else if(parsed.accion === 'borrar'){
+      // Borrar último o por índice
+      const idx = parsed.indice !== undefined ? parsed.indice : listaItems.length-1;
+      if(idx>=0 && idx<listaItems.length) listaItems.splice(idx,1);
     } else if(parsed.accion === 'cerrar'){
       guardarListaFinal();
+      return;
     }
   } catch(e){
     console.error('Gemini lista error:', e);
@@ -7213,7 +7290,7 @@ function procesarEntradaListaLocal(texto){
 }
 
 function guardarListaFinal(){
-  detenerListaMic();
+  pararListaMicDefinitivo();
   listaTitulo = document.getElementById('lista-titulo')?.value || listaTitulo;
 
   // Guardar en state.notas
