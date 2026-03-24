@@ -3243,6 +3243,24 @@ function renderNotas(){
     </div>`;
 }
 
+
+// ── Bullet styles ──
+const BULLET_STYLES = {
+  check:   { icon: (done, i) => done ? '✅' : '☐',   label: '☐ Check' },
+  check2:  { icon: (done, i) => done ? '✓' : '○',    label: '○ Círculo' },
+  numeric: { icon: (done, i) => (i+1)+'.',            label: '1. Número' },
+  dot:     { icon: (done, i) => '●',                  label: '● Punto' },
+  arrow:   { icon: (done, i) => '→',                  label: '→ Flecha' },
+  star:    { icon: (done, i) => done ? '★' : '☆',    label: '☆ Estrella' },
+  emoji:   { icon: (done, i) => ['🔧','🛒','📦','💡','🔩','🪛','⚡'][i%7], label: '🔧 Emoji' },
+};
+
+function getBulletIcon(nota, idx, done){
+  const style = nota.bulletStyle || 'check';
+  const bs = BULLET_STYLES[style];
+  return bs ? bs.icon(done, idx) : '☐';
+}
+
 function renderNotaCard(n){
   const ICONOS   = {lista:'📋',texto:'📝',foto:'📷',recordatorio:'⏰'};
   const COLORES  = {lista:'#C9A84C',texto:'#2E86AB',foto:'#4CAF85',recordatorio:'#E05252'};
@@ -3276,20 +3294,27 @@ function renderNotaCard(n){
       const hechos = its.filter(i=>i.done).length;
       const pct = its.length>0?Math.round(hechos/its.length*100):0;
       const progColor = n.tipo==='recordatorio'?'#E05252':'#C9A84C';
-      const itemsHtml = its.map((it,i)=>`
-        <div class="nota-check-item ${it.done?'done':''}" onclick="toggleNotaItem('${n.id}',${i})">
-          <div class="nota-checkbox ${it.done?'checked':''}">${it.done?'✓':''}</div>
-          <span>${it.texto}</span>
-        </div>`).join('');
+      const itemsHtml = its.map((it,i)=>{
+        const bullet = getBulletIcon(n, i, it.done);
+        const style = n.bulletStyle||'check';
+        const isCheck = style==='check'||style==='check2'||style==='star';
+        return `<div class="nota-check-item ${it.done?'done':''}" onclick="${isCheck?`toggleNotaItem('${n.id}',${i})`:''}">
+          <span style="font-size:${style==='numeric'?'13':'16'}px;min-width:22px;text-align:center;opacity:${it.done?.5:1}">${bullet}</span>
+          <span style="text-decoration:${it.done?'line-through':'none'};color:${it.done?'var(--muted)':'var(--text)'}">${it.texto}</span>
+        </div>`;
+      }).join('');
       const progBar = its.length>0?`<div style="height:3px;background:#F1F5F9;border-radius:2px;margin:8px 0 4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${progColor};border-radius:2px;transition:width .4s"></div></div>`:'';
       cuerpo = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
         ${itemsHtml}
         ${n.tipo==='recordatorio'&&n.recordatorio?`<div class="nota-rec-tag">⏰ ${n.recordatorio}</div>`:''}
         ${progBar}
         <div style="display:flex;gap:6px;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--border);align-items:center;flex-wrap:wrap">
-          <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="editNota('${n.id}')">✏️ Editar</button>
+          <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="abrirEditarNota('${n.id}')">✏️ Editar</button>
           <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="openNotaVozAgregar('${n.id}')">🎙 Agregar</button>
           <button style="font-size:11px;color:#25D366;background:none;border:none;cursor:pointer;font-weight:600" onclick="compartirNotaWhatsApp('${n.id}')">📱 WhatsApp</button>
+          <select onchange="cambiarBulletStyle('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;background:var(--card);color:var(--text);cursor:pointer">
+            ${Object.entries(BULLET_STYLES).map(([k,v])=>`<option value="${k}" ${(n.bulletStyle||'check')===k?'selected':''}>${v.label}</option>`).join('')}
+          </select>
           <span style="margin-left:auto;font-size:11px;color:var(--muted)">${hechos}/${its.length}</span>
           ${delBtn}
         </div>
@@ -3373,6 +3398,98 @@ function compartirNotaWhatsApp(notaId){
     URL.revokeObjectURL(url);
     toast('Imagen descargada — compartila por WhatsApp 📱');
   },'image/jpeg',0.93);
+}
+
+
+function cambiarBulletStyle(id, style){
+  const n = (state.notas||[]).find(x=>x.id===id);
+  if(!n) return;
+  n.bulletStyle = style;
+  save('fnz_notas', state.notas);
+  render();
+}
+
+function abrirEditarNota(id){
+  const n = (state.notas||[]).find(x=>x.id===id);
+  if(!n) return;
+  const items = (n.items||[]).map((it,i)=>
+    `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <input type="text" value="${it.texto.replace(/"/g,'&quot;')}" 
+        onchange="editNotaItem('${id}',${i},this.value)"
+        style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text)">
+      <button onclick="deleteNotaItem('${id}',${i})" style="background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px">✕</button>
+    </div>`
+  ).join('');
+
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title" style="color:var(--gold)">✏️ Editar nota</div>
+    <div class="field">
+      <label class="field-label">Título</label>
+      <input id="edit-nota-titulo" type="text" value="${(n.titulo||'').replace(/"/g,'&quot;')}" placeholder="Título de la nota">
+    </div>
+    <div class="field">
+      <label class="field-label">Estilo de viñetas</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+        ${Object.entries(BULLET_STYLES).map(([k,v])=>`
+          <button onclick="cambiarBulletStyle('${id}','${k}');document.querySelectorAll('.bullet-opt').forEach(b=>b.style.background='var(--card)');this.style.background='var(--border)'" 
+            class="bullet-opt"
+            style="background:${(n.bulletStyle||'check')===k?'var(--border)':'var(--card)'};border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text)">
+            ${v.label}
+          </button>`).join('')}
+      </div>
+    </div>
+    ${n.items&&n.items.length>0?`
+    <div class="field">
+      <label class="field-label">Ítems</label>
+      ${items}
+      <button onclick="agregarItemEditNota('${id}')" style="width:100%;background:var(--card);border:1px dashed var(--border);border-radius:8px;padding:8px;font-size:13px;color:var(--muted);cursor:pointer;margin-top:4px">+ Agregar ítem</button>
+    </div>`:''}
+    <div class="field">
+      <label class="field-label">Texto / Notas</label>
+      <textarea id="edit-nota-texto" rows="3" placeholder="Texto libre..." style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);resize:vertical">${n.texto||''}</textarea>
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn-gold" onclick="guardarEditNota('${id}')">Guardar cambios</button>
+    </div>`;
+  showModal();
+}
+
+function editNotaItem(notaId, idx, valor){
+  const n = (state.notas||[]).find(x=>x.id===notaId);
+  if(!n||!n.items) return;
+  n.items[idx].texto = valor;
+  save('fnz_notas', state.notas);
+}
+
+function deleteNotaItem(notaId, idx){
+  const n = (state.notas||[]).find(x=>x.id===notaId);
+  if(!n||!n.items) return;
+  n.items.splice(idx,1);
+  save('fnz_notas', state.notas);
+  abrirEditarNota(notaId);
+}
+
+function agregarItemEditNota(notaId){
+  const n = (state.notas||[]).find(x=>x.id===notaId);
+  if(!n) return;
+  if(!n.items) n.items=[];
+  n.items.push({texto:'Nuevo ítem', done:false});
+  save('fnz_notas', state.notas);
+  abrirEditarNota(notaId);
+}
+
+function guardarEditNota(id){
+  const n = (state.notas||[]).find(x=>x.id===id);
+  if(!n) return;
+  const titulo = document.getElementById('edit-nota-titulo')?.value.trim();
+  const texto  = document.getElementById('edit-nota-texto')?.value.trim();
+  if(titulo) n.titulo = titulo;
+  if(texto !== undefined) n.texto = texto;
+  save('fnz_notas', state.notas);
+  closeModal();
+  render();
+  toast('Nota actualizada ✓');
 }
 
 function setNotaFilter(f){ _notaFilter=f; render(); }
@@ -7641,7 +7758,12 @@ async function processVoiceWithGemini(text){
     document.getElementById('micModal').style.display='none';
     try{ parseAgendaVoz(text); }catch(e){}
     const p = window._avParsed;
-    openAddAgenda(p ? p.tipo : 'trabajo', null, p || {});
+    // Detectar visita desde el texto si el parser no lo hizo
+    const tLow2 = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const esVisitaExplicita = /\b(visita|vista|crea una visita|crear una visita|nueva visita|agendar visita|agenda visita|cotizar|cotizacion|presupuesto|pasar a ver|ir a ver|ir a revisar|revisar|chequear)\b/.test(tLow2);
+    const tipoFinal = p ? p.tipo : (esVisitaExplicita ? 'visita' : 'trabajo');
+    if(p) p.tipo = tipoFinal;
+    openAddAgenda(tipoFinal, null, p || {tipo: tipoFinal});
     return;
   }
 
@@ -7737,7 +7859,11 @@ function processVoiceResultManual(text) {
     document.getElementById('micModal').style.display='none';
     try { parseAgendaVoz(text); } catch(e) {}
     const p = window._avParsed;
-    openAddAgenda(p ? p.tipo : 'trabajo', null, p || {});
+    const tLow3 = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const esVis = /\b(visita|vista|crea una visita|cotizar|cotizacion|presupuesto|pasar a ver|ir a ver|revisar|chequear)\b/.test(tLow3);
+    const tipoF = p ? p.tipo : (esVis ? 'visita' : 'trabajo');
+    if(p) p.tipo = tipoF;
+    openAddAgenda(tipoF, null, p || {tipo: tipoF});
     return;
   }
   const parsed = parseVoiceCommand(text);
