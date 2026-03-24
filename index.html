@@ -3718,6 +3718,36 @@ function renderAjustes(){
         5. Tipo: <strong>Aplicación web</strong> · Acceso: <strong>Cualquier persona</strong><br>
         6. Copia la URL y pégala arriba
       </div>
+    </div>
+
+    <!-- GEMINI AI CARD -->
+    <div class="card" style="margin-bottom:12px;border-color:#8B5CF644;background:linear-gradient(135deg,#F5F3FF,#FFFFFF)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#8B5CF6,#6366F1);display:flex;align-items:center;justify-content:center;font-size:22px">✨</div>
+        <div>
+          <div style="font-family:'Playfair Display',serif;font-size:15px;color:#7C3AED">Asistente de Voz con IA</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${localStorage.getItem('fnz_gemini_key')?'✓ Gemini activo — el micrófono usa IA':'Sin configurar — usando reconocimiento básico'}</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+        Con Gemini AI el micrófono entiende cualquier forma en que hables — fechas, servicios, ubicaciones y montos sin importar el orden o cómo lo digas.
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input id="gemini-key-input" type="password" placeholder="AIza... (pega tu API key de Gemini)" 
+          value="${localStorage.getItem('fnz_gemini_key')||''}"
+          style="flex:1;background:#F8FAFC;border:1px solid #8B5CF644;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px">
+      </div>
+      <div class="btn-row">
+        <button onclick="saveGeminiKey()" style="flex:2;background:linear-gradient(135deg,#7C3AED,#8B5CF6);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">💾 Activar Gemini</button>
+        <button onclick="testGeminiKey()" style="flex:1;background:transparent;border:1px solid #8B5CF644;color:#7C3AED;border-radius:10px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Probar</button>
+      </div>
+      <div style="margin-top:10px;background:#F5F3FF;border:1px solid #8B5CF633;border-radius:8px;padding:10px;font-size:11px;color:var(--muted);line-height:1.7">
+        <strong style="color:#7C3AED">Cómo obtener tu API key gratis:</strong><br>
+        1. Abre <strong>aistudio.google.com/apikey</strong><br>
+        2. Click en <strong>"Crear clave de API"</strong><br>
+        3. Copia la clave (empieza con AIza...)<br>
+        4. Pégala arriba y toca Activar
+      </div>
       <button onclick="descargarAppsScript()" style="width:100%;margin-top:10px;background:#F0FDF4;border:1px solid #4CAF8544;color:var(--green);border-radius:10px;padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">⬇ Descargar código Apps Script</button>
     </div>
 
@@ -6811,12 +6841,162 @@ function stopListening() {
   document.getElementById('micHint').innerHTML='Di algo como: <em>"Gasté 50 soles en comida"</em>';
 }
 
+
+// ══════════════════════════════════════════════════════════════
+// GEMINI AI — Asistente de Voz Inteligente
+// ══════════════════════════════════════════════════════════════
+
+function saveGeminiKey(){
+  const key = document.getElementById('gemini-key-input')?.value.trim();
+  if(!key){ toast('Pega tu API key de Gemini','error'); return; }
+  if(!key.startsWith('AIza')){ toast('La key debe empezar con AIza...','error'); return; }
+  localStorage.setItem('fnz_gemini_key', key);
+  toast('✨ Gemini activado — el micrófono ahora usa IA');
+  render();
+}
+
+function testGeminiKey(){
+  const key = document.getElementById('gemini-key-input')?.value.trim() || localStorage.getItem('fnz_gemini_key')||'';
+  if(!key){ toast('Primero pega tu API key','error'); return; }
+  toast('Probando conexión con Gemini...');
+  callGemini('Hola, responde solo "OK"', key).then(r=>{
+    if(r) toast('✓ Gemini conectado correctamente');
+    else toast('Error al conectar — verifica tu key','error');
+  });
+}
+
+async function callGemini(prompt, keyOverride){
+  const key = keyOverride || localStorage.getItem('fnz_gemini_key');
+  if(!key) return null;
+  try{
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          contents:[{parts:[{text: prompt}]}],
+          generationConfig:{temperature:0.1, maxOutputTokens:500}
+        })
+      }
+    );
+    if(!res.ok){ console.error('Gemini error:', res.status); return null; }
+    const data = await res.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  } catch(e){
+    console.error('Gemini fetch error:', e);
+    return null;
+  }
+}
+
+async function processWithGemini(text){
+  const isNeg = state.modo === 'negocio';
+  const hoy = new Date().toISOString().split('T')[0];
+  
+  const prompt = `Eres un asistente de finanzas personales para un gasfitero en Lima, Perú.
+Hoy es ${hoy} (${['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][new Date().getDay()]}).
+
+El usuario dijo: "${text}"
+
+Analiza si es:
+A) Un MOVIMIENTO FINANCIERO (gasto, ingreso, pago)
+B) Una AGENDA (visita o trabajo programado para el futuro)
+
+Responde SOLO con JSON válido, sin explicaciones, sin markdown:
+
+Para MOVIMIENTO:
+{"tipo":"movimiento","type":"ingreso|egreso","amount":numero_o_null,"category":"nombre categoria","description":"descripcion breve","date":"YYYY-MM-DD","cliente":"nombre o null","ubicacion":"distrito Lima o null","negocio":true_si_es_del_negocio}
+
+Para AGENDA:
+{"tipo":"agenda","subtipo":"visita|trabajo","fecha":"YYYY-MM-DD","hora":"HH:MM o null","cliente":"nombre o null","servicio":"${isNeg?'Punto Adicional|Modificación Red|Instalación Nueva|Conversión Artefacto|Conexión Artefacto|Reparación Tubería|Gasfitería|Documentación|Cocina / Cocinilla|Horno a Gas|Terma|Secadora a Gas|Calefón|Parrilla a Gas|Otro Servicio':'null'}","precio":numero_o_null,"ubicacion":"distrito Lima o null","notas":"notas o null"}
+
+Categorías para ${isNeg?'NEGOCIO':'PERSONAL'}:
+${isNeg?
+'Ingresos: Punto Adicional, Modificacion Red, Instalacion Nueva, Conversion Artefacto, Conexion Artefacto, Reparacion Tuberia, Gasfiteria, Documentacion, Cocina, Horno, Terma, Secadora, Calefon, Parrilla. Egresos: GNV, Materiales, Herramientas, Gasolina, Viaticos, Mantenimiento':
+'Ingresos: Sueldo, Freelance, Bono, Venta, Otro ingreso. Egresos: Alimentacion, Transporte, Servicios, Salud, Educacion, Ocio, Ropa, Deuda, Otro gasto'}
+
+Para fechas relativas usa hoy (${hoy}) como referencia. "este sábado" = próximo sábado.`;
+
+  const response = await callGemini(prompt);
+  if(!response) return null;
+  
+  try{
+    const clean = response.replace(/```json|```/g,'').trim();
+    return JSON.parse(clean);
+  } catch(e){
+    console.error('Gemini parse error:', e, response);
+    return null;
+  }
+}
+
+async function processVoiceWithGemini(text){
+  // Mostrar spinner
+  const micText = document.getElementById('micText');
+  if(micText) micText.textContent = '✨ Gemini procesando...';
+  
+  const result = await processWithGemini(text);
+  
+  if(!result){
+    // Fallback al parser manual
+    processVoiceResult._busy = false;
+    processVoiceResultManual(text);
+    return;
+  }
+  
+  if(result.tipo === 'agenda'){
+    // Agenda via Gemini
+    document.getElementById('micModal').style.display='none';
+    processVoiceResult._busy = false;
+    const pre = {
+      tipo:      result.subtipo || 'trabajo',
+      fecha:     result.fecha,
+      hora:      result.hora,
+      cliente:   result.cliente,
+      servicio:  result.servicio,
+      precio:    result.precio,
+      ubicacion: result.ubicacion,
+      notas:     result.notas,
+    };
+    window._avParsed = pre;
+    openAddAgenda(pre.tipo, null, pre);
+    
+  } else if(result.tipo === 'movimiento'){
+    // Movimiento via Gemini — abrir formulario prellenado
+    document.getElementById('micModal').style.display='none';
+    processVoiceResult._busy = false;
+    openTxModal(null, {
+      type:        result.type || 'egreso',
+      amount:      result.amount,
+      category:    result.category,
+      date:        result.date,
+      description: result.description,
+      cliente:     result.cliente,
+      ubicacion:   result.ubicacion,
+    });
+  } else {
+    processVoiceResult._busy = false;
+    processVoiceResultManual(text);
+  }
+}
+
 function processVoiceResult(text) {
   if (processVoiceResult._busy) return;
   processVoiceResult._busy = true;
   stopListening();
-  try {
 
+  // ── Si Gemini está configurado, usar IA ──
+  const geminiKey = localStorage.getItem('fnz_gemini_key');
+  if(geminiKey){
+    processVoiceWithGemini(text);
+    return;
+  }
+
+  // Fallback: parser manual
+  processVoiceResultManual(text);
+}
+
+function processVoiceResultManual(text) {
+  try {
   // Limpiar palabras de activación antes de evaluar
   const cleanText = text.replace(/^(oye|hey|ok|escucha|mira)\b/gi,'').trim();
   if(cleanText) text = cleanText;
