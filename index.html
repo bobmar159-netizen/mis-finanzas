@@ -229,6 +229,9 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .modo-btn.active-negocio  { background:var(--gold); color:#fff; box-shadow:0 2px 8px var(--gold)44; }
 
 /* ── MIC FAB ── */
+.mic-chip{background:#F1F5F9;border:1px solid #E2E8F0;border-radius:20px;padding:5px 10px;font-size:11px;font-weight:500;color:#475569;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s}
+.mic-chip:hover{background:#E2E8F0;color:#1E293B}
+.mic-chip:active{background:#CBD5E1}
 #micFab {
   position: fixed;
   bottom: 24px;
@@ -6708,6 +6711,7 @@ function openMicModal() {
     '"Tengo un trabajo de terma el martes a las 2 en San Borja, 320 soles"',
   ];
   const perHints = [
+    '"Crea una lista de compras"',
     '"Gasté 50 soles en comida"',
     '"Pagué 120 soles de luz"',
     '"Me depositaron mi sueldo de 2000 soles"',
@@ -6845,6 +6849,419 @@ function stopListening() {
 // ══════════════════════════════════════════════════════════════
 // GEMINI AI — Asistente de Voz Inteligente
 // ══════════════════════════════════════════════════════════════
+
+
+// ── Comandos rápidos (chips) ──
+function usarChip(btn){
+  const txt = btn.textContent.trim();
+  // Chips de lista/nota abren directamente el modo lista
+  if(txt.includes('lista') || txt.includes('nota')){
+    closeMicModal();
+    abrirModoLista(txt.includes('lista') ? 'lista' : 'nota');
+    return;
+  }
+  // Chips de agenda
+  if(txt.includes('Agenda') || txt.includes('Visita')){
+    const tipo = txt.includes('Visita') ? 'visita' : 'trabajo';
+    closeMicModal();
+    openAddAgenda(tipo, null, {});
+    return;
+  }
+  // Chips de movimiento — mostrar hint y activar mic
+  const hints = {
+    'Gasté': '"Gasté 80 soles en materiales"',
+    'Cobré': '"Cobré 400 soles por punto adicional al señor Juan"',
+    'trabajo': '"Instalé terma al señor Carlos en Miraflores, 320 soles"',
+  };
+  const micHintEl = document.getElementById('micHintText');
+  if(micHintEl){
+    for(const [k,v] of Object.entries(hints)){
+      if(txt.includes(k)){ micHintEl.textContent = v; break; }
+    }
+  }
+  document.getElementById('micHint').style.display='block';
+  if(!micListening) setTimeout(()=>startListening(), 200);
+}
+
+// ── Detectar si es comando de nota/lista ──
+function isNotaCommand(text){
+  const t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const notaKws = [
+    'crea una nota','crear una nota','nueva nota','haz una nota','hacer una nota',
+    'crea nota','crear nota','anota esto','toma nota','escribe esto',
+    'crea una lista','crear una lista','nueva lista','haz una lista','hacer una lista',
+    'crea lista','crear lista','crea la lista','hagame una lista','hazme una lista',
+    'creame una lista','crea me una lista','lista de compras','lista de materiales',
+    'lista de gastos','lista de tareas','crea una lista de','hacer una lista de',
+    'nueva lista de','abrir lista','iniciar lista','empezar lista',
+    'crea un recordatorio','nuevo recordatorio','crea recordatorio',
+  ];
+  return notaKws.some(k => t.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
+}
+
+// ══════════════════════════════════════════════════════════════
+// MODO LISTA — Micrófono encadenado con IA
+// ══════════════════════════════════════════════════════════════
+let listaItems = [];         // {texto, precio, tipo:'item'|'op'|'subtotal'}
+let listaTotal = 0;
+let listaSubtotales = [];    // historial de operaciones
+let listaTitulo = '';
+let listaTipo = 'lista';     // 'lista' o 'nota'
+let listaMicActivo = false;
+let listaRec = null;
+
+const CERRAR_KWS = [
+  'listo','eso es todo','finaliza','fin','termina','guarda','ok guarda',
+  'graba eso','ya','cierra','cerrar','guardar','ya terminé','termine'
+];
+
+function abrirModoLista(tipo, tituloInicial){
+  listaTipo = tipo || 'lista';
+  listaItems = [];
+  listaTotal = 0;
+  listaSubtotales = [];
+  listaTitulo = tituloInicial || (tipo==='lista' ? 'Lista de compras' : 'Nota');
+
+  // Crear modal de lista
+  const overlay = document.createElement('div');
+  overlay.id = 'listaModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;display:flex;align-items:flex-end;justify-content:center';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:430px;padding:20px 18px 30px;max-height:85vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div style="width:36px;height:36px;background:#FFF9C4;border:1px solid #F9A825;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">📋</div>
+        <div style="flex:1">
+          <input id="lista-titulo" value="${listaTitulo}" style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:#5D4037;border:none;background:transparent;width:100%;outline:none">
+          <div style="font-size:11px;color:#8D6E63">Dictando en modo lista</div>
+        </div>
+        <button onclick="cerrarListaModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+      </div>
+
+      <!-- Items de la lista -->
+      <div id="lista-items" style="min-height:60px;margin-bottom:12px;background:#FFFDE7;border:1px solid #F9A82533;border-radius:10px;padding:10px"></div>
+
+      <!-- Mic status -->
+      <div id="lista-mic-status" style="text-align:center;padding:10px;background:#F8FAFC;border-radius:10px;margin-bottom:10px;font-size:13px;color:#94A3B8">
+        Toca el micrófono para empezar a dictar
+      </div>
+
+      <!-- Botones -->
+      <div style="display:flex;gap:8px">
+        <button onclick="toggleListaMic()" id="lista-mic-btn" style="flex:1;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
+          🎙 Dictar
+        </button>
+        <button onclick="guardarListaFinal()" style="flex:1;background:#3A7D44;color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
+          ✓ Guardar
+        </button>
+      </div>
+      <div id="lista-share-row" style="display:none;margin-top:8px">
+        <button onclick="compartirListaWhatsApp()" style="width:100%;background:#25D366;color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
+          📱 Compartir por WhatsApp
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  renderListaItems();
+  setTimeout(()=>toggleListaMic(), 400);
+}
+
+function cerrarListaModal(){
+  listaMicActivo = false;
+  if(listaRec){ try{listaRec.stop();}catch(e){} }
+  const m = document.getElementById('listaModal');
+  if(m) m.remove();
+}
+
+function renderListaItems(){
+  const el = document.getElementById('lista-items');
+  if(!el) return;
+  if(!listaItems.length){
+    el.innerHTML = '<div style="color:#9CA3AF;font-size:12px;text-align:center;padding:8px">Aún no hay ítems. Empieza a dictar...</div>';
+    return;
+  }
+  el.innerHTML = listaItems.map((item,i) => {
+    if(item.tipo === 'subtotal'){
+      return `<div style="border-top:1px dashed #F9A825;margin:6px 0;padding:6px 0;display:flex;justify-content:space-between;font-weight:700;color:#5D4037;font-size:13px">
+        <span>${item.texto}</span><span style="color:#3A7D44">S/ ${item.valor.toFixed(2)}</span>
+      </div>`;
+    }
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #FFF9C4;font-size:13px;color:#4E342E">
+      <span style="flex:1">${item.texto}</span>
+      <span style="color:#5D4037;font-weight:600;margin-left:8px">${item.precio?'S/ '+item.precio.toFixed(2):''}</span>
+      <button onclick="borrarItemLista(${i})" style="background:none;border:none;color:#D4949488;font-size:12px;cursor:pointer;margin-left:6px">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function borrarItemLista(idx){
+  listaItems.splice(idx,1);
+  renderListaItems();
+}
+
+function toggleListaMic(){
+  if(listaMicActivo){ detenerListaMic(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ alert('Necesitás Chrome'); return; }
+  listaMicActivo = true;
+  const btn = document.getElementById('lista-mic-btn');
+  if(btn){ btn.style.background='linear-gradient(135deg,#E05252,#f87171)'; btn.textContent='⏹ Detener'; }
+
+  listaRec = new SR();
+  listaRec.lang = 'es-PE';
+  listaRec.interimResults = true;
+  listaRec.continuous = false;
+
+  listaRec.onresult = (e) => {
+    let txt = '';
+    for(let i=0;i<e.results.length;i++) txt += e.results[i][0].transcript;
+    const statusEl = document.getElementById('lista-mic-status');
+    if(statusEl) statusEl.textContent = '🎙 ' + txt;
+    if(e.results[e.results.length-1].isFinal){
+      detenerListaMic();
+      procesarEntradaLista(txt.trim());
+    }
+  };
+  listaRec.onerror = ()=> detenerListaMic();
+  listaRec.onend = ()=>{ if(listaMicActivo) detenerListaMic(); };
+  listaRec.start();
+}
+
+function detenerListaMic(){
+  listaMicActivo = false;
+  const btn = document.getElementById('lista-mic-btn');
+  if(btn){ btn.style.background='linear-gradient(135deg,#C9A84C,#E8C96A)'; btn.textContent='🎙 Dictar'; }
+  if(listaRec){ try{listaRec.stop();}catch(e){} }
+}
+
+async function procesarEntradaLista(texto){
+  const statusEl = document.getElementById('lista-mic-status');
+  if(statusEl) statusEl.textContent = '✨ Procesando...';
+
+  // Verificar si es cierre
+  const tNorm = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(CERRAR_KWS.some(k=>tNorm.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')))){
+    if(statusEl) statusEl.textContent = '✓ Lista guardada';
+    guardarListaFinal();
+    return;
+  }
+
+  // Usar Gemini si está disponible
+  const geminiKey = localStorage.getItem('fnz_gemini_key');
+  if(geminiKey){
+    await procesarEntradaListaGemini(texto, geminiKey);
+  } else {
+    procesarEntradaListaLocal(texto);
+  }
+  renderListaItems();
+  if(statusEl) statusEl.textContent = '✓ Listo — toca el micrófono para seguir';
+}
+
+async function procesarEntradaListaGemini(texto, key){
+  const listaActual = listaItems.map((it,i)=>
+    `${i+1}. ${it.texto}${it.precio?' - S/'+it.precio.toFixed(2):''}${it.tipo==='subtotal'?' [SUBTOTAL S/'+it.valor.toFixed(2)+']':''}`
+  ).join('\n');
+
+  const prompt = `Eres el asistente de lista de una app de finanzas. El usuario está dictando ítems para una lista.
+
+Lista actual:
+${listaActual || '(vacía)'}
+
+El usuario dijo: "${texto}"
+
+Determina qué hacer y responde SOLO con JSON válido:
+
+Si es un ítem nuevo (con o sin precio):
+{"accion":"agregar","texto":"nombre del ítem","precio":numero_o_null}
+
+Si es una operación (suma, resta, total, cuánto va):
+{"accion":"operar","operacion":"suma|resta|total|porcentaje","valor":numero_o_null,"descripcion":"texto descriptivo del resultado","resultado":numero_calculado}
+
+Si es corrección (borra X, cambia X a Y):
+{"accion":"corregir","indice":numero_0_basado,"campo":"texto|precio","nuevoValor":"valor"}
+
+Si es cierre (listo, ya, guarda, fin):
+{"accion":"cerrar"}
+
+Para operaciones calcula sobre los precios de la lista actual. Si dice "suma eso" suma todos los precios. Si dice "réstale 10" resta 10 al total actual.
+Si menciona porcentaje como "descuento de 10%" calcula el monto y réstalo.`;
+
+  try{
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+key;
+    const res = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:0.1,maxOutputTokens:200}})});
+    const data = await res.json();
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+
+    if(parsed.accion === 'agregar'){
+      listaItems.push({tipo:'item', texto:parsed.texto, precio:parsed.precio||null});
+      if(parsed.precio) listaTotal += parsed.precio;
+    } else if(parsed.accion === 'operar'){
+      listaItems.push({tipo:'subtotal', texto:parsed.descripcion||'Subtotal', valor:parsed.resultado||0});
+      listaTotal = parsed.resultado || listaTotal;
+    } else if(parsed.accion === 'corregir'){
+      const idx = parsed.indice;
+      if(idx>=0 && idx<listaItems.length){
+        if(parsed.campo==='precio') listaItems[idx].precio = parseFloat(parsed.nuevoValor)||null;
+        else listaItems[idx].texto = parsed.nuevoValor;
+      }
+    } else if(parsed.accion === 'cerrar'){
+      guardarListaFinal();
+    }
+  } catch(e){
+    console.error('Gemini lista error:', e);
+    procesarEntradaListaLocal(texto);
+  }
+}
+
+function procesarEntradaListaLocal(texto){
+  // Parser simple sin IA
+  const t = texto.toLowerCase();
+  // Detectar precio
+  const precioMatch = texto.match(/(\d+(?:[.,]\d+)?)\s*(?:soles?|sol)?\s*$/i) ||
+                      texto.match(/s\/\.?\s*(\d+(?:[.,]\d+)?)/i);
+  const precio = precioMatch ? parseFloat(precioMatch[1].replace(',','.')) : null;
+  const textoLimpio = texto.replace(/\d+(?:[.,]\d+)?\s*(?:soles?|sol)?\s*$/i,'').replace(/s\/\.?\s*\d+/i,'').trim();
+
+  listaItems.push({tipo:'item', texto:textoLimpio||texto, precio});
+  if(precio) listaTotal += precio;
+}
+
+function guardarListaFinal(){
+  detenerListaMic();
+  listaTitulo = document.getElementById('lista-titulo')?.value || listaTitulo;
+
+  // Guardar en state.notas
+  if(!state.notas) state.notas = [];
+  const items = listaItems.map(it=>({
+    texto: it.tipo==='subtotal' ? (it.texto+': S/'+it.valor.toFixed(2)) : (it.texto+(it.precio?' - S/'+it.precio.toFixed(2):'')),
+    done: false
+  }));
+  const nota = {
+    id:Date.now()+'',
+    tipo: listaTipo==='nota' ? 'texto' : 'lista',
+    titulo: listaTitulo,
+    items,
+    texto: items.map(i=>i.texto).join('\n'),
+    creado: new Date().toISOString()
+  };
+  state.notas.unshift(nota);
+  save('fnz_notas', state.notas);
+
+  // Mostrar botón de compartir y generar preview
+  const shareRow = document.getElementById('lista-share-row');
+  if(shareRow) shareRow.style.display='block';
+  const statusEl = document.getElementById('lista-mic-status');
+  if(statusEl) statusEl.innerHTML = '✓ Lista guardada · <strong>'+listaItems.length+' ítems</strong>';
+
+  // Generar canvas JPG
+  generarNotaJPG(nota);
+  toast('Lista guardada ✓', 'success');
+  setTimeout(()=>render(), 100);
+}
+
+// ── Generar nota estilo A (papel amarillo) como imagen ──
+function generarNotaJPG(nota){
+  const canvas = document.createElement('canvas');
+  const W = 600, padding = 40;
+  const lineH = 32, titleH = 60, footerH = 40;
+  const items = nota.items || [];
+  const H = titleH + (items.length * lineH) + footerH + padding*2;
+  canvas.width = W;
+  canvas.height = Math.max(H, 300);
+  const ctx = canvas.getContext('2d');
+
+  // Fondo amarillo
+  ctx.fillStyle = '#FFF9C4';
+  ctx.fillRect(0,0,W,canvas.height);
+
+  // Borde
+  ctx.strokeStyle = '#F9A825';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(1.5, 1.5, W-3, canvas.height-3);
+
+  // Franja superior
+  ctx.fillStyle = '#F9A825';
+  ctx.fillRect(0, 0, W, 6);
+
+  // Título
+  ctx.fillStyle = '#5D4037';
+  ctx.font = 'bold 22px Georgia, serif';
+  ctx.fillText(nota.titulo || 'Lista', padding, padding + 32);
+
+  // Línea bajo título
+  ctx.strokeStyle = '#F9A82566';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padding, titleH);
+  ctx.lineTo(W-padding, titleH);
+  ctx.stroke();
+
+  // Ítems
+  ctx.font = '16px Georgia, serif';
+  items.forEach((item, i) => {
+    const y = titleH + padding/2 + (i * lineH) + 22;
+    const isSub = item.texto.includes(':') && item.texto.includes('S/');
+
+    if(isSub){
+      ctx.strokeStyle = '#F9A82588';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      ctx.moveTo(padding, y-10);
+      ctx.lineTo(W-padding, y-10);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#3A7D44';
+      ctx.font = 'bold 16px Georgia, serif';
+    } else {
+      // Checkbox
+      ctx.strokeStyle = '#8D6E63';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(padding, y-12, 12, 12);
+      ctx.fillStyle = '#4E342E';
+      ctx.font = '16px Georgia, serif';
+    }
+
+    // Texto del ítem
+    const parts = item.texto.split(' - S/');
+    ctx.fillText((isSub?'':'    ') + parts[0], isSub?padding:padding+20, y);
+
+    // Precio alineado a la derecha
+    if(parts[1]){
+      const priceText = 'S/ '+parts[1];
+      ctx.textAlign = 'right';
+      ctx.fillStyle = isSub ? '#3A7D44' : '#5D4037';
+      ctx.font = isSub ? 'bold 16px Georgia, serif' : '16px Georgia, serif';
+      ctx.fillText(priceText, W-padding, y);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#4E342E';
+    }
+  });
+
+  // Footer — solo fecha
+  const fechaStr = new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  ctx.fillStyle = '#8D6E63';
+  ctx.font = '13px Georgia, serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(fechaStr, W-padding, canvas.height - 16);
+  ctx.textAlign = 'left';
+
+  window._listaCanvas = canvas;
+}
+
+function compartirListaWhatsApp(){
+  const canvas = window._listaCanvas;
+  if(!canvas){ toast('Generando imagen...'); return; }
+  canvas.toBlob(blob=>{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (listaTitulo||'lista').replace(/\s+/g,'_')+'.jpg';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Imagen descargada — compartí por WhatsApp 📱');
+  }, 'image/jpeg', 0.92);
+}
 
 function saveGeminiKey(){
   const key = document.getElementById('gemini-key-input')?.value.trim();
@@ -7016,6 +7433,21 @@ function processVoiceResult(text) {
   if (processVoiceResult._busy) return;
   processVoiceResult._busy = true;
   stopListening();
+
+  // ── Nota / Lista antes que Gemini ──
+  if(isNotaCommand(text)){
+    processVoiceResult._busy = false;
+    document.getElementById('micModal').style.display='none';
+    const tLow = text.toLowerCase();
+    const tipo = tLow.includes('nota') && !tLow.includes('lista') ? 'nota' : 'lista';
+    // Extraer título si lo dice: "crea una lista de compras" → "Lista de compras"
+    let titulo = tipo==='lista' ? 'Lista' : 'Nota';
+    const matchTitulo = text.match(/(?:lista|nota)\s+de\s+([\w\s]+?)(?:\s*$|\s+para)/i);
+    if(matchTitulo) titulo = matchTitulo[1].trim().charAt(0).toUpperCase()+matchTitulo[1].trim().slice(1);
+    else if(tipo==='lista') titulo = 'Lista de compras';
+    abrirModoLista(tipo, titulo);
+    return;
+  }
 
   // ── Si Gemini está configurado, usar IA ──
   const geminiKey = localStorage.getItem('fnz_gemini_key');
@@ -7659,6 +8091,18 @@ function closeNegocioModal() {
       <span class="wave-bar" style="--d:.15s"></span>
       <span class="wave-bar" style="--d:.25s"></span>
       <span class="wave-bar" style="--d:.08s"></span>
+    </div>
+
+    <!-- Comandos rápidos -->
+    <div id="micChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94A3B8;width:100%;margin-bottom:2px">Comandos más usados:</div>
+      <button onclick="usarChip(this)" class="mic-chip">💰 Gasté ... soles</button>
+      <button onclick="usarChip(this)" class="mic-chip">📥 Cobré ... soles</button>
+      <button onclick="usarChip(this)" class="mic-chip">🔧 Hice un trabajo</button>
+      <button onclick="usarChip(this)" class="mic-chip">📅 Agenda trabajo</button>
+      <button onclick="usarChip(this)" class="mic-chip">📅 Visita mañana</button>
+      <button onclick="usarChip(this)" class="mic-chip">📋 Crea una lista</button>
+      <button onclick="usarChip(this)" class="mic-chip">📝 Crea una nota</button>
     </div>
 
     <!-- Texto reconocido en tiempo real -->
