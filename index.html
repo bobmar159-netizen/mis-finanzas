@@ -3244,60 +3244,135 @@ function renderNotas(){
 }
 
 function renderNotaCard(n){
+  const ICONOS   = {lista:'📋',texto:'📝',foto:'📷',recordatorio:'⏰'};
   const COLORES  = {lista:'#C9A84C',texto:'#2E86AB',foto:'#4CAF85',recordatorio:'#E05252'};
-  const LABELS   = {lista:'✓ Lista',texto:'📝 Texto',foto:'🖼 Foto',recordatorio:'⏰ Recordatorio'};
+  const LABELS   = {lista:'Lista',texto:'Texto',foto:'Foto',recordatorio:'Recordatorio'};
   const BGBADGE  = {lista:'#FFF8EC',texto:'#EFF6FF',foto:'#F0FDF4',recordatorio:'#FEF2F2'};
-  const TXTBADGE = {lista:'#C9A84C',texto:'#1565C0',foto:'#15803D',recordatorio:'#DC2626'};
+  const TXTBADGE = {lista:'#92700A',texto:'#1565C0',foto:'#15803D',recordatorio:'#DC2626'};
   const color = COLORES[n.tipo]||'#C9A84C';
-  const ts = n.creado ? new Date(n.creado).toLocaleDateString('es-PE',{day:'numeric',month:'short'}) : '';
-  const pinBtn=`<button onclick="pinNota('${n.id}')" title="${n.pinned?'Desanclar':'Anclar'}" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;opacity:${n.pinned?1:.35}">${n.pinned?'📌':'📍'}</button>`;
-  const delBtn=`<button onclick="deleteNota('${n.id}')" style="width:28px;height:28px;background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;flex-shrink:0">✕</button>`;
-  let cuerpo = '';
+  const icono = ICONOS[n.tipo]||'📝';
+  const ts = n.creado ? new Date(n.creado).toLocaleDateString('es-PE',{day:'numeric',month:'short',year:'numeric'}) : '';
+  const expanded = !!n._expanded;
+
+  // Preview colapsado — primera línea o conteo de ítems
+  let preview = '';
   if(n.tipo==='lista'||n.tipo==='recordatorio'){
     const its = n.items||[];
     const hechos = its.filter(i=>i.done).length;
-    const pct = its.length>0 ? Math.round(hechos/its.length*100) : 0;
-    const progColor = n.tipo==='recordatorio'?'#E05252':'#C9A84C';
-    const items = its.map((it,i)=>`
-      <div class="nota-check-item ${it.done?'done':''}" onclick="toggleNotaItem('${n.id}',${i})">
-        <div class="nota-checkbox ${it.done?'checked':''}">${it.done?'✓':''}</div>
-        <span>${it.texto}</span>
-      </div>`).join('');
-    const progBar = its.length>0?`<div style="height:3px;background:#F1F5F9;border-radius:2px;margin:8px 0 4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${progColor};border-radius:2px"></div></div>`:'';
-    cuerpo = `${items}
-      ${n.tipo==='recordatorio'&&n.recordatorio?`<div class="nota-rec-tag">⏰ ${n.recordatorio}</div>`:''}
-      ${progBar}
-      <div style="display:flex;gap:6px;margin-top:6px;padding-top:6px;border-top:0.5px solid var(--border);align-items:center">
-        <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="editNota('${n.id}')">✏️ Editar</button>
-        <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="openNotaVozAgregar('${n.id}')">🎙 Agregar</button>
-        <span style="margin-left:auto;font-size:11px;color:var(--muted)">${hechos}/${its.length} hechos</span>
-        ${delBtn}
-      </div>`;
+    preview = its.length > 0 ? `${hechos}/${its.length} ítems` : 'Sin ítems';
   } else if(n.tipo==='foto'){
-    const thumbs=(n.fotos||[]).map(f=>`<img class="nota-img-thumb" src="${f}" onclick="verFotoNota('${f}')" />`).join('');
-    cuerpo = `${n.texto?`<div style="font-size:13px;color:var(--muted);margin-bottom:8px;line-height:1.5">${n.texto}</div>`:''}
-      <div class="nota-imgs-row">${thumbs}<div class="nota-img-thumb add-btn" onclick="agregarFotoNota('${n.id}')">+</div></div>
-      <div style="display:flex;gap:6px;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--border);align-items:center">
-        <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="editNota('${n.id}')">✏️ Editar</button>
-        <span style="margin-left:auto;font-size:11px;color:var(--muted)">${(n.fotos||[]).length} foto(s)</span>
-        ${delBtn}
-      </div>`;
+    preview = `${(n.fotos||[]).length} foto(s)`;
   } else {
-    cuerpo = `<div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:4px">${n.texto||''}</div>
-      <div style="display:flex;gap:6px;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--border);align-items:center">
-        <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="editNota('${n.id}')">✏️ Editar</button>
-        <span style="margin-left:auto"></span>
-        ${delBtn}
-      </div>`;
+    const txt = (n.texto||'').replace(/<[^>]+>/g,'');
+    preview = txt.length > 50 ? txt.substring(0,50)+'…' : txt;
   }
-  return `<div class="nota-card" style="${n.pinned?'border-color:#C9A84C66;':''}">
+
+  // Contenido expandido
+  let cuerpo = '';
+  if(expanded){
+    const delBtn=`<button onclick="deleteNota('${n.id}')" style="width:28px;height:28px;background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;flex-shrink:0">✕</button>`;
+    if(n.tipo==='lista'||n.tipo==='recordatorio'){
+      const its = n.items||[];
+      const hechos = its.filter(i=>i.done).length;
+      const pct = its.length>0?Math.round(hechos/its.length*100):0;
+      const progColor = n.tipo==='recordatorio'?'#E05252':'#C9A84C';
+      const itemsHtml = its.map((it,i)=>`
+        <div class="nota-check-item ${it.done?'done':''}" onclick="toggleNotaItem('${n.id}',${i})">
+          <div class="nota-checkbox ${it.done?'checked':''}">${it.done?'✓':''}</div>
+          <span>${it.texto}</span>
+        </div>`).join('');
+      const progBar = its.length>0?`<div style="height:3px;background:#F1F5F9;border-radius:2px;margin:8px 0 4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${progColor};border-radius:2px;transition:width .4s"></div></div>`:'';
+      cuerpo = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        ${itemsHtml}
+        ${n.tipo==='recordatorio'&&n.recordatorio?`<div class="nota-rec-tag">⏰ ${n.recordatorio}</div>`:''}
+        ${progBar}
+        <div style="display:flex;gap:6px;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--border);align-items:center;flex-wrap:wrap">
+          <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="editNota('${n.id}')">✏️ Editar</button>
+          <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="openNotaVozAgregar('${n.id}')">🎙 Agregar</button>
+          <button style="font-size:11px;color:#25D366;background:none;border:none;cursor:pointer;font-weight:600" onclick="compartirNotaWhatsApp('${n.id}')">📱 WhatsApp</button>
+          <span style="margin-left:auto;font-size:11px;color:var(--muted)">${hechos}/${its.length}</span>
+          ${delBtn}
+        </div>
+      </div>`;
+    } else if(n.tipo==='foto'){
+      const thumbs=(n.fotos||[]).map(f=>`<img class="nota-img-thumb" src="${f}" onclick="verFotoNota('${f}')" />`).join('');
+      cuerpo = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        ${n.texto?`<div style="font-size:13px;color:var(--muted);margin-bottom:8px;line-height:1.5">${n.texto}</div>`:''}
+        <div class="nota-imgs-row">${thumbs}<div class="nota-img-thumb add-btn" onclick="agregarFotoNota('${n.id}')">+</div></div>
+        <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
+          <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="editNota('${n.id}')">✏️ Editar</button>
+          <span style="margin-left:auto;font-size:11px;color:var(--muted)">${(n.fotos||[]).length} foto(s)</span>
+          ${delBtn}
+        </div>
+      </div>`;
+    } else {
+      cuerpo = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:4px">${n.texto||''}</div>
+        <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
+          <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="editNota('${n.id}')">✏️ Editar</button>
+          <button style="font-size:11px;color:#25D366;background:none;border:none;cursor:pointer;font-weight:600" onclick="compartirNotaWhatsApp('${n.id}')">📱 WhatsApp</button>
+          <span style="margin-left:auto"></span>
+          ${delBtn}
+        </div>
+      </div>`;
+    }
+  }
+
+  return `<div class="nota-card" style="${n.pinned?'border-color:#C9A84C66;':''}" onclick="toggleNotaExpand('${n.id}',event)">
     <div class="nota-accent" style="background:${color}"></div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      ${pinBtn}
-      <span class="nota-tipo-badge" style="background:${BGBADGE[n.tipo]||'#FFF8EC'};color:${TXTBADGE[n.tipo]||'#C9A84C'}">${LABELS[n.tipo]||'Nota'}</span>
-      <span style="font-size:14px;font-weight:600;color:var(--text);flex:1">${n.titulo||'Sin título'}</span>
-      <span style="font-size:11px;color:var(--muted)">${ts}</span>
-    </div>${cuerpo}</div>`;
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:36px;height:36px;border-radius:10px;background:${BGBADGE[n.tipo]||'#FFF8EC'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${icono}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.titulo||'Sin título'}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px">${preview}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+        <span style="font-size:10px;color:var(--muted)">${ts}</span>
+        <span style="font-size:10px;background:${BGBADGE[n.tipo]||'#FFF8EC'};color:${TXTBADGE[n.tipo]||'#92700A'};padding:1px 6px;border-radius:6px;font-weight:600">${LABELS[n.tipo]||'Nota'}</span>
+      </div>
+      <span style="font-size:12px;color:var(--muted);margin-left:2px">${expanded?'▲':'▼'}</span>
+    </div>
+    ${cuerpo}
+  </div>`;
+}
+
+function toggleNotaExpand(id, e){
+  // No colapsar si tocaron un botón interno
+  if(e && e.target && (e.target.tagName==='BUTTON'||e.target.closest('button'))) return;
+  const n = (state.notas||[]).find(x=>x.id===id);
+  if(!n) return;
+  n._expanded = !n._expanded;
+  render();
+}
+
+function compartirNotaWhatsApp(notaId){
+  const n = (state.notas||[]).find(x=>x.id===notaId);
+  if(!n){ toast('Nota no encontrada','error'); return; }
+  // Cargar items en listaItems para que generarNotaJPG los use
+  const prevItems = listaItems;
+  const prevTitulo = listaTitulo;
+  listaItems = (n.items||[]).map(it=>({
+    tipo:'item',
+    texto: it.texto.split(' - S/')[0].trim(),
+    precio: it.texto.includes(' - S/') ? parseFloat(it.texto.split(' - S/')[1]) : null
+  }));
+  listaTitulo = n.titulo || 'Nota';
+  const canvas = generarNotaJPG(n);
+  listaItems = prevItems;
+  listaTitulo = prevTitulo;
+
+  canvas.toBlob(blob=>{
+    const filename = (n.titulo||'nota').replace(/\s+/g,'_')+'.jpg';
+    if(navigator.share && navigator.canShare && navigator.canShare({files:[new File([blob],'a.jpg',{type:'image/jpeg'})]})){
+      navigator.share({title:n.titulo, files:[new File([blob],filename,{type:'image/jpeg'})]}).catch(()=>{});
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download=filename; a.click();
+    URL.revokeObjectURL(url);
+    toast('Imagen descargada — compartila por WhatsApp 📱');
+  },'image/jpeg',0.93);
 }
 
 function setNotaFilter(f){ _notaFilter=f; render(); }
@@ -3474,6 +3549,8 @@ function openNotaVoz(editId){
       <button id="nv-save-btn" class="btn-green" onclick="saveNotaVoz()" style="flex:2;display:none">✓ Guardar nota</button>
     </div>`;
   showModal();
+  // Auto-iniciar micrófono
+  setTimeout(()=>toggleNotaVoz(), 350);
 }
 
 function openNotaVozAgregar(notaId){ openNotaVoz(notaId); }
@@ -6724,7 +6801,7 @@ function openMicModal() {
     hint.textContent = list[Math.floor(Math.random()*list.length)];
   }
   // ★ Arrancar el micrófono automáticamente — sin necesidad de tocar "Escuchar"
-  setTimeout(()=>startListening(), 300);
+  setTimeout(()=>startListening(), 200);
 }
 
 function closeMicModal(e) {
