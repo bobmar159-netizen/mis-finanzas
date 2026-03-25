@@ -628,22 +628,48 @@ const DEFAULT_SERVICES_NEG = [
 ];
 
 // ── Claves de localStorage por modo ──
+// IMPORTANTE: modo negocio usa prefijo 'fnz_neg_' para coincidir con loadFromSheets
 function getKeys(modo){
-  const s = modo==='negocio' ? '_neg' : '';
+  const neg = modo === 'negocio';
   return {
-    tx:                  'fnz_tx'+s,
-    debts:               'fnz_debts'+s,
-    services:            'fnz_services'+s,
-    catsIn:              'fnz_cats_in'+s,
-    catsEx:              'fnz_cats_ex'+s,
-    prestamos:           'fnz_prestamos'+s,
-    prestamosPersonales: 'fnz_prestpers'+s,
-    metas:               'fnz_metas'+s,
-    presupuesto:         'fnz_presup'+s,
+    tx:                  neg ? 'fnz_neg_tx'       : 'fnz_tx',
+    debts:               neg ? 'fnz_neg_debts'    : 'fnz_debts',
+    services:            neg ? 'fnz_neg_services' : 'fnz_services',
+    catsIn:              neg ? 'fnz_neg_cats_in'  : 'fnz_cats_in',
+    catsEx:              neg ? 'fnz_neg_cats_ex'  : 'fnz_cats_ex',
+    prestamos:           neg ? 'fnz_neg_prestamos': 'fnz_prestamos',
+    prestamosPersonales: neg ? 'fnz_neg_prestpers': 'fnz_prestpers',
+    metas:               neg ? 'fnz_neg_metas'    : 'fnz_metas',
+    presupuesto:         neg ? 'fnz_neg_presup'   : 'fnz_presup',
     recordatorios:       'fnz_recordatorios',
     sonidos:             'fnz_sonidos',
   };
 }
+
+// ── Migración única: mover datos de claves viejas (_neg) a claves nuevas (neg_) ──
+(function _migrateOldKeys(){
+  const oldToNew = {
+    'fnz_tx_neg':       'fnz_neg_tx',
+    'fnz_debts_neg':    'fnz_neg_debts',
+    'fnz_services_neg': 'fnz_neg_services',
+    'fnz_cats_in_neg':  'fnz_neg_cats_in',
+    'fnz_cats_ex_neg':  'fnz_neg_cats_ex',
+    'fnz_prestamos_neg':'fnz_neg_prestamos',
+    'fnz_prestpers_neg':'fnz_neg_prestpers',
+    'fnz_metas_neg':    'fnz_neg_metas',
+    'fnz_presup_neg':   'fnz_neg_presup',
+  };
+  let migrated = false;
+  Object.entries(oldToNew).forEach(([oldKey, newKey]) => {
+    const old = localStorage.getItem(oldKey);
+    if(old !== null && localStorage.getItem(newKey) === null){
+      localStorage.setItem(newKey, old);
+      localStorage.removeItem(oldKey);
+      migrated = true;
+    }
+  });
+  if(migrated) console.log('[MisFinanzas] Keys migrados a formato fnz_neg_*');
+})();
 
 // ── Cargar estado según modo ──
 function loadStateForModo(modo){
@@ -2432,16 +2458,14 @@ function appendWithoutOverlap(existing, newText) {
 
 function syncAgendaToSheets(item){
   const url=localStorage.getItem('fnz_sheets_url')||'';
-  if(!url){ toast('⚠ Configura la URL de Sheets en Ajustes','error'); return; }
-  toast('↑ Enviando a Sheets...','info');
+  if(!url) return; // sin Sheets → silencio
   _sendToSheets(url,{type:'agenda',item,modo:state.modo,timestamp:item.id+'_'+Date.now()});
 }
 
 function syncSeccionToSheets(type,item){
   const url=localStorage.getItem('fnz_sheets_url')||'';
-  if(!url){ toast('⚠ Configura la URL de Sheets en Ajustes','error'); return; }
-  toast('↑ Enviando a Sheets...','info');
-  const ts=type+'_'+(item.id||'')+'_'+Date.now();
+  if(!url) return; // sin Sheets configurado → silencio, no error
+  const ts=type+'_'+(item.id||item.nombre||'')+'_'+Date.now();
   _sendToSheets(url,{type,item,modo:state.modo,timestamp:ts});
 }
 
@@ -3444,8 +3468,33 @@ function renderNotaCard(n){
         <span style="font-size:11px;color:${nc.footer};font-weight:700;flex-shrink:0">${done}/${n.items.length}</span>
       </div>`;
   } else if(n.texto){
-    const raw = n.texto.replace(/<[^>]+>/g,'').trim();
-    preview = `<div style="font-size:13px;color:${nc.footer};line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-left:54px">${raw}</div>`;
+    // For audio: show duration badge + transcript preview
+    if(n.tipo==='audio' && n.duracion){
+      const mm = String(Math.floor(n.duracion/60)).padStart(2,'0');
+      const ss = String(n.duracion%60).padStart(2,'0');
+      const raw = n.texto.replace(/<[^>]+>/g,'').trim().substring(0,80);
+      preview = `<div style="margin-left:54px">
+        <span style="font-size:11px;background:#FEF2F2;color:#C62828;padding:2px 8px;border-radius:10px;font-weight:600;margin-bottom:5px;display:inline-block">🔴 ${mm}:${ss}</span>
+        ${raw?`<div style="font-size:13px;color:${nc.footer};line-height:1.55;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${raw}</div>`:''}
+      </div>`;
+    } else {
+      // Strip HTML but preserve table summary
+      let raw = n.texto;
+      // If has table, show "Tabla: N filas" instead of stripped cells jumbled
+      if(raw.includes('class="nt"')){
+        const tableCount = (raw.match(/class="nt"/g)||[]).length;
+        const stripped = raw.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().substring(0,60);
+        preview = `<div style="font-size:13px;color:${nc.footer};line-height:1.55;margin-left:54px">
+          <span style="background:#F1F5F9;color:#64748B;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">⊞ ${tableCount} tabla${tableCount>1?'s':''}</span>
+          ${stripped?`<span style="margin-left:6px">${stripped}…</span>`:''}
+        </div>`;
+      } else {
+        const rawStripped = raw.replace(/<[^>]+>/g,'').trim();
+        if(rawStripped){
+          preview = `<div style="font-size:13px;color:${nc.footer};line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-left:54px">${rawStripped}</div>`;
+        }
+      }
+    }
   }
 
   const geminiKey = localStorage.getItem('fnz_gemini_key');
@@ -3562,30 +3611,11 @@ function notaAgregarVoz(notaId){
   abrirModoLista('lista', n.titulo);
 }
 
-function pinNota(id){
-  const n = (state.notas||[]).find(x=>x.id===id);
-  if(!n) return;
-  n.pinned = !n.pinned;
-  save('fnz_notas', state.notas);
-  render();
-  toast(n.pinned ? '📌 Nota anclada' : 'Nota desanclada');
-}
-
-function verFotoNota(src){
-  document.getElementById('modal-content').innerHTML = `
-    <img src="${src}" style="width:100%;border-radius:12px;max-height:70vh;object-fit:contain">
-    <div class="btn-row" style="margin-top:12px">
-      <button class="btn-ghost" onclick="closeModal()">Cerrar</button>
-    </div>`;
-  showModal();
-}
-
 // Legacy compat
 function toggleNotaExpand(id, e){
   if(e && e.target && e.target.closest && e.target.closest('button')) return;
   abrirEditorNota(id);
 }
-function editNota(id){ abrirEditorNota(id); }
 // confirmDeleteNota → usa la función real de borrado
 function confirmDeleteNota(id){
   state.notas = (state.notas||[]).filter(n=>n.id!==id);
@@ -4082,6 +4112,23 @@ function _copiarNotaPortapapeles(notaId){
     ? n.items.map(i=>`${i.done?'✅':'○'} ${i.texto}`).join('\n')
     : (n.texto||'').replace(/<[^>]+>/g,'').trim();
   navigator.clipboard?.writeText(`${titulo}\n\n${cuerpo}`).then(()=>toast('✓ Copiado al portapapeles'));
+}
+
+// ★ función faltante — compartir nota por WhatsApp
+function compartirNotaWhatsApp(notaId){
+  const n = (state.notas||[]).find(x=>x.id===notaId);
+  if(!n) return;
+  const titulo = n.titulo||'Nota';
+  let cuerpo = '';
+  if(n.tipo==='lista' && n.items?.length){
+    cuerpo = n.items.map(i=>`${i.done?'✅':'○'} ${i.texto}`).join('\n');
+  } else {
+    cuerpo = (n.texto||'')
+      .replace(/<br\s*\/?>/gi,'\n').replace(/<p[^>]*>/gi,'').replace(/<\/p>/gi,'\n')
+      .replace(/<[^>]+>/g,'').trim();
+  }
+  const texto = encodeURIComponent(`📝 *${titulo}*\n\n${cuerpo}\n\n_Mis Finanzas_`);
+  window.open(`https://wa.me/?text=${texto}`, '_blank');
 }
 function pinNota(id){
   const n=state.notas.find(x=>x.id===id);
@@ -6064,6 +6111,9 @@ function descargarAppsScript(){
   toast('Script v6.4 descargado ✓ — Pega en Apps Script y publica Nueva versión');
 }
 function switchPage(page){
+  // Stop mic if active when navigating away
+  if(micListening) stopListening();
+  if(listaMicActivo) pararListaMicDefinitivo();
   state.page=page;
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   const tab=document.getElementById('tab-'+page);
@@ -6077,7 +6127,8 @@ function showModal(){
   document.body.style.overflow='hidden';
 }
 function closeModal(e){
-  if(e&&e.target!==document.getElementById('modal'))return;
+  // Si viene de overlay: solo cerrar si tocaron el fondo, no el contenido
+  if(e && e.target && e.target.id !== 'modal') return;
   document.getElementById('modal').style.display='none';
   document.body.style.overflow='';
 }
@@ -6133,6 +6184,7 @@ function loadFromSheets(forzar) {
   // Solo cargar si forzar=true O si el localStorage está vacío (caché borrado)
   const hayDatos = (
     (load('fnz_neg_tx', []).length > 0) ||
+    (load('fnz_tx', []).length > 0) ||
     (load('fnz_agenda', []).length > 0)
   );
   if (!forzar && hayDatos) { render(); return; }
@@ -6201,6 +6253,8 @@ function loadFromSheets(forzar) {
       }
 
       save('fnz_last_load', new Date().toISOString());
+      // ★ Recargar state completo desde localStorage para que todo sea consistente
+      loadStateForModo(state.modo);
       toast('✓ Datos restaurados desde Sheets');
       render();
     })
@@ -7835,6 +7889,11 @@ function abrirEditorNota(editId){
         const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false);
         const s=window.getSelection(); s.removeAllRanges(); s.addRange(r);
       }catch(e){}
+      // ★ Re-attach tab/calc handlers for any tables already in the content
+      ed.querySelectorAll('table.nt[id]').forEach(t=>{
+        _ntAttachTab(t.id);
+        ntRecalc(t.id);
+      });
     }
   }, 100);
 
@@ -7928,7 +7987,13 @@ function nedAddTable(){
       </div>
     </div>`;
   document.body.appendChild(modal);
+  _ntHasTotal = true; // reset to default each time modal opens
   _ntUpdateHeaderInputs();
+  // Init check visual
+  setTimeout(()=>{
+    const chk = document.getElementById('nt-total-check');
+    if(chk){ chk.style.background='#3A7D44'; chk.style.borderColor='#3A7D44'; chk.textContent='✓'; chk.style.color='#fff'; }
+  }, 30);
 
   const rowsEl = document.getElementById('nt-cols');
   rowsEl.addEventListener('input', _ntUpdateHeaderInputs);
@@ -7959,15 +8024,6 @@ function _ntUpdateHeaderInputs(){
         style="flex:1;border:1px solid #E2E8F0;border-radius:8px;padding:8px 11px;font-size:13px;font-family:'DM Sans',sans-serif;color:#1E293B">
     </div>`).join('');
 }
-
-// Inicializar el check de total
-setTimeout(()=>{
-  const chk = document.getElementById('nt-total-check');
-  if(chk && _ntHasTotal){
-    chk.style.background='#3A7D44'; chk.style.borderColor='#3A7D44';
-    chk.textContent='✓'; chk.style.color='#fff';
-  }
-}, 50);
 
 function _ntConfirmarTabla(){
   const rows = Math.max(1, Math.min(20, parseInt(document.getElementById('nt-rows')?.value)||3));
@@ -9166,6 +9222,7 @@ REGLAS IMPORTANTES:
 }
 
 async function processVoiceWithGemini(text){
+  try {
   // ── Chequeos locales PRIMERO — sin delay, sin Gemini ──
   const cleanText = text.replace(/^(oye|hey|ok|escucha|mira)\b/gi,'').trim();
   if(cleanText) text = cleanText;
@@ -9208,7 +9265,6 @@ async function processVoiceWithGemini(text){
   const result = await processWithGemini(text);
 
   if(!result){
-    // Gemini no respondió — mostrar error, NO usar parser manual
     processVoiceResult._busy = false;
     if(micText) micText.textContent = '⚠ Gemini no respondió. Intentá de nuevo.';
     toast('Gemini no respondió — intentá de nuevo','error');
@@ -9244,15 +9300,22 @@ async function processVoiceWithGemini(text){
       ubicacion:   result.ubicacion,
     });
   } else {
-    // Gemini devolvió algo pero no reconocible — mostrar error
     processVoiceResult._busy = false;
     if(micText) micText.textContent = '⚠ No entendí. Intentá de nuevo con más detalle.';
     toast('No entendí la orden — intentá de nuevo','error');
   }
+
+  } catch(fatalErr) {
+    // ★ Garantizar que _busy se libera aunque ocurra cualquier error inesperado
+    console.error('processVoiceWithGemini fatal error:', fatalErr);
+    processVoiceResult._busy = false;
+    const micText2 = document.getElementById('micText');
+    if(micText2) micText2.textContent = '⚠ Error inesperado. Intentá de nuevo.';
+    toast('Error inesperado — intentá de nuevo', 'error');
+  }
 }
 
 
-// ── Gemini rellena el formulario de agenda después de abrirlo ──
 // ── Gemini corrige/completa el formulario de agenda después del parse local ──
 async function rellenarAgendaConGemini(text, tipoDetectado, localData){
   const geminiKey = localStorage.getItem('fnz_gemini_key');
@@ -9375,6 +9438,9 @@ function _rellenarFormularioAgenda(p){
 function processVoiceResult(text) {
   if (processVoiceResult._busy) return;
   processVoiceResult._busy = true;
+  // ★ Safety: auto-liberar _busy después de 8s en caso de error silencioso
+  clearTimeout(processVoiceResult._busyTimer);
+  processVoiceResult._busyTimer = setTimeout(()=>{ processVoiceResult._busy = false; }, 8000);
   stopListening();
 
   // ── Nota / Lista antes que Gemini ──
