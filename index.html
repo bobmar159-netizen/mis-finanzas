@@ -5875,7 +5875,7 @@ function extractClienteAgenda(text){
     new RegExp('(?:senora?|dona|don|sr\\.?|sra\\.?)\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
   ];
 
-  const stopWords = /^(en|de|del|al|la|el|por|para|con|que|fue|era|los|las|un|una|dia|manana|hoy|ayer|servicio|precio|monto|cobro|costo|trabajo|visita|agenda|lunes|martes|miercoles|jueves|viernes|sabado|domingo|soles|sol|a|las|punto|adicional|terma|cocina|horno|secadora|calefon|parrilla|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|este|esta|desde|hasta|cerca)$/i;
+  const stopWords = /^(en|de|del|al|la|el|por|para|con|que|fue|era|los|las|un|una|dia|día|manana|mañana|hoy|ayer|servicio|precio|monto|cobro|trabajo|visita|agenda|lunes|martes|miercoles|jueves|viernes|sabado|domingo|soles|sol|a|las|punto|adicional|terma|cocina|horno|secadora|calefon|parrilla|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|este|esta|desde|hasta|cerca|mañana|siguiente|proximo|próximo|ese|eso|esto)$/i;
   const distWords = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|brena|miraflores|independencia|carabayllo|ventanilla|bellavista)$/i;
   const diasStop  = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|ayer)$/i;
 
@@ -7228,7 +7228,7 @@ function extractCliente(text) {
       const svcIdx = nombre.search(SERVICIO_STOP);
       if(svcIdx > 0) nombre = nombre.slice(0, svcIdx).trim();
       // Limpiar preposiciones y días de semana
-      nombre = nombre.replace(/\b(en|de|del|al|la|el|por|para|con|que|fue|era|un|una|este|esta|lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana)\b/gi,'').trim();
+      nombre = nombre.replace(/\b(en|de|del|al|la|el|por|para|con|que|fue|era|un|una|este|esta|dia|día|lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana|siguiente|proximo|próximo)\b/gi,'').trim();
       // ★ Si segunda palabra es inicio de distrito → solo primera
       const partes = nombre.split(/\s+/).filter(Boolean);
       const DISTW = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|breña|brena|miraflores|independencia|carabayllo|ventanilla)$/i;
@@ -7864,11 +7864,14 @@ function startListeningHandlers(rec) {
     if(display) try { updateGhostFromText(display); } catch(err){}
 
     // Timer de silencio — procesar cuando para de hablar
+    // ★ Timer dinámico: más largo si detecta agenda (frases largas con pausas naturales)
     clearTimeout(micSilenceTimer);
     if(micFullTranscript.trim()){
+      const esAgendaEnProgreso = isAgendaCommand(micFullTranscript + ' ' + sessionInterim);
+      const espera = esAgendaEnProgreso ? 2500 : MIC_SILENCE_MS;
       micSilenceTimer = setTimeout(()=>{
         if(micListening && micFullTranscript.trim()) processVoiceResult(micFullTranscript.trim());
-      }, MIC_SILENCE_MS);
+      }, espera);
     }
   };
 
@@ -9726,13 +9729,39 @@ function _rellenarFormularioAgenda(p){
   }
 }
 
+// ── Eliminar repeticiones de texto por reinicios del mic ──
+function _deduplicarTranscript(text){
+  if(!text || text.length < 20) return text;
+  const words = text.trim().split(/\s+/);
+  if(words.length < 6) return text;
+
+  // Buscar si la primera mitad se repite en la segunda
+  // Estrategia: buscar la secuencia más larga que aparece dos veces
+  const half = Math.floor(words.length / 2);
+  for(let len = half; len >= 4; len--){
+    const head = words.slice(0, len).join(' ').toLowerCase();
+    const rest = words.slice(len).join(' ').toLowerCase();
+    if(rest.includes(head)){
+      // Hay repetición — devolver solo desde la segunda ocurrencia
+      // (la segunda contiene lo nuevo que se dijo después)
+      const idx = rest.indexOf(head);
+      const uniqueAfter = rest.slice(idx + head.length).trim();
+      return (head + (uniqueAfter ? ' ' + uniqueAfter : '')).trim();
+    }
+  }
+  return text;
+}
+
 function processVoiceResult(text) {
   if (processVoiceResult._busy) return;
   processVoiceResult._busy = true;
-  // ★ Safety: auto-liberar _busy después de 8s en caso de error silencioso
   clearTimeout(processVoiceResult._busyTimer);
   processVoiceResult._busyTimer = setTimeout(()=>{ processVoiceResult._busy = false; }, 8000);
   stopListening();
+
+  // ★ Deduplicar texto repetido por reinicios del mic
+  // Ej: "agenda construccion ... agenda construccion ..." → tomar solo la primera ocurrencia completa
+  text = _deduplicarTranscript(text);
 
   // ── Nota / Lista antes que Gemini ──
   if(isNotaCommand(text)){
