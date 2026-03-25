@@ -299,160 +299,87 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 
 
 /* ── Editor de notas premium ── */
-#nota-editor-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 500;
-  display: flex;
-  flex-direction: column;
-  background: #FFFDE7;
+/* ════════════════════════════════════════
+   EDITOR NOTAS — Evernote style
+   ════════════════════════════════════════ */
+#ned-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  display: flex; flex-direction: column;
+  font-family: 'DM Sans', sans-serif;
 }
-/* ── Top bar ── */
-#nota-editor-overlay .ned-topbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-bottom: 1px solid rgba(0,0,0,.08);
-  background: inherit;
-  flex-shrink: 0;
+#ned-topbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-bottom: 1px solid rgba(0,0,0,.1);
+  flex-shrink: 0; background: inherit;
 }
-/* ── Toolbar ── */
-#nota-editor-overlay .ned-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 1px;
-  padding: 6px 8px;
+#ned-toolbar {
+  display: flex; align-items: center; gap: 2px;
+  padding: 5px 10px; flex-shrink: 0;
   border-bottom: 1px solid rgba(0,0,0,.1);
-  background: rgba(255,255,255,.7);
-  backdrop-filter: blur(8px);
-  flex-wrap: wrap;
-  flex-shrink: 0;
-  row-gap: 4px;
+  flex-wrap: wrap; row-gap: 3px;
+  background: rgba(255,255,255,.6);
 }
-#nota-editor-overlay .ntb {
-  background: none;
-  border: 1px solid transparent;
-  cursor: pointer;
-  padding: 5px 8px;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #444;
-  white-space: nowrap;
-  flex-shrink: 0;
-  font-family: 'DM Sans', sans-serif;
-  min-width: 28px;
-  text-align: center;
-  transition: all .15s;
-  line-height: 1.2;
+.ned-btn {
+  background: none; border: 1px solid transparent;
+  border-radius: 6px; padding: 5px 7px; font-size: 13px;
+  cursor: pointer; color: #444; font-family: inherit;
+  min-width: 26px; text-align: center; flex-shrink: 0;
+  transition: all .12s; line-height: 1.2; white-space: nowrap;
 }
-#nota-editor-overlay .ntb:active { transform: scale(.95); }
-#nota-editor-overlay .ntb:hover { background: rgba(0,0,0,.07); }
-#nota-editor-overlay .ntb.active { background: rgba(0,0,0,.12); color: #000; font-weight: 700; border-color: rgba(0,0,0,.15); }
-#nota-editor-overlay .ntb.sep { width: 1px; height: 18px; background: rgba(0,0,0,.15); padding: 0; margin: 0 4px; cursor: default; min-width: 1px; pointer-events: none; }
-/* ── Title ── */
-#nota-editor-overlay #ned-titulo {
-  font-family: 'Playfair Display', serif;
-  font-size: 22px;
-  font-weight: 700;
-  border: none;
-  outline: none;
-  background: transparent;
-  padding: 14px 20px 8px;
-  width: 100%;
-  box-sizing: border-box;
-  flex-shrink: 0;
+.ned-btn:hover { background: rgba(0,0,0,.08); }
+.ned-btn.on { background: rgba(0,0,0,.13); font-weight: 700; color: #111; border-color: rgba(0,0,0,.2); }
+.ned-btn:active { transform: scale(.94); }
+.ned-sep { width: 1px; height: 18px; background: rgba(0,0,0,.15); margin: 0 3px; flex-shrink: 0; }
+#ned-title-in {
+  border: none; outline: none; background: transparent;
+  font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700;
+  padding: 12px 20px 6px; width: 100%; box-sizing: border-box; flex-shrink: 0;
 }
-/* ── Body: lined paper ── */
-#nota-editor-overlay #ned-body {
-  flex: 1;
-  padding: 4px 20px 100px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 15px;
-  line-height: 32px;
-  color: #333;
-  overflow-y: auto;
-  outline: none;
+#ned-scroller {
+  flex: 1; overflow-y: auto; padding: 0 20px 100px;
   background-image: repeating-linear-gradient(
-    to bottom,
-    transparent,
-    transparent 31px,
-    rgba(0,0,0,.08) 31px,
-    rgba(0,0,0,.08) 32px
+    transparent, transparent 31px, rgba(0,0,0,.07) 31px, rgba(0,0,0,.07) 32px
   );
   background-attachment: local;
 }
-#nota-editor-overlay #ned-body:focus { outline: none; }
-#nota-editor-overlay #ned-body p { margin: 0; line-height: 32px; min-height: 32px; }
-#nota-editor-overlay #ned-body h2 { font-size: 19px; font-weight: 700; line-height: 32px; margin: 0; }
-#nota-editor-overlay #ned-body h3 { font-size: 16px; font-weight: 600; line-height: 32px; margin: 0; }
-#nota-editor-overlay #ned-body ul, #nota-editor-overlay #ned-body ol { padding-left: 22px; margin: 0; }
-#nota-editor-overlay #ned-body li { line-height: 32px; min-height: 32px; }
-#nota-editor-overlay #ned-body table { border-collapse: collapse; width: 100%; margin: 8px 0; line-height: 1.5; }
-#nota-editor-overlay #ned-body td, #nota-editor-overlay #ned-body th { border: 1px solid #bbb; padding: 6px 10px; min-width: 60px; background: rgba(255,255,255,.6); }
-#nota-editor-overlay #ned-body th { background: rgba(0,0,0,.05); font-weight: 700; }
-/* ── Checklist items ── */
-#nota-editor-overlay .ned-check-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  line-height: 32px;
-  min-height: 32px;
+#ned-editor {
+  outline: none; min-height: 100%; padding-top: 6px;
+  font-size: 15px; line-height: 32px; color: #333;
+  word-break: break-word;
 }
-#nota-editor-overlay .ned-check-row input[type=checkbox] {
-  width: 17px;
-  height: 17px;
-  cursor: pointer;
-  flex-shrink: 0;
-  accent-color: #3A7D44;
-}
-#nota-editor-overlay .ned-check-row span {
-  flex: 1;
-  outline: none;
-  min-width: 20px;
-}
-#nota-editor-overlay .ned-check-row.done span { text-decoration: line-through; opacity: .5; }
-/* ── Footer ── */
-#nota-editor-overlay .ned-footer {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  background: rgba(255,255,255,.95);
-  border-top: 1px solid rgba(0,0,0,.1);
-  padding: 8px 16px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  z-index: 501;
+#ned-editor:empty:before { content: attr(data-ph); color: #aaa; pointer-events: none; }
+#ned-editor p, #ned-editor div { margin: 0; min-height: 32px; line-height: 32px; }
+#ned-editor h2 { font-size: 19px; font-weight: 700; line-height: 40px; margin: 4px 0 0; }
+#ned-editor h3 { font-size: 16px; font-weight: 600; line-height: 36px; margin: 2px 0 0; }
+#ned-editor ul, #ned-editor ol { padding-left: 22px; margin: 0; }
+#ned-editor li { line-height: 32px; }
+#ned-editor table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 14px; line-height: 1.5; }
+#ned-editor td, #ned-editor th { border: 1px solid #bbb; padding: 6px 10px; min-width: 60px; vertical-align: top; }
+#ned-editor th { background: rgba(0,0,0,.05); font-weight: 700; }
+#ned-editor mark { background: #FFF9C4; padding: 0 2px; border-radius: 3px; }
+/* checklist */
+#ned-editor .ned-row { display: flex; align-items: flex-start; gap: 8px; min-height: 32px; padding: 1px 0; }
+#ned-editor .ned-row input[type=checkbox] { margin-top: 7px; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; accent-color: #3A7D44; }
+#ned-editor .ned-row .ned-txt { flex: 1; outline: none; min-height: 22px; line-height: 32px; padding: 0; border: none; font-size: 15px; font-family: inherit; background: transparent; color: inherit; width: 100%; }
+#ned-editor .ned-row.ned-done .ned-txt { text-decoration: line-through; opacity: .5; }
+/* photo strip */
+#ned-photos { display: flex; gap: 8px; padding: 6px 0 4px; flex-shrink: 0; overflow-x: auto; }
+#ned-photos::-webkit-scrollbar { display: none; }
+#ned-photos img { width: 70px; height: 70px; object-fit: cover; border-radius: 10px; cursor: pointer; flex-shrink: 0; }
+/* footer */
+#ned-footer {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(255,255,255,.94); border-top: 1px solid rgba(0,0,0,.1);
+  padding: 8px 16px; display: flex; align-items: center; gap: 8px; z-index: 501;
   backdrop-filter: blur(8px);
 }
-/* ── Photo strip ── */
-#nota-editor-overlay .ned-photo-strip {
-  display: flex;
-  gap: 8px;
-  padding: 6px 20px;
-  overflow-x: auto;
+.ned-cdot {
+  width: 20px; height: 20px; border-radius: 50%;
+  cursor: pointer; border: 2px solid transparent; transition: transform .15s;
   flex-shrink: 0;
 }
-#nota-editor-overlay .ned-photo-strip::-webkit-scrollbar { display: none; }
-#nota-editor-overlay .ned-photo-strip img {
-  width: 72px; height: 72px;
-  object-fit: cover;
-  border-radius: 10px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-/* Color picker dots */
-.ned-color-dot {
-  width: 20px; height: 20px;
-  border-radius: 50%;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: transform .15s, border-color .15s;
-  flex-shrink: 0;
-}
-.ned-color-dot.sel { border-color: #333; transform: scale(1.2); }
-/* highlight */
-.ned-hl { background: #FFF9C4; padding: 0 2px; border-radius: 3px; }
+.ned-cdot.sel { border-color: #333; transform: scale(1.2); }
+#nota-editor-overlay { display: none; }
 </style>
 </head>
 <body>
@@ -3368,148 +3295,183 @@ let _notaVozRecordatorio = null;
 let _notaVozBuffer = '';
 let _notaVozIgnoreNext = false;
 
+// ══════════════════════════════════════════════════════════════
+// SISTEMA DE NOTAS
+// ══════════════════════════════════════════════════════════════
+
 function renderNotas(){
-  try {
-  if(!state.notas) state.notas=[];
-  const todas = state.notas;
-  const total = todas.length;
-  const notas = _notaFilter==='todas' ? todas : todas.filter(n=>n.tipo===_notaFilter);
-  const notasHtml = notas.length===0
-    ? `<div style="text-align:center;padding:48px 20px;color:var(--muted)">
-        <div style="font-size:48px;margin-bottom:12px">📝</div>
-        <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px">Sin notas aún</div>
-        <div style="font-size:12px">Toca <strong>+ Nueva nota</strong> o usa el micrófono</div>
+  if(!state.notas) state.notas = [];
+  const notas = state.notas;
+  const total = notas.length;
+
+  const notasHtml = total === 0
+    ? `<div style="text-align:center;padding:60px 20px">
+        <div style="font-size:52px;margin-bottom:12px">📝</div>
+        <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px">Sin notas aún</div>
+        <div style="font-size:13px;color:var(--muted)">Toca <b>+ Nueva nota</b> para empezar</div>
        </div>`
-    : notas.map(n=>{ try{ return renderNotaCard(n); } catch(e){ console.error('renderNotaCard error',e,n); return ''; }}).join('');
+    : notas.map(n => renderNotaCard(n)).join('');
 
   return `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <div>
-        <div class="section-title" style="margin-bottom:2px">Mis Notas</div>
+        <div class="section-title">Mis Notas</div>
         <div class="section-sub">${total} nota${total!==1?'s':''}</div>
       </div>
-      <button onclick="abrirEditorNota()" style="background:var(--gold);color:#0D0D0F;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px">
-        <span style="font-size:16px">+</span> Nueva nota
+      <button onclick="abrirEditorNota()" style="background:var(--gold);color:#0D0D0F;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer">
+        + Nueva nota
       </button>
     </div>
     ${notasHtml}
-    <div style="display:flex;gap:8px;margin-top:8px;padding-bottom:80px">
-      <button style="flex:1;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0D0D0F;border:none;border-radius:12px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer" onclick="openNotaVoz()">
-        🎙 Nota de voz
-      </button>
-    </div>`;
-  } catch(e) {
-    console.error('renderNotas error:', e);
-    return '<div style="padding:20px;text-align:center;color:red">Error al cargar notas.</div>';
-  }
+    <div style="height:80px"></div>`;
 }
 
 function renderNotaCard(n){
-  const nc = NOTA_COLORES[n.colorHoja||'amarillo']||NOTA_COLORES.amarillo;
-  const ts = n.creado ? new Date(n.creado).toLocaleDateString('es-PE',{day:'numeric',month:'short',year:'numeric'}) : '';
-  const expanded = !!n._expanded;
+  if(!n) return '';
+  const nc = (NOTA_COLORES && NOTA_COLORES[n.colorHoja]) || NOTA_COLORES.amarillo;
+  const fecha = n.creado
+    ? new Date(n.creado).toLocaleDateString('es-PE',{day:'numeric',month:'short',year:'2-digit'})
+    : '';
 
-  // Build preview text
+  // Preview text — strip HTML tags
   let preview = '';
-  let extraBadges = '';
-
-  if(n.items && n.items.length>0){
-    const hechos = n.items.filter(i=>i.done).length;
-    const total = n.items.length;
-    preview = n.items.slice(0,2).map(it=>{
-      const bullet = getBulletIcon(n, 0, it.done);
-      return `<span style="opacity:${it.done?.5:1};text-decoration:${it.done?'line-through':'none'}">${bullet} ${it.texto}</span>`;
-    }).join(' · ');
-    if(total>2) preview += ` +${total-2} más`;
-    extraBadges += `<span style="font-size:10px;background:#FFF8E1;color:#92700A;padding:1px 7px;border-radius:10px;font-weight:600">${hechos}/${total} ✓</span>`;
-  } else {
-    const txt = (n.texto||'').replace(/<[^>]+>/g,'').trim();
-    preview = txt.length>80 ? txt.substring(0,80)+'…' : txt;
+  if(n.items && n.items.length > 0){
+    const done = n.items.filter(i=>i.done).length;
+    preview = `${done}/${n.items.length} completados`;
+  } else if(n.texto){
+    preview = n.texto.replace(/<[^>]+>/g,'').trim().substring(0,60);
+    if(preview.length===60) preview += '…';
   }
 
-  if(n.recordatorio){
-    extraBadges += ` <span style="font-size:10px;background:#FEF2F2;color:#DC2626;padding:1px 7px;border-radius:10px;font-weight:600">⏰ ${n.recordatorio}</span>`;
-  }
-  if(n.fotos && n.fotos.length>0){
-    extraBadges += ` <span style="font-size:10px;background:#F0FDF4;color:#15803D;padding:1px 7px;border-radius:10px;font-weight:600">📷 ${n.fotos.length}</span>`;
-  }
+  // Extra badges
+  const badges = [];
+  if(n.recordatorio) badges.push(`<span style="font-size:10px;background:#FEF2F2;color:#DC2626;padding:2px 7px;border-radius:10px;font-weight:600">⏰ ${n.recordatorio}</span>`);
+  if(n.fotos && n.fotos.length) badges.push(`<span style="font-size:10px;background:#F0FDF4;color:#15803D;padding:2px 7px;border-radius:10px;font-weight:600">📷 ${n.fotos.length}</span>`);
+  if(n.items && n.items.length) badges.push(`<span style="font-size:10px;background:#FFF8E1;color:#92700A;padding:2px 7px;border-radius:10px;font-weight:600">☑ ${n.items.length}</span>`);
 
-  // EXPANDED content
-  let expandedHtml = '';
-  if(expanded){
-    let contentHtml = '';
+  return `
+    <div style="background:${nc.bg};border:1px solid ${nc.border}44;border-radius:14px;padding:13px 14px;margin-bottom:10px;position:relative;cursor:pointer;overflow:hidden"
+         onclick="abrirEditorNota('${n.id}')">
 
-    // Images if any
-    if(n.fotos && n.fotos.length>0){
-      const imgs = n.fotos.map(f=>`<img src="${f}" onclick="verFotoNota('${f}')" style="width:80px;height:80px;object-fit:cover;border-radius:8px;cursor:pointer">`).join('');
-      contentHtml += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${imgs}</div>`;
-    }
+      <!-- Color accent bar -->
+      <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:${nc.border};border-radius:14px 0 0 14px"></div>
 
-    // Checklist items
-    if(n.items && n.items.length>0){
-      const its = n.items;
-      contentHtml += its.map((it,i)=>{
-        const bullet = getBulletIcon(n, i, it.done);
-        const style = n.bulletStyle||'check';
-        const isCheck = style==='check'||style==='check2'||style==='star';
-        return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:${isCheck?'pointer':'default'}" onclick="${isCheck?`toggleNotaItem('${n.id}',${i})`:''}">
-          <span style="font-size:${style==='numeric'?'12':'15'}px;min-width:20px;text-align:center;flex-shrink:0">${bullet}</span>
-          <span style="font-size:13px;flex:1;text-decoration:${it.done?'line-through':'none'};color:${it.done?'var(--muted)':'var(--text)'};line-height:1.4">${it.texto}</span>
-        </div>`;
-      }).join('');
-    }
-
-    // Rich text
-    if(n.texto){
-      const rawTxt = n.texto.replace(/<[^>]+>/g,'').trim();
-      if(rawTxt){
-        contentHtml += `<div style="font-size:13px;color:var(--text);line-height:1.7;margin-top:${n.items?.length?'10':'0'}px">${n.texto}</div>`;
-      }
-    }
-
-    // Reminder
-    if(n.recordatorio){
-      contentHtml += `<div style="margin-top:8px;background:#FEF2F2;border-radius:8px;padding:8px 12px;font-size:12px;color:#DC2626;display:flex;align-items:center;gap:6px">
-        <span style="font-size:16px">⏰</span> ${n.recordatorio}
-      </div>`;
-    }
-
-    expandedHtml = `
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-        ${contentHtml || '<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">Nota vacía</div>'}
-        <div style="display:flex;gap:6px;margin-top:12px;padding-top:8px;border-top:1px solid var(--border);flex-wrap:wrap;align-items:center">
-          <button onclick="event.stopPropagation();abrirEditorNota('${n.id}')" style="font-size:12px;color:var(--muted);background:none;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer">✏️ Editar</button>
-          <button onclick="event.stopPropagation();compartirNotaWhatsApp('${n.id}')" style="font-size:12px;color:#25D366;background:none;border:1px solid #25D36633;border-radius:8px;padding:5px 10px;cursor:pointer;font-weight:600">📱 WhatsApp</button>
-          <select onchange="cambiarBulletStyle('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;border:1px solid var(--border);border-radius:8px;padding:4px 6px;background:var(--card);color:var(--muted);cursor:pointer">
-            ${Object.entries(BULLET_STYLES).map(([k,v])=>`<option value="${k}" ${(n.bulletStyle||'check')===k?'selected':''}>${v.label}</option>`).join('')}
-          </select>
-          <select onchange="cambiarColorNota('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;border:1px solid var(--border);border-radius:8px;padding:4px 6px;background:var(--card);color:var(--muted);cursor:pointer">
-            ${Object.entries(NOTA_COLORES).map(([k,v])=>`<option value="${k}" ${(n.colorHoja||'amarillo')===k?'selected':''}>${v.label}</option>`).join('')}
-          </select>
-          <button onclick="event.stopPropagation();pinNota('${n.id}')" style="font-size:12px;background:none;border:1px solid var(--border);border-radius:8px;padding:5px 8px;cursor:pointer;opacity:${n.pinned?1:.4}">${n.pinned?'📌':'📍'}</button>
-          <button onclick="event.stopPropagation();deleteNota('${n.id}')" style="margin-left:auto;width:30px;height:30px;background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;flex-shrink:0">✕</button>
-        </div>
-      </div>`;
-  }
-
-  const cardStyle = `background:${nc.bg};border-color:${nc.border}55;${n.pinned?'border-left:3px solid var(--gold);':''}`;
-
-  return `<div class="nota-card" style="${cardStyle}" onclick="toggleNotaExpand('${n.id}',event)">
-    <div style="display:flex;align-items:flex-start;gap:10px">
-      <div style="flex:1;min-width:0">
+      <div style="padding-left:8px">
+        <!-- Header row: title + date + actions -->
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
           <span style="font-size:14px;font-weight:700;color:${nc.title};flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.titulo||'Sin título'}</span>
-          <span style="font-size:10px;color:${nc.footer};white-space:nowrap;flex-shrink:0">${ts}</span>
+          <span style="font-size:10px;color:${nc.footer};flex-shrink:0">${fecha}</span>
+          <!-- 🎙 Agregar por voz -->
+          <button onclick="event.stopPropagation();notaAgregarVoz('${n.id}')"
+            style="background:${nc.border}33;border:none;border-radius:8px;padding:4px 7px;font-size:13px;cursor:pointer;flex-shrink:0;line-height:1"
+            title="Agregar por voz">🎙</button>
+          <!-- Menú acción -->
+          <button onclick="event.stopPropagation();notaMenu('${n.id}')"
+            style="background:none;border:none;cursor:pointer;font-size:18px;color:${nc.footer};flex-shrink:0;padding:2px;line-height:1"
+            title="Opciones">⋮</button>
         </div>
-        ${preview?`<div style="font-size:12px;color:${nc.footer};line-height:1.4;margin-bottom:${extraBadges?'5':'0'}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${preview}</div>`:''}
-        ${extraBadges?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${extraBadges}</div>`:''}
+
+        <!-- Preview -->
+        ${preview ? `<div style="font-size:12px;color:${nc.footer};line-height:1.4;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${preview}</div>` : ''}
+
+        <!-- Badges -->
+        ${badges.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px">${badges.join('')}</div>` : ''}
       </div>
-      <span style="font-size:11px;color:var(--muted);flex-shrink:0;margin-top:2px">${expanded?'▲':'▼'}</span>
-    </div>
-    ${expandedHtml}
-  </div>`;
+    </div>`;
 }
 
+// ── Menú contextual de nota ──
+function notaMenu(id){
+  const n = (state.notas||[]).find(x=>x.id===id);
+  if(!n) return;
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title" style="color:var(--text)">"${(n.titulo||'Nota').substring(0,30)}"</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+      <button onclick="closeModal();abrirEditorNota('${id}')"
+        style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text);display:flex;align-items:center;gap:10px">
+        ✏️ <span>Editar nota</span></button>
+      <button onclick="closeModal();notaAgregarVoz('${id}')"
+        style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text);display:flex;align-items:center;gap:10px">
+        🎙 <span>Agregar por voz</span></button>
+      <button onclick="closeModal();compartirNotaWhatsApp('${id}')"
+        style="background:var(--card);border:1px solid #25D36633;border-radius:10px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:#15803D;display:flex;align-items:center;gap:10px;font-weight:600">
+        📱 <span>Compartir por WhatsApp</span></button>
+      <button onclick="closeModal();pinNota('${id}')"
+        style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text);display:flex;align-items:center;gap:10px">
+        ${n.pinned?'📌 <span>Desanclar</span>':'📍 <span>Anclar arriba</span>'}</button>
+      <button onclick="closeModal();confirmarEliminarNota('${id}')"
+        style="background:#FEF2F2;border:1px solid #E0525233;border-radius:10px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:#E05252;display:flex;align-items:center;gap:10px;font-weight:600">
+        🗑 <span>Eliminar nota</span></button>
+    </div>
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+    </div>`;
+  showModal();
+}
+
+function confirmarEliminarNota(id){
+  const n = (state.notas||[]).find(x=>x.id===id);
+  if(!n) return;
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title" style="color:var(--red)">🗑 Eliminar nota</div>
+    <div style="font-size:14px;color:var(--text);margin-bottom:6px">"${n.titulo||'Sin título'}"</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Esta acción no se puede deshacer.</div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button style="flex:2;background:#E05252;color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer"
+        onclick="deleteNota('${id}');closeModal()">Sí, eliminar</button>
+    </div>`;
+  showModal();
+}
+
+// Keep deleteNota simple
+function deleteNota(id){
+  state.notas = (state.notas||[]).filter(n=>n.id!==id);
+  save('fnz_notas', state.notas);
+  render();
+  toast('Nota eliminada');
+}
+
+function notaAgregarVoz(notaId){
+  // Open lista modal to add items to existing nota
+  const n = (state.notas||[]).find(x=>x.id===notaId);
+  if(!n) return;
+  listaTipo = 'lista';
+  listaTitulo = n.titulo || 'Nota';
+  listaItems = (n.items||[]).map(it=>({tipo:'item',texto:it.texto,precio:null,done:it.done}));
+  listaTotal = 0;
+
+  // Override guardarListaFinal to save to existing nota
+  window._notaVozTargetId = notaId;
+  abrirModoLista('lista', n.titulo);
+}
+
+function pinNota(id){
+  const n = (state.notas||[]).find(x=>x.id===id);
+  if(!n) return;
+  n.pinned = !n.pinned;
+  save('fnz_notas', state.notas);
+  render();
+  toast(n.pinned ? '📌 Nota anclada' : 'Nota desanclada');
+}
+
+function verFotoNota(src){
+  document.getElementById('modal-content').innerHTML = `
+    <img src="${src}" style="width:100%;border-radius:12px;max-height:70vh;object-fit:contain">
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn-ghost" onclick="closeModal()">Cerrar</button>
+    </div>`;
+  showModal();
+}
+
+// Legacy compat
+function toggleNotaExpand(id, e){
+  if(e && e.target && e.target.closest && e.target.closest('button')) return;
+  abrirEditorNota(id);
+}
+function editNota(id){ abrirEditorNota(id); }
+function confirmDeleteNota(id){ deleteNota(id); }
+function abrirEditarNota(id){ abrirEditorNota(id); }
 
 function setNotaFilter(f){ _notaFilter=f; render(); }
 function toggleNotaItem(notaId,idx){ if(!state.notas)return; const n=state.notas.find(x=>x.id===notaId); if(!n||!n.items)return; n.items[idx].done=!n.items[idx].done; save('fnz_notas',state.notas); render(); }
@@ -7142,106 +7104,94 @@ function stopListening() {
 
 
 
-// ══════════════════════════════════════════════════════════════
-// EDITOR DE NOTAS — Evernote style
-// ══════════════════════════════════════════════════════════════
-let _nedNota = null;
-let _nedUndoStack = [];
-let _nedRedoStack = [];
-let _nedFotos = [];
-let _nedRecordatorio = '';
-let _nedColor = 'amarillo';
+// ═══════════════════════════════════════════════════════
+// EDITOR NOTAS — Evernote style, robusto
+// ═══════════════════════════════════════════════════════
+let _nedNota = null, _nedFotos = [], _nedRecordatorio = '', _nedColor = 'amarillo';
+let _nedHistory = [], _nedFuture = [];
 
 function abrirEditorNota(editId){
-  const existing = document.getElementById('nota-editor-overlay');
-  if(existing) existing.remove();
+  document.getElementById('ned-overlay')?.remove();
 
   _nedNota = editId ? (state.notas||[]).find(x=>x.id===editId) : null;
-  _nedFotos = _nedNota?.fotos ? [..._nedNota.fotos] : [];
-  _nedRecordatorio = _nedNota?.recordatorio || '';
-  _nedColor = _nedNota?.colorHoja || 'amarillo';
+  _nedFotos = [...(_nedNota?.fotos||[])];
+  _nedRecordatorio = _nedNota?.recordatorio||'';
+  _nedColor = _nedNota?.colorHoja||'amarillo';
+  _nedHistory = []; _nedFuture = [];
 
-  const n = _nedNota || {};
-  const nc = NOTA_COLORES[_nedColor] || NOTA_COLORES.amarillo;
+  const n = _nedNota||{};
+  const nc = NOTA_COLORES[_nedColor]||NOTA_COLORES.amarillo;
 
-  // Build color dots
-  const colorDots = Object.entries(NOTA_COLORES).map(([k,v])=>
-    `<div class="ned-color-dot${_nedColor===k?' sel':''}" onclick="nedSetColor('${k}')"
+  const cdots = Object.entries(NOTA_COLORES).map(([k,v])=>
+    `<div class="ned-cdot${_nedColor===k?' sel':''}" onclick="nedColor('${k}')"
       style="background:${v.bg};border-color:${v.border}" title="${v.label}"></div>`
   ).join('');
 
-  const overlay = document.createElement('div');
-  overlay.id = 'nota-editor-overlay';
-  overlay.style.cssText = `background:${nc.bg};color:${nc.text}`;
+  const ov = document.createElement('div');
+  ov.id = 'ned-overlay';
+  ov.style.cssText = `position:fixed;inset:0;z-index:500;display:flex;flex-direction:column;background:${nc.bg};font-family:'DM Sans',sans-serif`;
 
-  overlay.innerHTML = `
-    <!-- Top bar -->
-    <div class="ned-topbar">
-      <button onclick="cerrarEditorNota()" style="background:none;border:none;cursor:pointer;font-size:22px;color:${nc.footer};padding:2px 6px;line-height:1;flex-shrink:0">←</button>
-      <span id="ned-dirty" style="font-size:11px;color:${nc.footer};flex:1"></span>
-      <button onclick="nedAddPhoto()" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px 6px;opacity:.7" title="Agregar foto">📷</button>
-      <button onclick="nedToggleReminder()" id="ned-rec-btn" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px 6px;opacity:${_nedRecordatorio?1:.5}" title="Recordatorio">⏰</button>
-      <button onclick="nedSaveNota(true)" style="background:#3A7D44;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0">Guardar</button>
+  ov.innerHTML = `
+    <div id="ned-topbar" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.1);flex-shrink:0;background:${nc.bg}">
+      <button onclick="nedClose()" style="background:none;border:none;font-size:22px;cursor:pointer;color:${nc.footer};padding:2px 6px;line-height:1;flex-shrink:0">←</button>
+      <span id="ned-status" style="font-size:11px;color:${nc.footer};flex:1"></span>
+      <button onclick="nedAddPhoto()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 6px;opacity:.75" title="Foto">📷</button>
+      <button id="ned-rec-btn" onclick="nedEditReminder()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 6px;opacity:${_nedRecordatorio?1:.5}" title="Recordatorio">⏰</button>
+      <button onclick="nedSave(true)" style="background:#3A7D44;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0">Guardar</button>
     </div>
 
-    <!-- Reminder -->
-    <div id="ned-rem-row" style="display:${_nedRecordatorio?'flex':'none'};align-items:center;gap:8px;padding:6px 20px;background:#FEF2F2;font-size:12px;color:#DC2626;flex-shrink:0">
-      <span style="font-size:15px">⏰</span>
-      <span id="ned-rem-txt">${_nedRecordatorio}</span>
-      <button onclick="nedClearReminder()" style="background:none;border:none;cursor:pointer;color:#DC2626;margin-left:auto;font-size:16px;line-height:1">✕</button>
+    <div id="ned-rem" style="display:${_nedRecordatorio?'flex':'none'};align-items:center;gap:8px;padding:7px 20px;background:#FEF2F2;border-bottom:1px solid #FECACA;flex-shrink:0;font-size:12px;color:#DC2626">
+      ⏰ <span id="ned-rem-txt">${_nedRecordatorio}</span>
+      <button onclick="nedClearRem()" style="background:none;border:none;cursor:pointer;color:#DC2626;margin-left:auto;font-size:18px;line-height:1">✕</button>
     </div>
 
-    <!-- Title -->
-    <input id="ned-titulo" type="text" placeholder="Título..."
+    <input id="ned-title-in" type="text" placeholder="Título..."
       value="${(n.titulo||'').replace(/"/g,'&quot;')}"
-      style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;border:none;outline:none;background:transparent;color:${nc.title};padding:14px 20px 6px;width:100%;box-sizing:border-box;flex-shrink:0"
+      style="border:none;outline:none;background:transparent;font-family:'Playfair Display',serif;font-size:22px;font-weight:700;padding:12px 20px 6px;width:100%;box-sizing:border-box;flex-shrink:0;color:${nc.title}"
       oninput="nedDirty()">
 
-    <!-- Photo strip -->
-    <div id="ned-photos" class="ned-photo-strip" style="display:${_nedFotos.length?'flex':'none'}">
-      ${_nedFotos.map((f,i)=>`
-        <div style="position:relative;flex-shrink:0">
-          <img src="${f}" onclick="verFotoNota('${f}')">
-          <button onclick="nedRemovePhoto(${i})" style="position:absolute;top:-5px;right:-5px;width:20px;height:20px;border-radius:50%;background:#E05252;color:#fff;border:none;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700">✕</button>
-        </div>`).join('')}
+    <div id="ned-photos" style="display:${_nedFotos.length?'flex':'none'};gap:8px;padding:6px 20px 2px;flex-shrink:0;overflow-x:auto">
+      ${_nedFotos.map((f,i)=>`<div style="position:relative;flex-shrink:0">
+        <img src="${f}" onclick="verFotoNota('${f}')" style="width:70px;height:70px;object-fit:cover;border-radius:10px;cursor:pointer">
+        <button onclick="nedDelPhoto(${i})" style="position:absolute;top:-5px;right:-5px;width:20px;height:20px;border-radius:50%;background:#E05252;color:#fff;border:none;cursor:pointer;font-size:11px;font-weight:700">✕</button>
+      </div>`).join('')}
     </div>
 
-    <!-- Toolbar -->
-    <div class="ned-toolbar">
-      <button class="ntb" onclick="nedUndo()" title="Deshacer (Ctrl+Z)">↩</button>
-      <button class="ntb" onclick="nedRedo()" title="Rehacer (Ctrl+Y)">↪</button>
-      <div class="ntb sep"></div>
-      <button class="ntb" id="ntb-bold"      onmousedown="event.preventDefault();nedFmt('bold')"        title="Negrita"><strong>B</strong></button>
-      <button class="ntb" id="ntb-italic"    onmousedown="event.preventDefault();nedFmt('italic')"      title="Cursiva" style="font-style:italic">I</button>
-      <button class="ntb" id="ntb-underline" onmousedown="event.preventDefault();nedFmt('underline')"   title="Subrayado" style="text-decoration:underline">U</button>
-      <button class="ntb" id="ntb-strike"    onmousedown="event.preventDefault();nedFmt('strikeThrough')" title="Tachado" style="text-decoration:line-through">S</button>
-      <div class="ntb sep"></div>
-      <button class="ntb" onmousedown="event.preventDefault();nedFmt('formatBlock','h2')" title="Título">T1</button>
-      <button class="ntb" onmousedown="event.preventDefault();nedFmt('formatBlock','h3')" title="Subtítulo">T2</button>
-      <button class="ntb" onmousedown="event.preventDefault();nedFmt('formatBlock','p')"  title="Párrafo normal">¶</button>
-      <div class="ntb sep"></div>
-      <button class="ntb" onmousedown="event.preventDefault();nedFmt('insertUnorderedList')" title="Lista de puntos">• Lista</button>
-      <button class="ntb" onmousedown="event.preventDefault();nedFmt('insertOrderedList')"   title="Lista numerada">1. Lista</button>
-      <button class="ntb" onmousedown="event.preventDefault();nedInsertCheck()"              title="Lista de tareas">☑ Check</button>
-      <div class="ntb sep"></div>
-      <button class="ntb" onmousedown="event.preventDefault();nedInsertTable()" title="Insertar tabla">⊞ Tabla</button>
-      <button class="ntb" onmousedown="event.preventDefault();nedHighlight()"   title="Resaltar texto" style="background:#FFF9C4;color:#92700A;font-weight:600">Aa</button>
-      <div class="ntb sep"></div>
-      ${colorDots}
+    <div id="ned-toolbar" style="display:flex;align-items:center;gap:2px;padding:5px 10px;flex-shrink:0;border-bottom:1px solid rgba(0,0,0,.1);flex-wrap:wrap;row-gap:3px;background:rgba(255,255,255,.6)">
+      <button class="ned-btn" onclick="nedUndo()" title="Deshacer">↩</button>
+      <button class="ned-btn" onclick="nedRedo()" title="Rehacer">↪</button>
+      <div class="ned-sep"></div>
+      <button class="ned-btn" id="nb-b" onmousedown="event.preventDefault();nedExec('bold')"        ><b>B</b></button>
+      <button class="ned-btn" id="nb-i" onmousedown="event.preventDefault();nedExec('italic')"      ><i>I</i></button>
+      <button class="ned-btn" id="nb-u" onmousedown="event.preventDefault();nedExec('underline')"   style="text-decoration:underline">U</button>
+      <button class="ned-btn" id="nb-s" onmousedown="event.preventDefault();nedExec('strikeThrough')" style="text-decoration:line-through">S</button>
+      <div class="ned-sep"></div>
+      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('formatBlock','h2')">T1</button>
+      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('formatBlock','h3')">T2</button>
+      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('formatBlock','p')">¶</button>
+      <div class="ned-sep"></div>
+      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('insertUnorderedList')">• Lista</button>
+      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('insertOrderedList')">1. Lista</button>
+      <button class="ned-btn" onmousedown="event.preventDefault();nedAddCheck()">☑ Check</button>
+      <div class="ned-sep"></div>
+      <button class="ned-btn" onmousedown="event.preventDefault();nedAddTable()">⊞ Tabla</button>
+      <button class="ned-btn" onmousedown="event.preventDefault();nedMark()" style="background:#FFF9C4;color:#92700A;font-weight:600">Aa</button>
+      <div class="ned-sep"></div>
+      ${cdots}
     </div>
 
-    <!-- Editable body -->
-    <div id="ned-body" contenteditable="true"
-      style="color:${nc.text}"
-      onkeydown="nedKeyDown(event)"
-      oninput="nedDirty();nedUpdateBar()"
-      onmouseup="nedUpdateBar()"
-      onkeyup="nedUpdateBar()">
-      ${n.texto||'<p><br></p>'}
+    <div id="ned-scroller" style="flex:1;overflow-y:auto;padding:0 20px 100px;background-image:repeating-linear-gradient(transparent,transparent 31px,rgba(0,0,0,.07) 31px,rgba(0,0,0,.07) 32px);background-attachment:local">
+      <div id="ned-editor" contenteditable="true" data-ph="Escribe aquí..."
+        style="outline:none;min-height:400px;padding-top:6px;font-size:15px;line-height:32px;color:${nc.text};word-break:break-word"
+        onkeydown="nedKey(event)"
+        oninput="nedDirty();nedBar()"
+        onmouseup="nedBar()"
+        onkeyup="nedBar()">
+        ${n.texto||''}
+      </div>
     </div>
 
-    <!-- Footer -->
-    <div class="ned-footer" style="background:${nc.bg}ee">
+    <div id="ned-footer" style="position:fixed;bottom:0;left:0;right:0;background:${nc.bg}ee;border-top:1px solid rgba(0,0,0,.1);padding:8px 16px;display:flex;align-items:center;gap:8px;z-index:501;backdrop-filter:blur(8px)">
       <span id="ned-wc" style="font-size:11px;color:${nc.footer}">0 palabras</span>
       <span style="flex:1"></span>
       <span id="ned-saved" style="font-size:11px;color:${nc.footer}"></span>
@@ -7250,250 +7200,252 @@ function abrirEditorNota(editId){
     <input type="file" id="ned-file" accept="image/*" multiple style="display:none" onchange="nedPhotosIn(this)">
   `;
 
-  document.body.appendChild(overlay);
+  document.body.appendChild(ov);
   document.body.style.overflow = 'hidden';
 
   setTimeout(()=>{
-    const body = document.getElementById('ned-body');
-    if(body){
-      body.focus();
-      nedWC();
-      // Cursor at end
+    const ed = document.getElementById('ned-editor');
+    if(ed){
+      ed.focus();
+      nedUpdateWC();
       try{
-        const r = document.createRange();
-        r.selectNodeContents(body);
-        r.collapse(false);
-        const s = window.getSelection();
-        s.removeAllRanges();
-        s.addRange(r);
+        const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false);
+        const s=window.getSelection(); s.removeAllRanges(); s.addRange(r);
       }catch(e){}
     }
-  }, 120);
+  }, 100);
 
-  window._nedAutoSave = setInterval(nedAutoSave, 15000);
+  window._nedTimer = setInterval(nedAutoSave, 15000);
 }
 
-function nedSetColor(color){
+function nedExec(cmd, val){
+  const ed = document.getElementById('ned-editor');
+  if(!ed) return;
+  ed.focus();
+  try{ document.execCommand(cmd, false, val||null); }catch(e){}
+  nedBar(); nedDirty();
+}
+
+function nedAddCheck(){
+  const ed = document.getElementById('ned-editor');
+  if(!ed) return;
+  ed.focus();
+  const row = document.createElement('div');
+  row.className = 'ned-row';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.addEventListener('change', function(){ row.classList.toggle('ned-done', this.checked); });
+  const span = document.createElement('span');
+  span.className = 'ned-txt';
+  span.contentEditable = 'true';
+  span.textContent = '';
+  row.appendChild(cb); row.appendChild(span);
+  // Insert at cursor or append
+  const sel = window.getSelection();
+  if(sel && sel.rangeCount){
+    const r = sel.getRangeAt(0);
+    r.deleteContents();
+    r.insertNode(row);
+    r.collapse(false);
+    sel.removeAllRanges(); sel.addRange(r);
+  } else {
+    ed.appendChild(row);
+  }
+  span.focus();
+  nedDirty();
+}
+
+function nedAddTable(){
+  const ed = document.getElementById('ned-editor');
+  if(!ed) return;
+  ed.focus();
+  const tableHtml = `<table style="border-collapse:collapse;width:100%;margin:6px 0">
+    <thead><tr>
+      <th style="border:1px solid #bbb;padding:6px 10px;background:rgba(0,0,0,.05);font-weight:700">Columna 1</th>
+      <th style="border:1px solid #bbb;padding:6px 10px;background:rgba(0,0,0,.05);font-weight:700">Columna 2</th>
+    </tr></thead>
+    <tbody>
+      <tr><td style="border:1px solid #bbb;padding:6px 10px;min-width:60px"> </td><td style="border:1px solid #bbb;padding:6px 10px;min-width:60px"> </td></tr>
+      <tr><td style="border:1px solid #bbb;padding:6px 10px;min-width:60px"> </td><td style="border:1px solid #bbb;padding:6px 10px;min-width:60px"> </td></tr>
+    </tbody>
+  </table><p><br></p>`;
+  try{ document.execCommand('insertHTML', false, tableHtml); }catch(e){}
+  nedDirty();
+}
+
+function nedMark(){
+  const ed = document.getElementById('ned-editor');
+  if(!ed) return;
+  ed.focus();
+  const sel = window.getSelection();
+  const txt = sel?.toString()?.trim();
+  if(txt){
+    try{ document.execCommand('insertHTML', false, `<mark style="background:#FFF9C4;padding:0 2px;border-radius:3px">${txt}</mark>`); }catch(e){}
+  } else {
+    try{ document.execCommand('insertHTML', false, '<mark style="background:#FFF9C4;padding:0 2px;border-radius:3px">resaltado</mark>'); }catch(e){}
+  }
+  nedDirty();
+}
+
+function nedColor(color){
   _nedColor = color;
   const nc = NOTA_COLORES[color]||NOTA_COLORES.amarillo;
-  const ov = document.getElementById('nota-editor-overlay');
+  const ov = document.getElementById('ned-overlay');
   if(ov) ov.style.background = nc.bg;
-  const t = document.getElementById('ned-titulo');
-  if(t) t.style.color = nc.title;
-  const b = document.getElementById('ned-body');
-  if(b) b.style.color = nc.text;
-  const f = document.querySelector('#nota-editor-overlay .ned-footer');
-  if(f) f.style.background = nc.bg+'ee';
-  document.querySelectorAll('.ned-color-dot').forEach(d=>{
-    d.classList.toggle('sel', d.title===nc.label);
+  const tb = document.getElementById('ned-title-in');
+  if(tb) tb.style.color = nc.title;
+  const ed = document.getElementById('ned-editor');
+  if(ed) ed.style.color = nc.text;
+  const ft = document.getElementById('ned-footer');
+  if(ft) ft.style.background = nc.bg+'ee';
+  const top = document.getElementById('ned-topbar');
+  if(top) top.style.background = nc.bg;
+  document.querySelectorAll('.ned-cdot').forEach(d=>{
+    d.classList.toggle('sel', d.title === nc.label);
   });
 }
 
-function nedFmt(cmd, val){
-  const b = document.getElementById('ned-body');
-  if(!b) return;
-  b.focus();
-  try{ document.execCommand(cmd, false, val||null); }catch(e){}
-  nedUpdateBar();
-  nedDirty();
-}
-
-function nedInsertCheck(){
-  const b = document.getElementById('ned-body');
-  if(!b) return;
-  b.focus();
-  // Build a proper checkbox row
-  const id = 'chk'+Date.now();
-  const html = `<div class="ned-check-row" id="${id}"><input type="checkbox" onchange="this.parentElement.classList.toggle('done',this.checked)"><span contenteditable="true" style="flex:1;outline:none;min-height:20px"> </span></div>`;
-  try{ document.execCommand('insertHTML', false, html); }catch(e){}
-  // Focus the span
-  setTimeout(()=>{
-    const row = document.getElementById(id);
-    const span = row?.querySelector('span');
-    if(span){
-      span.focus();
-      const r = document.createRange();
-      r.selectNodeContents(span);
-      r.collapse(false);
-      const s = window.getSelection();
-      s.removeAllRanges();
-      s.addRange(r);
-    }
-  }, 30);
-  nedDirty();
-}
-
-function nedInsertTable(){
-  const b = document.getElementById('ned-body');
-  if(!b) return;
-  b.focus();
-  const tbl = `<table><thead><tr><th>Columna 1</th><th>Columna 2</th><th>Columna 3</th></tr></thead><tbody><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr></tbody></table><p><br></p>`;
-  try{ document.execCommand('insertHTML', false, tbl); }catch(e){}
-  nedDirty();
-}
-
-function nedHighlight(){
-  const sel = window.getSelection();
-  if(!sel || !sel.toString().trim()){
-    try{ document.execCommand('insertHTML', false, '<mark class="ned-hl">texto resaltado</mark>'); }catch(e){}
-  } else {
-    try{ document.execCommand('insertHTML', false, `<mark class="ned-hl">${sel.toString()}</mark>`); }catch(e){}
-  }
-  nedDirty();
-}
-
-// undo/redo stacks declared at top level
-
 function nedUndo(){
-  if(_nedUndoStack.length===0){ try{document.execCommand('undo');}catch(e){} return; }
-  const b = document.getElementById('ned-body');
-  if(!b) return;
-  _nedRedoStack.push(b.innerHTML);
-  b.innerHTML = _nedUndoStack.pop();
-  nedWC();
+  const ed = document.getElementById('ned-editor');
+  if(!ed) return;
+  if(_nedHistory.length){
+    _nedFuture.push(ed.innerHTML);
+    ed.innerHTML = _nedHistory.pop();
+    nedUpdateWC();
+  } else { try{document.execCommand('undo');}catch(e){} }
 }
 
 function nedRedo(){
-  if(_nedRedoStack.length===0){ try{document.execCommand('redo');}catch(e){} return; }
-  const b = document.getElementById('ned-body');
-  if(!b) return;
-  _nedUndoStack.push(b.innerHTML);
-  b.innerHTML = _nedRedoStack.pop();
-  nedWC();
+  const ed = document.getElementById('ned-editor');
+  if(!ed) return;
+  if(_nedFuture.length){
+    _nedHistory.push(ed.innerHTML);
+    ed.innerHTML = _nedFuture.pop();
+    nedUpdateWC();
+  } else { try{document.execCommand('redo');}catch(e){} }
 }
 
-function nedKeyDown(e){
-  // Ctrl/Cmd shortcuts
-  const mod = e.ctrlKey || e.metaKey;
-  if(mod && e.key==='z' && !e.shiftKey){ e.preventDefault(); nedUndo(); return; }
-  if(mod && (e.key==='y' || (e.key==='z' && e.shiftKey))){ e.preventDefault(); nedRedo(); return; }
-  if(mod && e.key==='b'){ e.preventDefault(); nedFmt('bold'); return; }
-  if(mod && e.key==='i'){ e.preventDefault(); nedFmt('italic'); return; }
-  if(mod && e.key==='u'){ e.preventDefault(); nedFmt('underline'); return; }
-  // Save undo snapshot on space/enter
-  if(e.key===' ' || e.key==='Enter'){
-    const b = document.getElementById('ned-body');
-    if(b){ _nedUndoStack.push(b.innerHTML); if(_nedUndoStack.length>60) _nedUndoStack.shift(); }
+function nedKey(e){
+  const mod = e.ctrlKey||e.metaKey;
+  if(mod&&e.key==='z'&&!e.shiftKey){ e.preventDefault(); nedUndo(); return; }
+  if(mod&&(e.key==='y'||(e.key==='z'&&e.shiftKey))){ e.preventDefault(); nedRedo(); return; }
+  if(mod&&e.key==='b'){ e.preventDefault(); nedExec('bold'); return; }
+  if(mod&&e.key==='i'){ e.preventDefault(); nedExec('italic'); return; }
+  if(mod&&e.key==='u'){ e.preventDefault(); nedExec('underline'); return; }
+  if(e.key===' '||e.key==='Enter'){
+    const ed=document.getElementById('ned-editor');
+    if(ed){ _nedHistory.push(ed.innerHTML); if(_nedHistory.length>60) _nedHistory.shift(); _nedFuture=[]; }
   }
 }
 
-function nedDirty(){
-  const el = document.getElementById('ned-dirty');
-  if(el) el.textContent = '● Sin guardar';
-  nedWC();
-}
-
-function nedUpdateBar(){
+function nedBar(){
   try{
-    const cmds = ['bold','italic','underline'];
-    const ids = ['ntb-bold','ntb-italic','ntb-underline'];
-    cmds.forEach((c,i)=>{
-      const btn = document.getElementById(ids[i]);
-      if(btn) btn.classList.toggle('active', document.queryCommandState(c));
+    const cmds = [['bold','nb-b'],['italic','nb-i'],['underline','nb-u']];
+    cmds.forEach(([c,id])=>{
+      const b=document.getElementById(id);
+      if(b) b.classList.toggle('on', document.queryCommandState(c));
     });
   }catch(e){}
 }
 
-function nedWC(){
-  const b = document.getElementById('ned-body');
-  const el = document.getElementById('ned-wc');
-  if(!b||!el) return;
-  const words = (b.innerText||'').trim().split(/\s+/).filter(w=>w.length>0).length;
-  el.textContent = words + ' palabra' + (words!==1?'s':'');
+function nedDirty(){
+  const s = document.getElementById('ned-status');
+  if(s) s.textContent = '● Sin guardar';
+  nedUpdateWC();
+}
+
+function nedUpdateWC(){
+  const ed=document.getElementById('ned-editor');
+  const el=document.getElementById('ned-wc');
+  if(!ed||!el) return;
+  const w=(ed.innerText||'').trim().split(/\s+/).filter(x=>x.length).length;
+  el.textContent = w+' palabra'+(w!==1?'s':'');
 }
 
 function nedAddPhoto(){ document.getElementById('ned-file')?.click(); }
 
 function nedPhotosIn(input){
   Array.from(input.files).forEach(f=>{
-    const r = new FileReader();
-    r.onload = e => { _nedFotos.push(e.target.result); nedRefreshStrip(); nedDirty(); };
+    const r=new FileReader();
+    r.onload=e=>{_nedFotos.push(e.target.result); nedRefreshPhotos(); nedDirty();};
     r.readAsDataURL(f);
   });
   input.value='';
 }
 
-function nedRemovePhoto(i){ _nedFotos.splice(i,1); nedRefreshStrip(); nedDirty(); }
+function nedDelPhoto(i){ _nedFotos.splice(i,1); nedRefreshPhotos(); nedDirty(); }
 
-function nedRefreshStrip(){
-  const strip = document.getElementById('ned-photos');
+function nedRefreshPhotos(){
+  const strip=document.getElementById('ned-photos');
   if(!strip) return;
-  if(!_nedFotos.length){ strip.style.display='none'; return; }
-  strip.style.display='flex';
-  strip.innerHTML = _nedFotos.map((f,i)=>`
+  strip.style.display=_nedFotos.length?'flex':'none';
+  strip.innerHTML=_nedFotos.map((f,i)=>`
     <div style="position:relative;flex-shrink:0">
-      <img src="${f}" onclick="verFotoNota('${f}')" style="width:72px;height:72px;object-fit:cover;border-radius:10px;cursor:pointer">
-      <button onclick="nedRemovePhoto(${i})" style="position:absolute;top:-5px;right:-5px;width:20px;height:20px;border-radius:50%;background:#E05252;color:#fff;border:none;cursor:pointer;font-size:11px;font-weight:700">✕</button>
+      <img src="${f}" onclick="verFotoNota('${f}')" style="width:70px;height:70px;object-fit:cover;border-radius:10px;cursor:pointer">
+      <button onclick="nedDelPhoto(${i})" style="position:absolute;top:-5px;right:-5px;width:20px;height:20px;border-radius:50%;background:#E05252;color:#fff;border:none;cursor:pointer;font-size:11px;font-weight:700">✕</button>
     </div>`).join('');
 }
 
-function nedToggleReminder(){
-  if(_nedRecordatorio){
-    nedClearReminder();
-  } else {
-    const val = prompt('Escribe el recordatorio (ej: "Mañana a las 9am"):','');
-    if(val===null) return;
-    _nedRecordatorio = val.trim();
-    const row = document.getElementById('ned-rem-row');
-    const txt = document.getElementById('ned-rem-txt');
-    const btn = document.getElementById('ned-rec-btn');
-    if(row) row.style.display = _nedRecordatorio?'flex':'none';
-    if(txt) txt.textContent = _nedRecordatorio;
-    if(btn) btn.style.opacity = _nedRecordatorio?'1':'0.5';
-    nedDirty();
-  }
+function nedEditReminder(){
+  const val=prompt('Recordatorio (ej: "Mañana 9am"):',_nedRecordatorio||'');
+  if(val===null) return;
+  _nedRecordatorio=val.trim();
+  const row=document.getElementById('ned-rem');
+  const txt=document.getElementById('ned-rem-txt');
+  const btn=document.getElementById('ned-rec-btn');
+  if(row) row.style.display=_nedRecordatorio?'flex':'none';
+  if(txt) txt.textContent=_nedRecordatorio;
+  if(btn) btn.style.opacity=_nedRecordatorio?'1':'0.5';
+  nedDirty();
 }
 
-function nedClearReminder(){
-  _nedRecordatorio = '';
-  const row = document.getElementById('ned-rem-row');
-  const btn = document.getElementById('ned-rec-btn');
-  if(row) row.style.display = 'none';
-  if(btn) btn.style.opacity = '0.5';
+function nedClearRem(){
+  _nedRecordatorio='';
+  const row=document.getElementById('ned-rem');
+  if(row) row.style.display='none';
+  const btn=document.getElementById('ned-rec-btn');
+  if(btn) btn.style.opacity='0.5';
 }
 
 function nedAutoSave(){
-  const b = document.getElementById('ned-body');
-  if(!b) return;
-  const dirty = document.getElementById('ned-dirty');
-  if(!dirty || !dirty.textContent.includes('Sin guardar')) return;
-  nedSaveNota(false);
-  dirty.textContent = '';
-  const saved = document.getElementById('ned-saved');
-  if(saved) saved.textContent = 'Guardado ' + new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+  const s=document.getElementById('ned-status');
+  if(!s||!s.textContent.includes('Sin guardar')) return;
+  nedSave(false);
+  s.textContent='';
+  const sv=document.getElementById('ned-saved');
+  if(sv) sv.textContent='Guardado '+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
 }
 
-function nedSaveNota(close){
-  const titulo = document.getElementById('ned-titulo')?.value.trim() || 'Nota';
-  const body = document.getElementById('ned-body');
-  const texto = body?.innerHTML || '';
+function nedSave(close){
+  const titulo=(document.getElementById('ned-title-in')?.value||'').trim()||'Nota';
+  const ed=document.getElementById('ned-editor');
+  const texto=ed?.innerHTML||'';
   if(!state.notas) state.notas=[];
 
   if(_nedNota){
-    const n = state.notas.find(x=>x.id===_nedNota.id);
-    if(n){ Object.assign(n,{titulo,texto,colorHoja:_nedColor,fotos:[..._nedFotos],recordatorio:_nedRecordatorio,modificado:new Date().toISOString()}); }
+    const n=state.notas.find(x=>x.id===_nedNota.id);
+    if(n) Object.assign(n,{titulo,texto,colorHoja:_nedColor,fotos:[..._nedFotos],recordatorio:_nedRecordatorio,modificado:new Date().toISOString()});
   } else {
-    const nota = {id:Date.now()+'',tipo:'texto',titulo,texto,colorHoja:_nedColor,fotos:[..._nedFotos],recordatorio:_nedRecordatorio,creado:new Date().toISOString()};
+    const nota={id:Date.now()+'',tipo:'texto',titulo,texto,colorHoja:_nedColor,fotos:[..._nedFotos],recordatorio:_nedRecordatorio,creado:new Date().toISOString()};
     state.notas.unshift(nota);
-    _nedNota = state.notas[0];
+    _nedNota=state.notas[0];
   }
-  save('fnz_notas', state.notas);
+  save('fnz_notas',state.notas);
 
-  if(close){
-    cerrarEditorNota();
-    toast('Nota guardada ✓');
-  }
+  if(close){ nedClose(); toast('Nota guardada ✓'); }
 }
 
-function cerrarEditorNotaGuardando(){ nedSaveNota(true); }
-
-function cerrarEditorNota(){
-  clearInterval(window._nedAutoSave);
-  document.getElementById('nota-editor-overlay')?.remove();
-  document.body.style.overflow = '';
+function nedClose(){
+  clearInterval(window._nedTimer);
+  document.getElementById('ned-overlay')?.remove();
+  document.body.style.overflow='';
   render();
 }
 
+// Legacy aliases
+function cerrarEditorNota(){ nedClose(); }
+function cerrarEditorNotaGuardando(){ nedSave(true); }
+function nedSaveNota(close){ nedSave(close); }
 
 // ── Comandos rápidos (chips) ──
 function usarChip(btn){
