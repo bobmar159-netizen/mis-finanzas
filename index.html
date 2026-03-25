@@ -282,6 +282,39 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .nota-filter-btn{font-size:11px;padding:5px 11px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s}
 .nota-filter-btn.active{border-color:var(--gold);background:#FFF8EC;color:var(--gold);font-weight:600}
 
+/* ── NOTA TYPE POPUP ── */
+.nota-type-popup{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:302;animation:slideUp .22s ease}
+.nota-type-bg{background:var(--card);border-radius:24px 24px 0 0;padding:20px 18px 36px;border-top:1px solid var(--border);box-shadow:0 -6px 30px #00000018}
+.nota-type-item{display:flex;align-items:center;gap:14px;padding:14px 12px;border-radius:16px;cursor:pointer;margin-bottom:4px;transition:background .12s;-webkit-tap-highlight-color:transparent}
+.nota-type-item:active{background:var(--bg)}
+.nota-type-ic{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+.nota-type-lbl{font-size:16px;font-weight:700;color:var(--text);line-height:1.2}
+.nota-type-sub{font-size:12px;color:var(--muted);margin-top:3px}
+
+/* ── AUDIO RECORDING ── */
+.aud-mic-btn{width:112px;height:112px;border-radius:56px;background:linear-gradient(135deg,#E05252,#f87171);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:50px;margin:0 auto;box-shadow:0 6px 24px #E0525244;transition:transform .15s}
+.aud-mic-btn:active{transform:scale(.94)}
+.aud-mic-btn.rec{background:linear-gradient(135deg,#C62828,#E05252);animation:audPulse 1.6s ease-in-out infinite}
+@keyframes audPulse{0%,100%{box-shadow:0 6px 24px #E0525244,0 0 0 0 #E0525444}50%{box-shadow:0 6px 24px #E0525244,0 0 0 22px #E0525200}}
+.aud-wave{display:flex;align-items:center;justify-content:center;gap:3px;height:50px;margin:10px 0}
+.aud-bar{width:4px;border-radius:2px;background:#E2E8F0;transition:height .15s ease,background .3s}
+.aud-bar.active{background:linear-gradient(180deg,#E05252,#f87171);animation:audBar .55s var(--d,0s) infinite ease-in-out alternate}
+@keyframes audBar{from{height:4px}to{height:38px}}
+
+/* ── CHAT IA ── */
+.chat-ia-bubble{max-width:84%;padding:11px 14px;border-radius:16px;font-size:14px;line-height:1.55;word-break:break-word}
+.chat-ia-bubble.user{align-self:flex-end;background:var(--gold);color:#fff;border-radius:16px 4px 16px 16px}
+.chat-ia-bubble.ai{align-self:flex-start;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:4px 16px 16px 16px}
+
+/* ── NOTA CARD v2 ── */
+.nc2{background:var(--card);border:1px solid var(--border);border-radius:18px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 6px #00000008}
+.nc2-body{padding:16px 16px 12px 20px;cursor:pointer;position:relative}
+.nc2-accent{position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:18px 0 0 18px}
+.nc2-actions{display:flex;border-top:1px solid var(--border);padding:0 4px}
+.nc2-act{flex:1;padding:13px 4px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;font-size:19px;-webkit-tap-highlight-color:transparent}
+.nc2-act span{font-size:11px;font-family:'DM Sans',sans-serif;font-weight:600}
+.nc2-act:active{background:var(--bg)}
+
 /* ── WAVE BARS ── */
 .wave-bar {
   display: inline-block;
@@ -439,6 +472,8 @@ const NOTA_COLORES = {
   azul:     { bg:'#E3F2FD', border:'#90CAF9', title:'#0D47A1', text:'#1565C0', line:'#90CAF955', footer:'#1976D2', label:'Azul' },
   rosa:     { bg:'#FCE4EC', border:'#F48FB1', title:'#880E4F', text:'#880E4F', line:'#F48FB155', footer:'#C2185B', label:'Rosa' },
   pizarron: { bg:'#263238', border:'#455A64', title:'#ECEFF1', text:'#CFD8DC', line:'#455A6466', footer:'#78909C', label:'Pizarrón' },
+  celeste:  { bg:'#EFF6FF', border:'#60A5FA', title:'#1E40AF', text:'#1D4ED8', line:'#60A5FA44', footer:'#3B82F6', label:'Celeste' },
+  lavanda:  { bg:'#F5F3FF', border:'#A78BFA', title:'#4C1D95', text:'#5B21B6', line:'#A78BFA44', footer:'#7C3AED', label:'Lavanda' },
 };
 
 // ── Bullet styles ──
@@ -953,13 +988,18 @@ function renderDashboard(){
 
   return `
     <div class="month-nav"><button onclick="prevMonth()">‹</button><span>${monthName()}</span><button onclick="nextMonth()">›</button></div>
-    <div class="summary-card" style="background:linear-gradient(135deg,var(--gold),var(--gold2));border:1px solid var(--gold)33;text-align:center;margin-bottom:12px">
-      <div class="summary-label" style="color:#C8E6C9">Balance del mes</div>
-      <div class="summary-amount" style="color:${balColor}">${fmtSign(bal)}</div>
-      <div style="display:flex;gap:24px;justify-content:center;margin-top:14px">
-        <div><div style="font-size:10px;color:#C8E6C9;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ingresos</div><div style="color:#A5D6A7;font-weight:600">+${fmt(inc)}</div></div>
-        <div style="width:1px;background:#ffffff22"></div>
-        <div><div style="font-size:10px;color:#A5D6A7;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Egresos</div><div style="color:#EF9A9A;font-weight:600">-${fmt(exp)}</div></div>
+    <div class="summary-card" style="background:var(--card);border:1.5px solid var(--border);text-align:center;margin-bottom:12px;box-shadow:0 2px 12px #00000008">
+      <div class="summary-label" style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.07em">Balance del mes</div>
+      <div class="summary-amount" style="color:${balColor};font-size:42px;margin:4px 0">${fmtSign(bal)}</div>
+      <div style="display:flex;gap:0;justify-content:center;margin-top:14px;background:var(--bg);border-radius:12px;overflow:hidden">
+        <div style="flex:1;padding:10px 8px;border-right:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Ingresos</div>
+          <div style="color:var(--green);font-weight:700;font-size:15px">+${fmt(inc)}</div>
+        </div>
+        <div style="flex:1;padding:10px 8px">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Egresos</div>
+          <div style="color:var(--red);font-weight:700;font-size:15px">-${fmt(exp)}</div>
+        </div>
       </div>
     </div>
     <!-- Acceso rápido al micrófono -->
@@ -3301,81 +3341,138 @@ let _notaVozIgnoreNext = false;
 
 function renderNotas(){
   if(!state.notas) state.notas = [];
-  const notas = state.notas;
-  const total = notas.length;
+  const filter = window._notaFilter || 'todas';
 
-  const notasHtml = total === 0
-    ? `<div style="text-align:center;padding:60px 20px">
-        <div style="font-size:52px;margin-bottom:12px">📝</div>
-        <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px">Sin notas aún</div>
+  // Sort: pinned first → by date desc
+  let notas = [...state.notas].sort((a,b)=>{
+    if(a.pinned && !b.pinned) return -1;
+    if(!a.pinned && b.pinned) return 1;
+    return (b.creado||'').localeCompare(a.creado||'');
+  });
+
+  const counts = {
+    todas: state.notas.length,
+    lista: state.notas.filter(n=>n.tipo==='lista').length,
+    texto: state.notas.filter(n=>!n.tipo||n.tipo==='texto').length,
+    audio: state.notas.filter(n=>n.tipo==='audio').length,
+  };
+
+  if(filter !== 'todas') notas = notas.filter(n=>{
+    if(filter==='texto') return !n.tipo || n.tipo==='texto';
+    return n.tipo===filter;
+  });
+
+  const filterPills = [
+    {k:'todas', lbl:'Todas'},
+    {k:'lista',  lbl:'📋 Listas'},
+    {k:'texto',  lbl:'📝 Textos'},
+    {k:'audio',  lbl:'🎙 Audio'},
+  ].map(({k,lbl})=>`
+    <button class="nota-filter-btn${filter===k?' active':''}" onclick="setNotaFilter('${k}')">
+      ${lbl}${counts[k]>0?` <span style="font-size:10px;opacity:.65">${counts[k]}</span>`:''}
+    </button>`).join('');
+
+  const notasHtml = notas.length === 0
+    ? `<div style="text-align:center;padding:64px 20px">
+        <div style="font-size:60px;margin-bottom:16px">📝</div>
+        <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">Sin notas aún</div>
         <div style="font-size:13px;color:var(--muted)">Toca <b>+ Nueva nota</b> para empezar</div>
        </div>`
-    : notas.map(n => renderNotaCard(n)).join('');
+    : notas.map(n=>renderNotaCard(n)).join('');
 
   return `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div>
         <div class="section-title">Mis Notas</div>
-        <div class="section-sub">${total} nota${total!==1?'s':''}</div>
+        <div class="section-sub">${state.notas.length} nota${state.notas.length!==1?'s':''}</div>
       </div>
-      <button onclick="abrirEditorNota()" style="background:var(--gold);color:#0D0D0F;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer">
-        + Nueva nota
+      <button onclick="abrirNotaTypeMenu()" style="background:var(--gold);color:#fff;border:none;border-radius:12px;padding:12px 18px;font-size:14px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;gap:7px">
+        ＋ Nueva nota <span style="font-size:16px;opacity:.85">∨</span>
       </button>
     </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+      ${filterPills}
+    </div>
     ${notasHtml}
-    <div style="height:80px"></div>`;
+    <div style="height:90px"></div>`;
 }
 
 function renderNotaCard(n){
   if(!n) return '';
   const nc = (NOTA_COLORES && NOTA_COLORES[n.colorHoja]) || NOTA_COLORES.amarillo;
   const fecha = n.creado
-    ? new Date(n.creado).toLocaleDateString('es-PE',{day:'numeric',month:'short',year:'2-digit'})
+    ? new Date(n.creado).toLocaleDateString('es-PE',{day:'numeric',month:'short'})
     : '';
 
-  // Preview text — strip HTML tags
+  const tipoMap = {lista:{ic:'📋',lbl:'Lista'},texto:{ic:'📝',lbl:'Nota'},audio:{ic:'🎙',lbl:'Audio'}};
+  const tipo = tipoMap[n.tipo] || tipoMap.texto;
+
+  // Build preview
   let preview = '';
-  if(n.items && n.items.length > 0){
+  let progressHtml = '';
+  if(n.tipo==='lista' && n.items && n.items.length>0){
     const done = n.items.filter(i=>i.done).length;
-    preview = `${done}/${n.items.length} completados`;
+    const pct = Math.round(done/n.items.length*100);
+    preview = n.items.slice(0,3).map(i=>{
+      const txt = (i.texto||'').split(' - S/')[0].substring(0,38);
+      return `<span style="display:block;font-size:13px;color:${nc.footer};${i.done?'opacity:.5;text-decoration:line-through':''};line-height:1.6">${i.done?'☑':'○'} ${txt}</span>`;
+    }).join('');
+    progressHtml = `
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;margin-left:54px">
+        <div style="flex:1;height:5px;background:${nc.border}33;border-radius:3px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${nc.border};border-radius:3px;transition:width .4s"></div>
+        </div>
+        <span style="font-size:11px;color:${nc.footer};font-weight:700;flex-shrink:0">${done}/${n.items.length}</span>
+      </div>`;
   } else if(n.texto){
-    preview = n.texto.replace(/<[^>]+>/g,'').trim().substring(0,60);
-    if(preview.length===60) preview += '…';
+    const raw = n.texto.replace(/<[^>]+>/g,'').trim();
+    preview = `<div style="font-size:13px;color:${nc.footer};line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-left:54px">${raw}</div>`;
   }
 
-  // Extra badges
-  const badges = [];
-  if(n.recordatorio) badges.push(`<span style="font-size:10px;background:#FEF2F2;color:#DC2626;padding:2px 7px;border-radius:10px;font-weight:600">⏰ ${n.recordatorio}</span>`);
-  if(n.fotos && n.fotos.length) badges.push(`<span style="font-size:10px;background:#F0FDF4;color:#15803D;padding:2px 7px;border-radius:10px;font-weight:600">📷 ${n.fotos.length}</span>`);
-  if(n.items && n.items.length) badges.push(`<span style="font-size:10px;background:#FFF8E1;color:#92700A;padding:2px 7px;border-radius:10px;font-weight:600">☑ ${n.items.length}</span>`);
+  const geminiKey = localStorage.getItem('fnz_gemini_key');
 
   return `
-    <div style="background:${nc.bg};border:1px solid ${nc.border}44;border-radius:14px;padding:13px 14px;margin-bottom:10px;position:relative;cursor:pointer;overflow:hidden"
-         onclick="abrirEditorNota('${n.id}')">
+    <div class="nc2" style="border-color:${nc.border}55">
+      <!-- Accent bar -->
+      <div class="nc2-accent" style="background:${nc.border}"></div>
 
-      <!-- Color accent bar -->
-      <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:${nc.border};border-radius:14px 0 0 14px"></div>
-
-      <div style="padding-left:8px">
-        <!-- Header row: title + date + actions -->
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-          <span style="font-size:14px;font-weight:700;color:${nc.title};flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.titulo||'Sin título'}</span>
-          <span style="font-size:10px;color:${nc.footer};flex-shrink:0">${fecha}</span>
-          <!-- 🎙 Agregar por voz -->
-          <button onclick="event.stopPropagation();notaAgregarVoz('${n.id}')"
-            style="background:${nc.border}33;border:none;border-radius:8px;padding:4px 7px;font-size:13px;cursor:pointer;flex-shrink:0;line-height:1"
-            title="Agregar por voz">🎙</button>
-          <!-- Menú acción -->
-          <button onclick="event.stopPropagation();notaMenu('${n.id}')"
-            style="background:none;border:none;cursor:pointer;font-size:18px;color:${nc.footer};flex-shrink:0;padding:2px;line-height:1"
-            title="Opciones">⋮</button>
+      <!-- Clickable body -->
+      <div class="nc2-body" onclick="abrirEditorNota('${n.id}')" style="background:${nc.bg}">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:${preview?'8':'0'}px">
+          <!-- Icon -->
+          <div style="width:42px;height:42px;border-radius:14px;background:${nc.border}33;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;margin-left:6px">${tipo.ic}</div>
+          <!-- Title + meta -->
+          <div style="flex:1;min-width:0;padding-top:1px">
+            <div style="font-size:16px;font-weight:700;color:${nc.title};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3">${n.pinned?'📌 ':''}${n.titulo||'Sin título'}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+              <span style="font-size:11px;background:${nc.border}44;color:${nc.footer};padding:2px 9px;border-radius:10px;font-weight:600">${tipo.lbl}</span>
+              <span style="font-size:11px;color:${nc.footer}">${fecha}</span>
+              ${n.recordatorio?`<span style="font-size:11px;background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:10px;font-weight:600">⏰ ${n.recordatorio}</span>`:''}
+              ${n.fotos&&n.fotos.length?`<span style="font-size:11px;background:#F0FDF4;color:#15803D;padding:2px 8px;border-radius:10px;font-weight:600">📷 ${n.fotos.length}</span>`:''}
+            </div>
+          </div>
         </div>
+        ${preview}
+        ${progressHtml}
+      </div>
 
-        <!-- Preview -->
-        ${preview ? `<div style="font-size:12px;color:${nc.footer};line-height:1.4;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${preview}</div>` : ''}
-
-        <!-- Badges -->
-        ${badges.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px">${badges.join('')}</div>` : ''}
+      <!-- Action bar -->
+      <div class="nc2-actions" style="background:${nc.bg}">
+        <button class="nc2-act" onclick="event.stopPropagation();notaAgregarVoz('${n.id}')" style="color:${nc.footer}" title="Dictar">
+          🎙 <span style="color:${nc.footer}">Dictar</span>
+        </button>
+        <div style="width:1px;background:${nc.border}33;margin:8px 0"></div>
+        ${geminiKey?`<button class="nc2-act" onclick="event.stopPropagation();abrirChatIA('${n.id}')" style="color:${nc.footer}" title="Chat IA">
+          ✨ <span style="color:${nc.footer}">Chat IA</span>
+        </button>
+        <div style="width:1px;background:${nc.border}33;margin:8px 0"></div>`:''}
+        <button class="nc2-act" onclick="event.stopPropagation();compartirNota('${n.id}')" style="color:${nc.footer}" title="Compartir">
+          📤 <span style="color:${nc.footer}">Compartir</span>
+        </button>
+        <div style="width:1px;background:${nc.border}33;margin:8px 0"></div>
+        <button class="nc2-act" onclick="event.stopPropagation();confirmarEliminarNota('${n.id}')" style="color:#E05252" title="Eliminar">
+          🗑 <span style="color:#E05252">Borrar</span>
+        </button>
       </div>
     </div>`;
 }
@@ -3470,30 +3567,502 @@ function toggleNotaExpand(id, e){
   abrirEditorNota(id);
 }
 function editNota(id){ abrirEditorNota(id); }
-function confirmDeleteNota(id){ deleteNota(id); }
+// confirmDeleteNota → usa la función real de borrado
+function confirmDeleteNota(id){
+  state.notas = (state.notas||[]).filter(n=>n.id!==id);
+  save('fnz_notas', state.notas);
+  closeModal();
+  render();
+  toast('Nota eliminada ✓');
+}
 function abrirEditarNota(id){ abrirEditorNota(id); }
 
 function setNotaFilter(f){ _notaFilter=f; render(); }
 function toggleNotaItem(notaId,idx){ if(!state.notas)return; const n=state.notas.find(x=>x.id===notaId); if(!n||!n.items)return; n.items[idx].done=!n.items[idx].done; save('fnz_notas',state.notas); render(); }
-function deleteNota(id){
-  const n=state.notas.find(x=>x.id===id);
-  if(!n)return;
-  document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title" style="color:var(--red)">🗑 Eliminar nota</div>
-    <div style="font-size:14px;color:var(--text);margin-bottom:6px">"${n.titulo||'Sin título'}"</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Esta acción no se puede deshacer.</div>
-    <div class="btn-row">
-      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button style="flex:2;background:#E05252;color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="confirmDeleteNota('${id}')">Sí, eliminar</button>
+
+// ══════════════════════════════════════════════════════════════
+// POPUP MENÚ — Tipo de nota nueva
+// ══════════════════════════════════════════════════════════════
+let _notaMenuOpen = false;
+
+function abrirNotaTypeMenu(){
+  if(_notaMenuOpen){ cerrarNotaTypeMenu(); return; }
+  _notaMenuOpen = true;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'notaTypeOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:301;background:#00000055;animation:fadeIn .18s';
+  overlay.addEventListener('click', e=>{ if(e.target===overlay) cerrarNotaTypeMenu(); });
+
+  overlay.innerHTML = `
+    <div class="nota-type-popup">
+      <div class="nota-type-bg">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding:0 4px">
+          <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);font-weight:700">¿Qué querés crear?</div>
+          <button onclick="cerrarNotaTypeMenu()" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;width:34px;height:34px;font-size:16px;cursor:pointer;color:var(--muted)">✕</button>
+        </div>
+
+        <div class="nota-type-item" onclick="cerrarNotaTypeMenu();abrirEditorNota()">
+          <div class="nota-type-ic" style="background:#FFF9C4">📝</div>
+          <div>
+            <div class="nota-type-lbl">Nota en blanco</div>
+            <div class="nota-type-sub">Texto libre con formato completo</div>
+          </div>
+          <div style="font-size:18px;color:var(--muted);margin-left:auto">›</div>
+        </div>
+
+        <div class="nota-type-item" onclick="cerrarNotaTypeMenu();abrirModoLista('lista','Lista de compras')">
+          <div class="nota-type-ic" style="background:#E8F5E9">📋</div>
+          <div>
+            <div class="nota-type-lbl">Lista de ítems</div>
+            <div class="nota-type-sub">Checklist con precios y totales por voz</div>
+          </div>
+          <div style="font-size:18px;color:var(--muted);margin-left:auto">›</div>
+        </div>
+
+        <div class="nota-type-item" onclick="cerrarNotaTypeMenu();abrirGrabarAudio()">
+          <div class="nota-type-ic" style="background:#FEF2F2">🎙</div>
+          <div>
+            <div class="nota-type-lbl">Grabar y transcribir</div>
+            <div class="nota-type-sub">Habla, la IA transcribe automáticamente</div>
+          </div>
+          <div style="font-size:18px;color:var(--muted);margin-left:auto">›</div>
+        </div>
+
+        <div class="nota-type-item" onclick="cerrarNotaTypeMenu();_abrirNotaConFoto()">
+          <div class="nota-type-ic" style="background:#EFF6FF">📷</div>
+          <div>
+            <div class="nota-type-lbl">Nota con foto</div>
+            <div class="nota-type-sub">Crea una nota y añade imágenes</div>
+          </div>
+          <div style="font-size:18px;color:var(--muted);margin-left:auto">›</div>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+}
+
+function cerrarNotaTypeMenu(){
+  _notaMenuOpen = false;
+  document.getElementById('notaTypeOverlay')?.remove();
+}
+
+function _abrirNotaConFoto(){
+  abrirEditorNota();
+  setTimeout(()=>{ document.getElementById('ned-file')?.click(); }, 350);
+}
+
+// ══════════════════════════════════════════════════════════════
+// GRABACIÓN DE AUDIO CON TRANSCRIPCIÓN EN VIVO
+// ══════════════════════════════════════════════════════════════
+let _audRec = null;
+let _audRecording = false;
+let _audTranscript = '';
+let _audTimer = null;
+let _audSecs = 0;
+
+function abrirGrabarAudio(){
+  _audTranscript = '';
+  _audRecording = false;
+  _audSecs = 0;
+
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.id = 'audioRecModal';
+  ov.style.cssText = 'display:flex!important;align-items:flex-end;justify-content:center;z-index:300';
+  ov.onclick = e=>{ if(e.target===ov) cerrarGrabarAudio(); };
+
+  ov.innerHTML = `
+    <div class="modal" style="padding-bottom:32px;background:var(--card);border-radius:28px 28px 0 0">
+
+      <!-- Header -->
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--text);margin-bottom:4px">🎙 Grabar y transcribir</div>
+        <div style="font-size:12px;color:var(--muted)">Tu voz se transcribe en tiempo real</div>
+      </div>
+
+      <!-- Timer grande -->
+      <div id="aud-timer" style="text-align:center;font-family:'DM Sans',sans-serif;font-size:44px;font-weight:700;color:var(--text);letter-spacing:4px;margin-bottom:6px">00:00</div>
+
+      <!-- Wave animation -->
+      <div class="aud-wave" id="aud-wave">
+        ${Array.from({length:16},(_,i)=>`<div class="aud-bar" style="--d:${(i*0.075).toFixed(2)}s;height:4px"></div>`).join('')}
+      </div>
+
+      <!-- Status -->
+      <div id="aud-status" style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:20px;min-height:20px">
+        Toca el micrófono para empezar
+      </div>
+
+      <!-- Botón mic grande -->
+      <div style="display:flex;justify-content:center;margin-bottom:20px">
+        <button id="aud-mic-btn" class="aud-mic-btn" onclick="toggleAudioRec()">🎙</button>
+      </div>
+
+      <!-- Transcripción -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:7px">Transcripción en tiempo real:</div>
+        <div id="aud-transcript" style="min-height:90px;max-height:160px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:14px 16px;font-size:14px;color:var(--text);line-height:1.65;word-break:break-word">
+          <span style="color:var(--muted);font-style:italic">Tu voz aparecerá aquí mientras grabás...</span>
+        </div>
+      </div>
+
+      <!-- Botones -->
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost" onclick="cerrarGrabarAudio()" style="flex:1">Cancelar</button>
+        <button id="aud-save-btn" onclick="guardarNotaAudio()"
+          style="flex:2;background:var(--gold);color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;display:none">
+          ✓ Guardar nota
+        </button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(ov);
+}
+
+function toggleAudioRec(){
+  if(_audRecording) pararAudioRec();
+  else iniciarAudioRec();
+}
+
+function iniciarAudioRec(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    document.getElementById('aud-status').textContent = '⚠ Necesitás Chrome para grabar voz.';
+    return;
+  }
+
+  _audRecording = true;
+  _audSecs = 0;
+
+  const btn = document.getElementById('aud-mic-btn');
+  if(btn){ btn.classList.add('rec'); btn.textContent='⏹'; }
+
+  document.getElementById('aud-status').textContent = '🔴 Grabando... habla ahora';
+  document.querySelectorAll('#aud-wave .aud-bar').forEach(b=>b.classList.add('active'));
+
+  // Timer
+  _audTimer = setInterval(()=>{
+    _audSecs++;
+    const m = String(Math.floor(_audSecs/60)).padStart(2,'0');
+    const s = String(_audSecs%60).padStart(2,'0');
+    const el = document.getElementById('aud-timer');
+    if(el) el.textContent = m+':'+s;
+  }, 1000);
+
+  // Speech recognition — continuous
+  _audRec = new SR();
+  _audRec.lang = 'es-PE';
+  _audRec.continuous = true;
+  _audRec.interimResults = true;
+  _audRec.maxAlternatives = 1;
+
+  _audRec.onresult = (e)=>{
+    let newFinal='', interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal) newFinal += e.results[i][0].transcript+' ';
+      else interim += e.results[i][0].transcript;
+    }
+    if(newFinal) _audTranscript += newFinal;
+    const display = (_audTranscript + interim).trim();
+    const el = document.getElementById('aud-transcript');
+    if(el && display){
+      el.innerHTML = `<span>${display}</span><span style="color:var(--muted);font-style:italic"> ${interim?'...':''}</span>`;
+      el.scrollTop = el.scrollHeight;
+    }
+    if(_audTranscript.trim()){
+      const sb = document.getElementById('aud-save-btn');
+      if(sb) sb.style.display='block';
+    }
+  };
+
+  _audRec.onerror = (e)=>{
+    if(e.error==='no-speech'||e.error==='aborted') return;
+    document.getElementById('aud-status').textContent = '⚠ '+e.error;
+  };
+
+  _audRec.onend = ()=>{
+    if(_audRecording){ try{ _audRec.start(); }catch(er){} }
+  };
+
+  try{ _audRec.start(); }catch(e){}
+}
+
+function pararAudioRec(){
+  _audRecording = false;
+  clearInterval(_audTimer);
+  if(_audRec){ try{ _audRec.stop(); }catch(e){} _audRec = null; }
+  const btn = document.getElementById('aud-mic-btn');
+  if(btn){ btn.classList.remove('rec'); btn.textContent='🎙'; }
+  document.querySelectorAll('#aud-wave .aud-bar').forEach(b=>b.classList.remove('active'));
+  const hasTxt = _audTranscript.trim().length > 0;
+  document.getElementById('aud-status').textContent = hasTxt ? '✓ Listo — guardá o seguí grabando' : 'Toca el micrófono para empezar';
+  if(hasTxt){
+    const sb = document.getElementById('aud-save-btn');
+    if(sb) sb.style.display='block';
+  }
+}
+
+function cerrarGrabarAudio(){
+  pararAudioRec();
+  document.getElementById('audioRecModal')?.remove();
+}
+
+function guardarNotaAudio(){
+  const txt = _audTranscript.trim();
+  if(!txt){ toast('No hay texto grabado','error'); return; }
+
+  // Formatear transcript en párrafos limpia
+  const parrafos = txt.split(/(?<=[.!?])\s+/).filter(s=>s.trim().length>2)
+    .map(s=>s.trim().charAt(0).toUpperCase()+s.trim().slice(1));
+  const htmlTexto = '<p>' + parrafos.join('</p><p>') + '</p>';
+
+  const nota = {
+    id: Date.now()+'',
+    tipo: 'audio',
+    titulo: '🎙 Nota de voz · '+new Date().toLocaleDateString('es-PE',{day:'2-digit',month:'short'})+' '+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}),
+    texto: htmlTexto,
+    colorHoja: 'celeste',
+    fotos: [],
+    creado: new Date().toISOString(),
+    duracion: _audSecs,
+  };
+
+  if(!state.notas) state.notas = [];
+  state.notas.unshift(nota);
+  save('fnz_notas', state.notas);
+  cerrarGrabarAudio();
+
+  // Limpiar con Gemini si hay clave
+  const geminiKey = localStorage.getItem('fnz_gemini_key');
+  if(geminiKey) _mejorarTranscriptoIA(nota.id, txt, geminiKey);
+
+  toast('🎙 Nota de voz guardada ✓');
+  render();
+}
+
+async function _mejorarTranscriptoIA(notaId, rawText, key){
+  const prompt = `Limpia y estructura este texto dictado por voz en español peruano.
+Corrije puntuación, mayúsculas y pequeños errores de dictado.
+Devuelve el resultado como HTML usando solo <p> y <strong> si es necesario resaltar algo importante.
+Texto original: "${rawText}"
+Responde SOLO con el HTML limpio, sin explicaciones ni markdown.`;
+  try{
+    const res = await fetch(GEMINI_URL(key),{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:500}})
+    });
+    const data = await res.json();
+    const html = (data?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```html|```/g,'').trim();
+    if(html && html.includes('<')){
+      const n = state.notas.find(x=>x.id===notaId);
+      if(n){ n.texto=html; save('fnz_notas',state.notas); }
+      toast('✨ Transcripción mejorada por IA');
+    }
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════════════════════════
+// CHAT IA CON NOTA
+// ══════════════════════════════════════════════════════════════
+let _chatNotaId = null;
+
+function abrirChatIA(notaId){
+  const geminiKey = localStorage.getItem('fnz_gemini_key');
+  if(!geminiKey){
+    toast('⚙ Configura tu clave Gemini en Ajustes para usar Chat IA','info');
+    return;
+  }
+  const n = (state.notas||[]).find(x=>x.id===notaId);
+  if(!n) return;
+  _chatNotaId = notaId;
+
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.id = 'chatIAModal';
+  ov.style.cssText = 'display:flex!important;align-items:flex-end;justify-content:center;z-index:300';
+  ov.onclick = e=>{ if(e.target===ov) cerrarChatIA(); };
+
+  const notePreview = (n.texto||n.items?.map(i=>i.texto).join(', ')||'').replace(/<[^>]+>/g,'').trim().substring(0,100);
+
+  ov.innerHTML = `
+    <div class="modal" style="padding:0;height:82vh;display:flex;flex-direction:column;border-radius:28px 28px 0 0;overflow:hidden">
+
+      <!-- Header fijo -->
+      <div style="padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;background:var(--card)">
+        <div style="width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,var(--gold),var(--gold2));display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">✨</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--gold)">Chat IA</div>
+          <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.titulo||'Nota'}</div>
+        </div>
+        <button onclick="cerrarChatIA()" style="background:var(--bg);border:1px solid var(--border);border-radius:12px;width:36px;height:36px;font-size:18px;cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center">✕</button>
+      </div>
+
+      <!-- Contexto de nota -->
+      <div style="padding:10px 16px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Contenido de la nota:</div>
+        <div style="font-size:12px;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:9px 12px;max-height:56px;overflow:hidden;line-height:1.5">
+          ${notePreview}${notePreview.length>=100?'…':''}
+        </div>
+      </div>
+
+      <!-- Mensajes -->
+      <div id="chat-ia-msgs" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:var(--bg)">
+        <!-- Bienvenida IA -->
+        <div class="chat-ia-bubble ai" style="background:#F0FDF4;border:1px solid #4CAF8533;font-style:italic;font-size:13px;color:#2D5F3A">
+          Hola, soy tu asistente IA. Puedo hacer un resumen de esta nota, extraer puntos clave, crear una lista de tareas o responder cualquier pregunta. ¿Qué necesitás?
+        </div>
+        <!-- Acciones rápidas -->
+        <div style="display:flex;flex-wrap:wrap;gap:7px">
+          <button onclick="chatIASend('Haz un resumen breve de esta nota')" style="background:var(--card);border:1px solid var(--border);border-radius:20px;padding:8px 14px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;color:var(--text);font-weight:500">📋 Resumen</button>
+          <button onclick="chatIASend('Extrae los puntos más importantes en una lista')" style="background:var(--card);border:1px solid var(--border);border-radius:20px;padding:8px 14px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;color:var(--text);font-weight:500">⭐ Puntos clave</button>
+          <button onclick="chatIASend('Transforma el contenido en una lista de tareas pendientes')" style="background:var(--card);border:1px solid var(--border);border-radius:20px;padding:8px 14px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;color:var(--text);font-weight:500">☑ Lista de tareas</button>
+          <button onclick="chatIASend('Mejora la redacción de esta nota')" style="background:var(--card);border:1px solid var(--border);border-radius:20px;padding:8px 14px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;color:var(--text);font-weight:500">✏️ Mejorar texto</button>
+        </div>
+      </div>
+
+      <!-- Input fijo abajo -->
+      <div style="padding:10px 14px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;background:var(--card)">
+        <input id="chat-ia-input" type="text" placeholder="Preguntá algo sobre esta nota..."
+          style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:22px;padding:12px 18px;font-size:14px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();_chatIASendInput();}">
+        <button onclick="_chatIASendInput()"
+          style="width:48px;height:48px;border-radius:24px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;cursor:pointer;font-size:20px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff">▶</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(ov);
+}
+
+function cerrarChatIA(){
+  document.getElementById('chatIAModal')?.remove();
+  _chatNotaId = null;
+}
+
+function _chatIASendInput(){
+  const inp = document.getElementById('chat-ia-input');
+  if(!inp||!inp.value.trim()) return;
+  chatIASend(inp.value.trim());
+  inp.value = '';
+}
+
+async function chatIASend(msg){
+  const geminiKey = localStorage.getItem('fnz_gemini_key');
+  if(!geminiKey) return;
+  const n = (state.notas||[]).find(x=>x.id===_chatNotaId);
+  if(!n) return;
+  const msgs = document.getElementById('chat-ia-msgs');
+  if(!msgs) return;
+
+  // Remover botones de acciones rápidas después del primer mensaje
+  msgs.querySelectorAll('button[onclick*="chatIASend"]').forEach(b=>b.closest('div')?.remove());
+
+  // Burbuja usuario
+  msgs.innerHTML += `<div class="chat-ia-bubble user">${msg}</div>`;
+
+  // Loading dots
+  const loadId = 'ciai'+Date.now();
+  msgs.innerHTML += `<div class="chat-ia-bubble ai" id="${loadId}" style="padding:14px">
+    <div style="display:flex;gap:5px;align-items:center">
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--gold);animation:pulse 1s 0s infinite"></div>
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--gold);animation:pulse 1s .2s infinite"></div>
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--gold);animation:pulse 1s .4s infinite"></div>
+    </div>
+  </div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+
+  // Construir contexto
+  const ctx = (n.texto||'').replace(/<[^>]+>/g,'').trim()
+    || (n.items||[]).map(i=>i.texto).join(', ')
+    || '(nota vacía)';
+
+  const fullPrompt = `Sos un asistente IA que ayuda con notas personales en español de Perú.
+El usuario tiene una nota titulada "${n.titulo||'Sin título'}" con este contenido:
+---
+${ctx.substring(0,1500)}
+---
+Respondé de forma clara, útil y concisa. Usá viñetas cuando sea apropiado.
+Pregunta del usuario: ${msg}`;
+
+  try{
+    const res = await fetch(GEMINI_URL(geminiKey),{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{role:'user',parts:[{text:fullPrompt}]}],generationConfig:{temperature:0.5,maxOutputTokens:700}})
+    });
+    const data = await res.json();
+    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No pude procesar la respuesta.';
+
+    document.getElementById(loadId)?.remove();
+
+    const formatted = reply
+      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+      .replace(/^[•\-\*]\s/gm,'● ')
+      .replace(/\n\n/g,'</p><p style="margin:6px 0 0">')
+      .replace(/\n/g,'<br>');
+
+    msgs.innerHTML += `<div class="chat-ia-bubble ai"><p style="margin:0">${formatted}</p></div>`;
+  } catch(e){
+    document.getElementById(loadId)?.remove();
+    msgs.innerHTML += `<div class="chat-ia-bubble ai" style="color:#E05252">⚠ Error al conectar con Gemini.</div>`;
+  }
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ══════════════════════════════════════════════════════════════
+// COMPARTIR NOTA — Web Share API + WhatsApp fallback
+// ══════════════════════════════════════════════════════════════
+async function compartirNota(notaId){
+  const n = (state.notas||[]).find(x=>x.id===notaId);
+  if(!n) return;
+
+  const titulo = n.titulo || 'Nota';
+  let cuerpo = '';
+
+  if(n.tipo==='lista' && n.items?.length){
+    cuerpo = n.items.map(i=>`${i.done?'✅':'○'} ${i.texto}`).join('\n');
+  } else {
+    cuerpo = (n.texto||'').replace(/<br\s*\/?>/gi,'\n').replace(/<p[^>]*>/gi,'').replace(/<\/p>/gi,'\n').replace(/<[^>]+>/g,'').trim();
+  }
+
+  const texto = `📝 *${titulo}*\n\n${cuerpo}\n\n_Mis Finanzas App_`;
+
+  // Intentar Web Share API nativa
+  if(navigator.share){
+    try{
+      await navigator.share({ title: titulo, text: texto });
+      return;
+    } catch(e){ /* user cancelled or not supported */ }
+  }
+
+  // Fallback: modal con opciones
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title" style="color:var(--gold)">📤 Compartir nota</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">"${titulo}"</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onclick="closeModal();compartirNotaWhatsApp('${notaId}')"
+        style="background:#F0FDF4;border:1px solid #25D36633;border-radius:12px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:#15803D;display:flex;align-items:center;gap:12px;font-weight:600">
+        📱 <span>Compartir por WhatsApp</span>
+      </button>
+      <button onclick="closeModal();_copiarNotaPortapapeles('${notaId}')"
+        style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text);display:flex;align-items:center;gap:12px">
+        📋 <span>Copiar al portapapeles</span>
+      </button>
+    </div>
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn-ghost" onclick="closeModal()">Cerrar</button>
     </div>`;
   showModal();
 }
-function confirmDeleteNota(id){
-  const nota=state.notas.find(n=>n.id===id);
-  state.notas=state.notas.filter(n=>n.id!==id);
-  save('fnz_notas',state.notas);
-  if(nota) syncSeccionToSheets('nota_delete',{id,titulo:nota.titulo||''});
-  closeModal(); render(); toast('Nota eliminada');
+
+function _copiarNotaPortapapeles(notaId){
+  const n = (state.notas||[]).find(x=>x.id===notaId);
+  if(!n) return;
+  const titulo = n.titulo||'Nota';
+  let cuerpo = n.tipo==='lista' && n.items?.length
+    ? n.items.map(i=>`${i.done?'✅':'○'} ${i.texto}`).join('\n')
+    : (n.texto||'').replace(/<[^>]+>/g,'').trim();
+  navigator.clipboard?.writeText(`${titulo}\n\n${cuerpo}`).then(()=>toast('✓ Copiado al portapapeles'));
 }
 function pinNota(id){
   const n=state.notas.find(x=>x.id===id);
@@ -6994,7 +7563,7 @@ function toggleListening() {
 let micSilenceTimer  = null;  // temporizador de silencio
 let micFullTranscript = '';   // acumula todo lo dicho
 let micRestartLock   = false; // evita reinicios en cadena
-const MIC_SILENCE_MS = 2000;  // ms de silencio antes de procesar (reducido para más rapidez)
+const MIC_SILENCE_MS = 1500;  // ms de silencio antes de procesar — rápido y preciso
 
 function startListening() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -7062,6 +7631,11 @@ function startListeningHandlers(rec) {
     if(newFinal) micFullTranscript = appendWithoutOverlap(micFullTranscript, newFinal);
     const display=(micFullTranscript+interim).trim();
     document.getElementById('micText').textContent=display||'...';
+
+    // ★ Detección rápida durante interim — actualizar header sin esperar silencio
+    const checkText = (micFullTranscript+interim).trim().toLowerCase();
+    _actualizarContextoMic(checkText);
+
     // ★ Actualizar formulario fantasma con el texto acumulado
     if(display) try { updateGhostFromText(display); } catch(e){}
     clearTimeout(micSilenceTimer);
@@ -7082,6 +7656,36 @@ function startListeningHandlers(rec) {
     stopListening();
   };
   rec.onend=()=>{ if(micListening&&!micRestartLock) restartListening(); };
+}
+
+// ── Detectar contexto en tiempo real mientras habla ──
+function _actualizarContextoMic(texto){
+  const header = document.getElementById('micHeader');
+  const icon   = document.getElementById('micContextIcon');
+  const title  = document.getElementById('micContextTitle');
+  const sub    = document.getElementById('micContextSub');
+  if(!header||!icon||!title||!sub) return;
+
+  const t = texto.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+
+  if(isNotaCommand(texto)){
+    const esLista = t.includes('lista');
+    header.style.background='#1E3A2E';
+    icon.textContent  = esLista ? '📋' : '📝';
+    title.textContent = esLista ? 'Modo Lista' : 'Nueva Nota';
+    sub.textContent   = esLista ? 'Dictarás ítems uno por uno' : 'Se abrirá el editor de notas';
+  } else if(isAgendaCommand(texto)){
+    const esVis = /\b(visita|cotizar|presupuesto)\b/.test(t);
+    header.style.background='#1A2B3E';
+    icon.textContent  = esVis ? '👁' : '🔧';
+    title.textContent = esVis ? 'Agenda — Visita' : 'Agenda — Trabajo';
+    sub.textContent   = 'Gemini llenará los campos automáticamente';
+  } else if(/\b(gast[eé]|pagu[eé]|compr[eé]|recib[ií]|cobr[eé]|gan[eé])\b/.test(t)){
+    header.style.background='#1E293B';
+    icon.textContent  = /\b(recib|cobr|gan)\b/.test(t) ? '↑' : '↓';
+    title.textContent = /\b(recib|cobr|gan)\b/.test(t) ? 'Registrar Ingreso' : 'Registrar Gasto';
+    sub.textContent   = 'Gemini analizará el monto y categoría';
+  }
 }
 
 function stopListening() {
