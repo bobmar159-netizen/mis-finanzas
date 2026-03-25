@@ -5860,35 +5860,32 @@ function stopAgendaVoz(){
 // Extractor de cliente específico para agenda — patrones más simples
 function extractClienteAgenda(text){
   const t2 = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+  // ★ Terminadores que indican fin del nombre (sin necesidad de coma)
+  const FIN = '(?:\\s+en\\b|\\s+de\\b|\\s*[,.]|\\s+servicio\\b|\\s+precio\\b|\\s+soles\\b|\\s+sol\\b|\\s+punto\\b|\\s+terma\\b|\\s+cocina\\b|\\s+horno\\b|\\s+calefon\\b|\\s+parrilla\\b|\\s+secadora\\b|\\s+instalacion\\b|\\s+conexion\\b|\\s+reparacion\\b|\\s+modificacion\\b|\\s+gasfiteria\\b|\\s+documentacion\\b|\\s+conversion\\b|\\s+a las\\b|$)';
+
   const patterns = [
-    // "a la señora Leonor", "al señor Pedro", "a don Carlos", "a doña María"
-    /\ba\s+(?:la\s+|el\s+)?(?:señora?|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
-    // "para la señora Leonor", "para el señor García"
-    /para\s+(?:la\s+|el\s+)?(?:señora?|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
-    // "con la señora / con el señor"
-    /con\s+(?:la\s+|el\s+)?(?:señora?|don|doña)\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
-    // "donde la señora / donde el señor"
-    /donde\s+(?:la\s+|el\s+)?(?:señora?|don|doña)?\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
-    // "al cliente / para el cliente"
-    /(?:al|para el|para la)\s+(?:cliente|clienta)\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,25}?)(?:\s+en\b|\s*[,.]|$)/i,
-    // trabajo/visita para Pérez
-    /(?:trabajo|visita|servicio|instalacion|reparacion)\s+para\s+(?:el|la)?\s*(?:señora?|don|doña)?\s*([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{2,25}?)(?:\s+en\b|\s+de\b|\s*[,.]|$)/i,
-    // ★ Sin preposición: "señora Paty Los Olivos", "señor Carlos jueves"
-    /(?:señora?|doña|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñ][A-Za-záéíóúñ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|$)/i,
+    new RegExp('\\ba\\s+(?:la\\s+|el\\s+)?(?:senora?|don|dona|sr\\.?|sra\\.?)\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
+    new RegExp('para\\s+(?:la\\s+|el\\s+)?(?:senora?|don|dona|sr\\.?|sra\\.?)\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
+    new RegExp('con\\s+(?:la\\s+|el\\s+)?(?:senora?|don|dona)\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
+    new RegExp('donde\\s+(?:la\\s+|el\\s+)?(?:senora?|don|dona)?\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
+    new RegExp('(?:al|para el|para la)\\s+(?:cliente|clienta)\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
+    new RegExp('(?:trabajo|visita|servicio|instalacion|reparacion)\\s+para\\s+(?:el|la)?\\s*(?:senora?|don|dona)?\\s*([A-Za-z][A-Za-z\\s]{2,20}?)' + FIN, 'i'),
+    // sin preposición: "señora Paty Los Olivos"
+    new RegExp('(?:senora?|dona|don|sr\\.?|sra\\.?)\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
   ];
-  // ★ Palabras que nunca son parte del nombre — incluyendo preposiciones de lugar
-  const stopWords = /^(en|de|del|al|la|el|por|para|con|que|fue|era|los|las|un|una|dia|mañana|manana|hoy|ayer|servicio|precio|monto|cobro|costo|trabajo|visita|agenda|lunes|martes|miercoles|jueves|viernes|sabado|domingo|soles|sol|a|las|modificacion|instalacion|conexion|reparacion|gasfiteria|documentacion|conversion|construccion|construcion|terma|cocina|horno|secadora|calefon|parrilla|punto|adicional|tuberia|red|el|este|esta|para|desde|hasta|hacia|cerca|queda|vive)$/i;
-  // ★ Palabras de inicio de distrito — no son apellidos
-  const distWords = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|lurín|chorrillos|breña|brena|miraflores|independencia|carabayllo|ventanilla|bellavista)$/i;
-  const diasStop = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana|ayer)$/i;
+
+  const stopWords = /^(en|de|del|al|la|el|por|para|con|que|fue|era|los|las|un|una|dia|manana|hoy|ayer|servicio|precio|monto|cobro|costo|trabajo|visita|agenda|lunes|martes|miercoles|jueves|viernes|sabado|domingo|soles|sol|a|las|punto|adicional|terma|cocina|horno|secadora|calefon|parrilla|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|este|esta|desde|hasta|cerca)$/i;
+  const distWords = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|brena|miraflores|independencia|carabayllo|ventanilla|bellavista)$/i;
+  const diasStop  = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|ayer)$/i;
+
   for(const p of patterns){
-    const m=t2.match(p);
-    if(m&&m[1]){
-      let partes = m[1].trim().split(/\s+/).filter(w=>!stopWords.test(w));
-      // ★ Si la segunda palabra es inicio de distrito o día → solo primera
-      if(partes.length>1 && (distWords.test(partes[1])||diasStop.test(partes[1]))) partes=[partes[0]];
-      const nombre = partes.slice(0,2).join(' ').trim();
-      if(nombre.length>1) return nombre;
+    const m = t2.match(p);
+    if(m && m[1]){
+      let partes = m[1].trim().split(/\s+/).filter(w => !stopWords.test(w));
+      if(partes.length > 1 && (distWords.test(partes[1]) || diasStop.test(partes[1]))) partes = [partes[0]];
+      const nombre = partes.slice(0, 2).join(' ').trim();
+      if(nombre.length > 1) return nombre;
     }
   }
   return null;
@@ -5975,17 +5972,20 @@ function parseAgendaVoz(text){
     const t2 = text.toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
-    // Patrones de hora con AM/PM y variaciones peruanas
+    // ── Mapa de números en palabras → dígito ──
+    const HORA_PALABRAS = {
+      'una':1,'uno':1,'dos':2,'tres':3,'cuatro':4,'cinco':5,'seis':6,
+      'siete':7,'ocho':8,'nueve':9,'diez':10,'once':11,'doce':12,
+      'trece':13,'catorce':14,'quince':15,'dieciseis':16,'diecisiete':17,
+      'dieciocho':18,'diecinueve':19,'veinte':20,'veintiuno':21,'veintidos':22,
+    };
+
+    // Patrones de hora con dígitos
     const horaPatterns = [
-      // "a las 3 de la tarde", "a las 3pm", "a las 3 pm"
-      /a las\s+(\d{1,2})(?::(\d{2}))?\s*(?:horas?)?\s*(pm|am|p\.m|a\.m|de la tarde|de la manana|de la mañana|del mediodia|del mediodía|del mediodia|de la noche|de la madrugada)/i,
-      // "3 de la tarde", "3pm", "8 am"
+      /a las\s+(\d{1,2})(?::(\d{2}))?\s*(?:horas?)?\s*(pm|am|p\.m|a\.m|de la tarde|de la manana|de la mañana|del mediodia|del mediodía|de la noche|de la madrugada)/i,
       /\b(\d{1,2})(?::(\d{2}))?\s*(pm|am|p\.m|a\.m|de la tarde|de la manana|de la mañana|de la noche|de la madrugada)\b/i,
-      // "a las 3 y media", "a las 3 y cuarto"
       /a las\s+(\d{1,2})\s+y\s+(media|cuarto|quince|treinta|cuarenta|cuarenta y cinco)/i,
-      // "a las 15:00", "a las 9:30"
       /a las\s+(\d{1,2}):(\d{2})/i,
-      // solo HH:MM
       /\b(\d{1,2}):(\d{2})\b/,
     ];
 
@@ -5995,25 +5995,43 @@ function parseAgendaVoz(text){
       let h=parseInt(m2[1]), min=0;
       const rest = (m2[2]||'').toLowerCase();
       const period = (m2[3]||'').toLowerCase();
-
-      // Minutos por texto
       if(rest==='media'||rest==='treinta') min=30;
       else if(rest==='cuarto'||rest==='quince') min=15;
       else if(rest==='cuarenta') min=40;
       else if(rest==='cuarenta y cinco') min=45;
       else min=parseInt(rest)||0;
-
-      // PM contexts
       const isPM = period.includes('pm')||period.includes('tarde')||period.includes('noche')||period.includes('p.m');
       const isAM = period.includes('am')||period.includes('manana')||period.includes('madrugada')||period.includes('a.m');
-
       if(isPM && h!==12 && h<12) h+=12;
       if(isAM && h===12) h=0;
-      // Heurística: si no se especificó AM/PM y h<=6 y no hay otro contexto → probablemente PM (trabajo)
       if(!isPM&&!isAM&&h>=1&&h<=6) h+=12;
-
       hora = String(h).padStart(2,'0')+':'+String(min).padStart(2,'0');
       break;
+    }
+
+    // ★ Hora en palabras — "nueve de la mañana", "tres de la tarde", "a las ocho"
+    if(!hora){
+      const wordPat = /(?:a las\s+)?([a-z]+)\s+(?:y\s+(media|cuarto|quince|treinta))?\s*(?:de la\s+)?(manana|tarde|noche|madrugada|mediodia)?/i;
+      // Buscar en contexto "a las [palabra]" o "[palabra] de la [periodo]"
+      const wm = t2.match(/a las\s+([a-z]+)(?:\s+y\s+(media|cuarto|quince|treinta))?(?:\s+de la\s+(manana|tarde|noche|madrugada)|\s+(am|pm))?/i)
+               || t2.match(/\b([a-z]+)\s+(?:y\s+(media|cuarto|quince|treinta)\s+)?de la\s+(manana|tarde|noche|madrugada)\b/i);
+      if(wm){
+        const numWord = (wm[1]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        const h = HORA_PALABRAS[numWord];
+        if(h){
+          const minWord = (wm[2]||'').toLowerCase();
+          let min = 0;
+          if(minWord==='media'||minWord==='treinta') min=30;
+          else if(minWord==='cuarto'||minWord==='quince') min=15;
+          const period = (wm[3]||wm[4]||'').toLowerCase();
+          let hFinal = h;
+          if((period.includes('tarde')||period.includes('noche')||period.includes('pm'))&&h<12) hFinal+=12;
+          if((period.includes('manana')||period.includes('am'))&&h===12) hFinal=0;
+          // Sin periodo explícito y h<=6 → tarde (heurística para trabajos)
+          if(!period&&h>=1&&h<=6) hFinal+=12;
+          hora = String(hFinal).padStart(2,'0')+':'+String(min).padStart(2,'0');
+        }
+      }
     }
   }
   // ── Extracción robusta independiente del orden ──
@@ -7200,7 +7218,7 @@ function extractCliente(text) {
     /de(?:l|\s+la)?\s+(?:señor|señora|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+por\b|\s+precio|$)/i,
     /(?:para|al|con)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+en\b|\s+de\b|\s*[,.]|\s+precio|$)/,
     // ★ Sin preposición: "señora Carmen Lince", "señor Pedro viernes"
-    /(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+la\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|$)/i,
+    /(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+la\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|\s+servicio\b|\s+precio\b|\s+soles\b|\s+punto\b|\s+terma\b|\s+cocina\b|\s+horno\b|\s+calefon\b|\s+parrilla\b|\s+instalacion\b|\s+conexion\b|\s+reparacion\b|$)/i,
   ];
   for (const p of patterns) {
     const m = t.match(p);
