@@ -446,6 +446,33 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 
 <script>
 const GEMINI_URL = k => `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${k}`;
+
+// ── Colores de hoja de nota ──
+const NOTA_COLORES = {
+  amarillo: { bg:'#FFFDE7', border:'#F9A825', title:'#4E342E', text:'#5D4037', line:'#F9A82544', footer:'#A1887F', label:'Amarillo' },
+  blanco:   { bg:'#FFFFFF', border:'#E0E0E0', title:'#212121', text:'#424242', line:'#E0E0E0',   footer:'#9E9E9E', label:'Blanco' },
+  verde:    { bg:'#F1F8E9', border:'#AED581', title:'#33691E', text:'#33691E', line:'#AED58155', footer:'#689F38', label:'Verde' },
+  azul:     { bg:'#E3F2FD', border:'#90CAF9', title:'#0D47A1', text:'#1565C0', line:'#90CAF955', footer:'#1976D2', label:'Azul' },
+  rosa:     { bg:'#FCE4EC', border:'#F48FB1', title:'#880E4F', text:'#880E4F', line:'#F48FB155', footer:'#C2185B', label:'Rosa' },
+  pizarron: { bg:'#263238', border:'#455A64', title:'#ECEFF1', text:'#CFD8DC', line:'#455A6466', footer:'#78909C', label:'Pizarrón' },
+};
+
+// ── Bullet styles ──
+const BULLET_STYLES = {
+  check:   { icon: (done, i) => done ? '✅' : '☐',   label: '☐ Check' },
+  check2:  { icon: (done, i) => done ? '✓' : '○',    label: '○ Círculo' },
+  numeric: { icon: (done, i) => (i+1)+'.',            label: '1. Número' },
+  dot:     { icon: (done, i) => '●',                  label: '● Punto' },
+  arrow:   { icon: (done, i) => '→',                  label: '→ Flecha' },
+  star:    { icon: (done, i) => done ? '★' : '☆',    label: '☆ Estrella' },
+  emoji:   { icon: (done, i) => ['🔧','🛒','📦','💡','🔩','🪛','⚡'][i%7], label: '🔧 Emoji' },
+};
+
+function getBulletIcon(nota, idx, done){
+  const style = nota.bulletStyle || 'check';
+  const bs = BULLET_STYLES[style];
+  return bs ? bs.icon(done, idx) : '☐';
+}
 // ─────────────────────────────────────────────
 // CONSTANTS & DEFAULTS
 // ─────────────────────────────────────────────
@@ -3285,6 +3312,7 @@ let _notaVozBuffer = '';
 let _notaVozIgnoreNext = false;
 
 function renderNotas(){
+  try {
   if(!state.notas) state.notas=[];
   const todas = state.notas;
   const total = todas.length;
@@ -3295,7 +3323,7 @@ function renderNotas(){
         <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px">Sin notas aún</div>
         <div style="font-size:12px">Toca <strong>+ Nueva nota</strong> o usa el micrófono</div>
        </div>`
-    : notas.map(n=>renderNotaCard(n)).join('');
+    : notas.map(n=>{ try{ return renderNotaCard(n); } catch(e){ console.error('renderNotaCard error',e,n); return ''; }}).join('');
 
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
@@ -3313,6 +3341,10 @@ function renderNotas(){
         🎙 Nota de voz
       </button>
     </div>`;
+  } catch(e) {
+    console.error('renderNotas error:', e);
+    return '<div style="padding:20px;text-align:center;color:red">Error al cargar notas.</div>';
+  }
 }
 
 function renderNotaCard(n){
@@ -7065,6 +7097,9 @@ let _nedColor = 'amarillo';
 let _nedLastSaved = '';
 
 function abrirEditorNota(editId){
+  // Remove existing overlay if any
+  const existing = document.getElementById('nota-editor-overlay');
+  if(existing) existing.remove();
   _nedNota = editId ? (state.notas||[]).find(x=>x.id===editId) : null;
   _nedFotos = _nedNota?.fotos ? [..._nedNota.fotos] : [];
   _nedRecordatorio = _nedNota?.recordatorio || '';
