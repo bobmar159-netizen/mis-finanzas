@@ -137,6 +137,26 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .mv-amt-egr{color:#C62828}
 .mv-chevron{font-size:10px;color:var(--muted);transition:transform .2s}
 .mv-card.open .mv-chevron{transform:rotate(180deg)}
+
+/* ── AGENDA CARD v2 — colapsable ── */
+.ag-card{background:var(--card);border:1px solid var(--border);border-radius:16px;margin-bottom:10px;overflow:hidden;transition:border-color .2s;-webkit-tap-highlight-color:transparent}
+.ag-card.open{border-color:var(--gold)}
+.ag-card-head{padding:14px 16px;cursor:pointer;display:flex;gap:12px;align-items:flex-start}
+.ag-card-head:active{opacity:.9}
+.ag-card-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.ag-card-body{flex:1;min-width:0}
+.ag-card-nombre{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;margin-bottom:5px}
+.ag-card-meta{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:4px}
+.ag-card-pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.ag-card-servicio{font-size:12px;font-weight:600;color:#185FA5;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ag-card-chevron{font-size:12px;color:var(--muted);margin-top:4px;flex-shrink:0;transition:transform .22s}
+.ag-card.open .ag-card-chevron{transform:rotate(180deg)}
+.ag-card-expand{max-height:0;overflow:hidden;transition:max-height .28s ease}
+.ag-card.open .ag-card-expand{max-height:500px}
+.ag-card-detail{padding:0 16px 14px;display:flex;flex-direction:column;gap:7px;border-top:1px solid var(--border);padding-top:12px}
+.ag-card-actions{display:flex;gap:6px;flex-wrap:wrap}
+.ag-act-btn{flex:1;min-width:80px;border:1px solid;border-radius:10px;padding:10px 8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;text-align:center;-webkit-tap-highlight-color:transparent}
+.ag-act-btn:active{opacity:.8;transform:scale(.97)}
 .mv-expand{max-height:0;overflow:hidden;transition:max-height .28s ease}
 .mv-card.open .mv-expand{max-height:300px}
 .mv-detail{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;padding-top:10px;margin-top:10px;border-top:0.5px solid var(--border)}
@@ -1231,6 +1251,14 @@ function renderMovimientos(){
 function toggleMvCard(id){
   const el=document.getElementById(id);
   if(el) el.classList.toggle('open');
+}
+
+function toggleAgendaCard(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  // Cerrar todas las demás antes de abrir esta
+  document.querySelectorAll('.ag-card.open').forEach(c=>{ if(c.id!==id) c.classList.remove('open'); });
+  el.classList.toggle('open');
 }
 
 // ── CATEGORIES PAGE ──
@@ -5159,43 +5187,106 @@ function renderAgenda(){
   </div>`;
 
   function agendaCard(item){
-    // Migrar estados viejos al nuevo sistema
     const _migrarEstado = s => ({completado:'se_finalizo',cancelado:'se_desanimo'}[s]||s||'agendado');
     const est = AGENDA_ESTADOS[_migrarEstado(item.estado)] || AGENDA_ESTADOS['agendado'];
     const dias = diasHastaLabel(item.fecha);
     const ubic = parseUbicacionLink(item.ubicacion);
     const isVisita = item.tipo==='visita';
-    return `<div class="debt-card" style="border-color:${est.border}44;margin-bottom:10px">
-      <div class="debt-accent" style="background:${est.border}"></div>
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div>
-          <div style="font-family:'Playfair Display',serif;font-size:15px;color:var(--text)">${item.cliente||'Sin cliente'}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${isVisita?'👁 Visita':'🔧 Trabajo'} · ${item.fecha}${item.hora?' · '+horaTo12(item.hora):''}</div>
-          ${!isVisita&&item.servicio?`<div style="font-size:12px;color:#1565C0;margin-top:3px;font-weight:500">🔵 ${item.servicio}</div>`:''}
+    const cardId = 'agcard_'+item.id;
+    const estaActivo = ['agendado','pendiente','reprogramo'].includes(_migrarEstado(item.estado));
+
+    // Icono y color según tipo
+    const icono = isVisita ? '👁' : '🔧';
+    const iconBg = isVisita ? '#EFF6FF' : '#F3F0FF';
+
+    // Fecha formateada
+    const [y,m,d] = (item.fecha||'').split('-');
+    const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const fechaLbl = y ? `${parseInt(d)} ${meses[parseInt(m)-1]}` : '—';
+    const horaLbl = item.hora ? horaTo12(item.hora) : '';
+
+    // Precio
+    const precioBadge = !isVisita && item.precio
+      ? `<span class="ag-card-pill" style="background:#F3F0FF;color:#534AB7">S/ ${fmt(item.precio).replace('S/ ','')}</span>`
+      : '';
+
+    // Detalle expandido
+    const ubicHtml = ubic.link
+      ? `<a href="${ubic.link}" target="_blank" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;background:#EEF4FF;border:1px solid #2E86AB33;border-radius:8px;padding:6px 11px;font-size:12px;color:#1565C0;text-decoration:none;font-weight:600">${ubic.display} ↗</a>`
+      : `<div style="font-size:12px;color:var(--muted)">${ubic.display}</div>`;
+
+    const precioHtml = !isVisita && item.precio
+      ? `<div style="background:#F3F0FF;border-radius:10px;padding:9px 13px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;color:#534AB7;font-weight:600">Precio acordado</span>
+          <span style="font-size:17px;font-weight:700;color:#534AB7;font-family:'Playfair Display',serif">${fmt(item.precio)}</span>
+        </div>` : '';
+
+    const telHtml = item.telefono
+      ? `<a href="tel:${item.telefono}" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:6px;background:#F0FDF4;border:1px solid #4CAF8533;border-radius:8px;padding:6px 11px;font-size:12px;color:#27500A;text-decoration:none;font-weight:600">📞 ${item.telefono}</a>` : '';
+
+    const notasHtml = item.notas
+      ? `<div style="background:#FFFBEB;border:1px solid #EF9F2733;border-radius:8px;padding:8px 11px;font-size:12px;color:#633806">📝 ${item.notas}</div>` : '';
+
+    // Pago badge si finalizó
+    const pagoBadge = item.estadoPago
+      ? `<span class="ag-card-pill" style="background:${(AGENDA_PAGO[item.estadoPago]||{}).bg||'#F5F5F5'};color:${(AGENDA_PAGO[item.estadoPago]||{}).color||'#333'}">${(AGENDA_PAGO[item.estadoPago]||{}).label||''}</span>` : '';
+    const montoP = item.montoPendienteCobro>0
+      ? `<span class="ag-card-pill" style="background:#FAEEDA;color:#633806">Pendiente: S/ ${item.montoPendienteCobro.toFixed(2)}</span>` : '';
+
+    // Botones de acción según estado
+    const accionesHtml = estaActivo ? `
+      <div class="ag-card-actions">
+        <button class="ag-act-btn" style="background:#EEEDFE;border-color:#AFA9EC;color:#3C3489"
+          onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','reprogramo')">↻ Reprogramó</button>
+        <button class="ag-act-btn" style="background:#F1EFE8;border-color:#B4B2A9;color:#444441"
+          onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','se_desanimo')">✗ Se desanimó</button>
+        ${!isVisita
+          ? `<button class="ag-act-btn" style="background:#EAF3DE;border-color:#97C459;color:#27500A"
+              onclick="event.stopPropagation();abrirModalCobro('${item.id}')">✓ Se finalizó</button>`
+          : `<button class="ag-act-btn" style="background:#FFF3E0;border-color:#FFCC80;color:#BF360C"
+              onclick="event.stopPropagation();convertirVisitaAConstruccion('${item.id}')">🔨 Convertir a Construcción</button>`}
+      </div>` : '';
+
+    // Botones secundarios (editar / whatsapp / eliminar)
+    const secundariosHtml = `
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <button onclick="event.stopPropagation();editAgendaItem('${item.id}')"
+          style="flex:1;padding:9px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">✎ Editar</button>
+        ${item.telefono ? `<button onclick="event.stopPropagation();abrirWhatsAppAgenda('${item.id}')"
+          style="width:40px;background:#E8F5E2;border:1px solid #9FE1CB;color:#085041;border-radius:10px;cursor:pointer;font-size:18px">💬</button>` : ''}
+        <button onclick="event.stopPropagation();deleteAgendaItem('${item.id}')"
+          style="width:40px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700">✕</button>
+      </div>`;
+
+    return `
+    <div class="ag-card" id="${cardId}">
+      <!-- CABECERA — siempre visible, tap para expandir -->
+      <div class="ag-card-head" onclick="toggleAgendaCard('${cardId}')">
+        <div class="ag-card-icon" style="background:${iconBg}">${icono}</div>
+        <div class="ag-card-body">
+          <div class="ag-card-nombre">${item.cliente||'Sin cliente'}</div>
+          <div class="ag-card-meta">
+            <span class="ag-card-pill" style="background:${dias.bg};color:${dias.color}">${dias.txt}</span>
+            <span style="font-size:12px;color:var(--muted);font-weight:600">${fechaLbl}${horaLbl?' · '+horaLbl:''}</span>
+            <span class="ag-card-pill" style="background:${est.bg};color:${est.color}">${est.label}</span>
+            ${precioBadge}${pagoBadge}${montoP}
+          </div>
+          ${!isVisita && item.servicio ? `<div class="ag-card-servicio">🔵 ${item.servicio}</div>` : ''}
+          ${item.ubicacion ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">📍 ${item.ubicacion}</div>` : ''}
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-          <span style="background:${dias.bg};color:${dias.color};font-size:10px;font-weight:600;padding:3px 8px;border-radius:10px">${dias.txt}</span>
-          <span style="background:${est.bg};color:${est.color};font-size:10px;font-weight:600;padding:3px 8px;border-radius:10px">${est.label}</span>
-        </div>
+        <div class="ag-card-chevron">▾</div>
       </div>
-      ${ubic.link
-        ?`<a href="${ubic.link}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#EEF4FF;border:1px solid #2E86AB33;border-radius:8px;padding:5px 10px;font-size:12px;color:#1565C0;text-decoration:none;margin-bottom:8px">${ubic.display} ↗</a>`
-        :`<div style="font-size:12px;color:var(--muted);margin-bottom:8px">📍 ${ubic.display}</div>`}
-      ${!isVisita&&item.precio?`<div style="background:#F3F0FF;border-radius:8px;padding:7px 10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:11px;color:#6C3483">Precio acordado</span><span style="font-size:15px;font-weight:700;color:#6C3483">${fmt(item.precio)}</span></div>`:''}
-      ${item.telefono?`<a href="tel:${item.telefono}" style="display:inline-flex;align-items:center;gap:5px;background:#F0FDF4;border:1px solid #4CAF8533;border-radius:8px;padding:5px 10px;font-size:12px;color:#27500A;text-decoration:none;margin-bottom:8px">📞 ${item.telefono}</a>`:''}
-      ${item.notas?`<div style="background:#FFFBEB;border:1px solid #EF9F2733;border-radius:8px;padding:7px 10px;font-size:12px;color:#633806;margin-bottom:8px">📝 ${item.notas}</div>`:''}
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${['agendado','pendiente','reprogramo'].includes(item.estado||'agendado')?`
-          <button onclick="cambiarEstadoAgenda('${item.id}','reprogramo')" style="flex:1;min-width:88px;background:#EEEDFE;border:1px solid #7F77DD44;color:#3C3489;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer">↻ Reprogramó</button>
-          <button onclick="cambiarEstadoAgenda('${item.id}','se_desanimo')" style="flex:1;min-width:88px;background:#F1EFE8;border:1px solid #88878044;color:#444441;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer">✗ Se desanimó</button>
-          ${!isVisita?`<button onclick="abrirModalCobro('${item.id}')" style="flex:1;min-width:105px;background:#EAF3DE;border:1px solid #63992244;color:#27500A;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer">✓ Se finalizó</button>`:''}
-        `:''}
-        ${item.estadoPago?`<span style="background:${(AGENDA_PAGO[item.estadoPago]||{}).bg||'#F5F5F5'};color:${(AGENDA_PAGO[item.estadoPago]||{}).color||'#333'};font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px">${(AGENDA_PAGO[item.estadoPago]||{}).label||''}</span>`:''}
-        ${item.montoPendienteCobro>0?`<span style="background:#FAEEDA;color:#633806;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px">Pendiente cobrar: ${fmt(item.montoPendienteCobro)}</span>`:''}
-        ${isVisita?`<button onclick="convertirVisitaAConstruccion('${item.id}')" style="flex:1;min-width:130px;background:#FFF3E0;border:1px solid #E6510044;color:#BF360C;border-radius:8px;padding:7px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">🔨 Convertir a Construcción</button>`:''}
-        <button onclick="editAgendaItem('${item.id}')" style="width:32px;height:32px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:12px">✎</button>
-        ${item.telefono?`<button onclick="abrirWhatsAppAgenda('${item.id}')" style="width:32px;height:32px;background:#E8F5E2;border:1px solid #25D36644;color:#128C5E;border-radius:8px;cursor:pointer;font-size:15px" title="Confirmar por WhatsApp">💬</button>`:''}
-        <button onclick="deleteAgendaItem('${item.id}')" style="width:32px;height:32px;background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">✕</button>
+
+      <!-- DETALLE — se despliega al tap -->
+      <div class="ag-card-expand">
+        <div class="ag-card-detail">
+          ${ubicHtml}
+          ${precioHtml}
+          ${telHtml}
+          ${notasHtml}
+          ${accionesHtml}
+          ${secundariosHtml}
+        </div>
       </div>
     </div>`;
   }
@@ -6976,7 +7067,7 @@ function buildSmartDescription(text, cat, detectedService) {
 
 // Los 8 servicios del negocio con todas sus variaciones
 const SERVICIOS_NEGOCIO = [
-  { id:'punto_adicional',   label:'Punto adicional',
+  { id:'punto_adicional',   label:'Punto Adicional',
     kws:['punto adicional','punto extra','hice un punto','hice el punto','trabajo de punto',
          'punto de gas','instale un punto','instalé un punto','nuevo punto','agregar punto',
          'punto adicional de gas','trabajo punto adicional','cobré por un punto','cobré un punto',
@@ -6985,36 +7076,32 @@ const SERVICIOS_NEGOCIO = [
          'toma adicional','derivación nueva','derivacion nueva','derivación adicional',
          'cobré hoy por punto','punto gas natural','cobré un punto adicional',
          'servicio punto adicional','servicio de punto','un punto','el punto'] },
-  { id:'modificacion_red',  label:'Modificación de red',
+  { id:'modificacion_red',  label:'Modificación Red',
     kws:['modificacion de red','modificación de red','modifique la red','modifiqué la red',
          'cambio de red','modificacion interna','modificación interna','rediseño de red',
          'cambie la tuberia','cambié la tubería','modificar red','modificacion',
          'servicio modificacion','modificar la instalacion','modificar instalacion'] },
-  { id:'instalacion_nueva', label:'Instalación nueva',
+  { id:'instalacion_nueva', label:'Instalación Nueva',
     kws:['instalacion nueva','instalación nueva','nueva instalacion',
          'nueva instalación','instalacion de gas','instalación de gas','instalacion completa',
          'proyecto nuevo','obra nueva','instalar gas'] },
-  { id:'conversion_artefacto', label:'Conversión de artefacto',
+  { id:'conversion_artefacto', label:'Conversión Artefacto',
     kws:['conversion de artefacto','conversión de artefacto','converti','convertí',
          'conversion a gas','conversión a gas','converti cocina','convertí cocina',
          'conversion de horno','converti artefacto','adaptar artefacto',
-         // ★ Clave corta — palabra sola
          'conversion','conversión','hice conversion','hice conversión',
          'hice una conversion','hice una conversión','realice conversion','realicé conversión',
-         // ★ Variantes fonéticas Chrome
          'combersion','comversion','combersión','comversión',
          'combercion','convercion','conbersion','conbersión'] },
-  { id:'conexion_artefacto',label:'Conexión de artefacto',
+  { id:'conexion_artefacto',label:'Conexión Artefacto',
     kws:['conexion de artefacto','conexión de artefacto','conecte','conecté','conectar artefacto',
          'conexion de cocina','conexión de cocina','conecte el artefacto','conectar equipo',
          'conecte la cocina','conecté la cocina','conexion nueva de artefacto',
-         // ★ Clave corta — palabra sola
          'conexion','conexión','hice conexion','hice conexión',
          'hice la conexion','hice la conexión','nueva conexion','nueva conexión',
-         // ★ Variantes fonéticas Chrome
          'coneccion','conección','konexion','coneccion de artefacto',
          'coneccion de cocina','coneccion nueva','conectar nueva','hice la coneccion'] },
-  { id:'reparacion_tuberia',label:'Reparación de tubería',
+  { id:'reparacion_tuberia',label:'Reparación Tubería',
     kws:['reparacion de tuberia','reparación de tubería','repare','reparé','tuberia rota',
          'tubería rota','fuga de gas','filtración de gas','filtracion de gas',
          'arregle la tuberia','arreglé la tubería','perdida de gas','pérdida de gas',
@@ -7027,7 +7114,6 @@ const SERVICIOS_NEGOCIO = [
     kws:['documentacion','documentación','tramite','trámite','certificado','certificacion',
          'plano','planos','expediente','habilitacion','habilitación','conformidad',
          'inspeccion','inspección','revision de planos','firma de documentos'] },
-  // ── Artefactos de gas ──
   { id:'cocina_artefacto',  label:'Cocina / Cocinilla',
     kws:['cocina','cocinilla','cocina a gas','instale la cocina','conexion de cocina',
          'cocina nueva','cambio de cocina','cocina de gas','instale cocina','cobré por cocina',
@@ -7583,6 +7669,11 @@ function resetMicModal() {
 
 function openMicModal() {
   resetMicModal();
+  // ★ Limpiar sesión anterior — evita acumulación de transcripts viejos
+  micFullTranscript = '';
+  _micSessionBase   = '';
+  _micSessionFinals = '';
+  clearTimeout(micSilenceTimer);
   document.getElementById('micModal').style.display='flex';
   document.getElementById('micPreview').style.display='none';
   document.getElementById('micSaveBtn').style.display='none';
@@ -7633,10 +7724,12 @@ function toggleListening() {
 }
 
 // ── Variables de control del micrófono ──
-let micSilenceTimer  = null;  // temporizador de silencio
-let micFullTranscript = '';   // acumula todo lo dicho
-let micRestartLock   = false; // evita reinicios en cadena
-const MIC_SILENCE_MS = 1500;  // ms de silencio antes de procesar — rápido y preciso
+let micSilenceTimer   = null;
+let micFullTranscript = '';
+let micRestartLock    = false;
+let _micSessionBase   = ''; // ★ texto acumulado ANTES del restart actual
+let _micSessionFinals = ''; // ★ finales de la sesión actual (no del restart)
+const MIC_SILENCE_MS  = 1500;
 
 function startListening() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -7647,6 +7740,8 @@ function startListening() {
   }
 
   micFullTranscript = '';
+  _micSessionBase   = '';
+  _micSessionFinals = '';
   micRestartLock    = false;
   clearTimeout(micSilenceTimer);
 
@@ -7654,7 +7749,7 @@ function startListening() {
   recognition.lang            = 'es-PE';
   recognition.interimResults  = true;
   recognition.maxAlternatives = 3;
-  recognition.continuous      = true;   // ← no corta solo
+  recognition.continuous      = true;
 
   micListening = true;
   document.getElementById('micBtn').style.background='linear-gradient(135deg,#E05252,#f87171)';
@@ -7666,9 +7761,7 @@ function startListening() {
   document.getElementById('micText').style.color='#1E293B';
   document.getElementById('micText').textContent='...';
 
-  // Usar el mismo handler que restartListening — evita duplicados
   startListeningHandlers(recognition);
-  // ★ onstart — feedback inmediato cuando Chrome activa el mic
   recognition.onstart = () => {
     document.getElementById('micText').textContent='🎙 Habla ahora...';
     document.getElementById('micText').style.color='#2E7D32';
@@ -7683,6 +7776,9 @@ function restartListening() {
   setTimeout(() => {
     if (!micListening) return;
     micRestartLock = false;
+    // ★ Guardar lo acumulado hasta ahora como base de la nueva sesión
+    _micSessionBase   = micFullTranscript.trim();
+    _micSessionFinals = '';
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SR();
     recognition.lang           = 'es-PE';
@@ -7695,40 +7791,61 @@ function restartListening() {
 }
 
 function startListeningHandlers(rec) {
+  // ★ Acumular solo los resultados NUEVOS de esta sesión.
+  // _micSessionBase = todo lo dicho antes del último restart.
+  // _micSessionFinals = finales confirmados de esta sesión.
+  // micFullTranscript = base + sessionFinals (lo que se muestra y procesa).
+
   rec.onresult = (e) => {
-    let interim='', newFinal='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal) newFinal+=e.results[i][0].transcript+' ';
-      else interim+=e.results[i][0].transcript;
+    let sessionInterim = '';
+    let newFinals      = '';
+
+    // Solo procesar desde e.resultIndex — resultados realmente nuevos en esta sesión
+    for(let i = e.resultIndex; i < e.results.length; i++){
+      if(e.results[i].isFinal) newFinals += e.results[i][0].transcript + ' ';
+      else                     sessionInterim += e.results[i][0].transcript;
     }
-    if(newFinal) micFullTranscript = appendWithoutOverlap(micFullTranscript, newFinal);
-    const display=(micFullTranscript+interim).trim();
-    document.getElementById('micText').textContent=display||'...';
 
-    // ★ Detección rápida durante interim — actualizar header sin esperar silencio
-    const checkText = (micFullTranscript+interim).trim().toLowerCase();
-    _actualizarContextoMic(checkText);
+    // Acumular solo los finales nuevos (no lo que ya teníamos en _micSessionBase)
+    if(newFinals.trim()){
+      _micSessionFinals = (_micSessionFinals.trim() + ' ' + newFinals.trim()).trim();
+    }
 
-    // ★ Actualizar formulario fantasma con el texto acumulado
-    if(display) try { updateGhostFromText(display); } catch(e){}
+    // Texto completo = base (sesiones anteriores) + finales actuales + interim actual
+    micFullTranscript = (_micSessionBase + ' ' + _micSessionFinals).trim();
+    const display     = (micFullTranscript + (sessionInterim ? ' ' + sessionInterim : '')).trim();
+
+    document.getElementById('micText').textContent = display || '...';
+
+    // Detección de contexto en tiempo real
+    _actualizarContextoMic(display);
+
+    // Formulario fantasma
+    if(display) try { updateGhostFromText(display); } catch(err){}
+
+    // Timer de silencio — procesar cuando para de hablar
     clearTimeout(micSilenceTimer);
     if(micFullTranscript.trim()){
-      micSilenceTimer=setTimeout(()=>{
-        if(micListening&&micFullTranscript.trim()) processVoiceResult(micFullTranscript.trim());
+      micSilenceTimer = setTimeout(()=>{
+        if(micListening && micFullTranscript.trim()) processVoiceResult(micFullTranscript.trim());
       }, MIC_SILENCE_MS);
     }
   };
-  rec.onerror=(e)=>{
-    if(e.error==='no-speech'){ if(micListening&&!micRestartLock) restartListening(); return; }
-    if(e.error==='aborted') return;
-    if(e.error==='not-allowed'){
-      document.getElementById('micText').textContent='⚠ Permiso de micrófono denegado.';
-      document.getElementById('micText').style.color='#E05252';
+
+  rec.onerror = (e) => {
+    if(e.error === 'no-speech'){ if(micListening && !micRestartLock) restartListening(); return; }
+    if(e.error === 'aborted') return;
+    if(e.error === 'not-allowed'){
+      document.getElementById('micText').textContent = '⚠ Permiso de micrófono denegado.';
+      document.getElementById('micText').style.color = '#E05252';
     }
-    micRestartLock = false; // ★ siempre resetear para no quedar bloqueado
+    micRestartLock = false;
     stopListening();
   };
-  rec.onend=()=>{ if(micListening&&!micRestartLock) restartListening(); };
+
+  rec.onend = () => {
+    if(micListening && !micRestartLock) restartListening();
+  };
 }
 
 // ── Detectar contexto en tiempo real mientras habla ──
@@ -7762,8 +7879,11 @@ function _actualizarContextoMic(texto){
 }
 
 function stopListening() {
-  micListening    = false;
-  micRestartLock  = true;
+  micListening      = false;
+  micRestartLock    = true;
+  _micSessionBase   = '';
+  _micSessionFinals = '';
+  micFullTranscript = '';
   clearTimeout(micSilenceTimer);
   if(recognition){ try{ recognition.stop(); }catch(e){} }
   document.getElementById('micBtn').style.background='linear-gradient(135deg,#3A7D44,#52A85A)';
