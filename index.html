@@ -7670,22 +7670,36 @@ function updateGhostFromText(text) {
 }
 
 function resetMicModal() {
+  // ★ Restaurar HTML original del mic si fue sobreescrito por el panel de agenda
+  const box = document.getElementById('micBox');
+  if(box && !document.getElementById('micContextIcon') && window._micBoxOriginalHTML){
+    box.innerHTML = window._micBoxOriginalHTML;
+  }
   _micContext = null;
   _ghostData  = {};
   _ghostHistory = [];
   const header = document.getElementById('micHeader');
-  const box    = document.getElementById('micBox');
   if(header){ header.style.background='#1E293B'; }
-  if(box)   { box.style.borderTop='none'; }
-  document.getElementById('micContextIcon').textContent  = '🎙';
-  document.getElementById('micContextTitle').textContent = 'Registro por Voz';
-  document.getElementById('micContextSub').textContent   = 'Habla y detecto qué registrar';
-  document.getElementById('micGhostForm').style.display  = 'none';
-  document.getElementById('micGhostFields').innerHTML    = '';
-  document.getElementById('micMissingFields').innerHTML  = '';
+  const icon  = document.getElementById('micContextIcon');
+  const title = document.getElementById('micContextTitle');
+  const sub   = document.getElementById('micContextSub');
+  if(icon)  icon.textContent  = '🎙';
+  if(title) title.textContent = 'Registro por Voz';
+  if(sub)   sub.textContent   = 'Habla y detecto qué registrar';
+  const gf = document.getElementById('micGhostForm');
+  const gfl = document.getElementById('micGhostFields');
+  const mfl = document.getElementById('micMissingFields');
+  if(gf)  gf.style.display = 'none';
+  if(gfl) gfl.innerHTML    = '';
+  if(mfl) mfl.innerHTML    = '';
 }
 
 function openMicModal() {
+  // ★ Guardar HTML original la primera vez (para restaurarlo después del panel agenda)
+  const box = document.getElementById('micBox');
+  if(box && !window._micBoxOriginalHTML){
+    window._micBoxOriginalHTML = box.innerHTML;
+  }
   resetMicModal();
   // ★ Limpiar sesión anterior — evita acumulación de transcripts viejos
   micFullTranscript = '';
@@ -7731,9 +7745,15 @@ function openMicModal() {
 }
 
 function closeMicModal(e) {
-  if (e && e.target!==document.getElementById('micModal')) return;
+  if(e && e.target && e.target !== document.getElementById('micModal')) return;
   stopListening();
-  document.getElementById('micModal').style.display='none';
+  // ★ Restaurar contenido original si fue reemplazado por panel de agenda
+  const box = document.getElementById('micBox');
+  if(box && !document.getElementById('micContextIcon') && window._micBoxOriginalHTML){
+    box.innerHTML = window._micBoxOriginalHTML;
+  }
+  _agendaMicData = {};
+  document.getElementById('micModal').style.display = 'none';
 }
 
 function toggleListening() {
@@ -7796,8 +7816,7 @@ function restartListening() {
     micRestartLock = false;
     // ★ Guardar lo acumulado hasta ahora como base de la nueva sesión
     _micSessionBase   = micFullTranscript.trim();
-    _micSessionFinals = '';
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    _micSessionFinals = '';    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SR();
     recognition.lang           = 'es-PE';
     recognition.interimResults = true;
@@ -7829,9 +7848,12 @@ function startListeningHandlers(rec) {
       _micSessionFinals = (_micSessionFinals.trim() + ' ' + newFinals.trim()).trim();
     }
 
-    // Texto completo = base (sesiones anteriores) + finales actuales + interim actual
-    micFullTranscript = (_micSessionBase + ' ' + _micSessionFinals).trim();
-    const display     = (micFullTranscript + (sessionInterim ? ' ' + sessionInterim : '')).trim();
+    // Texto completo = base + finales actuales + interim actual
+    const base = _micSessionBase.trim();
+    const finals = _micSessionFinals.trim();
+    micFullTranscript = (base + (base && finals ? ' ' : '') + finals).trim();
+    const interimClean = sessionInterim.trim();
+    const display = (micFullTranscript + (micFullTranscript && interimClean ? ' ' : '') + interimClean).trim();
 
     document.getElementById('micText').textContent = display || '...';
 
@@ -9378,20 +9400,21 @@ async function processVoiceWithGemini(text){
     return;
   }
 
-  // 2. Agenda → LOCAL parse INMEDIATO → form abierto al instante → Gemini corrige en paralelo
+  // 2. Agenda → LOCAL parse INMEDIATO → mic PERMANECE ABIERTO con resumen de campos
   if(isAgendaCommand(text)){
     processVoiceResult._busy = false;
-    document.getElementById('micModal').style.display='none';
     const tLow2 = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     const esVisita = /\b(visita|vista|crea una visita|crear una visita|nueva visita|agendar visita|agenda visita|cotizar|cotizacion|presupuesto|pasar a ver|ir a ver|ir a revisar|revisar|chequear)\b/.test(tLow2);
     const tipoDetectado = esVisita ? 'visita' : 'trabajo';
 
-    // ★ 1. Parser local → llenar form INMEDIATAMENTE (sin esperar red)
+    // Parser local inmediato
     try{ parseAgendaVoz(text); }catch(err){}
     const localData = window._avParsed ? {...window._avParsed, tipo: tipoDetectado} : {tipo: tipoDetectado};
-    openAddAgenda(tipoDetectado, null, localData);
 
-    // ★ 2. Gemini corre en paralelo → corrige/completa campos
+    // ★ NO cerrar el mic modal — transformarlo en panel de confirmación de agenda
+    _mostrarResumenAgendaEnMic(localData, text, tipoDetectado);
+
+    // Gemini corre en paralelo para corregir
     rellenarAgendaConGemini(text, tipoDetectado, localData);
     return;
   }
@@ -9454,18 +9477,135 @@ async function processVoiceWithGemini(text){
 }
 
 
+// ══════════════════════════════════════════════════════════════
+// AGENDA EN MIC — resumen de campos, mic queda abierto
+// ══════════════════════════════════════════════════════════════
+let _agendaMicData = {}; // datos acumulados para la agenda en progreso
+
+function _mostrarResumenAgendaEnMic(data, rawText, tipo){
+  _agendaMicData = {...data};
+  stopListening(); // parar mic mientras se muestra el resumen
+
+  const box = document.getElementById('micBox');
+  if(!box) return;
+
+  const isVisita = tipo === 'visita';
+  const iconTipo = isVisita ? '👁' : '🔧';
+  const colorTipo = isVisita ? '#185FA5' : '#6C3483';
+  const bgTipo    = isVisita ? '#EFF6FF' : '#F3F0FF';
+
+  // Helper: campo con estado visual
+  const campo = (lbl, val, faltante=false) => {
+    const ok = val && String(val).trim().length > 0;
+    if(!ok && !faltante) return ''; // campo opcional vacío → no mostrar
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:${ok?'var(--card)':'#FEF9EC'};border:1px solid ${ok?'var(--border)':'#F9A82555'};border-radius:10px">
+      <span style="font-size:16px">${ok?'✓':'⚠'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">${lbl}</div>
+        <div style="font-size:14px;font-weight:600;color:${ok?'var(--text)':'#B45309'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ok ? val : 'No detectado — di el '+lbl.toLowerCase()}</div>
+      </div>
+    </div>`;
+  };
+
+  // Formatear fecha legible
+  const fechaLbl = data.fecha ? (() => {
+    const [y,m,d] = data.fecha.split('-');
+    const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    return `${parseInt(d)} ${meses[parseInt(m)-1]} ${y}`;
+  })() : '';
+
+  // Formatear hora legible
+  const horaLbl = data.hora ? (() => {
+    const [hh,mm] = data.hora.split(':');
+    const h = parseInt(hh);
+    const period = h>=12 ? 'PM' : 'AM';
+    const h12 = h%12||12;
+    return `${h12}:${mm} ${period}`;
+  })() : '';
+
+  box.innerHTML = `
+    <!-- Header tipo agenda -->
+    <div style="text-align:center;margin-bottom:16px;padding:14px 16px;border-radius:14px;background:${bgTipo}">
+      <div style="font-size:30px;margin-bottom:4px">${iconTipo}</div>
+      <div style="font-family:'Playfair Display',serif;font-size:17px;color:${colorTipo};font-weight:700;margin-bottom:2px">${isVisita ? 'Agenda de Visita' : 'Agenda de Trabajo'}</div>
+      <div style="font-size:11px;color:${colorTipo}88">Revisá los campos detectados</div>
+    </div>
+
+    <!-- Campos detectados -->
+    <div id="ag-mic-campos" style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px">
+      ${campo('Cliente', data.cliente, true)}
+      ${campo('Fecha', fechaLbl, true)}
+      ${campo('Hora', horaLbl)}
+      ${!isVisita ? campo('Servicio', data.servicio, true) : ''}
+      ${!isVisita ? campo('Precio', data.precio ? 'S/ '+Number(data.precio).toFixed(2) : '') : ''}
+      ${campo('Ubicación', data.ubicacion, true)}
+    </div>
+
+    <!-- Estado Gemini -->
+    <div id="ag-mic-status" style="font-size:11px;color:#7C3AED;text-align:center;padding:7px;background:#F5F3FF;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:6px;animation:pulse 1.2s infinite">
+      <span>✨</span> Gemini verificando datos...
+    </div>
+
+    <!-- Botones -->
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button onclick="_agendaMicAbrir()"
+        style="flex:2;background:linear-gradient(135deg,${colorTipo},${isVisita?'#2E86AB':'#9B59B6'});color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer">
+        📋 Abrir formulario completo
+      </button>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeMicModal()" style="flex:1;background:transparent;border:1px solid var(--border);border-radius:12px;padding:12px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;color:var(--muted)">
+        Cancelar
+      </button>
+      <button onclick="_agendaMicGuardarDirecto()"
+        style="flex:2;background:linear-gradient(135deg,#2d7a57,#4CAF85);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
+        ✓ Guardar así
+      </button>
+    </div>`;
+}
+
+function _agendaMicAbrir(){
+  const d = _agendaMicData;
+  document.getElementById('micModal').style.display='none';
+  openAddAgenda(d.tipo||'trabajo', null, d);
+}
+
+function _agendaMicGuardarDirecto(){
+  const d = _agendaMicData;
+  if(!d.cliente){ toast('Falta el nombre del cliente','error'); return; }
+  if(!d.fecha)  { toast('Falta la fecha','error'); return; }
+
+  const hoy = new Date().toISOString().split('T')[0];
+  const item = {
+    id:       Date.now()+'',
+    tipo:     d.tipo||'trabajo',
+    fecha:    d.fecha||hoy,
+    hora:     d.hora||'',
+    cliente:  d.cliente||'',
+    servicio: d.servicio||'',
+    precio:   d.precio||0,
+    ubicacion:d.ubicacion||'',
+    notas:    d.notas||'',
+    telefono: d.telefono||'',
+    estado:   'agendado',
+    creado:   new Date().toISOString(),
+  };
+
+  if(!state.agenda) state.agenda=[];
+  state.agenda.push(item);
+  save('fnz_agenda', state.agenda);
+  syncAgendaToSheets(item);
+
+  document.getElementById('micModal').style.display='none';
+  switchPage('agenda');
+  render();
+  toast(`✓ ${d.tipo==='visita'?'Visita':'Trabajo'} agendado — ${d.cliente}`);
+}
+
 // ── Gemini corrige/completa el formulario de agenda después del parse local ──
 async function rellenarAgendaConGemini(text, tipoDetectado, localData){
   const geminiKey = localStorage.getItem('fnz_gemini_key');
-  if(!geminiKey) return; // sin clave: el parse local ya llenó el form
-
-  // Indicador sutil "verificando con IA..."
-  const statusEl = document.createElement('div');
-  statusEl.id = 'ag-ai-status';
-  statusEl.style.cssText = 'background:#F5F3FF;border:1px solid #8B5CF633;border-radius:8px;padding:7px 12px;margin-bottom:10px;font-size:11px;color:#7C3AED;display:flex;align-items:center;gap:6px;animation:pulse 1.2s ease-in-out infinite';
-  statusEl.innerHTML = '<span>✨</span> Gemini verificando datos...';
-  const btnRow = document.querySelector('#ag-form .btn-row') || document.querySelector('.btn-row');
-  if(btnRow) btnRow.parentNode.insertBefore(statusEl, btnRow);
+  if(!geminiKey) return;
 
   const ahora = new Date();
   const hoy = ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0')+'-'+String(ahora.getDate()).padStart(2,'0');
@@ -9524,22 +9664,35 @@ Respondé SOLO con JSON válido, sin explicaciones:
     const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
     parsed.tipo = tipoDetectado;
 
-    // ★ Solo actualizar campos que Gemini mejoró (no pisar lo que ya estaba bien)
-    _rellenarFormularioAgenda(parsed);
+    // ★ Actualizar _agendaMicData con la versión mejorada de Gemini
+    Object.keys(parsed).forEach(k => {
+      if(parsed[k] !== null && parsed[k] !== undefined && parsed[k] !== '') {
+        _agendaMicData[k] = parsed[k];
+      }
+    });
 
-    // Indicar que Gemini verificó
-    if(statusEl){
-      statusEl.style.animation='none';
-      statusEl.style.background='#F0FDF4';
-      statusEl.style.borderColor='#4CAF8533';
-      statusEl.style.color='#166534';
-      statusEl.innerHTML='<span>✓</span> Datos verificados por IA';
-      setTimeout(()=>statusEl.remove(), 2200);
+    // Refrescar el panel del mic con los datos corregidos
+    const panelPresente = document.getElementById('ag-mic-campos');
+    if(panelPresente){
+      _mostrarResumenAgendaEnMic(_agendaMicData, text, tipoDetectado);
+    } else {
+      // Si el form ya está abierto, rellenar sus campos
+      _rellenarFormularioAgenda(parsed);
+    }
+
+    // Actualizar status
+    const st = document.getElementById('ag-mic-status');
+    if(st){
+      st.style.animation='none';
+      st.style.background='#F0FDF4';
+      st.style.color='#166534';
+      st.innerHTML='<span>✓</span> Verificado por IA';
+      setTimeout(()=>{ if(st) st.remove(); }, 2000);
     }
   } catch(e){
     console.error('Gemini agenda error:', e);
-    if(statusEl) statusEl.remove();
-    // El form ya tiene los datos del parser local — no es un error grave
+    const st = document.getElementById('ag-mic-status');
+    if(st){ st.style.animation='none'; st.textContent='Parser local activo'; }
   }
 }
 
@@ -9612,17 +9765,16 @@ function processVoiceResultManual(text) {
   // Limpiar palabras de activación antes de evaluar
   const cleanText = text.replace(/^(oye|hey|ok|escucha|mira)\b/gi,'').trim();
   if(cleanText) text = cleanText;
-  // Si es comando de agenda, redirigir al formulario prellenado
+  // Si es comando de agenda → mismo flujo: mic queda abierto con resumen
   if(isAgendaCommand(text)){
     processVoiceResult._busy = false;
-    document.getElementById('micModal').style.display='none';
     try { parseAgendaVoz(text); } catch(e) {}
     const p = window._avParsed;
     const tLow3 = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     const esVis = /\b(visita|vista|crea una visita|cotizar|cotizacion|presupuesto|pasar a ver|ir a ver|revisar|chequear)\b/.test(tLow3);
     const tipoF = p ? p.tipo : (esVis ? 'visita' : 'trabajo');
-    if(p) p.tipo = tipoF;
-    openAddAgenda(tipoF, null, p || {tipo: tipoF});
+    const localData = p ? {...p, tipo: tipoF} : {tipo: tipoF};
+    _mostrarResumenAgendaEnMic(localData, text, tipoF);
     return;
   }
   const parsed = parseVoiceCommand(text);
