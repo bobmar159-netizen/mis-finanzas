@@ -264,6 +264,10 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 /* ── NOTAS ── */
 .nota-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px 16px;margin-bottom:10px;position:relative;overflow:hidden}
 .nota-card .nota-accent{position:absolute;left:0;top:0;bottom:0;width:3px}
+/* Notas fullscreen */
+#app.notas-fullscreen{position:fixed;inset:0;z-index:150;overflow-y:auto;border-radius:0}
+#app.notas-fullscreen #header{position:sticky;top:0;z-index:10}
+#app.notas-fullscreen .tab-bar{display:none}
 .nota-tipo-badge{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;display:inline-block}
 .nota-check-item{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:14px;color:var(--text);border-bottom:0.5px solid var(--border);cursor:pointer}
 .nota-check-item:last-child{border-bottom:none}
@@ -344,6 +348,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 <div class="toast" id="toast" style="display:none"></div>
 
 <script>
+const GEMINI_URL = k => `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${k}`;
 // ─────────────────────────────────────────────
 // CONSTANTS & DEFAULTS
 // ─────────────────────────────────────────────
@@ -3213,11 +3218,16 @@ function renderNotas(){
     : notas.map(n=>renderNotaCard(n)).join('');
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div>
-        <div class="section-title" style="margin-bottom:2px">Mis Notas</div>
-        <div class="section-sub">Listas · Apuntes · Fotos · Recordatorios</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button onclick="switchPage('inicio')" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted);padding:4px">←</button>
+        <div>
+          <div class="section-title" style="margin-bottom:2px">Mis Notas</div>
+          <div class="section-sub">Listas · Apuntes · Fotos · Recordatorios</div>
+        </div>
       </div>
-      <button onclick="openNotaTexto()" style="background:var(--gold);color:#0D0D0F;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer">+ Nueva</button>
+      <div style="display:flex;gap:6px">
+        <button onclick="openNotaTexto()" style="background:var(--gold);color:#0D0D0F;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer">+ Nueva</button>
+      </div>
     </div>
     ${total>0?`
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
@@ -3243,6 +3253,17 @@ function renderNotas(){
     </div>`;
 }
 
+
+
+// ── Colores de hoja de nota ──
+const NOTA_COLORES = {
+  amarillo: { bg:'#FFFDE7', border:'#F9A825', title:'#4E342E', text:'#5D4037', line:'#F9A82544', footer:'#A1887F', label:'Amarillo' },
+  blanco:   { bg:'#FFFFFF', border:'#E0E0E0', title:'#212121', text:'#424242', line:'#E0E0E0',   footer:'#9E9E9E', label:'Blanco' },
+  verde:    { bg:'#F1F8E9', border:'#AED581', title:'#33691E', text:'#33691E', line:'#AED58155', footer:'#689F38', label:'Verde' },
+  azul:     { bg:'#E3F2FD', border:'#90CAF9', title:'#0D47A1', text:'#1565C0', line:'#90CAF955', footer:'#1976D2', label:'Azul' },
+  rosa:     { bg:'#FCE4EC', border:'#F48FB1', title:'#880E4F', text:'#880E4F', line:'#F48FB155', footer:'#C2185B', label:'Rosa' },
+  pizarron: { bg:'#263238', border:'#455A64', title:'#ECEFF1', text:'#CFD8DC', line:'#455A6466', footer:'#78909C', label:'Pizarrón' },
+};
 
 // ── Bullet styles ──
 const BULLET_STYLES = {
@@ -3315,6 +3336,9 @@ function renderNotaCard(n){
           <select onchange="cambiarBulletStyle('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;background:var(--card);color:var(--text);cursor:pointer">
             ${Object.entries(BULLET_STYLES).map(([k,v])=>`<option value="${k}" ${(n.bulletStyle||'check')===k?'selected':''}>${v.label}</option>`).join('')}
           </select>
+          <select onchange="cambiarColorNota('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;background:var(--card);color:var(--text);cursor:pointer">
+            ${Object.entries(NOTA_COLORES).map(([k,v])=>`<option value="${k}" ${(n.colorHoja||'amarillo')===k?'selected':''}>${v.label}</option>`).join('')}
+          </select>
           <span style="margin-left:auto;font-size:11px;color:var(--muted)">${hechos}/${its.length}</span>
           ${delBtn}
         </div>
@@ -3343,8 +3367,11 @@ function renderNotaCard(n){
     }
   }
 
-  return `<div class="nota-card" style="${n.pinned?'border-color:#C9A84C66;':''}" onclick="toggleNotaExpand('${n.id}',event)">
-    <div class="nota-accent" style="background:${color}"></div>
+  const nc = NOTA_COLORES[n.colorHoja||'amarillo']||NOTA_COLORES.amarillo;
+  const cardBg = n.colorHoja && n.colorHoja!=='amarillo' ? `background:${nc.bg};` : '';
+  const cardBorder = n.colorHoja ? `border-color:${nc.border}44;` : '';
+  return `<div class="nota-card" style="${n.pinned?'border-color:#C9A84C66;':''}${cardBg}${cardBorder}" onclick="toggleNotaExpand('${n.id}',event)">
+    <div class="nota-accent" style="background:${nc.border||color}"></div>
     <div style="display:flex;align-items:center;gap:10px">
       <div style="width:36px;height:36px;border-radius:10px;background:${BGBADGE[n.tipo]||'#FFF8EC'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${icono}</div>
       <div style="flex:1;min-width:0">
@@ -3401,6 +3428,14 @@ function compartirNotaWhatsApp(notaId){
 }
 
 
+function cambiarColorNota(id, color){
+  const n = (state.notas||[]).find(x=>x.id===id);
+  if(!n) return;
+  n.colorHoja = color;
+  save('fnz_notas', state.notas);
+  render();
+}
+
 function cambiarBulletStyle(id, style){
   const n = (state.notas||[]).find(x=>x.id===id);
   if(!n) return;
@@ -3426,6 +3461,17 @@ function abrirEditarNota(id){
     <div class="field">
       <label class="field-label">Título</label>
       <input id="edit-nota-titulo" type="text" value="${(n.titulo||'').replace(/"/g,'&quot;')}" placeholder="Título de la nota">
+    </div>
+    <div class="field">
+      <label class="field-label">Color de hoja</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+        ${Object.entries(NOTA_COLORES).map(([k,v])=>`
+          <button onclick="cambiarColorNota('${id}','${k}');document.querySelectorAll('.color-opt').forEach(b=>b.style.outline='none');this.style.outline='2px solid var(--text)'"
+            class="color-opt"
+            style="width:28px;height:28px;border-radius:50%;background:${v.bg};border:1.5px solid ${v.border};cursor:pointer;outline:${(n.colorHoja||'amarillo')===k?'2px solid var(--text)':'none'};outline-offset:2px"
+            title="${v.label}">
+          </button>`).join('')}
+      </div>
     </div>
     <div class="field">
       <label class="field-label">Estilo de viñetas</label>
@@ -3525,12 +3571,13 @@ function pinNota(id){
 function verFotoNota(src){ document.getElementById('modal-content').innerHTML=`<img src="${src}" style="width:100%;border-radius:12px;max-height:70vh;object-fit:contain"><div class="btn-row" style="margin-top:12px"><button class="btn-ghost" onclick="closeModal()">Cerrar</button></div>`; showModal(); }
 function agregarFotoNota(id){ const input=document.createElement('input'); input.type='file'; input.accept='image/*,application/pdf'; input.onchange=e=>{ const file=e.target.files[0]; if(!file)return; const reader=new FileReader(); reader.onload=ev=>{ const n=state.notas.find(x=>x.id===id); if(!n)return; if(!n.fotos)n.fotos=[]; n.fotos.push(ev.target.result); save('fnz_notas',state.notas); render(); toast('Foto agregada ✓'); }; reader.readAsDataURL(file); }; input.click(); }
 function editNota(id){
-  const n=state.notas.find(x=>x.id===id);
-  if(!n) return;
-  // Siempre abrir editor manual — nunca el micrófono al editar
-  if(n.tipo==='lista'||n.tipo==='recordatorio') return openEditNotaLista(n);
-  if(n.tipo==='foto') return openNotaFoto(n);
-  openNotaTexto(n);
+  const n=(state.notas||[]).find(x=>x.id===id);
+  if(!n)return;
+  if(n.tipo==='texto'){
+    openNotaTexto(n);
+  } else {
+    abrirEditarNota(id);
+  }
 }
 
 function openEditNotaLista(n){
@@ -3599,25 +3646,117 @@ function saveEditNotaLista(id){
 }
 
 function openNotaTexto(preData){
-  const pre=preData||{}; const isEdit=!!pre.id;
-  document.getElementById('modal-content').innerHTML=`
+  const pre = preData||{};
+  const isEdit = !!pre.id;
+  const titulo = pre.titulo || '';
+  const texto = pre.texto || '';
+  const colorHoja = pre.colorHoja || 'amarillo';
+  const nc = NOTA_COLORES[colorHoja]||NOTA_COLORES.amarillo;
+
+  document.getElementById('modal-content').innerHTML = `
     <div class="modal-title" style="color:var(--gold)">${isEdit?'Editar':'Nueva'} nota</div>
-    <div class="field"><label class="field-label">Título</label><input id="nt-titulo" type="text" placeholder="Ej: Presupuesto remodelación" value="${pre.titulo||''}"></div>
-    <div class="field"><label class="field-label">Texto</label><textarea id="nt-texto" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:14px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%;min-height:100px;resize:vertical">${pre.texto||''}</textarea></div>
-    <div class="btn-row"><button class="btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn-gold" onclick="saveNotaTexto('${pre.id||''}')">Guardar</button></div>`;
+
+    <div id="nota-toolbar" style="display:flex;flex-wrap:wrap;gap:3px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:10px 10px 0 0;margin-bottom:0">
+      <button onmousedown="event.preventDefault();formatNota('bold')" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:13px;font-weight:700;color:var(--text)">B</button>
+      <button onmousedown="event.preventDefault();formatNota('italic')" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:13px;font-style:italic;color:var(--text)">I</button>
+      <button onmousedown="event.preventDefault();formatNota('underline')" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:13px;text-decoration:underline;color:var(--text)">U</button>
+      <button onmousedown="event.preventDefault();formatNota('strikeThrough')" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:13px;text-decoration:line-through;color:var(--text)">S</button>
+      <div style="width:1px;background:var(--border);margin:2px 4px;height:20px;align-self:center"></div>
+      <button onmousedown="event.preventDefault();formatNota('formatBlock','H2')" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:700;color:var(--text)">T1</button>
+      <button onmousedown="event.preventDefault();formatNota('formatBlock','H3')" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:12px;color:var(--text)">T2</button>
+      <div style="width:1px;background:var(--border);margin:2px 4px;height:20px;align-self:center"></div>
+      <button onmousedown="event.preventDefault();formatNota('insertUnorderedList')" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:12px;color:var(--text)">• Lista</button>
+      <button onmousedown="event.preventDefault();formatNota('insertOrderedList')" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:12px;color:var(--text)">1. Lista</button>
+      <div style="width:1px;background:var(--border);margin:2px 4px;height:20px;align-self:center"></div>
+      <button onmousedown="event.preventDefault();insertNotaTable()" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:12px;color:var(--text)">⊞ Tabla</button>
+      <button onmousedown="event.preventDefault();insertNotaHighlight()" style="background:#FFF9C4;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:11px;color:#92700A;font-weight:600">Resaltar</button>
+      <div style="width:1px;background:var(--border);margin:2px 4px;height:20px;align-self:center"></div>
+      <div style="display:flex;gap:4px;align-items:center">
+        ${Object.entries(NOTA_COLORES).map(([k,v])=>`<button onmousedown="event.preventDefault();cambiarColorNotaEditor('${k}')" class="color-opt-editor" style="width:18px;height:18px;border-radius:50%;background:${v.bg};border:1.5px solid ${v.border};cursor:pointer;outline:${colorHoja===k?'2px solid var(--text)':'none'};outline-offset:1px;flex-shrink:0" title="${v.label}"></button>`).join('')}
+      </div>
+    </div>
+
+    <input id="nt-titulo" type="text" placeholder="Título de la nota..." value="${titulo.replace(/"/g,'&quot;')}"
+      style="width:100%;border:1px solid var(--border);border-top:none;border-bottom:none;border-radius:0;padding:10px 14px;font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:${nc.title};background:${nc.bg};outline:none;box-sizing:border-box">
+
+    <div id="nt-body" contenteditable="true"
+      style="min-height:200px;border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;padding:14px;font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.8;color:${nc.text};background:${nc.bg};outline:none;overflow-y:auto"
+      oninput="updateNotaWordCount()">${texto||''}</div>
+
+    <div id="nota-wordcount" style="font-size:11px;color:var(--muted);text-align:right;margin-top:3px">0 palabras</div>
+
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn-gold" onclick="guardarNotaEditor('${pre.id||''}')">Guardar nota</button>
+    </div>`;
   showModal();
+  setTimeout(()=>{
+    const editor = document.getElementById('nt-body');
+    if(editor){ editor.focus(); updateNotaWordCount(); }
+    window._notaEditorColor = colorHoja;
+  }, 100);
 }
+
 function saveNotaTexto(editId){
-  const titulo=document.getElementById('nt-titulo').value.trim();
-  const texto=document.getElementById('nt-texto').value.trim();
-  if(!titulo&&!texto)return toast('Escribe algo primero','error');
-  if(!state.notas)state.notas=[];
-  let nota;
-  if(editId){ state.notas=state.notas.map(n=>n.id===editId?{...n,titulo:titulo||'Nota',texto}:n); nota=state.notas.find(n=>n.id===editId); }
-  else { nota={id:Date.now()+'',tipo:'texto',titulo:titulo||'Nota',texto,creado:new Date().toISOString()}; state.notas.unshift(nota); }
-  save('fnz_notas',state.notas);
-  if(nota) syncSeccionToSheets('nota', nota);
-  closeModal(); render(); toast('Nota guardada ✓');
+  guardarNotaEditor(editId);
+}
+
+function formatNota(cmd, val){
+  document.execCommand(cmd, false, val||null);
+  document.getElementById('nt-body')?.focus();
+}
+
+function insertNotaTable(){
+  const table = `<table style="width:100%;border-collapse:collapse;margin:8px 0"><tr><td style="border:1px solid #ccc;padding:6px 10px;min-width:60px">Celda 1</td><td style="border:1px solid #ccc;padding:6px 10px;min-width:60px">Celda 2</td></tr><tr><td style="border:1px solid #ccc;padding:6px 10px">Celda 3</td><td style="border:1px solid #ccc;padding:6px 10px">Celda 4</td></tr></table>`;
+  document.execCommand('insertHTML', false, table);
+  document.getElementById('nt-body')?.focus();
+}
+
+function insertNotaHighlight(){
+  const sel = window.getSelection();
+  if(sel && sel.toString()){
+    document.execCommand('insertHTML', false, `<span style="background:#FFF9C4;padding:0 2px;border-radius:2px">${sel.toString()}</span>`);
+  } else {
+    document.execCommand('insertHTML', false, '<span style="background:#FFF9C4;padding:0 2px;border-radius:2px">texto resaltado</span>');
+  }
+}
+
+function cambiarColorNotaEditor(color){
+  window._notaEditorColor = color;
+  const nc = NOTA_COLORES[color]||NOTA_COLORES.amarillo;
+  const body = document.getElementById('nt-body');
+  const titulo = document.getElementById('nt-titulo');
+  if(body){ body.style.background=nc.bg; body.style.color=nc.text; }
+  if(titulo){ titulo.style.background=nc.bg; titulo.style.color=nc.title; }
+  document.querySelectorAll('.color-opt-editor').forEach(b=>{
+    b.style.outline = b.title===nc.label ? '2px solid var(--text)' : 'none';
+  });
+}
+
+function updateNotaWordCount(){
+  const el = document.getElementById('nt-body');
+  const wc = document.getElementById('nota-wordcount');
+  if(!el||!wc) return;
+  const words = (el.innerText||'').trim().split(/\s+/).filter(w=>w.length>0).length;
+  wc.textContent = words + ' palabra' + (words!==1?'s':'');
+}
+
+function guardarNotaEditor(editId){
+  const titulo = document.getElementById('nt-titulo')?.value.trim() || 'Nota';
+  const body = document.getElementById('nt-body');
+  const texto = body?.innerHTML || '';
+  const colorHoja = window._notaEditorColor || 'amarillo';
+  if(!body?.innerText.trim() && !titulo) return toast('Escribí algo primero','error');
+  if(!state.notas) state.notas=[];
+  if(editId){
+    const n = state.notas.find(x=>x.id===editId);
+    if(n){ n.titulo=titulo; n.texto=texto; n.colorHoja=colorHoja; }
+  } else {
+    state.notas.unshift({id:Date.now()+'', tipo:'texto', titulo, texto, colorHoja, creado:new Date().toISOString()});
+  }
+  save('fnz_notas', state.notas);
+  closeModal(); render();
+  toast('Nota guardada ✓');
 }
 
 function openNotaFoto(){
@@ -3647,6 +3786,12 @@ function saveNotaFoto(){
 }
 
 function openNotaVoz(editId){
+  // Redirigir al nuevo flujo unificado con Gemini
+  if(!editId){
+    closeModal();
+    abrirModoLista('lista', '');
+    return;
+  }
   _notaVozEditId=editId||null; _notaVozItems=[]; _notaVozTitulo=''; _notaVozTipo='texto'; _notaVozEscuchando=false; _notaVozRecordatorio=null; _notaVozBuffer=''; _notaVozIgnoreNext=false;
   if(editId){ const n=state.notas.find(x=>x.id===editId); if(n){_notaVozItems=[...(n.items||[])];_notaVozTitulo=n.titulo||'';_notaVozTipo=n.tipo;} }
   document.getElementById('modal-content').innerHTML=`
@@ -3761,7 +3906,7 @@ function _procesarFragmentoNota(texto){
           return;
         }}}}
   if(_notaVozTipo==='lista'||_notaVozTipo==='recordatorio'){
-    const SEP=/\b(?:aparte|a\s+parte|siguiente|despu[eé]s|y\s+despu[eé]s|tambi[eé]n|y\s+tambi[eé]n|adem[aá]s|y\s+luego|luego|finalmente|otro\s+(?:es|ser[ií]a)|el\s+(?:siguiente|otro|pr[oó]ximo)|por\s+[uú]ltimo|uno\s+m[aá]s|y\s+por\s+[uú]ltimo|igualmente|por\s+otra\s+parte)\b/gi;
+    const SEP=/\b(?:aparte|a\s+parte|siguiente|despu[eé]s|y\s+despu[eé]s|tambi[eé]n|y\s+tambi[eé]n|adem[aá]s|y\s+luego|luego|finalmente|otro\s+(?:es|ser[ií]a)|el\s+(?:siguiente|otro|pr[oó]ximo)|por\s+[uú]ltimo|uno\s+m[aá]s|y\s+por\s+[uú]ltimo|igualmente|por\s+otra\s+parte|y\s+tambi[eé]n|y\s+adem[aá]s|punto\s+y|coma|agrega|a[ñn]ade|a[ñn]adir|m[aá]s\s+uno|otro\s+m[aá]s|otra\s+cosa|otra\s+m[aá]s|y\s+otro|y\s+otra|separar|nueva\s+l[ií]nea|nuevo\s+[ií]tem|nueva\s+entrada)\b/gi;
     const partes=t.split(SEP).map(p=>p.trim()).filter(p=>p.length>0);
     if(partes.length>1||(partes.length===1&&texto.trim().length>2)){
       const RUIDO=/^(um+|eh+|ah+|ok|oye|este|bueno|entonces|pues)$/i;
@@ -5425,6 +5570,9 @@ function descargarAppsScript(){
   toast('Script v6.4 descargado ✓ — Pega en Apps Script y publica Nueva versión');
 }
 function switchPage(page){
+  const appEl = document.getElementById('app');
+  if(page==='notas') appEl?.classList.add('notas-fullscreen');
+  else appEl?.classList.remove('notas-fullscreen');
   state.page=page;
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   const tab=document.getElementById('tab-'+page);
@@ -7098,6 +7246,16 @@ function isNotaCommand(text){
     'quiero una nota','abre una nota','ponme una nota','nueva nota de',
     // recordatorio
     'crea un recordatorio','nuevo recordatorio','crea recordatorio',
+    // Variantes adicionales
+    'dictame una lista','dictame una nota','dictame esto',
+    'apuntame una lista','apuntame esto','apúntame',
+    'escribeme una lista','escribeme esto','escríbeme',
+    'pon una lista','ponme una lista','ponme esto',
+    'quiero anotar','quiero una lista','necesito una lista',
+    'arma una lista','armame una lista','armame esto',
+    'preparame una lista','prepara una lista',
+    'registra esto','memoriza esto','guarda esto como lista',
+    'nueva nota rapida','nota rapida','nota rápida',
   ];
   return notaKws.some(k => t.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
 }
@@ -7115,7 +7273,10 @@ let listaRec = null;
 
 const CERRAR_KWS = [
   'listo','eso es todo','finaliza','fin','termina','guarda','ok guarda',
-  'graba eso','ya','cierra','cerrar','guardar','ya terminé','termine'
+  'graba eso','cierra','cerrar','guardar','ya terminé','termine',
+  'ya estuvo','eso nomás','eso nomas','hasta ahí','hasta ahi',
+  'nada más','nada mas','con eso basta','eso es','ok ya',
+  'perfecto guarda','así está bien','asi esta bien','terminar lista'
 ];
 
 function abrirModoLista(tipo, tituloInicial){
@@ -7361,7 +7522,7 @@ Para operaciones calcula sobre los precios de la lista actual. Si dice "suma eso
 Si menciona porcentaje como "descuento de 10%" calcula el monto y réstalo.`;
 
   try{
-    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+key;
+    const url = GEMINI_URL(key);
     const res = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:0.1,maxOutputTokens:200}})});
     const data = await res.json();
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
@@ -7463,8 +7624,9 @@ function generarNotaJPG(nota){
   canvas.height = totalH;
   const ctx = canvas.getContext('2d');
 
-  // ── Fondo papel amarillo ──
-  ctx.fillStyle = '#FFFDE7';
+  // ── Color de hoja según nota ──
+  const nc = NOTA_COLORES[nota.colorHoja||'amarillo'] || NOTA_COLORES.amarillo;
+  ctx.fillStyle = nc.bg;
   ctx.fillRect(0, 0, W, totalH);
 
   // Líneas de fondo estilo cuaderno
@@ -7475,23 +7637,23 @@ function generarNotaJPG(nota){
   }
 
   // Borde exterior
-  ctx.strokeStyle = '#F9A825';
+  ctx.strokeStyle = nc.border;
   ctx.lineWidth = 2.5;
   roundRect(ctx, 2, 2, W-4, totalH-4, 8);
   ctx.stroke();
 
   // Franja amarilla superior
-  ctx.fillStyle = '#F9A825';
+  ctx.fillStyle = nc.border;
   roundRect(ctx, 2, 2, W-4, 7, {tl:8,tr:8,br:0,bl:0});
   ctx.fill();
 
   // ── Emoji y título ──
   ctx.font = 'bold 26px Georgia, serif';
-  ctx.fillStyle = '#4E342E';
+  ctx.fillStyle = nc.title;
   ctx.fillText('📋 ' + titulo, PAD, 52);
 
   // Línea bajo título
-  ctx.strokeStyle = '#F9A82599';
+  ctx.strokeStyle = nc.border+'99';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(PAD, TITLE_AREA - 8);
@@ -7535,7 +7697,7 @@ function generarNotaJPG(nota){
       ctx.strokeRect(PAD, y - 13, 13, 13);
 
       ctx.font = '15px Georgia, serif';
-      ctx.fillStyle = '#4E342E';
+      ctx.fillStyle = nc.text;
       const textoItem = item.texto || '';
       ctx.fillText(textoItem, PAD + 22, y);
 
@@ -7562,7 +7724,7 @@ function generarNotaJPG(nota){
   ctx.stroke();
 
   ctx.font = '12px Georgia, serif';
-  ctx.fillStyle = '#A1887F';
+  ctx.fillStyle = nc.footer;
   ctx.textAlign = 'right';
   ctx.fillText(fechaStr, W - PAD, totalH - 18);
   ctx.textAlign = 'left';
@@ -7645,7 +7807,7 @@ function testGeminiKey(){
 async function callGemini(prompt, keyOverride){
   const key = keyOverride || localStorage.getItem('fnz_gemini_key');
   if(!key) return null;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+  const url = GEMINI_URL(key);
   const body = {
     contents:[{role:'user', parts:[{text: prompt}]}],
     generationConfig:{temperature:0.1, maxOutputTokens:600}
@@ -7752,18 +7914,18 @@ async function processVoiceWithGemini(text){
     return;
   }
 
-  // 2. Agenda → abrir formulario INMEDIATO, Gemini rellena los campos
+  // 2. Agenda → Gemini rellena campos, formulario pre-llenado
   if(isAgendaCommand(text)){
     processVoiceResult._busy = false;
     document.getElementById('micModal').style.display='none';
-    try{ parseAgendaVoz(text); }catch(e){}
-    const p = window._avParsed;
-    // Detectar visita desde el texto si el parser no lo hizo
+    // Detectar tipo visita/trabajo
     const tLow2 = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    const esVisitaExplicita = /\b(visita|vista|crea una visita|crear una visita|nueva visita|agendar visita|agenda visita|cotizar|cotizacion|presupuesto|pasar a ver|ir a ver|ir a revisar|revisar|chequear)\b/.test(tLow2);
-    const tipoFinal = p ? p.tipo : (esVisitaExplicita ? 'visita' : 'trabajo');
-    if(p) p.tipo = tipoFinal;
-    openAddAgenda(tipoFinal, null, p || {tipo: tipoFinal});
+    const esVisita = /\b(visita|vista|crea una visita|crear una visita|nueva visita|agendar visita|agenda visita|cotizar|cotizacion|presupuesto|pasar a ver|ir a ver|ir a revisar|revisar|chequear)\b/.test(tLow2);
+    const tipoDetectado = esVisita ? 'visita' : 'trabajo';
+    // Abrir formulario inmediatamente con tipo correcto y spinner
+    openAddAgenda(tipoDetectado, null, {tipo: tipoDetectado, _cargando: true});
+    // Luego Gemini rellena los campos
+    rellenarAgendaConGemini(text, tipoDetectado);
     return;
   }
 
@@ -7814,6 +7976,104 @@ async function processVoiceWithGemini(text){
     processVoiceResult._busy = false;
     if(micText) micText.textContent = '⚠ No entendí. Intentá de nuevo con más detalle.';
     toast('No entendí la orden — intentá de nuevo','error');
+  }
+}
+
+
+// ── Gemini rellena el formulario de agenda después de abrirlo ──
+async function rellenarAgendaConGemini(text, tipoDetectado){
+  const geminiKey = localStorage.getItem('fnz_gemini_key');
+  if(!geminiKey){
+    // Sin Gemini: usar parser local
+    try{ parseAgendaVoz(text); }catch(e){}
+    const p = window._avParsed;
+    if(p) _rellenarFormularioAgenda(p);
+    return;
+  }
+
+  // Mostrar indicador de carga en el formulario
+  const loadEl = document.createElement('div');
+  loadEl.id = 'ag-gemini-load';
+  loadEl.style.cssText = 'background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:1px solid #8B5CF644;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#7C3AED;display:flex;align-items:center;gap:8px;animation:pulse 1s ease-in-out infinite';
+  loadEl.innerHTML = '<span style="font-size:16px">✨</span> Gemini procesando tu agenda...';
+  const btnRow = document.querySelector('.btn-row');
+  if(btnRow) btnRow.parentNode.insertBefore(loadEl, btnRow);
+
+  const ahora = new Date();
+  const hoy = ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0')+'-'+String(ahora.getDate()).padStart(2,'0');
+  const diaSemana = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][ahora.getDay()];
+  const manana = new Date(ahora); manana.setDate(ahora.getDate()+1);
+  const mananaStr = manana.getFullYear()+'-'+String(manana.getMonth()+1).padStart(2,'0')+'-'+String(manana.getDate()).padStart(2,'0');
+
+  const prompt = `Eres un asistente de agenda para un gasfitero en Lima, Perú.
+Hoy es ${hoy} (${diaSemana}). Mañana es ${mananaStr}.
+Tipo detectado: ${tipoDetectado} (visita o trabajo).
+
+El usuario dijo: "${text}"
+
+Extrae los datos y responde SOLO con JSON válido:
+{"fecha":"YYYY-MM-DD","hora":"HH:MM o null","cliente":"solo nombre propio o null","servicio":"${tipoDetectado==='trabajo'?'Punto Adicional|Modificación Red|Instalación Nueva|Conversión Artefacto|Conexión Artefacto|Reparación Tubería|Gasfitería|Documentación|Cocina / Cocinilla|Horno a Gas|Terma|Secadora a Gas|Calefón|Parrilla a Gas|Otro Servicio':'null'}","precio":numero_o_null,"ubicacion":"distrito Lima o null","notas":"texto extra o null"}
+
+Reglas:
+- cliente: SOLO el nombre (sin señor/señora/don/doña)
+- hora: 24h format. "9am"="09:00", "3pm"="15:00"
+- "este sábado/domingo/lunes" = próximo de esa fecha desde hoy
+- "mañana" = ${mananaStr}
+- Si no se menciona dato, poner null`;
+
+  try{
+    const res = await fetch(GEMINI_URL(geminiKey), {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        contents:[{role:'user',parts:[{text:prompt}]}],
+        generationConfig:{temperature:0.1,maxOutputTokens:300}
+      })
+    });
+    const data = await res.json();
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    parsed.tipo = tipoDetectado;
+    _rellenarFormularioAgenda(parsed);
+  } catch(e){
+    console.error('Gemini agenda error:', e);
+    // Fallback parser local
+    try{ parseAgendaVoz(text); }catch(e2){}
+    const p = window._avParsed;
+    if(p) _rellenarFormularioAgenda(p);
+  } finally {
+    const loadEl2 = document.getElementById('ag-gemini-load');
+    if(loadEl2) loadEl2.remove();
+  }
+}
+
+function _rellenarFormularioAgenda(p){
+  if(!p) return;
+  const setVal = (id,v) => { if(!v&&v!==0) return; const el=document.getElementById(id); if(el) el.value=v; };
+  setVal('ag-cliente',   p.cliente);
+  setVal('ag-fecha',     p.fecha);
+  setVal('ag-ubicacion', p.ubicacion);
+  setVal('ag-notas',     p.notas);
+  if(p.precio) setVal('ag-precio', p.precio);
+  if(p.hora){
+    const [hh,mm] = p.hora.split(':');
+    const h24 = parseInt(hh);
+    const period = h24>=12?'PM':'AM';
+    const h12 = h24%12||12;
+    const txtEl = document.getElementById('ag-hora-txt');
+    if(txtEl) txtEl.value = h12+':'+(mm||'00');
+    setAgAmpm(period);
+  }
+  if(p.servicio){
+    const sel = document.getElementById('ag-servicio');
+    if(sel){
+      const pNorm = p.servicio.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+      const found = Array.from(sel.options).find(o=>{
+        const oNorm = o.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+        return oNorm===pNorm || oNorm.startsWith(pNorm) || pNorm.startsWith(oNorm);
+      });
+      if(found) sel.value = found.value;
+    }
   }
 }
 
