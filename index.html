@@ -306,96 +306,153 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
   display: flex;
   flex-direction: column;
   background: #FFFDE7;
-  transition: background .2s;
 }
+/* ── Top bar ── */
+#nota-editor-overlay .ned-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+  background: inherit;
+  flex-shrink: 0;
+}
+/* ── Toolbar ── */
 #nota-editor-overlay .ned-toolbar {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 8px 10px;
+  gap: 1px;
+  padding: 6px 8px;
   border-bottom: 1px solid rgba(0,0,0,.1);
-  background: rgba(255,255,255,.8);
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  background: rgba(255,255,255,.7);
+  backdrop-filter: blur(8px);
+  flex-wrap: wrap;
   flex-shrink: 0;
+  row-gap: 4px;
 }
-#nota-editor-overlay .ned-toolbar::-webkit-scrollbar { display: none; }
 #nota-editor-overlay .ntb {
   background: none;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
-  padding: 6px 9px;
-  border-radius: 7px;
+  padding: 5px 8px;
+  border-radius: 6px;
   font-size: 13px;
-  color: #555;
+  color: #444;
   white-space: nowrap;
   flex-shrink: 0;
   font-family: 'DM Sans', sans-serif;
-  transition: background .15s;
+  min-width: 28px;
+  text-align: center;
+  transition: all .15s;
+  line-height: 1.2;
 }
-#nota-editor-overlay .ntb:hover, #nota-editor-overlay .ntb:active { background: rgba(0,0,0,.08); }
-#nota-editor-overlay .ntb.active { background: rgba(0,0,0,.12); color: #000; font-weight: 700; }
-#nota-editor-overlay .ntb.sep { width: 1px; height: 20px; background: rgba(0,0,0,.15); padding: 0; margin: 0 3px; cursor: default; }
-#nota-editor-overlay .ned-title {
+#nota-editor-overlay .ntb:active { transform: scale(.95); }
+#nota-editor-overlay .ntb:hover { background: rgba(0,0,0,.07); }
+#nota-editor-overlay .ntb.active { background: rgba(0,0,0,.12); color: #000; font-weight: 700; border-color: rgba(0,0,0,.15); }
+#nota-editor-overlay .ntb.sep { width: 1px; height: 18px; background: rgba(0,0,0,.15); padding: 0; margin: 0 4px; cursor: default; min-width: 1px; pointer-events: none; }
+/* ── Title ── */
+#nota-editor-overlay #ned-titulo {
   font-family: 'Playfair Display', serif;
   font-size: 22px;
   font-weight: 700;
   border: none;
   outline: none;
   background: transparent;
-  color: #333;
-  padding: 16px 18px 6px;
+  padding: 14px 20px 8px;
   width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
-#nota-editor-overlay .ned-body {
+/* ── Body: lined paper ── */
+#nota-editor-overlay #ned-body {
   flex: 1;
-  padding: 8px 18px 80px;
+  padding: 4px 20px 100px;
   font-family: 'DM Sans', sans-serif;
   font-size: 15px;
-  line-height: 1.8;
+  line-height: 32px;
   color: #333;
   overflow-y: auto;
   outline: none;
-  -webkit-user-modify: read-write-plaintext-only;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 31px,
+    rgba(0,0,0,.08) 31px,
+    rgba(0,0,0,.08) 32px
+  );
+  background-attachment: local;
 }
-#nota-editor-overlay .ned-body:focus { outline: none; }
-#nota-editor-overlay .ned-body ul { padding-left: 20px; margin: 4px 0; }
-#nota-editor-overlay .ned-body ol { padding-left: 20px; margin: 4px 0; }
-#nota-editor-overlay .ned-body li { margin-bottom: 4px; }
-#nota-editor-overlay .ned-body h2 { font-size: 18px; font-weight: 700; margin: 12px 0 4px; }
-#nota-editor-overlay .ned-body h3 { font-size: 16px; font-weight: 600; margin: 10px 0 4px; }
-#nota-editor-overlay .ned-body table { border-collapse: collapse; width: 100%; margin: 8px 0; }
-#nota-editor-overlay .ned-body td, #nota-editor-overlay .ned-body th { border: 1px solid #ccc; padding: 6px 10px; min-width: 60px; }
+#nota-editor-overlay #ned-body:focus { outline: none; }
+#nota-editor-overlay #ned-body p { margin: 0; line-height: 32px; min-height: 32px; }
+#nota-editor-overlay #ned-body h2 { font-size: 19px; font-weight: 700; line-height: 32px; margin: 0; }
+#nota-editor-overlay #ned-body h3 { font-size: 16px; font-weight: 600; line-height: 32px; margin: 0; }
+#nota-editor-overlay #ned-body ul, #nota-editor-overlay #ned-body ol { padding-left: 22px; margin: 0; }
+#nota-editor-overlay #ned-body li { line-height: 32px; min-height: 32px; }
+#nota-editor-overlay #ned-body table { border-collapse: collapse; width: 100%; margin: 8px 0; line-height: 1.5; }
+#nota-editor-overlay #ned-body td, #nota-editor-overlay #ned-body th { border: 1px solid #bbb; padding: 6px 10px; min-width: 60px; background: rgba(255,255,255,.6); }
+#nota-editor-overlay #ned-body th { background: rgba(0,0,0,.05); font-weight: 700; }
+/* ── Checklist items ── */
+#nota-editor-overlay .ned-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 32px;
+  min-height: 32px;
+}
+#nota-editor-overlay .ned-check-row input[type=checkbox] {
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
+  flex-shrink: 0;
+  accent-color: #3A7D44;
+}
+#nota-editor-overlay .ned-check-row span {
+  flex: 1;
+  outline: none;
+  min-width: 20px;
+}
+#nota-editor-overlay .ned-check-row.done span { text-decoration: line-through; opacity: .5; }
+/* ── Footer ── */
 #nota-editor-overlay .ned-footer {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 0; left: 0; right: 0;
   background: rgba(255,255,255,.95);
   border-top: 1px solid rgba(0,0,0,.1);
-  padding: 10px 16px;
+  padding: 8px 16px;
   display: flex;
   gap: 8px;
   align-items: center;
   z-index: 501;
+  backdrop-filter: blur(8px);
 }
+/* ── Photo strip ── */
 #nota-editor-overlay .ned-photo-strip {
   display: flex;
   gap: 8px;
-  padding: 8px 18px;
+  padding: 6px 20px;
   overflow-x: auto;
   flex-shrink: 0;
-  -webkit-overflow-scrolling: touch;
 }
+#nota-editor-overlay .ned-photo-strip::-webkit-scrollbar { display: none; }
 #nota-editor-overlay .ned-photo-strip img {
-  width: 70px;
-  height: 70px;
+  width: 72px; height: 72px;
   object-fit: cover;
   border-radius: 10px;
   cursor: pointer;
   flex-shrink: 0;
 }
+/* Color picker dots */
+.ned-color-dot {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform .15s, border-color .15s;
+  flex-shrink: 0;
+}
+.ned-color-dot.sel { border-color: #333; transform: scale(1.2); }
+/* highlight */
+.ned-hl { background: #FFF9C4; padding: 0 2px; border-radius: 3px; }
 </style>
 </head>
 <body>
@@ -7086,382 +7143,357 @@ function stopListening() {
 
 
 // ══════════════════════════════════════════════════════════════
-// EDITOR DE NOTAS UNIFICADO — Apple Notes style
+// EDITOR DE NOTAS — Evernote style
 // ══════════════════════════════════════════════════════════════
-let _nedNota = null; // nota actual en edición
+let _nedNota = null;
 let _nedUndoStack = [];
 let _nedRedoStack = [];
 let _nedFotos = [];
 let _nedRecordatorio = '';
 let _nedColor = 'amarillo';
-let _nedLastSaved = '';
 
 function abrirEditorNota(editId){
-  // Remove existing overlay if any
   const existing = document.getElementById('nota-editor-overlay');
   if(existing) existing.remove();
+
   _nedNota = editId ? (state.notas||[]).find(x=>x.id===editId) : null;
   _nedFotos = _nedNota?.fotos ? [..._nedNota.fotos] : [];
   _nedRecordatorio = _nedNota?.recordatorio || '';
   _nedColor = _nedNota?.colorHoja || 'amarillo';
-  _nedUndoStack = [];
-  _nedRedoStack = [];
 
   const n = _nedNota || {};
-  const nc = NOTA_COLORES[_nedColor]||NOTA_COLORES.amarillo;
+  const nc = NOTA_COLORES[_nedColor] || NOTA_COLORES.amarillo;
 
-  // Build toolbar color dots
+  // Build color dots
   const colorDots = Object.entries(NOTA_COLORES).map(([k,v])=>
-    `<button class="ntb" onclick="nedSetColor('${k}')" id="ncc-${k}"
-      style="width:18px;height:18px;border-radius:50%;background:${v.bg};border:2px solid ${v.border};padding:0;outline:${_nedColor===k?'2px solid #333':'none'};outline-offset:1px"
-      title="${v.label}"></button>`
+    `<div class="ned-color-dot${_nedColor===k?' sel':''}" onclick="nedSetColor('${k}')"
+      style="background:${v.bg};border-color:${v.border}" title="${v.label}"></div>`
   ).join('');
 
-  // Create overlay
   const overlay = document.createElement('div');
   overlay.id = 'nota-editor-overlay';
-  overlay.style.background = nc.bg;
+  overlay.style.cssText = `background:${nc.bg};color:${nc.text}`;
+
   overlay.innerHTML = `
-    <!-- Top bar: back + save + options -->
-    <div style="display:flex;align-items:center;padding:10px 14px 0;gap:10px;flex-shrink:0">
-      <button onclick="cerrarEditorNota()" style="background:none;border:none;cursor:pointer;font-size:22px;color:#666;padding:4px;line-height:1">←</button>
-      <span id="ned-save-indicator" style="font-size:11px;color:#999;flex:1"></span>
-      <button onclick="nedAddPhoto()" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px" title="Agregar foto">📷</button>
-      <button onclick="nedSetReminder()" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px;opacity:${_nedRecordatorio?1:.5}" title="Recordatorio">⏰</button>
-      <button onclick="cerrarEditorNotaGuardando()" style="background:var(--gold);color:#0D0D0F;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer">Guardar</button>
+    <!-- Top bar -->
+    <div class="ned-topbar">
+      <button onclick="cerrarEditorNota()" style="background:none;border:none;cursor:pointer;font-size:22px;color:${nc.footer};padding:2px 6px;line-height:1;flex-shrink:0">←</button>
+      <span id="ned-dirty" style="font-size:11px;color:${nc.footer};flex:1"></span>
+      <button onclick="nedAddPhoto()" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px 6px;opacity:.7" title="Agregar foto">📷</button>
+      <button onclick="nedToggleReminder()" id="ned-rec-btn" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px 6px;opacity:${_nedRecordatorio?1:.5}" title="Recordatorio">⏰</button>
+      <button onclick="nedSaveNota(true)" style="background:#3A7D44;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0">Guardar</button>
+    </div>
+
+    <!-- Reminder -->
+    <div id="ned-rem-row" style="display:${_nedRecordatorio?'flex':'none'};align-items:center;gap:8px;padding:6px 20px;background:#FEF2F2;font-size:12px;color:#DC2626;flex-shrink:0">
+      <span style="font-size:15px">⏰</span>
+      <span id="ned-rem-txt">${_nedRecordatorio}</span>
+      <button onclick="nedClearReminder()" style="background:none;border:none;cursor:pointer;color:#DC2626;margin-left:auto;font-size:16px;line-height:1">✕</button>
     </div>
 
     <!-- Title -->
     <input id="ned-titulo" type="text" placeholder="Título..."
       value="${(n.titulo||'').replace(/"/g,'&quot;')}"
-      style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;border:none;outline:none;background:transparent;color:${nc.title};padding:12px 18px 6px;width:100%;box-sizing:border-box"
-      oninput="nedMarkDirty()">
+      style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;border:none;outline:none;background:transparent;color:${nc.title};padding:14px 20px 6px;width:100%;box-sizing:border-box;flex-shrink:0"
+      oninput="nedDirty()">
 
     <!-- Photo strip -->
-    <div id="ned-photos" class="ned-photo-strip" style="${_nedFotos.length===0?'display:none':''}">
+    <div id="ned-photos" class="ned-photo-strip" style="display:${_nedFotos.length?'flex':'none'}">
       ${_nedFotos.map((f,i)=>`
         <div style="position:relative;flex-shrink:0">
           <img src="${f}" onclick="verFotoNota('${f}')">
-          <button onclick="nedRemovePhoto(${i})" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:#E05252;color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>
+          <button onclick="nedRemovePhoto(${i})" style="position:absolute;top:-5px;right:-5px;width:20px;height:20px;border-radius:50%;background:#E05252;color:#fff;border:none;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700">✕</button>
         </div>`).join('')}
-    </div>
-
-    <!-- Reminder badge -->
-    <div id="ned-reminder-badge" style="display:${_nedRecordatorio?'flex':'none'};align-items:center;gap:8px;margin:4px 18px;background:#FEF2F2;border-radius:8px;padding:8px 12px;font-size:12px;color:#DC2626">
-      <span style="font-size:16px">⏰</span>
-      <span id="ned-reminder-text">${_nedRecordatorio}</span>
-      <button onclick="nedClearReminder()" style="background:none;border:none;cursor:pointer;color:#DC2626;margin-left:auto;font-size:14px">✕</button>
     </div>
 
     <!-- Toolbar -->
     <div class="ned-toolbar">
-      <button class="ntb" onclick="nedUndo()" title="Deshacer">↩</button>
-      <button class="ntb" onclick="nedRedo()" title="Rehacer">↪</button>
+      <button class="ntb" onclick="nedUndo()" title="Deshacer (Ctrl+Z)">↩</button>
+      <button class="ntb" onclick="nedRedo()" title="Rehacer (Ctrl+Y)">↪</button>
       <div class="ntb sep"></div>
-      <button class="ntb" id="ntb-bold" onmousedown="event.preventDefault();nedFmt('bold')" title="Negrita"><strong>B</strong></button>
-      <button class="ntb" id="ntb-italic" onmousedown="event.preventDefault();nedFmt('italic')" title="Cursiva" style="font-style:italic">I</button>
-      <button class="ntb" id="ntb-underline" onmousedown="event.preventDefault();nedFmt('underline')" title="Subrayado" style="text-decoration:underline">U</button>
-      <button class="ntb" id="ntb-strike" onmousedown="event.preventDefault();nedFmt('strikeThrough')" title="Tachado" style="text-decoration:line-through">S</button>
+      <button class="ntb" id="ntb-bold"      onmousedown="event.preventDefault();nedFmt('bold')"        title="Negrita"><strong>B</strong></button>
+      <button class="ntb" id="ntb-italic"    onmousedown="event.preventDefault();nedFmt('italic')"      title="Cursiva" style="font-style:italic">I</button>
+      <button class="ntb" id="ntb-underline" onmousedown="event.preventDefault();nedFmt('underline')"   title="Subrayado" style="text-decoration:underline">U</button>
+      <button class="ntb" id="ntb-strike"    onmousedown="event.preventDefault();nedFmt('strikeThrough')" title="Tachado" style="text-decoration:line-through">S</button>
       <div class="ntb sep"></div>
-      <button class="ntb" onmousedown="event.preventDefault();nedFmt('formatBlock','H2')" title="Título grande">T1</button>
-      <button class="ntb" onmousedown="event.preventDefault();nedFmt('formatBlock','H3')" title="Título pequeño">T2</button>
-      <button class="ntb" onmousedown="event.preventDefault();nedFmt('formatBlock','P')" title="Párrafo">¶</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedFmt('formatBlock','h2')" title="Título">T1</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedFmt('formatBlock','h3')" title="Subtítulo">T2</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedFmt('formatBlock','p')"  title="Párrafo normal">¶</button>
       <div class="ntb sep"></div>
-      <button class="ntb" onmousedown="event.preventDefault();nedFmt('insertUnorderedList')" title="Lista">• Lista</button>
-      <button class="ntb" onmousedown="event.preventDefault();nedFmt('insertOrderedList')" title="Numerada">1. Lista</button>
-      <button class="ntb" onmousedown="event.preventDefault();nedInsertChecklist()" title="Check">☐ Check</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedFmt('insertUnorderedList')" title="Lista de puntos">• Lista</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedFmt('insertOrderedList')"   title="Lista numerada">1. Lista</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedInsertCheck()"              title="Lista de tareas">☑ Check</button>
       <div class="ntb sep"></div>
-      <button class="ntb" onmousedown="event.preventDefault();nedInsertTable()" title="Tabla">⊞</button>
-      <button class="ntb" onmousedown="event.preventDefault();nedHighlight()" style="background:#FFF9C4;color:#92700A;font-size:11px;font-weight:600" title="Resaltar">Aa</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedInsertTable()" title="Insertar tabla">⊞ Tabla</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedHighlight()"   title="Resaltar texto" style="background:#FFF9C4;color:#92700A;font-weight:600">Aa</button>
       <div class="ntb sep"></div>
       ${colorDots}
     </div>
 
-    <!-- Body -->
-    <div id="ned-body" class="ned-body" contenteditable="true"
+    <!-- Editable body -->
+    <div id="ned-body" contenteditable="true"
       style="color:${nc.text}"
-      oninput="nedMarkDirty();nedUpdateToolbar()"
-      onkeyup="nedUpdateToolbar()"
-      onmouseup="nedUpdateToolbar()"
-      onkeydown="nedHandleKey(event)">
-      ${n.texto || ''}
+      onkeydown="nedKeyDown(event)"
+      oninput="nedDirty();nedUpdateBar()"
+      onmouseup="nedUpdateBar()"
+      onkeyup="nedUpdateBar()">
+      ${n.texto||'<p><br></p>'}
     </div>
 
-    <!-- Footer: word count + actions -->
-    <div class="ned-footer" style="background:${nc.bg}cc">
-      <span id="ned-wordcount" style="font-size:11px;color:#999">0 palabras</span>
+    <!-- Footer -->
+    <div class="ned-footer" style="background:${nc.bg}ee">
+      <span id="ned-wc" style="font-size:11px;color:${nc.footer}">0 palabras</span>
       <span style="flex:1"></span>
-      <span id="ned-autosave" style="font-size:11px;color:#999"></span>
+      <span id="ned-saved" style="font-size:11px;color:${nc.footer}"></span>
     </div>
 
-    <!-- Hidden file input for photos -->
-    <input type="file" id="ned-file-input" accept="image/*" multiple style="display:none" onchange="nedHandlePhotos(this)">
+    <input type="file" id="ned-file" accept="image/*" multiple style="display:none" onchange="nedPhotosIn(this)">
   `;
 
   document.body.appendChild(overlay);
   document.body.style.overflow = 'hidden';
 
-  // Focus
   setTimeout(()=>{
     const body = document.getElementById('ned-body');
     if(body){
       body.focus();
-      nedUpdateWordCount();
-      // Place cursor at end
-      const range = document.createRange();
-      const sel = window.getSelection();
-      range.selectNodeContents(body);
-      range.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(range);
+      nedWC();
+      // Cursor at end
+      try{
+        const r = document.createRange();
+        r.selectNodeContents(body);
+        r.collapse(false);
+        const s = window.getSelection();
+        s.removeAllRanges();
+        s.addRange(r);
+      }catch(e){}
     }
-  }, 100);
+  }, 120);
 
-  // Auto-save every 10s
-  window._nedAutoSave = setInterval(()=>nedAutoSave(), 10000);
+  window._nedAutoSave = setInterval(nedAutoSave, 15000);
 }
 
 function nedSetColor(color){
   _nedColor = color;
   const nc = NOTA_COLORES[color]||NOTA_COLORES.amarillo;
-  const overlay = document.getElementById('nota-editor-overlay');
-  if(overlay) overlay.style.background = nc.bg;
-  const titulo = document.getElementById('ned-titulo');
-  if(titulo) titulo.style.color = nc.title;
-  const body = document.getElementById('ned-body');
-  if(body) body.style.color = nc.text;
-  const footer = document.querySelector('.ned-footer');
-  if(footer) footer.style.background = nc.bg+'cc';
-  // Update dot outlines
-  Object.keys(NOTA_COLORES).forEach(k=>{
-    const dot = document.getElementById('ncc-'+k);
-    if(dot) dot.style.outline = k===color ? '2px solid #333' : 'none';
+  const ov = document.getElementById('nota-editor-overlay');
+  if(ov) ov.style.background = nc.bg;
+  const t = document.getElementById('ned-titulo');
+  if(t) t.style.color = nc.title;
+  const b = document.getElementById('ned-body');
+  if(b) b.style.color = nc.text;
+  const f = document.querySelector('#nota-editor-overlay .ned-footer');
+  if(f) f.style.background = nc.bg+'ee';
+  document.querySelectorAll('.ned-color-dot').forEach(d=>{
+    d.classList.toggle('sel', d.title===nc.label);
   });
 }
 
 function nedFmt(cmd, val){
-  const body = document.getElementById('ned-body');
-  if(!body) return;
-  body.focus();
-  document.execCommand(cmd, false, val||null);
-  nedUpdateToolbar();
-  nedMarkDirty();
+  const b = document.getElementById('ned-body');
+  if(!b) return;
+  b.focus();
+  try{ document.execCommand(cmd, false, val||null); }catch(e){}
+  nedUpdateBar();
+  nedDirty();
 }
 
-function nedInsertChecklist(){
-  const body = document.getElementById('ned-body');
-  if(!body) return;
-  body.focus();
-  const checkHtml = '<div style="display:flex;align-items:center;gap:8px;padding:2px 0"><input type="checkbox" style="width:16px;height:16px;cursor:pointer;flex-shrink:0" onchange="this.nextSibling.style.textDecoration=this.checked?&quot;line-through&quot;:&quot;none&quot;"><span style="flex:1;outline:none;min-width:20px">Ítem</span></div>';
-  document.execCommand('insertHTML', false, checkHtml);
-  nedMarkDirty();
+function nedInsertCheck(){
+  const b = document.getElementById('ned-body');
+  if(!b) return;
+  b.focus();
+  // Build a proper checkbox row
+  const id = 'chk'+Date.now();
+  const html = `<div class="ned-check-row" id="${id}"><input type="checkbox" onchange="this.parentElement.classList.toggle('done',this.checked)"><span contenteditable="true" style="flex:1;outline:none;min-height:20px"> </span></div>`;
+  try{ document.execCommand('insertHTML', false, html); }catch(e){}
+  // Focus the span
+  setTimeout(()=>{
+    const row = document.getElementById(id);
+    const span = row?.querySelector('span');
+    if(span){
+      span.focus();
+      const r = document.createRange();
+      r.selectNodeContents(span);
+      r.collapse(false);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    }
+  }, 30);
+  nedDirty();
 }
 
 function nedInsertTable(){
-  const table = `<table><tr><td>Columna 1</td><td>Columna 2</td></tr><tr><td></td><td></td></tr></table>`;
-  document.execCommand('insertHTML', false, table);
-  nedMarkDirty();
+  const b = document.getElementById('ned-body');
+  if(!b) return;
+  b.focus();
+  const tbl = `<table><thead><tr><th>Columna 1</th><th>Columna 2</th><th>Columna 3</th></tr></thead><tbody><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr></tbody></table><p><br></p>`;
+  try{ document.execCommand('insertHTML', false, tbl); }catch(e){}
+  nedDirty();
 }
 
 function nedHighlight(){
   const sel = window.getSelection();
-  if(sel && sel.toString()){
-    document.execCommand('insertHTML', false, `<mark style="background:#FFF9C4;padding:0 2px;border-radius:2px">${sel.toString()}</mark>`);
+  if(!sel || !sel.toString().trim()){
+    try{ document.execCommand('insertHTML', false, '<mark class="ned-hl">texto resaltado</mark>'); }catch(e){}
   } else {
-    document.execCommand('insertHTML', false, '<mark style="background:#FFF9C4;padding:0 2px;border-radius:2px">texto</mark>');
+    try{ document.execCommand('insertHTML', false, `<mark class="ned-hl">${sel.toString()}</mark>`); }catch(e){}
   }
-  nedMarkDirty();
+  nedDirty();
 }
 
+// undo/redo stacks declared at top level
+
 function nedUndo(){
-  if(_nedUndoStack.length===0){ document.execCommand('undo'); return; }
-  const body = document.getElementById('ned-body');
-  if(!body) return;
-  const state = _nedUndoStack.pop();
-  _nedRedoStack.push(body.innerHTML);
-  body.innerHTML = state;
-  nedUpdateWordCount();
+  if(_nedUndoStack.length===0){ try{document.execCommand('undo');}catch(e){} return; }
+  const b = document.getElementById('ned-body');
+  if(!b) return;
+  _nedRedoStack.push(b.innerHTML);
+  b.innerHTML = _nedUndoStack.pop();
+  nedWC();
 }
 
 function nedRedo(){
-  if(_nedRedoStack.length===0){ document.execCommand('redo'); return; }
-  const body = document.getElementById('ned-body');
-  if(!body) return;
-  const s = _nedRedoStack.pop();
-  _nedUndoStack.push(body.innerHTML);
-  body.innerHTML = s;
-  nedUpdateWordCount();
+  if(_nedRedoStack.length===0){ try{document.execCommand('redo');}catch(e){} return; }
+  const b = document.getElementById('ned-body');
+  if(!b) return;
+  _nedUndoStack.push(b.innerHTML);
+  b.innerHTML = _nedRedoStack.pop();
+  nedWC();
 }
 
-function nedHandleKey(e){
-  if((e.ctrlKey||e.metaKey) && e.key==='z' && !e.shiftKey){ e.preventDefault(); nedUndo(); return; }
-  if((e.ctrlKey||e.metaKey) && (e.key==='y'||(e.key==='z'&&e.shiftKey))){ e.preventDefault(); nedRedo(); return; }
-  // Save undo state on significant keys
-  if(e.key===' '||e.key==='Enter'){
-    const body = document.getElementById('ned-body');
-    if(body) _nedUndoStack.push(body.innerHTML);
-    if(_nedUndoStack.length>50) _nedUndoStack.shift();
+function nedKeyDown(e){
+  // Ctrl/Cmd shortcuts
+  const mod = e.ctrlKey || e.metaKey;
+  if(mod && e.key==='z' && !e.shiftKey){ e.preventDefault(); nedUndo(); return; }
+  if(mod && (e.key==='y' || (e.key==='z' && e.shiftKey))){ e.preventDefault(); nedRedo(); return; }
+  if(mod && e.key==='b'){ e.preventDefault(); nedFmt('bold'); return; }
+  if(mod && e.key==='i'){ e.preventDefault(); nedFmt('italic'); return; }
+  if(mod && e.key==='u'){ e.preventDefault(); nedFmt('underline'); return; }
+  // Save undo snapshot on space/enter
+  if(e.key===' ' || e.key==='Enter'){
+    const b = document.getElementById('ned-body');
+    if(b){ _nedUndoStack.push(b.innerHTML); if(_nedUndoStack.length>60) _nedUndoStack.shift(); }
   }
 }
 
-function nedMarkDirty(){
-  const ind = document.getElementById('ned-save-indicator');
-  if(ind) ind.textContent = '● Sin guardar';
-  nedUpdateWordCount();
+function nedDirty(){
+  const el = document.getElementById('ned-dirty');
+  if(el) el.textContent = '● Sin guardar';
+  nedWC();
 }
 
-function nedUpdateToolbar(){
-  ['bold','italic','underline','strikeThrough'].forEach(cmd=>{
-    const btn = document.getElementById('ntb-'+cmd.toLowerCase().replace('through','').replace('strike','strike'));
-    // match actual id
-  });
-  // Simple approach: check state
+function nedUpdateBar(){
   try{
-    const isBold = document.queryCommandState('bold');
-    const isItal = document.queryCommandState('italic');
-    const isUnd  = document.queryCommandState('underline');
-    const b = document.getElementById('ntb-bold');
-    const i = document.getElementById('ntb-italic');
-    const u = document.getElementById('ntb-underline');
-    if(b) b.classList.toggle('active', isBold);
-    if(i) i.classList.toggle('active', isItal);
-    if(u) u.classList.toggle('active', isUnd);
+    const cmds = ['bold','italic','underline'];
+    const ids = ['ntb-bold','ntb-italic','ntb-underline'];
+    cmds.forEach((c,i)=>{
+      const btn = document.getElementById(ids[i]);
+      if(btn) btn.classList.toggle('active', document.queryCommandState(c));
+    });
   }catch(e){}
 }
 
-function nedUpdateWordCount(){
-  const body = document.getElementById('ned-body');
-  const wc = document.getElementById('ned-wordcount');
-  if(!body||!wc) return;
-  const words = (body.innerText||'').trim().split(/\s+/).filter(w=>w.length>0).length;
-  wc.textContent = words + ' palabra' + (words!==1?'s':'');
+function nedWC(){
+  const b = document.getElementById('ned-body');
+  const el = document.getElementById('ned-wc');
+  if(!b||!el) return;
+  const words = (b.innerText||'').trim().split(/\s+/).filter(w=>w.length>0).length;
+  el.textContent = words + ' palabra' + (words!==1?'s':'');
 }
 
-function nedAddPhoto(){
-  document.getElementById('ned-file-input')?.click();
-}
+function nedAddPhoto(){ document.getElementById('ned-file')?.click(); }
 
-function nedHandlePhotos(input){
-  const files = Array.from(input.files);
-  if(!files.length) return;
-  const readers = files.map(f=>new Promise(res=>{
+function nedPhotosIn(input){
+  Array.from(input.files).forEach(f=>{
     const r = new FileReader();
-    r.onload = e => { _nedFotos.push(e.target.result); res(); };
+    r.onload = e => { _nedFotos.push(e.target.result); nedRefreshStrip(); nedDirty(); };
     r.readAsDataURL(f);
-  }));
-  Promise.all(readers).then(()=>{
-    nedRefreshPhotoStrip();
-    nedMarkDirty();
   });
-  input.value = '';
+  input.value='';
 }
 
-function nedRemovePhoto(idx){
-  _nedFotos.splice(idx,1);
-  nedRefreshPhotoStrip();
-  nedMarkDirty();
-}
+function nedRemovePhoto(i){ _nedFotos.splice(i,1); nedRefreshStrip(); nedDirty(); }
 
-function nedRefreshPhotoStrip(){
+function nedRefreshStrip(){
   const strip = document.getElementById('ned-photos');
   if(!strip) return;
-  if(_nedFotos.length===0){ strip.style.display='none'; return; }
-  strip.style.display = 'flex';
+  if(!_nedFotos.length){ strip.style.display='none'; return; }
+  strip.style.display='flex';
   strip.innerHTML = _nedFotos.map((f,i)=>`
     <div style="position:relative;flex-shrink:0">
-      <img src="${f}" onclick="verFotoNota('${f}')" style="width:70px;height:70px;object-fit:cover;border-radius:10px;cursor:pointer">
-      <button onclick="nedRemovePhoto(${i})" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:#E05252;color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>
+      <img src="${f}" onclick="verFotoNota('${f}')" style="width:72px;height:72px;object-fit:cover;border-radius:10px;cursor:pointer">
+      <button onclick="nedRemovePhoto(${i})" style="position:absolute;top:-5px;right:-5px;width:20px;height:20px;border-radius:50%;background:#E05252;color:#fff;border:none;cursor:pointer;font-size:11px;font-weight:700">✕</button>
     </div>`).join('');
 }
 
-function nedSetReminder(){
-  const current = _nedRecordatorio;
-  const val = prompt('Recordatorio (ej: "Hoy a las 9am", "Mañana 3pm"):', current||'');
-  if(val===null) return;
-  _nedRecordatorio = val.trim();
-  const badge = document.getElementById('ned-reminder-badge');
-  const txt = document.getElementById('ned-reminder-text');
-  const btn = document.querySelector('[onclick="nedSetReminder()"]');
-  if(badge){ badge.style.display = _nedRecordatorio ? 'flex' : 'none'; }
-  if(txt) txt.textContent = _nedRecordatorio;
-  if(btn) btn.style.opacity = _nedRecordatorio ? '1' : '0.5';
-  nedMarkDirty();
+function nedToggleReminder(){
+  if(_nedRecordatorio){
+    nedClearReminder();
+  } else {
+    const val = prompt('Escribe el recordatorio (ej: "Mañana a las 9am"):','');
+    if(val===null) return;
+    _nedRecordatorio = val.trim();
+    const row = document.getElementById('ned-rem-row');
+    const txt = document.getElementById('ned-rem-txt');
+    const btn = document.getElementById('ned-rec-btn');
+    if(row) row.style.display = _nedRecordatorio?'flex':'none';
+    if(txt) txt.textContent = _nedRecordatorio;
+    if(btn) btn.style.opacity = _nedRecordatorio?'1':'0.5';
+    nedDirty();
+  }
 }
 
 function nedClearReminder(){
   _nedRecordatorio = '';
-  const badge = document.getElementById('ned-reminder-badge');
-  if(badge) badge.style.display = 'none';
-  const btn = document.querySelector('[onclick="nedSetReminder()"]');
+  const row = document.getElementById('ned-rem-row');
+  const btn = document.getElementById('ned-rec-btn');
+  if(row) row.style.display = 'none';
   if(btn) btn.style.opacity = '0.5';
 }
 
 function nedAutoSave(){
-  const body = document.getElementById('ned-body');
-  if(!body) return;
-  const current = body.innerHTML;
-  if(current === _nedLastSaved) return;
+  const b = document.getElementById('ned-body');
+  if(!b) return;
+  const dirty = document.getElementById('ned-dirty');
+  if(!dirty || !dirty.textContent.includes('Sin guardar')) return;
   nedSaveNota(false);
-  _nedLastSaved = current;
-  const ind = document.getElementById('ned-autosave');
-  if(ind){ ind.textContent = 'Guardado ' + new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}); }
+  dirty.textContent = '';
+  const saved = document.getElementById('ned-saved');
+  if(saved) saved.textContent = 'Guardado ' + new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
 }
 
-function nedSaveNota(close=true){
+function nedSaveNota(close){
   const titulo = document.getElementById('ned-titulo')?.value.trim() || 'Nota';
   const body = document.getElementById('ned-body');
   const texto = body?.innerHTML || '';
-  const colorHoja = _nedColor;
-
   if(!state.notas) state.notas=[];
 
   if(_nedNota){
-    // Update existing
     const n = state.notas.find(x=>x.id===_nedNota.id);
-    if(n){
-      n.titulo = titulo;
-      n.texto = texto;
-      n.colorHoja = colorHoja;
-      n.fotos = [..._nedFotos];
-      n.recordatorio = _nedRecordatorio;
-      n.modificado = new Date().toISOString();
-      // Preserve tipo for backwards compat
-      if(!n.tipo) n.tipo = 'texto';
-    }
+    if(n){ Object.assign(n,{titulo,texto,colorHoja:_nedColor,fotos:[..._nedFotos],recordatorio:_nedRecordatorio,modificado:new Date().toISOString()}); }
   } else {
-    state.notas.unshift({
-      id: Date.now()+'',
-      tipo: 'texto',
-      titulo,
-      texto,
-      colorHoja,
-      fotos: [..._nedFotos],
-      recordatorio: _nedRecordatorio,
-      creado: new Date().toISOString()
-    });
+    const nota = {id:Date.now()+'',tipo:'texto',titulo,texto,colorHoja:_nedColor,fotos:[..._nedFotos],recordatorio:_nedRecordatorio,creado:new Date().toISOString()};
+    state.notas.unshift(nota);
     _nedNota = state.notas[0];
   }
-
   save('fnz_notas', state.notas);
+
   if(close){
-    clearInterval(window._nedAutoSave);
     cerrarEditorNota();
-    render();
     toast('Nota guardada ✓');
   }
 }
 
-function cerrarEditorNotaGuardando(){
-  nedSaveNota(true);
-}
+function cerrarEditorNotaGuardando(){ nedSaveNota(true); }
 
 function cerrarEditorNota(){
   clearInterval(window._nedAutoSave);
-  const overlay = document.getElementById('nota-editor-overlay');
-  if(overlay) overlay.remove();
+  document.getElementById('nota-editor-overlay')?.remove();
   document.body.style.overflow = '';
   render();
 }
+
 
 // ── Comandos rápidos (chips) ──
 function usarChip(btn){
