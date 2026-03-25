@@ -297,6 +297,105 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 }
 @keyframes waveAnim { from{height:8px} to{height:40px} }
 
+
+/* ── Editor de notas premium ── */
+#nota-editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  background: #FFFDE7;
+  transition: background .2s;
+}
+#nota-editor-overlay .ned-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(0,0,0,.1);
+  background: rgba(255,255,255,.8);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex-shrink: 0;
+}
+#nota-editor-overlay .ned-toolbar::-webkit-scrollbar { display: none; }
+#nota-editor-overlay .ntb {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 9px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: #555;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: 'DM Sans', sans-serif;
+  transition: background .15s;
+}
+#nota-editor-overlay .ntb:hover, #nota-editor-overlay .ntb:active { background: rgba(0,0,0,.08); }
+#nota-editor-overlay .ntb.active { background: rgba(0,0,0,.12); color: #000; font-weight: 700; }
+#nota-editor-overlay .ntb.sep { width: 1px; height: 20px; background: rgba(0,0,0,.15); padding: 0; margin: 0 3px; cursor: default; }
+#nota-editor-overlay .ned-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  font-weight: 700;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #333;
+  padding: 16px 18px 6px;
+  width: 100%;
+}
+#nota-editor-overlay .ned-body {
+  flex: 1;
+  padding: 8px 18px 80px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #333;
+  overflow-y: auto;
+  outline: none;
+  -webkit-user-modify: read-write-plaintext-only;
+}
+#nota-editor-overlay .ned-body:focus { outline: none; }
+#nota-editor-overlay .ned-body ul { padding-left: 20px; margin: 4px 0; }
+#nota-editor-overlay .ned-body ol { padding-left: 20px; margin: 4px 0; }
+#nota-editor-overlay .ned-body li { margin-bottom: 4px; }
+#nota-editor-overlay .ned-body h2 { font-size: 18px; font-weight: 700; margin: 12px 0 4px; }
+#nota-editor-overlay .ned-body h3 { font-size: 16px; font-weight: 600; margin: 10px 0 4px; }
+#nota-editor-overlay .ned-body table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+#nota-editor-overlay .ned-body td, #nota-editor-overlay .ned-body th { border: 1px solid #ccc; padding: 6px 10px; min-width: 60px; }
+#nota-editor-overlay .ned-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255,255,255,.95);
+  border-top: 1px solid rgba(0,0,0,.1);
+  padding: 10px 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 501;
+}
+#nota-editor-overlay .ned-photo-strip {
+  display: flex;
+  gap: 8px;
+  padding: 8px 18px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
+}
+#nota-editor-overlay .ned-photo-strip img {
+  width: 70px;
+  height: 70px;
+  object-fit: cover;
+  border-radius: 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
 </style>
 </head>
 <body>
@@ -3188,348 +3287,140 @@ let _notaVozIgnoreNext = false;
 function renderNotas(){
   if(!state.notas) state.notas=[];
   const todas = state.notas;
-  const nListas  = todas.filter(n=>n.tipo==='lista').length;
-  const nRec     = todas.filter(n=>n.tipo==='recordatorio').length;
-  const nFotos   = todas.filter(n=>n.tipo==='foto').length;
-  const nTexto   = todas.filter(n=>n.tipo==='texto').length;
-  const total    = todas.length;
-  const filtros = [
-    {id:'todas',label:'Todas',count:total},
-    {id:'lista',label:'✓ Listas',count:nListas},
-    {id:'texto',label:'📝 Texto',count:nTexto},
-    {id:'foto', label:'🖼 Fotos',count:nFotos},
-    {id:'recordatorio',label:'⏰ Record.',count:nRec},
-  ];
-  const filtroBtns = filtros.map(f=>
-    `<button class="nota-filter-btn ${_notaFilter===f.id?'active':''}" onclick="setNotaFilter('${f.id}')">
-      ${f.label}${f.count>0?` <span style="font-size:10px;opacity:.7">${f.count}</span>`:''}
-    </button>`
-  ).join('');
-  const notas = (_notaFilter==='todas' ? todas : todas.filter(n=>n.tipo===_notaFilter))
-    .sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)); // ancladas primero
+  const total = todas.length;
+  const notas = _notaFilter==='todas' ? todas : todas.filter(n=>n.tipo===_notaFilter);
   const notasHtml = notas.length===0
-    ? `<div style="text-align:center;padding:36px 20px;color:var(--muted)">
-        <div style="font-size:36px;margin-bottom:10px">📝</div>
-        <div style="font-size:14px;color:var(--text)">No hay notas aún</div>
-        <div style="font-size:12px;margin-top:6px">Usa el micrófono o los botones de abajo</div>
+    ? `<div style="text-align:center;padding:48px 20px;color:var(--muted)">
+        <div style="font-size:48px;margin-bottom:12px">📝</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px">Sin notas aún</div>
+        <div style="font-size:12px">Toca <strong>+ Nueva nota</strong> o usa el micrófono</div>
        </div>`
     : notas.map(n=>renderNotaCard(n)).join('');
+
   return `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div>
         <div class="section-title" style="margin-bottom:2px">Mis Notas</div>
-        <div class="section-sub">Listas · Apuntes · Fotos · Recordatorios</div>
+        <div class="section-sub">${total} nota${total!==1?'s':''}</div>
       </div>
-      <button onclick="openNotaTexto()" style="background:var(--gold);color:#0D0D0F;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer">+ Nueva</button>
+      <button onclick="abrirEditorNota()" style="background:var(--gold);color:#0D0D0F;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <span style="font-size:16px">+</span> Nueva nota
+      </button>
     </div>
-    ${total>0?`
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 10px;text-align:center">
-        <div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--gold)">${nListas}</div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">Listas</div>
-      </div>
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 10px;text-align:center">
-        <div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--red)">${nRec}</div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">Recordat.</div>
-      </div>
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 10px;text-align:center">
-        <div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--green)">${nFotos}</div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">Fotos</div>
-      </div>
-    </div>`:''}
-    <div class="nota-filter">${filtroBtns}</div>
     ${notasHtml}
-    <div class="notas-fab-row">
-      <button class="nota-fab-btn" style="background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0D0D0F" onclick="openNotaVoz()">🎙 Nota de voz</button>
-      <button class="nota-fab-btn" style="background:#2E86AB;color:#fff;flex:0 0 52px;border-radius:12px" onclick="openNotaFoto()">📷</button>
-      <button class="nota-fab-btn" style="background:#4CAF85;color:#fff;flex:0 0 52px;border-radius:12px" onclick="openNotaTexto()">✏️</button>
+    <div style="display:flex;gap:8px;margin-top:8px;padding-bottom:80px">
+      <button style="flex:1;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0D0D0F;border:none;border-radius:12px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer" onclick="openNotaVoz()">
+        🎙 Nota de voz
+      </button>
     </div>`;
-}
-
-
-
-// ── Colores de hoja de nota ──
-const NOTA_COLORES = {
-  amarillo: { bg:'#FFFDE7', border:'#F9A825', title:'#4E342E', text:'#5D4037', line:'#F9A82544', footer:'#A1887F', label:'Amarillo' },
-  blanco:   { bg:'#FFFFFF', border:'#E0E0E0', title:'#212121', text:'#424242', line:'#E0E0E0',   footer:'#9E9E9E', label:'Blanco' },
-  verde:    { bg:'#F1F8E9', border:'#AED581', title:'#33691E', text:'#33691E', line:'#AED58155', footer:'#689F38', label:'Verde' },
-  azul:     { bg:'#E3F2FD', border:'#90CAF9', title:'#0D47A1', text:'#1565C0', line:'#90CAF955', footer:'#1976D2', label:'Azul' },
-  rosa:     { bg:'#FCE4EC', border:'#F48FB1', title:'#880E4F', text:'#880E4F', line:'#F48FB155', footer:'#C2185B', label:'Rosa' },
-  pizarron: { bg:'#263238', border:'#455A64', title:'#ECEFF1', text:'#CFD8DC', line:'#455A6466', footer:'#78909C', label:'Pizarrón' },
-};
-
-// ── Bullet styles ──
-const BULLET_STYLES = {
-  check:   { icon: (done, i) => done ? '✅' : '☐',   label: '☐ Check' },
-  check2:  { icon: (done, i) => done ? '✓' : '○',    label: '○ Círculo' },
-  numeric: { icon: (done, i) => (i+1)+'.',            label: '1. Número' },
-  dot:     { icon: (done, i) => '●',                  label: '● Punto' },
-  arrow:   { icon: (done, i) => '→',                  label: '→ Flecha' },
-  star:    { icon: (done, i) => done ? '★' : '☆',    label: '☆ Estrella' },
-  emoji:   { icon: (done, i) => ['🔧','🛒','📦','💡','🔩','🪛','⚡'][i%7], label: '🔧 Emoji' },
-};
-
-function getBulletIcon(nota, idx, done){
-  const style = nota.bulletStyle || 'check';
-  const bs = BULLET_STYLES[style];
-  return bs ? bs.icon(done, idx) : '☐';
 }
 
 function renderNotaCard(n){
-  const ICONOS   = {lista:'📋',texto:'📝',foto:'📷',recordatorio:'⏰'};
-  const COLORES  = {lista:'#C9A84C',texto:'#2E86AB',foto:'#4CAF85',recordatorio:'#E05252'};
-  const LABELS   = {lista:'Lista',texto:'Texto',foto:'Foto',recordatorio:'Recordatorio'};
-  const BGBADGE  = {lista:'#FFF8EC',texto:'#EFF6FF',foto:'#F0FDF4',recordatorio:'#FEF2F2'};
-  const TXTBADGE = {lista:'#92700A',texto:'#1565C0',foto:'#15803D',recordatorio:'#DC2626'};
-  const color = COLORES[n.tipo]||'#C9A84C';
-  const icono = ICONOS[n.tipo]||'📝';
+  const nc = NOTA_COLORES[n.colorHoja||'amarillo']||NOTA_COLORES.amarillo;
   const ts = n.creado ? new Date(n.creado).toLocaleDateString('es-PE',{day:'numeric',month:'short',year:'numeric'}) : '';
   const expanded = !!n._expanded;
 
-  // Preview colapsado — primera línea o conteo de ítems
+  // Build preview text
   let preview = '';
-  if(n.tipo==='lista'||n.tipo==='recordatorio'){
-    const its = n.items||[];
-    const hechos = its.filter(i=>i.done).length;
-    preview = its.length > 0 ? `${hechos}/${its.length} ítems` : 'Sin ítems';
-  } else if(n.tipo==='foto'){
-    preview = `${(n.fotos||[]).length} foto(s)`;
+  let extraBadges = '';
+
+  if(n.items && n.items.length>0){
+    const hechos = n.items.filter(i=>i.done).length;
+    const total = n.items.length;
+    preview = n.items.slice(0,2).map(it=>{
+      const bullet = getBulletIcon(n, 0, it.done);
+      return `<span style="opacity:${it.done?.5:1};text-decoration:${it.done?'line-through':'none'}">${bullet} ${it.texto}</span>`;
+    }).join(' · ');
+    if(total>2) preview += ` +${total-2} más`;
+    extraBadges += `<span style="font-size:10px;background:#FFF8E1;color:#92700A;padding:1px 7px;border-radius:10px;font-weight:600">${hechos}/${total} ✓</span>`;
   } else {
-    const txt = (n.texto||'').replace(/<[^>]+>/g,'');
-    preview = txt.length > 50 ? txt.substring(0,50)+'…' : txt;
+    const txt = (n.texto||'').replace(/<[^>]+>/g,'').trim();
+    preview = txt.length>80 ? txt.substring(0,80)+'…' : txt;
   }
 
-  // Contenido expandido
-  let cuerpo = '';
+  if(n.recordatorio){
+    extraBadges += ` <span style="font-size:10px;background:#FEF2F2;color:#DC2626;padding:1px 7px;border-radius:10px;font-weight:600">⏰ ${n.recordatorio}</span>`;
+  }
+  if(n.fotos && n.fotos.length>0){
+    extraBadges += ` <span style="font-size:10px;background:#F0FDF4;color:#15803D;padding:1px 7px;border-radius:10px;font-weight:600">📷 ${n.fotos.length}</span>`;
+  }
+
+  // EXPANDED content
+  let expandedHtml = '';
   if(expanded){
-    const delBtn=`<button onclick="deleteNota('${n.id}')" style="width:28px;height:28px;background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;flex-shrink:0">✕</button>`;
-    if(n.tipo==='lista'||n.tipo==='recordatorio'){
-      const its = n.items||[];
-      const hechos = its.filter(i=>i.done).length;
-      const pct = its.length>0?Math.round(hechos/its.length*100):0;
-      const progColor = n.tipo==='recordatorio'?'#E05252':'#C9A84C';
-      const itemsHtml = its.map((it,i)=>{
+    let contentHtml = '';
+
+    // Images if any
+    if(n.fotos && n.fotos.length>0){
+      const imgs = n.fotos.map(f=>`<img src="${f}" onclick="verFotoNota('${f}')" style="width:80px;height:80px;object-fit:cover;border-radius:8px;cursor:pointer">`).join('');
+      contentHtml += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${imgs}</div>`;
+    }
+
+    // Checklist items
+    if(n.items && n.items.length>0){
+      const its = n.items;
+      contentHtml += its.map((it,i)=>{
         const bullet = getBulletIcon(n, i, it.done);
         const style = n.bulletStyle||'check';
         const isCheck = style==='check'||style==='check2'||style==='star';
-        return `<div class="nota-check-item ${it.done?'done':''}" onclick="${isCheck?`toggleNotaItem('${n.id}',${i})`:''}">
-          <span style="font-size:${style==='numeric'?'13':'16'}px;min-width:22px;text-align:center;opacity:${it.done?.5:1}">${bullet}</span>
-          <span style="text-decoration:${it.done?'line-through':'none'};color:${it.done?'var(--muted)':'var(--text)'}">${it.texto}</span>
+        return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:${isCheck?'pointer':'default'}" onclick="${isCheck?`toggleNotaItem('${n.id}',${i})`:''}">
+          <span style="font-size:${style==='numeric'?'12':'15'}px;min-width:20px;text-align:center;flex-shrink:0">${bullet}</span>
+          <span style="font-size:13px;flex:1;text-decoration:${it.done?'line-through':'none'};color:${it.done?'var(--muted)':'var(--text)'};line-height:1.4">${it.texto}</span>
         </div>`;
       }).join('');
-      const progBar = its.length>0?`<div style="height:3px;background:#F1F5F9;border-radius:2px;margin:8px 0 4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${progColor};border-radius:2px;transition:width .4s"></div></div>`:'';
-      cuerpo = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-        ${itemsHtml}
-        ${n.tipo==='recordatorio'&&n.recordatorio?`<div class="nota-rec-tag">⏰ ${n.recordatorio}</div>`:''}
-        ${progBar}
-        <div style="display:flex;gap:6px;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--border);align-items:center;flex-wrap:wrap">
-          <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="abrirEditarNota('${n.id}')">✏️ Editar</button>
-          <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="openNotaVozAgregar('${n.id}')">🎙 Agregar</button>
-          <button style="font-size:11px;color:#25D366;background:none;border:none;cursor:pointer;font-weight:600" onclick="compartirNotaWhatsApp('${n.id}')">📱 WhatsApp</button>
-          <select onchange="cambiarBulletStyle('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;background:var(--card);color:var(--text);cursor:pointer">
-            ${Object.entries(BULLET_STYLES).map(([k,v])=>`<option value="${k}" ${(n.bulletStyle||'check')===k?'selected':''}>${v.label}</option>`).join('')}
-          </select>
-          <select onchange="cambiarColorNota('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;background:var(--card);color:var(--text);cursor:pointer">
-            ${Object.entries(NOTA_COLORES).map(([k,v])=>`<option value="${k}" ${(n.colorHoja||'amarillo')===k?'selected':''}>${v.label}</option>`).join('')}
-          </select>
-          <span style="margin-left:auto;font-size:11px;color:var(--muted)">${hechos}/${its.length}</span>
-          ${delBtn}
-        </div>
-      </div>`;
-    } else if(n.tipo==='foto'){
-      const thumbs=(n.fotos||[]).map(f=>`<img class="nota-img-thumb" src="${f}" onclick="verFotoNota('${f}')" />`).join('');
-      cuerpo = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-        ${n.texto?`<div style="font-size:13px;color:var(--muted);margin-bottom:8px;line-height:1.5">${n.texto}</div>`:''}
-        <div class="nota-imgs-row">${thumbs}<div class="nota-img-thumb add-btn" onclick="agregarFotoNota('${n.id}')">+</div></div>
-        <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
-          <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="editNota('${n.id}')">✏️ Editar</button>
-          <span style="margin-left:auto;font-size:11px;color:var(--muted)">${(n.fotos||[]).length} foto(s)</span>
-          ${delBtn}
-        </div>
-      </div>`;
-    } else {
-      cuerpo = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-        <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:4px">${n.texto||''}</div>
-        <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
-          <button style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="editNota('${n.id}')">✏️ Editar</button>
-          <button style="font-size:11px;color:#25D366;background:none;border:none;cursor:pointer;font-weight:600" onclick="compartirNotaWhatsApp('${n.id}')">📱 WhatsApp</button>
-          <span style="margin-left:auto"></span>
-          ${delBtn}
-        </div>
+    }
+
+    // Rich text
+    if(n.texto){
+      const rawTxt = n.texto.replace(/<[^>]+>/g,'').trim();
+      if(rawTxt){
+        contentHtml += `<div style="font-size:13px;color:var(--text);line-height:1.7;margin-top:${n.items?.length?'10':'0'}px">${n.texto}</div>`;
+      }
+    }
+
+    // Reminder
+    if(n.recordatorio){
+      contentHtml += `<div style="margin-top:8px;background:#FEF2F2;border-radius:8px;padding:8px 12px;font-size:12px;color:#DC2626;display:flex;align-items:center;gap:6px">
+        <span style="font-size:16px">⏰</span> ${n.recordatorio}
       </div>`;
     }
+
+    expandedHtml = `
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        ${contentHtml || '<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">Nota vacía</div>'}
+        <div style="display:flex;gap:6px;margin-top:12px;padding-top:8px;border-top:1px solid var(--border);flex-wrap:wrap;align-items:center">
+          <button onclick="event.stopPropagation();abrirEditorNota('${n.id}')" style="font-size:12px;color:var(--muted);background:none;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer">✏️ Editar</button>
+          <button onclick="event.stopPropagation();compartirNotaWhatsApp('${n.id}')" style="font-size:12px;color:#25D366;background:none;border:1px solid #25D36633;border-radius:8px;padding:5px 10px;cursor:pointer;font-weight:600">📱 WhatsApp</button>
+          <select onchange="cambiarBulletStyle('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;border:1px solid var(--border);border-radius:8px;padding:4px 6px;background:var(--card);color:var(--muted);cursor:pointer">
+            ${Object.entries(BULLET_STYLES).map(([k,v])=>`<option value="${k}" ${(n.bulletStyle||'check')===k?'selected':''}>${v.label}</option>`).join('')}
+          </select>
+          <select onchange="cambiarColorNota('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;border:1px solid var(--border);border-radius:8px;padding:4px 6px;background:var(--card);color:var(--muted);cursor:pointer">
+            ${Object.entries(NOTA_COLORES).map(([k,v])=>`<option value="${k}" ${(n.colorHoja||'amarillo')===k?'selected':''}>${v.label}</option>`).join('')}
+          </select>
+          <button onclick="event.stopPropagation();pinNota('${n.id}')" style="font-size:12px;background:none;border:1px solid var(--border);border-radius:8px;padding:5px 8px;cursor:pointer;opacity:${n.pinned?1:.4}">${n.pinned?'📌':'📍'}</button>
+          <button onclick="event.stopPropagation();deleteNota('${n.id}')" style="margin-left:auto;width:30px;height:30px;background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;flex-shrink:0">✕</button>
+        </div>
+      </div>`;
   }
 
-  const nc = NOTA_COLORES[n.colorHoja||'amarillo']||NOTA_COLORES.amarillo;
-  const cardBg = n.colorHoja && n.colorHoja!=='amarillo' ? `background:${nc.bg};` : '';
-  const cardBorder = n.colorHoja ? `border-color:${nc.border}44;` : '';
-  return `<div class="nota-card" style="${n.pinned?'border-color:#C9A84C66;':''}${cardBg}${cardBorder}" onclick="toggleNotaExpand('${n.id}',event)">
-    <div class="nota-accent" style="background:${nc.border||color}"></div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <div style="width:36px;height:36px;border-radius:10px;background:${BGBADGE[n.tipo]||'#FFF8EC'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${icono}</div>
+  const cardStyle = `background:${nc.bg};border-color:${nc.border}55;${n.pinned?'border-left:3px solid var(--gold);':''}`;
+
+  return `<div class="nota-card" style="${cardStyle}" onclick="toggleNotaExpand('${n.id}',event)">
+    <div style="display:flex;align-items:flex-start;gap:10px">
       <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.titulo||'Sin título'}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:1px">${preview}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <span style="font-size:14px;font-weight:700;color:${nc.title};flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.titulo||'Sin título'}</span>
+          <span style="font-size:10px;color:${nc.footer};white-space:nowrap;flex-shrink:0">${ts}</span>
+        </div>
+        ${preview?`<div style="font-size:12px;color:${nc.footer};line-height:1.4;margin-bottom:${extraBadges?'5':'0'}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${preview}</div>`:''}
+        ${extraBadges?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${extraBadges}</div>`:''}
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
-        <span style="font-size:10px;color:var(--muted)">${ts}</span>
-        <span style="font-size:10px;background:${BGBADGE[n.tipo]||'#FFF8EC'};color:${TXTBADGE[n.tipo]||'#92700A'};padding:1px 6px;border-radius:6px;font-weight:600">${LABELS[n.tipo]||'Nota'}</span>
-      </div>
-      <span style="font-size:12px;color:var(--muted);margin-left:2px">${expanded?'▲':'▼'}</span>
+      <span style="font-size:11px;color:var(--muted);flex-shrink:0;margin-top:2px">${expanded?'▲':'▼'}</span>
     </div>
-    ${cuerpo}
+    ${expandedHtml}
   </div>`;
 }
 
-function toggleNotaExpand(id, e){
-  // No colapsar si tocaron un botón interno
-  if(e && e.target && (e.target.tagName==='BUTTON'||e.target.closest('button'))) return;
-  const n = (state.notas||[]).find(x=>x.id===id);
-  if(!n) return;
-  n._expanded = !n._expanded;
-  render();
-}
-
-function compartirNotaWhatsApp(notaId){
-  const n = (state.notas||[]).find(x=>x.id===notaId);
-  if(!n){ toast('Nota no encontrada','error'); return; }
-  // Cargar items en listaItems para que generarNotaJPG los use
-  const prevItems = listaItems;
-  const prevTitulo = listaTitulo;
-  listaItems = (n.items||[]).map(it=>({
-    tipo:'item',
-    texto: it.texto.split(' - S/')[0].trim(),
-    precio: it.texto.includes(' - S/') ? parseFloat(it.texto.split(' - S/')[1]) : null
-  }));
-  listaTitulo = n.titulo || 'Nota';
-  const canvas = generarNotaJPG(n);
-  listaItems = prevItems;
-  listaTitulo = prevTitulo;
-
-  canvas.toBlob(blob=>{
-    const filename = (n.titulo||'nota').replace(/\s+/g,'_')+'.jpg';
-    if(navigator.share && navigator.canShare && navigator.canShare({files:[new File([blob],'a.jpg',{type:'image/jpeg'})]})){
-      navigator.share({title:n.titulo, files:[new File([blob],filename,{type:'image/jpeg'})]}).catch(()=>{});
-      return;
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href=url; a.download=filename; a.click();
-    URL.revokeObjectURL(url);
-    toast('Imagen descargada — compartila por WhatsApp 📱');
-  },'image/jpeg',0.93);
-}
-
-
-function cambiarColorNota(id, color){
-  const n = (state.notas||[]).find(x=>x.id===id);
-  if(!n) return;
-  n.colorHoja = color;
-  save('fnz_notas', state.notas);
-  render();
-}
-
-function cambiarBulletStyle(id, style){
-  const n = (state.notas||[]).find(x=>x.id===id);
-  if(!n) return;
-  n.bulletStyle = style;
-  save('fnz_notas', state.notas);
-  render();
-}
-
-function abrirEditarNota(id){
-  const n = (state.notas||[]).find(x=>x.id===id);
-  if(!n) return;
-  const items = (n.items||[]).map((it,i)=>
-    `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <input type="text" value="${it.texto.replace(/"/g,'&quot;')}" 
-        onchange="editNotaItem('${id}',${i},this.value)"
-        style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text)">
-      <button onclick="deleteNotaItem('${id}',${i})" style="background:#FEF2F2;border:1px solid #E0525233;color:#E05252;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px">✕</button>
-    </div>`
-  ).join('');
-
-  document.getElementById('modal-content').innerHTML = `
-    <div class="modal-title" style="color:var(--gold)">✏️ Editar nota</div>
-    <div class="field">
-      <label class="field-label">Título</label>
-      <input id="edit-nota-titulo" type="text" value="${(n.titulo||'').replace(/"/g,'&quot;')}" placeholder="Título de la nota">
-    </div>
-    <div class="field">
-      <label class="field-label">Color de hoja</label>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
-        ${Object.entries(NOTA_COLORES).map(([k,v])=>`
-          <button onclick="cambiarColorNota('${id}','${k}');document.querySelectorAll('.color-opt').forEach(b=>b.style.outline='none');this.style.outline='2px solid var(--text)'"
-            class="color-opt"
-            style="width:28px;height:28px;border-radius:50%;background:${v.bg};border:1.5px solid ${v.border};cursor:pointer;outline:${(n.colorHoja||'amarillo')===k?'2px solid var(--text)':'none'};outline-offset:2px"
-            title="${v.label}">
-          </button>`).join('')}
-      </div>
-    </div>
-    <div class="field">
-      <label class="field-label">Estilo de viñetas</label>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
-        ${Object.entries(BULLET_STYLES).map(([k,v])=>`
-          <button onclick="cambiarBulletStyle('${id}','${k}');document.querySelectorAll('.bullet-opt').forEach(b=>b.style.background='var(--card)');this.style.background='var(--border)'" 
-            class="bullet-opt"
-            style="background:${(n.bulletStyle||'check')===k?'var(--border)':'var(--card)'};border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text)">
-            ${v.label}
-          </button>`).join('')}
-      </div>
-    </div>
-    ${n.items&&n.items.length>0?`
-    <div class="field">
-      <label class="field-label">Ítems</label>
-      ${items}
-      <button onclick="agregarItemEditNota('${id}')" style="width:100%;background:var(--card);border:1px dashed var(--border);border-radius:8px;padding:8px;font-size:13px;color:var(--muted);cursor:pointer;margin-top:4px">+ Agregar ítem</button>
-    </div>`:''}
-    <div class="field">
-      <label class="field-label">Texto / Notas</label>
-      <textarea id="edit-nota-texto" rows="3" placeholder="Texto libre..." style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);resize:vertical">${n.texto||''}</textarea>
-    </div>
-    <div class="btn-row">
-      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn-gold" onclick="guardarEditNota('${id}')">Guardar cambios</button>
-    </div>`;
-  showModal();
-}
-
-function editNotaItem(notaId, idx, valor){
-  const n = (state.notas||[]).find(x=>x.id===notaId);
-  if(!n||!n.items) return;
-  n.items[idx].texto = valor;
-  save('fnz_notas', state.notas);
-}
-
-function deleteNotaItem(notaId, idx){
-  const n = (state.notas||[]).find(x=>x.id===notaId);
-  if(!n||!n.items) return;
-  n.items.splice(idx,1);
-  save('fnz_notas', state.notas);
-  abrirEditarNota(notaId);
-}
-
-function agregarItemEditNota(notaId){
-  const n = (state.notas||[]).find(x=>x.id===notaId);
-  if(!n) return;
-  if(!n.items) n.items=[];
-  n.items.push({texto:'Nuevo ítem', done:false});
-  save('fnz_notas', state.notas);
-  abrirEditarNota(notaId);
-}
-
-function guardarEditNota(id){
-  const n = (state.notas||[]).find(x=>x.id===id);
-  if(!n) return;
-  const titulo = document.getElementById('edit-nota-titulo')?.value.trim();
-  const texto  = document.getElementById('edit-nota-texto')?.value.trim();
-  if(titulo) n.titulo = titulo;
-  if(texto !== undefined) n.texto = texto;
-  save('fnz_notas', state.notas);
-  closeModal();
-  render();
-  toast('Nota actualizada ✓');
-}
 
 function setNotaFilter(f){ _notaFilter=f; render(); }
 function toggleNotaItem(notaId,idx){ if(!state.notas)return; const n=state.notas.find(x=>x.id===notaId); if(!n||!n.items)return; n.items[idx].done=!n.items[idx].done; save('fnz_notas',state.notas); render(); }
@@ -3564,13 +3455,7 @@ function pinNota(id){
 function verFotoNota(src){ document.getElementById('modal-content').innerHTML=`<img src="${src}" style="width:100%;border-radius:12px;max-height:70vh;object-fit:contain"><div class="btn-row" style="margin-top:12px"><button class="btn-ghost" onclick="closeModal()">Cerrar</button></div>`; showModal(); }
 function agregarFotoNota(id){ const input=document.createElement('input'); input.type='file'; input.accept='image/*,application/pdf'; input.onchange=e=>{ const file=e.target.files[0]; if(!file)return; const reader=new FileReader(); reader.onload=ev=>{ const n=state.notas.find(x=>x.id===id); if(!n)return; if(!n.fotos)n.fotos=[]; n.fotos.push(ev.target.result); save('fnz_notas',state.notas); render(); toast('Foto agregada ✓'); }; reader.readAsDataURL(file); }; input.click(); }
 function editNota(id){
-  const n=(state.notas||[]).find(x=>x.id===id);
-  if(!n)return;
-  if(n.tipo==='texto'){
-    openNotaTexto(n);
-  } else {
-    abrirEditarNota(id);
-  }
+  abrirEditorNota(id);
 }
 
 function openEditNotaLista(n){
@@ -3752,31 +3637,8 @@ function guardarNotaEditor(editId){
   toast('Nota guardada ✓');
 }
 
-function openNotaFoto(){
-  document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title" style="color:#4CAF85">Nueva nota con foto</div>
-    <div class="field"><label class="field-label">Título</label><input id="nf-titulo" type="text" placeholder="Ej: Medidas del cuarto"></div>
-    <div class="field"><label class="field-label">Descripción (opcional)</label><input id="nf-texto" type="text" placeholder="Agrega un comentario..."></div>
-    <div class="field"><label class="field-label">Fotos / Archivos</label><input id="nf-file" type="file" accept="image/*,application/pdf" multiple style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 16px;width:100%;font-family:'DM Sans',sans-serif;font-size:13px"></div>
-    <div class="btn-row"><button class="btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn-gold" onclick="saveNotaFoto()">Guardar</button></div>`;
-  showModal();
-}
-function saveNotaFoto(){
-  const titulo=document.getElementById('nf-titulo').value.trim();
-  const texto=document.getElementById('nf-texto').value.trim();
-  const files=document.getElementById('nf-file').files;
-  if(!titulo)return toast('Agrega un título','error');
-  const fotos=[];
-  const readers=Array.from(files).map(f=>new Promise(res=>{ const r=new FileReader(); r.onload=e=>{fotos.push(e.target.result);res();}; r.readAsDataURL(f); }));
-  Promise.all(readers).then(()=>{
-    if(!state.notas)state.notas=[];
-    const nota={id:Date.now()+'',tipo:'foto',titulo,texto,fotos,creado:new Date().toISOString()};
-    state.notas.unshift(nota);
-    save('fnz_notas',state.notas);
-    syncSeccionToSheets('nota', nota);
-    closeModal(); render(); toast('Nota con foto guardada ✓');
-  });
-}
+function openNotaFoto(){ abrirEditorNota(); }
+function saveNotaFoto(){ abrirEditorNota(); }
 
 function openNotaVoz(editId){
   // Redirigir al nuevo flujo unificado con Gemini
@@ -7189,6 +7051,382 @@ function stopListening() {
 // GEMINI AI — Asistente de Voz Inteligente
 // ══════════════════════════════════════════════════════════════
 
+
+
+// ══════════════════════════════════════════════════════════════
+// EDITOR DE NOTAS UNIFICADO — Apple Notes style
+// ══════════════════════════════════════════════════════════════
+let _nedNota = null; // nota actual en edición
+let _nedUndoStack = [];
+let _nedRedoStack = [];
+let _nedFotos = [];
+let _nedRecordatorio = '';
+let _nedColor = 'amarillo';
+let _nedLastSaved = '';
+
+function abrirEditorNota(editId){
+  _nedNota = editId ? (state.notas||[]).find(x=>x.id===editId) : null;
+  _nedFotos = _nedNota?.fotos ? [..._nedNota.fotos] : [];
+  _nedRecordatorio = _nedNota?.recordatorio || '';
+  _nedColor = _nedNota?.colorHoja || 'amarillo';
+  _nedUndoStack = [];
+  _nedRedoStack = [];
+
+  const n = _nedNota || {};
+  const nc = NOTA_COLORES[_nedColor]||NOTA_COLORES.amarillo;
+
+  // Build toolbar color dots
+  const colorDots = Object.entries(NOTA_COLORES).map(([k,v])=>
+    `<button class="ntb" onclick="nedSetColor('${k}')" id="ncc-${k}"
+      style="width:18px;height:18px;border-radius:50%;background:${v.bg};border:2px solid ${v.border};padding:0;outline:${_nedColor===k?'2px solid #333':'none'};outline-offset:1px"
+      title="${v.label}"></button>`
+  ).join('');
+
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'nota-editor-overlay';
+  overlay.style.background = nc.bg;
+  overlay.innerHTML = `
+    <!-- Top bar: back + save + options -->
+    <div style="display:flex;align-items:center;padding:10px 14px 0;gap:10px;flex-shrink:0">
+      <button onclick="cerrarEditorNota()" style="background:none;border:none;cursor:pointer;font-size:22px;color:#666;padding:4px;line-height:1">←</button>
+      <span id="ned-save-indicator" style="font-size:11px;color:#999;flex:1"></span>
+      <button onclick="nedAddPhoto()" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px" title="Agregar foto">📷</button>
+      <button onclick="nedSetReminder()" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px;opacity:${_nedRecordatorio?1:.5}" title="Recordatorio">⏰</button>
+      <button onclick="cerrarEditorNotaGuardando()" style="background:var(--gold);color:#0D0D0F;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer">Guardar</button>
+    </div>
+
+    <!-- Title -->
+    <input id="ned-titulo" type="text" placeholder="Título..."
+      value="${(n.titulo||'').replace(/"/g,'&quot;')}"
+      style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;border:none;outline:none;background:transparent;color:${nc.title};padding:12px 18px 6px;width:100%;box-sizing:border-box"
+      oninput="nedMarkDirty()">
+
+    <!-- Photo strip -->
+    <div id="ned-photos" class="ned-photo-strip" style="${_nedFotos.length===0?'display:none':''}">
+      ${_nedFotos.map((f,i)=>`
+        <div style="position:relative;flex-shrink:0">
+          <img src="${f}" onclick="verFotoNota('${f}')">
+          <button onclick="nedRemovePhoto(${i})" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:#E05252;color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>
+        </div>`).join('')}
+    </div>
+
+    <!-- Reminder badge -->
+    <div id="ned-reminder-badge" style="display:${_nedRecordatorio?'flex':'none'};align-items:center;gap:8px;margin:4px 18px;background:#FEF2F2;border-radius:8px;padding:8px 12px;font-size:12px;color:#DC2626">
+      <span style="font-size:16px">⏰</span>
+      <span id="ned-reminder-text">${_nedRecordatorio}</span>
+      <button onclick="nedClearReminder()" style="background:none;border:none;cursor:pointer;color:#DC2626;margin-left:auto;font-size:14px">✕</button>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="ned-toolbar">
+      <button class="ntb" onclick="nedUndo()" title="Deshacer">↩</button>
+      <button class="ntb" onclick="nedRedo()" title="Rehacer">↪</button>
+      <div class="ntb sep"></div>
+      <button class="ntb" id="ntb-bold" onmousedown="event.preventDefault();nedFmt('bold')" title="Negrita"><strong>B</strong></button>
+      <button class="ntb" id="ntb-italic" onmousedown="event.preventDefault();nedFmt('italic')" title="Cursiva" style="font-style:italic">I</button>
+      <button class="ntb" id="ntb-underline" onmousedown="event.preventDefault();nedFmt('underline')" title="Subrayado" style="text-decoration:underline">U</button>
+      <button class="ntb" id="ntb-strike" onmousedown="event.preventDefault();nedFmt('strikeThrough')" title="Tachado" style="text-decoration:line-through">S</button>
+      <div class="ntb sep"></div>
+      <button class="ntb" onmousedown="event.preventDefault();nedFmt('formatBlock','H2')" title="Título grande">T1</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedFmt('formatBlock','H3')" title="Título pequeño">T2</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedFmt('formatBlock','P')" title="Párrafo">¶</button>
+      <div class="ntb sep"></div>
+      <button class="ntb" onmousedown="event.preventDefault();nedFmt('insertUnorderedList')" title="Lista">• Lista</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedFmt('insertOrderedList')" title="Numerada">1. Lista</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedInsertChecklist()" title="Check">☐ Check</button>
+      <div class="ntb sep"></div>
+      <button class="ntb" onmousedown="event.preventDefault();nedInsertTable()" title="Tabla">⊞</button>
+      <button class="ntb" onmousedown="event.preventDefault();nedHighlight()" style="background:#FFF9C4;color:#92700A;font-size:11px;font-weight:600" title="Resaltar">Aa</button>
+      <div class="ntb sep"></div>
+      ${colorDots}
+    </div>
+
+    <!-- Body -->
+    <div id="ned-body" class="ned-body" contenteditable="true"
+      style="color:${nc.text}"
+      oninput="nedMarkDirty();nedUpdateToolbar()"
+      onkeyup="nedUpdateToolbar()"
+      onmouseup="nedUpdateToolbar()"
+      onkeydown="nedHandleKey(event)">
+      ${n.texto || ''}
+    </div>
+
+    <!-- Footer: word count + actions -->
+    <div class="ned-footer" style="background:${nc.bg}cc">
+      <span id="ned-wordcount" style="font-size:11px;color:#999">0 palabras</span>
+      <span style="flex:1"></span>
+      <span id="ned-autosave" style="font-size:11px;color:#999"></span>
+    </div>
+
+    <!-- Hidden file input for photos -->
+    <input type="file" id="ned-file-input" accept="image/*" multiple style="display:none" onchange="nedHandlePhotos(this)">
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+
+  // Focus
+  setTimeout(()=>{
+    const body = document.getElementById('ned-body');
+    if(body){
+      body.focus();
+      nedUpdateWordCount();
+      // Place cursor at end
+      const range = document.createRange();
+      const sel = window.getSelection();
+      range.selectNodeContents(body);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }, 100);
+
+  // Auto-save every 10s
+  window._nedAutoSave = setInterval(()=>nedAutoSave(), 10000);
+}
+
+function nedSetColor(color){
+  _nedColor = color;
+  const nc = NOTA_COLORES[color]||NOTA_COLORES.amarillo;
+  const overlay = document.getElementById('nota-editor-overlay');
+  if(overlay) overlay.style.background = nc.bg;
+  const titulo = document.getElementById('ned-titulo');
+  if(titulo) titulo.style.color = nc.title;
+  const body = document.getElementById('ned-body');
+  if(body) body.style.color = nc.text;
+  const footer = document.querySelector('.ned-footer');
+  if(footer) footer.style.background = nc.bg+'cc';
+  // Update dot outlines
+  Object.keys(NOTA_COLORES).forEach(k=>{
+    const dot = document.getElementById('ncc-'+k);
+    if(dot) dot.style.outline = k===color ? '2px solid #333' : 'none';
+  });
+}
+
+function nedFmt(cmd, val){
+  const body = document.getElementById('ned-body');
+  if(!body) return;
+  body.focus();
+  document.execCommand(cmd, false, val||null);
+  nedUpdateToolbar();
+  nedMarkDirty();
+}
+
+function nedInsertChecklist(){
+  const body = document.getElementById('ned-body');
+  if(!body) return;
+  body.focus();
+  const checkHtml = '<div style="display:flex;align-items:center;gap:8px;padding:2px 0"><input type="checkbox" style="width:16px;height:16px;cursor:pointer;flex-shrink:0" onchange="this.nextSibling.style.textDecoration=this.checked?&quot;line-through&quot;:&quot;none&quot;"><span style="flex:1;outline:none;min-width:20px">Ítem</span></div>';
+  document.execCommand('insertHTML', false, checkHtml);
+  nedMarkDirty();
+}
+
+function nedInsertTable(){
+  const table = `<table><tr><td>Columna 1</td><td>Columna 2</td></tr><tr><td></td><td></td></tr></table>`;
+  document.execCommand('insertHTML', false, table);
+  nedMarkDirty();
+}
+
+function nedHighlight(){
+  const sel = window.getSelection();
+  if(sel && sel.toString()){
+    document.execCommand('insertHTML', false, `<mark style="background:#FFF9C4;padding:0 2px;border-radius:2px">${sel.toString()}</mark>`);
+  } else {
+    document.execCommand('insertHTML', false, '<mark style="background:#FFF9C4;padding:0 2px;border-radius:2px">texto</mark>');
+  }
+  nedMarkDirty();
+}
+
+function nedUndo(){
+  if(_nedUndoStack.length===0){ document.execCommand('undo'); return; }
+  const body = document.getElementById('ned-body');
+  if(!body) return;
+  const state = _nedUndoStack.pop();
+  _nedRedoStack.push(body.innerHTML);
+  body.innerHTML = state;
+  nedUpdateWordCount();
+}
+
+function nedRedo(){
+  if(_nedRedoStack.length===0){ document.execCommand('redo'); return; }
+  const body = document.getElementById('ned-body');
+  if(!body) return;
+  const s = _nedRedoStack.pop();
+  _nedUndoStack.push(body.innerHTML);
+  body.innerHTML = s;
+  nedUpdateWordCount();
+}
+
+function nedHandleKey(e){
+  if((e.ctrlKey||e.metaKey) && e.key==='z' && !e.shiftKey){ e.preventDefault(); nedUndo(); return; }
+  if((e.ctrlKey||e.metaKey) && (e.key==='y'||(e.key==='z'&&e.shiftKey))){ e.preventDefault(); nedRedo(); return; }
+  // Save undo state on significant keys
+  if(e.key===' '||e.key==='Enter'){
+    const body = document.getElementById('ned-body');
+    if(body) _nedUndoStack.push(body.innerHTML);
+    if(_nedUndoStack.length>50) _nedUndoStack.shift();
+  }
+}
+
+function nedMarkDirty(){
+  const ind = document.getElementById('ned-save-indicator');
+  if(ind) ind.textContent = '● Sin guardar';
+  nedUpdateWordCount();
+}
+
+function nedUpdateToolbar(){
+  ['bold','italic','underline','strikeThrough'].forEach(cmd=>{
+    const btn = document.getElementById('ntb-'+cmd.toLowerCase().replace('through','').replace('strike','strike'));
+    // match actual id
+  });
+  // Simple approach: check state
+  try{
+    const isBold = document.queryCommandState('bold');
+    const isItal = document.queryCommandState('italic');
+    const isUnd  = document.queryCommandState('underline');
+    const b = document.getElementById('ntb-bold');
+    const i = document.getElementById('ntb-italic');
+    const u = document.getElementById('ntb-underline');
+    if(b) b.classList.toggle('active', isBold);
+    if(i) i.classList.toggle('active', isItal);
+    if(u) u.classList.toggle('active', isUnd);
+  }catch(e){}
+}
+
+function nedUpdateWordCount(){
+  const body = document.getElementById('ned-body');
+  const wc = document.getElementById('ned-wordcount');
+  if(!body||!wc) return;
+  const words = (body.innerText||'').trim().split(/\s+/).filter(w=>w.length>0).length;
+  wc.textContent = words + ' palabra' + (words!==1?'s':'');
+}
+
+function nedAddPhoto(){
+  document.getElementById('ned-file-input')?.click();
+}
+
+function nedHandlePhotos(input){
+  const files = Array.from(input.files);
+  if(!files.length) return;
+  const readers = files.map(f=>new Promise(res=>{
+    const r = new FileReader();
+    r.onload = e => { _nedFotos.push(e.target.result); res(); };
+    r.readAsDataURL(f);
+  }));
+  Promise.all(readers).then(()=>{
+    nedRefreshPhotoStrip();
+    nedMarkDirty();
+  });
+  input.value = '';
+}
+
+function nedRemovePhoto(idx){
+  _nedFotos.splice(idx,1);
+  nedRefreshPhotoStrip();
+  nedMarkDirty();
+}
+
+function nedRefreshPhotoStrip(){
+  const strip = document.getElementById('ned-photos');
+  if(!strip) return;
+  if(_nedFotos.length===0){ strip.style.display='none'; return; }
+  strip.style.display = 'flex';
+  strip.innerHTML = _nedFotos.map((f,i)=>`
+    <div style="position:relative;flex-shrink:0">
+      <img src="${f}" onclick="verFotoNota('${f}')" style="width:70px;height:70px;object-fit:cover;border-radius:10px;cursor:pointer">
+      <button onclick="nedRemovePhoto(${i})" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:#E05252;color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>`).join('');
+}
+
+function nedSetReminder(){
+  const current = _nedRecordatorio;
+  const val = prompt('Recordatorio (ej: "Hoy a las 9am", "Mañana 3pm"):', current||'');
+  if(val===null) return;
+  _nedRecordatorio = val.trim();
+  const badge = document.getElementById('ned-reminder-badge');
+  const txt = document.getElementById('ned-reminder-text');
+  const btn = document.querySelector('[onclick="nedSetReminder()"]');
+  if(badge){ badge.style.display = _nedRecordatorio ? 'flex' : 'none'; }
+  if(txt) txt.textContent = _nedRecordatorio;
+  if(btn) btn.style.opacity = _nedRecordatorio ? '1' : '0.5';
+  nedMarkDirty();
+}
+
+function nedClearReminder(){
+  _nedRecordatorio = '';
+  const badge = document.getElementById('ned-reminder-badge');
+  if(badge) badge.style.display = 'none';
+  const btn = document.querySelector('[onclick="nedSetReminder()"]');
+  if(btn) btn.style.opacity = '0.5';
+}
+
+function nedAutoSave(){
+  const body = document.getElementById('ned-body');
+  if(!body) return;
+  const current = body.innerHTML;
+  if(current === _nedLastSaved) return;
+  nedSaveNota(false);
+  _nedLastSaved = current;
+  const ind = document.getElementById('ned-autosave');
+  if(ind){ ind.textContent = 'Guardado ' + new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}); }
+}
+
+function nedSaveNota(close=true){
+  const titulo = document.getElementById('ned-titulo')?.value.trim() || 'Nota';
+  const body = document.getElementById('ned-body');
+  const texto = body?.innerHTML || '';
+  const colorHoja = _nedColor;
+
+  if(!state.notas) state.notas=[];
+
+  if(_nedNota){
+    // Update existing
+    const n = state.notas.find(x=>x.id===_nedNota.id);
+    if(n){
+      n.titulo = titulo;
+      n.texto = texto;
+      n.colorHoja = colorHoja;
+      n.fotos = [..._nedFotos];
+      n.recordatorio = _nedRecordatorio;
+      n.modificado = new Date().toISOString();
+      // Preserve tipo for backwards compat
+      if(!n.tipo) n.tipo = 'texto';
+    }
+  } else {
+    state.notas.unshift({
+      id: Date.now()+'',
+      tipo: 'texto',
+      titulo,
+      texto,
+      colorHoja,
+      fotos: [..._nedFotos],
+      recordatorio: _nedRecordatorio,
+      creado: new Date().toISOString()
+    });
+    _nedNota = state.notas[0];
+  }
+
+  save('fnz_notas', state.notas);
+  if(close){
+    clearInterval(window._nedAutoSave);
+    cerrarEditorNota();
+    render();
+    toast('Nota guardada ✓');
+  }
+}
+
+function cerrarEditorNotaGuardando(){
+  nedSaveNota(true);
+}
+
+function cerrarEditorNota(){
+  clearInterval(window._nedAutoSave);
+  const overlay = document.getElementById('nota-editor-overlay');
+  if(overlay) overlay.remove();
+  document.body.style.overflow = '';
+  render();
+}
 
 // ── Comandos rápidos (chips) ──
 function usarChip(btn){
