@@ -8128,6 +8128,7 @@ let listaTitulo = '';
 let listaTipo = 'lista';     // 'lista' o 'nota'
 let listaMicActivo = false;
 let listaRec = null;
+let _listaSaved = false;     // ★ guard anti-duplicado
 
 const CERRAR_KWS = [
   'listo','eso es todo','finaliza','fin','termina','guarda','ok guarda',
@@ -8143,6 +8144,7 @@ function abrirModoLista(tipo, tituloInicial){
   listaTotal = 0;
   listaSubtotales = [];
   listaTitulo = tituloInicial || (tipo==='lista' ? 'Lista de compras' : 'Nota');
+  _listaSaved = false;  // ★ reset guard
 
   // Crear modal de lista
   const overlay = document.createElement('div');
@@ -8426,17 +8428,43 @@ function procesarEntradaListaLocal(texto){
 }
 
 function guardarListaFinal(){
+  if(_listaSaved) return;   // ★ anti-duplicado: solo guarda UNA vez
+  _listaSaved = true;
+
+  // ★ Deshabilitar botón inmediatamente para evitar doble tap
+  const guardarBtn = document.querySelector('#listaModal button[onclick="guardarListaFinal()"]');
+  if(guardarBtn){ guardarBtn.disabled = true; guardarBtn.textContent = '⏳ Guardando...'; }
+
   pararListaMicDefinitivo();
   listaTitulo = document.getElementById('lista-titulo')?.value || listaTitulo;
 
-  // Guardar en state.notas
   if(!state.notas) state.notas = [];
   const items = listaItems.map(it=>({
     texto: it.tipo==='subtotal' ? (it.texto+': S/'+it.valor.toFixed(2)) : (it.texto+(it.precio?' - S/'+it.precio.toFixed(2):'')),
     done: false
   }));
+
+  // ★ Si venimos de "Dictar" en una nota existente → actualizar, no crear nueva
+  const targetId = window._notaVozTargetId;
+  if(targetId){
+    const existing = state.notas.find(x=>x.id===targetId);
+    if(existing){
+      existing.items = items;
+      existing.texto = items.map(i=>i.texto).join('\n');
+      existing.titulo = listaTitulo;
+      existing.modificado = new Date().toISOString();
+      save('fnz_notas', state.notas);
+      window._notaVozTargetId = null;
+      toast('✓ Lista actualizada', 'success');
+      cerrarListaModal();
+      setTimeout(()=>{ switchPage('notas'); render(); }, 150);
+      return;
+    }
+    window._notaVozTargetId = null;
+  }
+
   const nota = {
-    id:Date.now()+'',
+    id: Date.now()+'',
     tipo: listaTipo==='nota' ? 'texto' : 'lista',
     titulo: listaTitulo,
     items,
@@ -8446,16 +8474,13 @@ function guardarListaFinal(){
   state.notas.unshift(nota);
   save('fnz_notas', state.notas);
 
-  // Mostrar botón de compartir y generar preview
-  const shareRow = document.getElementById('lista-share-row');
-  if(shareRow) shareRow.style.display='block';
-  const statusEl = document.getElementById('lista-mic-status');
-  if(statusEl) statusEl.innerHTML = '✓ Lista guardada · <strong>'+listaItems.length+' ítems</strong>';
-
-  // Generar canvas JPG
+  // Generar imagen para compartir
   generarNotaJPG(nota);
-  toast('Lista guardada ✓', 'success');
-  setTimeout(()=>render(), 100);
+  toast('✓ Lista guardada — ' + items.length + ' ítems', 'success');
+
+  // ★ Cerrar modal automáticamente y navegar a Notas
+  cerrarListaModal();
+  setTimeout(()=>{ switchPage('notas'); render(); }, 150);
 }
 
 // ── Generar nota estilo A (papel amarillo) como imagen ──
