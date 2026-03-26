@@ -7702,7 +7702,7 @@ function openMicModal() {
   if(box && !window._micBoxOriginalHTML){
     window._micBoxOriginalHTML = box.innerHTML;
   }
-  resetMicModal();
+  try{ resetMicModal(); }catch(e){}
   // ★ Limpiar sesión anterior — evita acumulación de transcripts viejos
   micFullTranscript = '';
   _micSessionBase   = '';
@@ -7715,7 +7715,7 @@ function openMicModal() {
   document.getElementById('micText').style.color='#94A3B8';
   micParsed=null;
   processVoiceResult._busy = false;
-  updateCatSelect(state.modo==='negocio'?'ingreso':'egreso');
+  try{ updateCatSelect(state.modo==='negocio'?'ingreso':'egreso'); }catch(e){}
   const hint = document.getElementById('micHintText');
   const negHints = [
     '"Hice un punto adicional de 400 soles al señor Juan en La Victoria"',
@@ -7867,32 +7867,41 @@ function startListeningHandlers(rec) {
     if(display) try { updateGhostFromText(display); } catch(err){}
 
     // Timer de silencio — procesar cuando para de hablar
+    // ★ Usar display (finals + interim) — el FINAL puede llegar tarde o nunca
+    // Guardar el último interim para usarlo si el timer dispara antes del FINAL
+    window._micLastInterim = sessionInterim;
+
     clearTimeout(micSilenceTimer);
-    if(micFullTranscript.trim()){
-      const textoCompleto = micFullTranscript + ' ' + sessionInterim;
-      const esAgenda = isAgendaCommand(textoCompleto);
+    const textoParaTimer = display; // finals + interim — lo que el usuario realmente dijo
+    if(textoParaTimer.trim()){
+      const esAgenda = isAgendaCommand(textoParaTimer);
 
       if(esAgenda){
-        // Para agenda: esperar hasta tener cliente + (servicio o fecha), o máx 4 segundos
-        const nrmText = textoCompleto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        const tieneCliente  = /\b(señor|señora|don|doña|senor|senora)\s+[a-z]/i.test(nrmText);
+        const nrmText = textoParaTimer.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        const tieneCliente  = /\b(se[nñ]or[a]?|don|do[nñ]a)\s+[a-z]/i.test(nrmText);
         const tieneServicio = /(punto adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion)/i.test(nrmText);
-        const tieneFecha    = /\b(mañana|manana|lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|\d{4}-\d{2})\b/i.test(nrmText);
+        const tieneFecha    = /\b(ma[nñ]ana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo|hoy|\d{4}-\d{2})\b/i.test(nrmText);
         const suficiente    = tieneCliente && (tieneServicio || tieneFecha);
-        // ★ Android corta el mic frecuentemente — dar más tiempo para acumular
         const esAndroid = /android/i.test(navigator.userAgent);
         const espera = esAndroid
-          ? (suficiente ? 3500 : 6000)   // Android: más tiempo
-          : (suficiente ? 2000 : 4000);  // PC: tiempo normal
+          ? (suficiente ? 3500 : 6000)
+          : (suficiente ? 2000 : 4000);
+        // ★ Capturar display AHORA — no cuando dispare el timer (puede estar vacío)
+        const _textoAgenda = display;
         micSilenceTimer = setTimeout(()=>{
-          if(micListening && micFullTranscript.trim()) processVoiceResult(micFullTranscript.trim());
+          const texto = (micFullTranscript.trim() || _textoAgenda).trim();
+          if(micListening && texto) processVoiceResult(texto);
         }, espera);
       } else {
+        const _textoGeneral = display;
         micSilenceTimer = setTimeout(()=>{
-          if(micListening && micFullTranscript.trim()) processVoiceResult(micFullTranscript.trim());
+          const texto = (micFullTranscript.trim() || _textoGeneral).trim();
+          if(micListening && texto) processVoiceResult(texto);
         }, MIC_SILENCE_MS);
       }
     }
+    // ★ Guardar display completo para usar como fallback en el timer
+    window._micLastDisplay = display;
   };
 
   rec.onerror = (e) => {
@@ -10086,14 +10095,17 @@ function confirmarNegocio(esNegocio) {
 
 function updateCatSelect(type, selectedId) {
   const sel = document.getElementById('pvCatEdit');
-  const list = type==='ingreso' ? state.catsIn : state.catsEx;
+  if(!sel) return; // ★ modal puede no estar en DOM todavía — no explotar
+  const list = (type==='ingreso' ? state.catsIn : state.catsEx) || [];
   sel.innerHTML = list.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${c.icon} ${c.name}</option>`).join('');
-  // Update on type change
-  document.getElementById('pvTypeEdit').onchange = function(){
+  const typeEdit = document.getElementById('pvTypeEdit');
+  if(typeEdit) typeEdit.onchange = function(){
     updateCatSelect(this.value);
-    // update preview color
-    document.getElementById('pvType').textContent = this.value==='ingreso'?'↑ Ingreso':'↓ Egreso';
-    document.getElementById('pvType').style.color = this.value==='ingreso'?'#4CAF85':'#E05252';
+    const pvType = document.getElementById('pvType');
+    if(pvType){
+      pvType.textContent = this.value==='ingreso'?'↑ Ingreso':'↓ Egreso';
+      pvType.style.color = this.value==='ingreso'?'#4CAF85':'#E05252';
+    }
   };
 }
 
