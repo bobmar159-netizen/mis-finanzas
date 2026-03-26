@@ -7691,6 +7691,12 @@ function resetMicModal() {
 }
 
 function openMicModal() {
+  // ★ Detener lista mic si está activo — evita conflicto de 2 instancias SR
+  if(listaMicActivo || listaRec){
+    listaMicActivo = false;
+    clearTimeout(_listaBufTimer);
+    if(listaRec){ try{listaRec.stop();}catch(e){} listaRec=null; }
+  }
   // ★ Guardar HTML original la primera vez (para restaurarlo después del panel agenda)
   const box = document.getElementById('micBox');
   if(box && !window._micBoxOriginalHTML){
@@ -8703,8 +8709,18 @@ function abrirModoLista(tipo, tituloInicial){
 }
 
 function cerrarListaModal(){
+  // ★ Detener todo completamente — evitar bucles de reinicio
   listaMicActivo = false;
-  if(listaRec){ try{listaRec.stop();}catch(e){} listaRec=null; }
+  clearTimeout(_listaBufTimer);
+  _listaBuf = '';
+  if(listaRec){
+    listaRec.onend = null; // ★ quitar handler antes de stop — evita reinicio
+    listaRec.onresult = null;
+    listaRec.onerror = null;
+    try{listaRec.stop();}catch(e){}
+    listaRec = null;
+  }
+  _listaSaved = false; // ★ reset para próxima lista
   const m = document.getElementById('listaModal');
   if(m) m.remove();
 }
@@ -9015,20 +9031,20 @@ Respondé SOLO con JSON válido:
       }
 
       renderListaItems();
-      _setListaStatus('✨ Lista organizada por Gemini — revisá y guardá');
+      _setListaStatus('✨ Gemini organizó la lista — guardando...');
+      // ★ Guardar automáticamente después de mostrar 1.5s
+      setTimeout(()=>guardarListaFinal(), 1500);
     } else {
-      _setListaStatus('✓ Lista lista — revisá y guardá');
+      _setListaStatus('✓ Lista lista — guardando...');
+      setTimeout(()=>guardarListaFinal(), 500);
     }
   } catch(err){
     console.error('Gemini lista error:', err);
-    _setListaStatus('⚠ No pude organizar con Gemini — guardá como está');
+    _setListaStatus('⚠ Gemini falló — guardando como está...');
+    setTimeout(()=>guardarListaFinal(), 800);
   }
 
-  // Mostrar botón guardar prominente
   if(btn){ btn.disabled = false; btn.textContent = '✓ Guardar lista'; btn.style.background='#3A7D44'; }
-  // Habilitar compartir
-  const shareRow = document.getElementById('lista-share-row');
-  if(shareRow) shareRow.style.display='block';
 }
 
 function pararListaMicDefinitivo(){
@@ -9102,11 +9118,10 @@ function guardarListaFinal(){
   state.notas.unshift(nota);
   save('fnz_notas', state.notas);
 
-  // Generar imagen para compartir
-  generarNotaJPG(nota);
-  toast('✓ Lista guardada — ' + items.length + ' ítems', 'success');
+  // ★ Generar imagen ANTES de cerrar modal (listaItems aún disponible)
+  try{ generarNotaJPG(nota); }catch(e){}
+  toast('✓ Lista guardada — ' + items.filter(i=>i.done===false||i.done===true).length + ' ítems', 'success');
 
-  // ★ Cerrar modal automáticamente y navegar a Notas
   cerrarListaModal();
   setTimeout(()=>{ switchPage('notas'); render(); }, 150);
 }
