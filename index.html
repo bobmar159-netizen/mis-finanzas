@@ -4464,14 +4464,10 @@ function _procesarFragmentoNota(texto){
     /apunta(?:me)?\s+(?:una?\s+)?lista\s+(?:de\s+|para\s+|del?\s+)?(.+)/i,
   ];
   if(_notaVozTipo==='texto'){for(const p of PATS){const m=texto.match(p);if(m){const titulo=(m[2]||m[1]||'').trim().replace(/^(de\s+|del?\s+|una?\s+)/i,'').trim();if(titulo.length>1){
-          _notaVozTitulo=titulo.charAt(0).toUpperCase()+titulo.slice(1);
-          _notaVozTipo='lista';
-          _notaVozBuffer='';
-          _notaVozIgnoreNext=true; // ignorar la frase del título que vuelve como finalPart
-          // Feedback visual claro: "Lista detectada — di los ítems"
-          const el=document.getElementById('nv-text');
-          if(el){el.textContent='Lista "'+_notaVozTitulo+'" creada — di los ítems uno por uno';el.style.color='#16A34A';}
-          _refreshNotaPreview();
+          // ★ Redirigir al nuevo sistema de lista (más robusto)
+          _stopNotaVoz();
+          closeModal();
+          setTimeout(()=>abrirModoLista('lista', titulo.charAt(0).toUpperCase()+titulo.slice(1)), 200);
           return;
         }}}}
   if(_notaVozTipo==='lista'||_notaVozTipo==='recordatorio'){
@@ -7767,7 +7763,7 @@ let micFullTranscript = '';
 let micRestartLock    = false;
 let _micSessionBase   = ''; // ★ texto acumulado ANTES del restart actual
 let _micSessionFinals = ''; // ★ finales de la sesión actual (no del restart)
-const MIC_SILENCE_MS  = 1500;
+const MIC_SILENCE_MS  = 2500; // ★ más tiempo para pensar
 
 function startListening() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -8623,6 +8619,13 @@ function isNotaCommand(text){
     'preparame una lista','prepara una lista',
     'registra esto','memoriza esto','guarda esto como lista',
     'nueva nota rapida','nota rapida','nota rápida',
+    // ★ Variantes naturales de habla casual peruana
+    'anota una lista','apunta una lista','apuntame una lista',
+    'quiero anotar','voy a dictar','voy a anotar una lista',
+    'dame una lista','hace una lista','haceme una lista',
+    'crea lista de','nueva lista de','haz lista de',
+    'lista para el trabajo','lista del trabajo','lista de hoy',
+    'lista rapida','lista rápida',
   ];
   return notaKws.some(k => t.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
 }
@@ -8754,7 +8757,7 @@ const SEPARADORES_KW = [
 // Buffer de texto acumulado para el ítem actual
 let _listaBuf = '';
 let _listaBufTimer = null;
-const LISTA_PAUSA_MS = 1800; // silencio después de hablar = confirma ítem
+const LISTA_PAUSA_MS = 3500; // ★ 3.5s — tiempo para pensar sin cortar
 
 function iniciarListaMic(){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -9416,8 +9419,8 @@ async function processVoiceWithGemini(text){
     const tLow = text.toLowerCase();
     const tipo = tLow.includes('nota') && !tLow.includes('lista') ? 'nota' : 'lista';
     let titulo = tipo==='lista' ? 'Lista de compras' : 'Nota';
-    const matchTitulo = text.match(/(?:lista|nota)\s+de\s+([\w\s]+?)(?:\s*$|\s+para)/i);
-    if(matchTitulo) titulo = matchTitulo[1].trim().charAt(0).toUpperCase()+matchTitulo[1].trim().slice(1);
+    const matchTitulo2 = text.match(/(?:lista|nota)\s+de\s+([\w\s]{2,40}?)(?:\s*$|,|\s+para\b)/i) || text.match(/(?:lista|nota)\s+para\s+([\w\s]{2,40}?)(?:\s*$|,)/i);
+    if(matchTitulo2){ let tt2=matchTitulo2[1].trim().replace(/^(de |del |una |un |para |el |la )/i,'').trim(); titulo=tt2.charAt(0).toUpperCase()+tt2.slice(1); }
     abrirModoLista(tipo, titulo);
     return;
   }
@@ -9790,9 +9793,16 @@ function processVoiceResult(text) {
     const tipo = tLow.includes('nota') && !tLow.includes('lista') ? 'nota' : 'lista';
     // Extraer título si lo dice: "crea una lista de compras" → "Lista de compras"
     let titulo = tipo==='lista' ? 'Lista' : 'Nota';
-    const matchTitulo = text.match(/(?:lista|nota)\s+de\s+([\w\s]+?)(?:\s*$|\s+para)/i);
-    if(matchTitulo) titulo = matchTitulo[1].trim().charAt(0).toUpperCase()+matchTitulo[1].trim().slice(1);
-    else if(tipo==='lista') titulo = 'Lista de compras';
+    // ★ Extraer título del comando: "crea una lista de materiales" → "Materiales"
+    const matchTitulo =
+      text.match(/(?:lista|nota)\s+de\s+([\w\s]{2,40}?)(?:\s*$|,|\s+para\b)/i) ||
+      text.match(/(?:lista|nota)\s+para\s+([\w\s]{2,40}?)(?:\s*$|,)/i) ||
+      text.match(/(?:lista|nota)\s+([\w\s]{2,30}?)(?:\s*$)/i);
+    if(matchTitulo){
+      let tt = matchTitulo[1].trim()
+        .replace(/^(de |del |una |un |para |el |la )/i,'').trim();
+      titulo = tt.charAt(0).toUpperCase() + tt.slice(1);
+    } else if(tipo==='lista') titulo = 'Lista de compras';
     abrirModoLista(tipo, titulo);
     return;
   }
