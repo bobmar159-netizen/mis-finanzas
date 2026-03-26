@@ -7922,6 +7922,21 @@ function startListeningHandlers(rec) {
 
 // ── Detectar contexto en tiempo real mientras habla ──
 function _actualizarContextoMic(texto){
+  // ★ Detección INMEDIATA de comando de lista en interim — sin esperar silencio
+  if(isNotaCommand(texto)){
+    const tLow = texto.toLowerCase();
+    const tipo = tLow.includes('nota') && !tLow.includes('lista') ? 'nota' : 'lista';
+    let titulo = tipo==='lista' ? 'Lista de compras' : 'Nota';
+    const matchT = texto.match(/(?:lista|nota)\s+de\s+([\w\s]{2,40}?)(?:\s*$|,|\s+para\b)/i)
+      || texto.match(/(?:lista|nota)\s+para\s+([\w\s]{2,40}?)(?:\s*$|,)/i);
+    if(matchT){ let tt=matchT[1].trim().replace(/^(de |del |una |un |para |el |la )/i,'').trim(); titulo=tt.charAt(0).toUpperCase()+tt.slice(1); }
+    // Abrir inmediatamente sin esperar el timer de silencio
+    processVoiceResult._busy = false;
+    stopListening();
+    document.getElementById('micModal').style.display='none';
+    setTimeout(()=>abrirModoLista(tipo, titulo), 50);
+    return;
+  }
   const header = document.getElementById('micHeader');
   const icon   = document.getElementById('micContextIcon');
   const title  = document.getElementById('micContextTitle');
@@ -8821,15 +8836,12 @@ function iniciarListaMic(){
       _procesarBufLista(_listaBuf.trim());
 
     } else if(interim){
-      // Mostrar interim sin procesar
       _setListaStatus('🎙 ' + (_listaBuf+interim).trim() + ' …');
 
-      // Chequeo de cierre DURANTE el interim (para reaccionar al instante)
       const tNorm = (_listaBuf+interim).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       const esCierre = CERRAR_KWS.some(k=>tNorm.endsWith(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
-      if(esCierre) return; // esperar el final para procesar
+      if(esCierre) return;
 
-      // ── Timer de pausa — si deja de hablar X ms, confirma el ítem ──
       clearTimeout(_listaBufTimer);
       if(_listaBuf.trim()){
         _listaBufTimer = setTimeout(()=>{
@@ -8849,13 +8861,19 @@ function iniciarListaMic(){
   };
 
   listaRec.onend = () => {
-    // Si sigue activo y no fue cierre intencional → reiniciar
     if(listaMicActivo){
+      // ★ Antes de reiniciar: si hay buffer pendiente confirmarlo como ítem
+      if(_listaBuf.trim().length > 1){
+        clearTimeout(_listaBufTimer);
+        _confirmarItemActual();
+      }
+      _listaBuf = ''; // ★ limpiar buffer — evita procesar texto viejo en nueva sesión
+      const delay = /android/i.test(navigator.userAgent) ? 400 : 100;
       setTimeout(()=>{
         if(listaMicActivo){
           try{ listaRec.start(); }catch(err){}
         }
-      }, 100);
+      }, delay);
     }
   };
 
@@ -8963,6 +8981,14 @@ function _confirmarItemActual(){
 function _agregarItemLocal(texto){
   const t = texto.trim();
   if(!t || t.length < 2) return;
+  // ★ No agregar si es igual al último ítem (duplicado por reinicio de mic)
+  const ultimos = listaItems.filter(i=>i.tipo==='item');
+  if(ultimos.length > 0){
+    const ultimo = ultimos[ultimos.length-1].texto.toLowerCase().trim();
+    if(ultimo === t.toLowerCase().trim()) return;
+    // También evitar si es subconjunto del último (ej: "mouse" si ya existe "computadora mouse")
+    if(ultimo.includes(t.toLowerCase()) || t.toLowerCase().includes(ultimo)) return;
+  }
 
   // Extraer precio si lo dice: "pan 5 soles" / "leche s/ 3.50"
   const precioMatch = t.match(/s\/\.?\s*(\d+(?:[.,]\d+)?)/i)
