@@ -511,17 +511,18 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 
 
 
+
 /* ── TABS SUPERIORES ── */
 .tabs {
-  display: flex; gap: 4px; padding: 0 14px; margin-top: 10px; margin-bottom: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; padding: 0 10px; margin-top: 10px; margin-bottom: 5px;
 }
-.tabs::-webkit-scrollbar { display: none; }
 .tabs-row2 { margin-top: 0; margin-bottom: 12px; }
 .tab {
-  flex: 0 0 auto; min-width: 68px; padding: 8px 6px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border);
-  font-family: inherit; font-size: 11.5px; font-weight: 700; color: var(--muted); cursor: pointer; text-align: center; transition: all 0.2s ease;
+  padding: 8px 1px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+  font-family: inherit; font-size: 10px; font-weight: 700; color: var(--muted); cursor: pointer; text-align: center; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
 }
-.tab.active { background: var(--gold); color: #fff; border-color: var(--gold); box-shadow: 0 4px 12px rgba(234,179,8,0.3); transform: translateY(-1px); }
+.tab.active { background: var(--gold); color: #fff; border-color: var(--gold); box-shadow: 0 2px 8px rgba(234,179,8,0.3); }
+
 
 </style>
 </head>
