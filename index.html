@@ -455,7 +455,7 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 
 
 /* ── Bottom Nav & Menu ── */
-#content { padding-bottom: 90px; }
+#content { padding-bottom: 20px; }
 .bottom-nav {
   position: absolute; bottom: 0; left: 0; right: 0; height: 65px;
   background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
@@ -510,6 +510,152 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .nc-date { font-size: 9.5px; opacity: 0.5; margin-top: 10px; font-weight: 500; font-family: 'DM Sans', sans-serif;}
 
 </style>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+/* ── METAL SLUG ULTIMATE SKIN ── */
+body {
+  background-image: url('https://i.pinimg.com/736x/cb/09/20/cb0920436cebb53610afae05b5b4e7ed.jpg');
+  background-size: cover;
+  background-position: center top;
+  background-attachment: fixed;
+}
+#header {
+  background: rgba(220, 215, 203, 0.95) !important;
+  border-bottom: 4px solid #4a4a4a !important;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+.h-title {
+  font-family: 'Press Start 2P', cursive !important;
+  font-size: 16px !important;
+  color: #1a4f8b !important;
+  text-shadow: 2px 2px 0px #fff;
+  letter-spacing: 1px;
+}
+.h-balance-val {
+  font-family: 'VT323', monospace !important;
+  font-size: 32px !important;
+  color: #388E3C !important;
+  text-shadow: 1px 1px 0px #000;
+}
+.modo-toggle {
+  background: #a9ac9c !important;
+  border: 2px solid #4a4a4a !important;
+  border-radius: 4px !important;
+}
+.modo-btn.active-personal, .modo-btn.active-negocio {
+  background: #1a4f8b !important;
+  border-radius: 2px !important;
+  box-shadow: inset 0 0 5px rgba(0,0,0,0.5) !important;
+  border: 1px solid #111 !important;
+  color: #fff !important;
+}
+
+/* Metal Slug Top Tabs */
+.ms-tabs {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px;
+  background: transparent; padding: 4px 0; border: none !important;
+}
+.ms-tab {
+  background: #a0a498 !important;
+  border: 2px solid #555 !important;
+  border-radius: 6px 6px 0 0 !important;
+  color: #222 !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-weight: 800 !important;
+  font-size: 10px !important;
+  padding: 8px 2px !important;
+  box-shadow: inset 2px 2px 0px rgba(255,255,255,0.4), inset -2px -2px 0px rgba(0,0,0,0.2) !important;
+  transition: all 0.1s !important;
+}
+.ms-tab.active {
+  background: #e2e0d3 !important;
+  border: 2px solid #222 !important;
+  border-bottom: 2px solid #e2e0d3 !important;
+  color: #1a4f8b !important;
+  transform: translateY(2px);
+  box-shadow: inset 2px 2px 0px rgba(255,255,255,0.8), 0 -4px 8px rgba(252, 211, 77, 0.4) !important;
+}
+.ms-tab.active .tab-icon {
+  filter: drop-shadow(0 0 4px rgba(252, 211, 77, 0.8));
+  transform: scale(1.15);
+}
+
+/* Rusted Cards / Metal Plates */
+.card, .mv-card, .menu-card, .summary-card, .debt-card, .service-card, .nc-premium {
+  background: #949a96 url('https://www.transparenttextures.com/patterns/rusted-metal.png') !important;
+  border: 4px solid #484b49 !important;
+  border-radius: 8px !important;
+  box-shadow: 4px 4px 0px rgba(0,0,0,0.4), inset 2px 2px 0px rgba(255,255,255,0.2) !important;
+  color: #f1f2e9 !important;
+  position: relative;
+}
+/* Fake rivets (remaches) */
+.card::before, .summary-card::before, .nc-premium::before {
+  content: ''; position: absolute; top: 4px; left: 4px; width: 6px; height: 6px; border-radius: 50%; background: #555; box-shadow: 1px 1px 0 #fff;
+}
+.card::after, .summary-card::after, .nc-premium::after {
+  content: ''; position: absolute; bottom: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: #555; box-shadow: 1px 1px 0 #fff;
+}
+
+/* Typography Overrides */
+.section-title, .mc-label, .nc-tit {
+  font-family: 'Press Start 2P', cursive !important;
+  font-size: 11px !important;
+  color: #eab308 !important;
+  text-shadow: 2px 2px 0px #000;
+  line-height: 1.4;
+}
+.summary-amount, .mv-amt, .debt-pending-amt, .service-amount, .stat-mini-val {
+  font-family: 'VT323', monospace !important;
+  font-size: 34px !important;
+  color: #a3e635 !important;
+  text-shadow: 2px 2px 0px #000;
+}
+.mv-amt-egr {
+  color: #ef4444 !important;
+}
+.mv-svc, .ag-card-nombre, .debt-name, .service-name, .tx-name {
+  color: #fff !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-weight: 800 !important;
+}
+
+/* Arcade Buttons */
+.btn-gold, #micFab {
+  background: #eab308 !important;
+  border: 4px solid #854d0e !important;
+  border-radius: 4px !important;
+  color: #451a03 !important;
+  font-family: 'Press Start 2P', cursive !important;
+  font-size: 10px !important;
+  box-shadow: inset 3px 3px 0px rgba(255,255,255,0.5), 2px 2px 0px #000 !important;
+  transition: transform 0.1s !important;
+}
+.btn-gold:active, #micFab:active { transform: translateY(4px) !important; box-shadow: inset 1px 1px 0px rgba(255,255,255,0.2), 0 0 0 #000 !important; }
+
+/* Menú Dropdown/Inputs to dark theme */
+.modal, .nota-type-bg, #ned-topbar {
+  background: rgba(44, 48, 44, 0.95) !important;
+  border: 4px solid #222 !important;
+}
+.field input, .field select, .field textarea, .nt-modal-box {
+  background: #111 !important;
+  color: #a3e635 !important;
+  font-family: 'VT323', monospace !important;
+  font-size: 20px !important;
+  border: 2px solid #555 !important;
+}
+.field-label { color: #eab308 !important; font-family: 'Press Start 2P', cursive !important; font-size: 8px !important; }
+
+/* Mic Fab - Ammo crate style */
+#micFab {
+  border-radius: 8px !important;
+  width: 64px !important; height: 64px !important;
+  background: #4ade80 !important;
+  border-color: #14532d !important;
+  color: #000 !important;
+}
+</style>
 </head>
 <body>
 <div id="app">
@@ -533,16 +679,26 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
       <button class="modo-btn" id="btn-modo-negocio" onclick="switchModo('negocio')">🔵 Mi Negocio</button>
     </div>
     
+  
+    <div class="tabs ms-tabs">
+      <button class="tab ms-tab active" onclick="switchPage('dashboard', 'start')" id="tab-dashboard"><span class="tab-icon">🪖</span>Inicio</button>
+      <button class="tab ms-tab" onclick="switchPage('movimientos', 'shot')" id="tab-movimientos"><span class="tab-icon">🏃</span>Movim.</button>
+      <button class="tab ms-tab" onclick="switchPage('deudas', 'boom')" id="tab-deudas"><span class="tab-icon">🛢️</span>Deudas</button>
+      <button class="tab ms-tab" onclick="switchPage('agenda', 'roger')" id="tab-agenda"><span class="tab-icon">📻</span>Agenda</button>
+      <button class="tab ms-tab" onclick="switchPage('servicios', 'click')" id="tab-servicios"><span class="tab-icon">⚡</span>Servic.</button>
+    </div>
+    <div class="tabs ms-tabs tabs-row2">
+      <button class="tab ms-tab" onclick="switchPage('categorias', 'wood')" id="tab-categorias"><span class="tab-icon">📦</span>Categ.</button>
+      <button class="tab ms-tab" onclick="switchPage('metas', 'ting')" id="tab-metas"><span class="tab-icon">🎯</span>Metas</button>
+      <button class="tab ms-tab" onclick="switchPage('presupuesto', 'coin')" id="tab-presupuesto"><span class="tab-icon">🪙</span>Presup.</button>
+      <button class="tab ms-tab" onclick="switchPage('graficos', 'radar')" id="tab-graficos"><span class="tab-icon">📟</span>Gráfic.</button>
+      <!-- Menú/Ajustes ahora tienen su pestaña arriba -->
+      <button class="tab ms-tab" onclick="switchPage('ajustes', 'reload')" id="tab-ajustes"><span class="tab-icon">🧰</span>Ajustes</button>
+    </div>
   </div>
   <div id="content"></div>
 
-  <nav class="bottom-nav">
-    <button class="bnav-item tab active" onclick="switchPage('dashboard')" id="tab-dashboard"><div class="bnav-icon">⊞</div>Inicio</button>
-    <button class="bnav-item tab" onclick="switchPage('movimientos')" id="tab-movimientos"><div class="bnav-icon">↕</div>Movim.</button>
-    <button class="bnav-item tab" onclick="switchPage('agenda')" id="tab-agenda"><div class="bnav-icon">📅</div>Agenda</button>
-    <button class="bnav-item tab" onclick="switchPage('notas')" id="tab-notas"><div class="bnav-icon">📝</div>Notas</button>
-    <button class="bnav-item tab" onclick="switchPage('menu')" id="tab-menu"><div class="bnav-icon">☰</div>Más</button>
-  </nav>
+  
 
 </div>
 
@@ -3625,7 +3781,7 @@ function renderNotaCard(n){
       <div class="nc2-accent" style="background:${nc.border}"></div>
 
       <!-- Clickable body -->
-      <div class="nc2-body" onclick="abrirEditorNota('${n.id}')" style="background:${nc.bg}">
+      <div class="nc2-body" onclick="playSfx('hmg'); abrirEditorNota('${n.id}')" style="background:${nc.bg}">
         <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:${preview?'8':'0'}px">
           <!-- Icon -->
           <div style="width:42px;height:42px;border-radius:14px;background:${nc.border}33;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;margin-left:6px">${tipo.ic}</div>
@@ -3672,7 +3828,7 @@ function notaMenu(id){
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-title" style="color:var(--text)">"${(n.titulo||'Nota').substring(0,30)}"</div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
-      <button onclick="closeModal();abrirEditorNota('${id}')"
+      <button onclick="closeModal();playSfx('hmg'); abrirEditorNota('${id}')"
         style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text);display:flex;align-items:center;gap:10px">
         ✏️ <span>Editar nota</span></button>
       <button onclick="closeModal();notaAgregarVoz('${id}')"
@@ -6311,7 +6467,7 @@ function descargarAppsScript(){
   URL.revokeObjectURL(url);
   toast('Script v6.4 descargado ✓ — Pega en Apps Script y publica Nueva versión');
 }
-function switchPage(page){
+function switchPage(page, sfx){ if(sfx) playSfx(sfx);
   // Stop mic if active when navigating away
   if(micListening) stopListening();
   if(listaMicActivo) pararListaMicDefinitivo();
@@ -10625,5 +10781,26 @@ function closeNegocioModal() {
     </div>
   </div>
 </div>
+
+  <audio id="sfx-start" src="https://www.myinstants.com/media/sounds/metal-slug-mission-start.mp3"></audio>
+  <audio id="sfx-shot" src="https://www.myinstants.com/media/sounds/metal-slug-shotgun.mp3"></audio>
+  <audio id="sfx-boom" src="https://www.myinstants.com/media/sounds/explosion_3.mp3"></audio>
+  <audio id="sfx-roger" src="https://www.myinstants.com/media/sounds/metal-slug-ok.mp3"></audio>
+  <audio id="sfx-click" src="https://www.myinstants.com/media/sounds/click.mp3"></audio>
+  <audio id="sfx-wood" src="https://www.myinstants.com/media/sounds/wood-smash.mp3"></audio>
+  <audio id="sfx-ting" src="https://www.myinstants.com/media/sounds/perfect.mp3"></audio>
+  <audio id="sfx-coin" src="https://www.myinstants.com/media/sounds/metal-slug-coin.mp3"></audio>
+  <audio id="sfx-radar" src="https://www.myinstants.com/media/sounds/bip.mp3"></audio>
+  <audio id="sfx-reload" src="https://www.myinstants.com/media/sounds/shotgun-reload.mp3"></audio>
+  <audio id="sfx-hmg" src="https://www.myinstants.com/media/sounds/heavy-machine-gun.mp3"></audio>
+  <script>
+    function playSfx(id){
+      try {
+        let a = document.getElementById('sfx-'+id);
+        if(a){ a.currentTime=0; a.play().catch(e=>console.log('Autoplay prevent')); }
+      }catch(e){}
+    }
+  </script>
+  
 </body>
 </html>
