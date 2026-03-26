@@ -452,78 +452,6 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 }
 .ned-cdot.sel { border-color: #333; transform: scale(1.2); }
 #nota-editor-overlay { display: none; }
-
-
-/* ── Bottom Nav & Menu ── */
-#content { padding-bottom: 16px; }
-.bottom-nav {
-  position: absolute; bottom: 0; left: 0; right: 0; height: 65px;
-  background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-  border-top: 1px solid rgba(0,0,0,0.06); display: flex; justify-content: space-around; align-items: center;
-  z-index: 80; box-shadow: 0 -4px 20px rgba(0,0,0,0.03); padding-bottom: env(safe-area-inset-bottom);
-}
-#app.tema-noche .bottom-nav { background: rgba(26, 26, 46, 0.85); border-top: 1px solid rgba(255,255,255,0.05); }
-.bnav-item {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  color: var(--muted); background: transparent; border: none; font-family: 'DM Sans', sans-serif;
-  font-size: 10px; font-weight: 600; flex: 1; height: 100%; cursor: pointer; transition: all 0.2s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-.bnav-item.active { color: var(--gold); }
-.bnav-item .bnav-icon { font-size: 22px; transition: transform 0.2s ease; }
-.bnav-item.active .bnav-icon { transform: translateY(-3px) scale(1.1); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
-
-.menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 8px; }
-.menu-card {
-  background: var(--card); border: 1px solid var(--border); border-radius: 20px;
-  padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px;
-  cursor: pointer; transition: all 0.15s; box-shadow: 0 4px 12px rgba(0,0,0,0.02);
-}
-.menu-card:active { transform: scale(0.95); }
-.menu-card .mc-icon { font-size: 32px; background: var(--bg); width: 56px; height: 56px; border-radius: 18px; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
-.menu-card .mc-label { font-size: 13px; font-weight: 700; color: var(--text); }
-
-/* ── Premium Notes (Masonry) ── */
-.notas-grid {
-  column-count: 2; column-gap: 12px; margin-top: 14px;
-}
-.nc-premium {
-  break-inside: avoid; margin-bottom: 12px; padding: 14px;
-  background: var(--card); border: 1.5px solid var(--border); border-radius: 20px;
-  position: relative; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.02);
-  transition: transform 0.15s; cursor: pointer;
-}
-.nc-premium:active { transform: scale(0.96); }
-.nc-premium.c-amarillo { background:#FFFde7; border-color:#F9A82544; }
-.nc-premium.c-blanco { background:#FFFFFF; border-color:#E0E0E0; }
-.nc-premium.c-verde { background:#F1F8E9; border-color:#AED58155; }
-.nc-premium.c-azul { background:#E3F2FD; border-color:#90CAF955; }
-.nc-premium.c-rosa { background:#FCE4EC; border-color:#F48FB155; }
-.nc-premium.c-pizarron { background:#263238; border-color:#455A64; color: #ECEFF1; }
-.nc-premium.c-celeste { background:#EFF6FF; border-color:#60A5FA44; }
-.nc-premium.c-lavanda { background:#F5F3FF; border-color:#A78BFA55; }
-.nc-tit { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; margin-bottom: 4px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.nc-txt { font-size: 12px; opacity: 0.85; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
-.nc-badge { font-size: 9px; padding: 2px 6px; border-radius: 8px; font-weight: 700; text-transform: uppercase; background: rgba(0,0,0,0.06); display: inline-block; margin-bottom: 6px; }
-.nc-img-strip { display: flex; gap: 4px; margin-top: 8px; overflow: hidden; }
-.nc-img-strip img { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; border: 1px solid rgba(0,0,0,0.05); }
-.nc-date { font-size: 9.5px; opacity: 0.5; margin-top: 10px; font-weight: 500; font-family: 'DM Sans', sans-serif;}
-
-
-
-
-/* ── TABS SUPERIORES ── */
-.tabs {
-  display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; padding: 0 10px; margin-top: 10px; margin-bottom: 5px;
-}
-.tabs-row2 { margin-top: 0; margin-bottom: 12px; }
-.tab {
-  padding: 8px 1px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
-  font-family: inherit; font-size: 10px; font-weight: 700; color: var(--muted); cursor: pointer; text-align: center; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
-}
-.tab.active { background: var(--gold); color: #fff; border-color: var(--gold); box-shadow: 0 2px 8px rgba(234,179,8,0.3); }
-
-
 </style>
 </head>
 <body>
@@ -547,28 +475,22 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
       <button class="modo-btn active-personal" id="btn-modo-personal" onclick="switchModo('personal')">👤 Personal</button>
       <button class="modo-btn" id="btn-modo-negocio" onclick="switchModo('negocio')">🔵 Mi Negocio</button>
     </div>
-    
-  
     <div class="tabs">
-      <button class="tab active" onclick="switchPage('dashboard')" id="tab-dashboard">Inicio</button>
-      <button class="tab" onclick="switchPage('movimientos')" id="tab-movimientos">Movim.</button>
-      <button class="tab" onclick="switchPage('deudas')" id="tab-deudas">Deudas</button>
-      <button class="tab" onclick="switchPage('agenda')" id="tab-agenda">Agenda</button>
-      <button class="tab" onclick="switchPage('servicios')" id="tab-servicios">Servicios</button>
+      <button class="tab active" onclick="switchPage('dashboard')" id="tab-dashboard"><span class="tab-icon">⊞</span>Inicio</button>
+      <button class="tab" onclick="switchPage('movimientos')" id="tab-movimientos"><span class="tab-icon">↕</span>Movim.</button>
+      <button class="tab" onclick="switchPage('deudas')" id="tab-deudas"><span class="tab-icon">🏦</span>Deudas</button>
+      <button class="tab" onclick="switchPage('agenda')" id="tab-agenda"><span class="tab-icon">📅</span>Agenda</button>
+      <button class="tab" onclick="switchPage('servicios')" id="tab-servicios"><span class="tab-icon">🏠</span>Servic.</button>
     </div>
     <div class="tabs tabs-row2">
-      <button class="tab" onclick="switchPage('categorias')" id="tab-categorias">Categorías</button>
-      <button class="tab" onclick="switchPage('metas')" id="tab-metas">Metas</button>
-      <button class="tab" onclick="switchPage('presupuesto')" id="tab-presupuesto">Presup.</button>
-      <button class="tab" onclick="switchPage('graficos')" id="tab-graficos">Gráficos</button>
-      <button class="tab" onclick="switchPage('ajustes')" id="tab-ajustes">Ajustes</button>
-      <button class="tab" onclick="switchPage('notas')" id="tab-notas">Notas</button>
+      <button class="tab" onclick="switchPage('categorias')" id="tab-categorias"><span class="tab-icon">🏷</span>Categ.</button>
+      <button class="tab" onclick="switchPage('metas')" id="tab-metas"><span class="tab-icon">🎯</span>Metas</button>
+      <button class="tab" onclick="switchPage('presupuesto')" id="tab-presupuesto"><span class="tab-icon">📋</span>Presup.</button>
+      <button class="tab" onclick="switchPage('graficos')" id="tab-graficos"><span class="tab-icon">📊</span>Gráfic.</button>
+      <button class="tab" onclick="switchPage('notas')" id="tab-notas"><span class="tab-icon">📝</span>Notas</button>
     </div>
-</div>
+  </div>
   <div id="content"></div>
-
-  
-
 </div>
 
 <div class="overlay" id="modal" style="display:none" onclick="closeModal(event)">
@@ -3488,43 +3410,6 @@ let _notaVozIgnoreNext = false;
 // SISTEMA DE NOTAS
 // ══════════════════════════════════════════════════════════════
 
-
-function renderMenu() {
-  return `
-    <div class="h-top" style="margin-bottom:8px">
-      <div><div class="h-title">Más Opciones</div><div class="h-subtitle">Configura tu aplicación</div></div>
-    </div>
-    <div class="menu-grid">
-      <div class="menu-card" onclick="switchPage('deudas')">
-        <div class="mc-icon">🏦</div><div class="mc-label">Deudas</div>
-      </div>
-      <div class="menu-card" onclick="switchPage('servicios')">
-        <div class="mc-icon">🏠</div><div class="mc-label">Servicios</div>
-      </div>
-      <div class="menu-card" onclick="switchPage('categorias')">
-        <div class="mc-icon">🏷️</div><div class="mc-label">Categorías</div>
-      </div>
-      <div class="menu-card" onclick="switchPage('metas')">
-        <div class="mc-icon">🎯</div><div class="mc-label">Metas</div>
-      </div>
-      <div class="menu-card" onclick="switchPage('presupuesto')">
-        <div class="mc-icon">📋</div><div class="mc-label">Presupuesto</div>
-      </div>
-      <div class="menu-card" onclick="switchPage('graficos')">
-        <div class="mc-icon">📊</div><div class="mc-label">Gráficos</div>
-      </div>
-      <div class="menu-card" style="grid-column: 1 / -1; flex-direction: row; justify-content: space-between; padding: 20px; margin-top: 4px" onclick="switchPage('ajustes')">
-        <div style="display:flex; align-items:center; gap: 14px;">
-          <div class="mc-icon" style="width:40px;height:40px;font-size:22px;margin:0;">⚙️</div>
-          <div class="mc-label" style="font-size: 16px;">Ajustes Generales</div>
-        </div>
-        <div style="color:var(--muted); font-size:20px;">→</div>
-      </div>
-    </div>
-    <div style="height:40px"></div>
-  `;
-}
-
 function renderNotas(){
   if(!state.notas) state.notas = [];
   const filter = window._notaFilter || 'todas';
@@ -3564,9 +3449,7 @@ function renderNotas(){
         <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">Sin notas aún</div>
         <div style="font-size:13px;color:var(--muted)">Toca <b>+ Nueva nota</b> para empezar</div>
        </div>`
-    : 
-    '<div class="notas-grid">' + notas.map(n=>renderNotaCard(n)).join('') + '</div>';
-
+    : notas.map(n=>renderNotaCard(n)).join('');
 
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -6393,7 +6276,6 @@ function render(){
     case 'graficos':content.innerHTML=renderGraficos();setTimeout(buildCharts,50);break;
     case 'ajustes':content.innerHTML=renderAjustes();break;
     case 'notas':content.innerHTML=renderNotas();break;
-    case 'menu':content.innerHTML=renderMenu();break;
   }
   setTimeout(()=>{ renderSoundsList(); renderRemindersList(); checkNotifBtn(); },50);
 }
@@ -6537,8 +6419,6 @@ loadFromSheets(false);
     fab.style.transition='';
     clearTimeout(_hold);
     if(_moved){
-      window._micFabMoved = true;
-      setTimeout(() => window._micFabMoved = false, 100);
       const r=fab.getBoundingClientRect();
       const b=Math.max(8,window.innerHeight-r.bottom);
       const l=Math.max(8,r.left);
@@ -7935,7 +7815,7 @@ function restartListening() {
     if (!micListening) return;
     micRestartLock = false;
     // ★ Guardar lo acumulado hasta ahora como base de la nueva sesión
-    _micSessionBase   = (_micSessionBase.trim() + ' ' + _micSessionFinals.trim()).trim();
+    _micSessionBase   = micFullTranscript.trim();
     _micSessionFinals = '';    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SR();
     recognition.lang           = 'es-PE';
@@ -8009,7 +7889,7 @@ function startListeningHandlers(rec) {
   };
 
   rec.onerror = (e) => {
-    if(e.error === 'no-speech'){ return; } // Ignorar para evitar bucle de pitidos en móviles
+    if(e.error === 'no-speech'){ if(micListening && !micRestartLock) restartListening(); return; }
     if(e.error === 'aborted') return;
     if(e.error === 'not-allowed'){
       document.getElementById('micText').textContent = '⚠ Permiso de micrófono denegado.';
@@ -10537,7 +10417,7 @@ function closeNegocioModal() {
 </div>
 
 <!-- ── MIC FAB ── -->
-<button id="micFab" onclick="if(window._micFabMoved) return; openMicModal()" title="Registrar por voz">
+<button id="micFab" onclick="openMicModal()" title="Registrar por voz">
   <span id="micFabIcon">🎙</span>
 </button>
 
