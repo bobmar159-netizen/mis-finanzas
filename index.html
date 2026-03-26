@@ -7769,7 +7769,7 @@ let micFullTranscript = '';
 let micRestartLock    = false;
 let _micSessionBase   = ''; // ★ texto acumulado ANTES del restart actual
 let _micSessionFinals = ''; // ★ finales de la sesión actual (no del restart)
-const MIC_SILENCE_MS  = 2500; // ★ más tiempo para pensar
+const MIC_SILENCE_MS  = /android/i.test(navigator.userAgent) ? 3500 : 2500; // ★ Android necesita más tiempo
 
 function startListening() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -7813,6 +7813,7 @@ function restartListening() {
   if (!micListening) return;
   micRestartLock = true;
   try { recognition.stop(); } catch(e) {}
+  const _rDelay = /android/i.test(navigator.userAgent) ? 400 : 150;
   setTimeout(() => {
     if (!micListening) return;
     micRestartLock = false;
@@ -7878,7 +7879,11 @@ function startListeningHandlers(rec) {
         const tieneServicio = /(punto adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion)/i.test(nrmText);
         const tieneFecha    = /\b(mañana|manana|lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|\d{4}-\d{2})\b/i.test(nrmText);
         const suficiente    = tieneCliente && (tieneServicio || tieneFecha);
-        const espera        = suficiente ? 2000 : 4000;
+        // ★ Android corta el mic frecuentemente — dar más tiempo para acumular
+        const esAndroid = /android/i.test(navigator.userAgent);
+        const espera = esAndroid
+          ? (suficiente ? 3500 : 6000)   // Android: más tiempo
+          : (suficiente ? 2000 : 4000);  // PC: tiempo normal
         micSilenceTimer = setTimeout(()=>{
           if(micListening && micFullTranscript.trim()) processVoiceResult(micFullTranscript.trim());
         }, espera);
