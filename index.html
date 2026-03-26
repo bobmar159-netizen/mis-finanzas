@@ -455,7 +455,7 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 
 
 /* ── Bottom Nav & Menu ── */
-#content { padding-bottom: 90px; }
+#content { padding-bottom: 16px; }
 .bottom-nav {
   position: absolute; bottom: 0; left: 0; right: 0; height: 65px;
   background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
@@ -509,6 +509,20 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .nc-img-strip img { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; border: 1px solid rgba(0,0,0,0.05); }
 .nc-date { font-size: 9.5px; opacity: 0.5; margin-top: 10px; font-weight: 500; font-family: 'DM Sans', sans-serif;}
 
+
+
+/* ── TABS SUPERIORES ── */
+.tabs {
+  display: flex; gap: 4px; padding: 0 14px; margin-top: 10px; margin-bottom: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tabs-row2 { margin-top: 0; margin-bottom: 12px; }
+.tab {
+  flex: 0 0 auto; min-width: 68px; padding: 8px 6px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border);
+  font-family: inherit; font-size: 11.5px; font-weight: 700; color: var(--muted); cursor: pointer; text-align: center; transition: all 0.2s ease;
+}
+.tab.active { background: var(--gold); color: #fff; border-color: var(--gold); box-shadow: 0 4px 12px rgba(234,179,8,0.3); transform: translateY(-1px); }
+
 </style>
 </head>
 <body>
@@ -533,16 +547,26 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
       <button class="modo-btn" id="btn-modo-negocio" onclick="switchModo('negocio')">🔵 Mi Negocio</button>
     </div>
     
-  </div>
+  
+    <div class="tabs">
+      <button class="tab active" onclick="switchPage('dashboard')" id="tab-dashboard">Inicio</button>
+      <button class="tab" onclick="switchPage('movimientos')" id="tab-movimientos">Movim.</button>
+      <button class="tab" onclick="switchPage('deudas')" id="tab-deudas">Deudas</button>
+      <button class="tab" onclick="switchPage('agenda')" id="tab-agenda">Agenda</button>
+      <button class="tab" onclick="switchPage('servicios')" id="tab-servicios">Servicios</button>
+    </div>
+    <div class="tabs tabs-row2">
+      <button class="tab" onclick="switchPage('categorias')" id="tab-categorias">Categorías</button>
+      <button class="tab" onclick="switchPage('metas')" id="tab-metas">Metas</button>
+      <button class="tab" onclick="switchPage('presupuesto')" id="tab-presupuesto">Presup.</button>
+      <button class="tab" onclick="switchPage('graficos')" id="tab-graficos">Gráficos</button>
+      <button class="tab" onclick="switchPage('ajustes')" id="tab-ajustes">Ajustes</button>
+      <button class="tab" onclick="switchPage('notas')" id="tab-notas">Notas</button>
+    </div>
+</div>
   <div id="content"></div>
 
-  <nav class="bottom-nav">
-    <button class="bnav-item tab active" onclick="switchPage('dashboard')" id="tab-dashboard"><div class="bnav-icon">⊞</div>Inicio</button>
-    <button class="bnav-item tab" onclick="switchPage('movimientos')" id="tab-movimientos"><div class="bnav-icon">↕</div>Movim.</button>
-    <button class="bnav-item tab" onclick="switchPage('agenda')" id="tab-agenda"><div class="bnav-icon">📅</div>Agenda</button>
-    <button class="bnav-item tab" onclick="switchPage('notas')" id="tab-notas"><div class="bnav-icon">📝</div>Notas</button>
-    <button class="bnav-item tab" onclick="switchPage('menu')" id="tab-menu"><div class="bnav-icon">☰</div>Más</button>
-  </nav>
+  
 
 </div>
 
