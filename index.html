@@ -8949,10 +8949,11 @@ async function _cerrarListaConIA(){
 
   const geminiKey = localStorage.getItem('fnz_gemini_key');
 
-  // Sin Gemini → guardar directo
+  // Sin Gemini → guardar directo automáticamente
   if(!geminiKey){
     renderListaItems();
-    _setListaStatus('✓ Lista lista — guardá cuando quieras');
+    _setListaStatus('✓ Guardando...');
+    setTimeout(()=>guardarListaFinal(), 400);
     return;
   }
 
@@ -9788,6 +9789,11 @@ function processVoiceResult(text) {
   // ── Nota / Lista antes que Gemini ──
   if(isNotaCommand(text)){
     processVoiceResult._busy = false;
+    clearTimeout(processVoiceResult._busyTimer);
+    // ★ Cerrar mic principal completamente antes de abrir lista
+    micListening = false;
+    micRestartLock = false;
+    if(recognition){ try{ recognition.stop(); }catch(e){} recognition = null; }
     document.getElementById('micModal').style.display='none';
     const tLow = text.toLowerCase();
     const tipo = tLow.includes('nota') && !tLow.includes('lista') ? 'nota' : 'lista';
