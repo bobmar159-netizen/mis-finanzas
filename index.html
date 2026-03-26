@@ -3533,7 +3533,7 @@ function renderNotaCard(n){
       <div class="nc2-accent" style="background:${nc.border}"></div>
 
       <!-- Clickable body -->
-      <div class="nc2-body" onclick="abrirEditorNota('${n.id}')" style="background:${nc.bg}">
+      <div class="nc2-body" onclick="${n.tipo==='lista'?`openEditNotaLista(state.notas.find(x=>x.id==='${n.id}'))`:`abrirEditorNota('${n.id}')`}" style="background:${nc.bg}">
         <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:${preview?'8':'0'}px">
           <!-- Icon -->
           <div style="width:42px;height:42px;border-radius:14px;background:${nc.border}33;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;margin-left:6px">${tipo.ic}</div>
@@ -9083,8 +9083,12 @@ function guardarListaFinal(){
   listaTitulo = document.getElementById('lista-titulo')?.value || listaTitulo;
 
   if(!state.notas) state.notas = [];
+  // ★ Guardar ítems con texto limpio y precio separado
   const items = listaItems.map(it=>({
-    texto: it.tipo==='subtotal' ? (it.texto+': S/'+it.valor.toFixed(2)) : (it.texto+(it.precio?' - S/'+it.precio.toFixed(2):'')),
+    texto: it.tipo==='subtotal'
+      ? (it.texto + ': S/' + (it.valor||0).toFixed(2))
+      : it.texto,                   // ★ SOLO el texto — sin precio concatenado
+    precio: it.tipo==='subtotal' ? null : (it.precio||null),
     done: false
   }));
 
