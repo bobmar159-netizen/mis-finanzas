@@ -8853,11 +8853,33 @@ function _procesarBufLista(texto){
   if(!texto) return;
   const tNorm = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
-  // 1. CIERRE — Gemini organiza toda la lista
-  const esCierre = CERRAR_KWS.some(k=>tNorm.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
-  if(esCierre){
+  // 1. CIERRE — procesar lo que haya ANTES de la palabra de cierre, luego cerrar
+  const kwCierre = CERRAR_KWS.find(k=>tNorm.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
+  if(kwCierre){
+    // ★ Extraer texto ANTES de la palabra de cierre y procesarlo como ítems
+    const idxCierre = tNorm.indexOf(kwCierre.normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+    const antesDelCierre = texto.substring(0, idxCierre).trim();
+    if(antesDelCierre.length > 1){
+      // Procesar separadores en el texto previo al cierre
+      let pendiente = antesDelCierre;
+      while(pendiente && pendiente.length > 1){
+        const rSep = SEPARADORES_KW.find(s=>pendiente.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(s.normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
+        if(rSep){
+          const sn = rSep.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+          const tn = pendiente.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+          const idx = tn.indexOf(sn);
+          const antes = pendiente.substring(0, idx).trim();
+          if(antes.length > 1) _agregarItemLocal(antes);
+          pendiente = pendiente.substring(idx + rSep.length).trim();
+        } else {
+          if(pendiente.length > 1) _agregarItemLocal(pendiente);
+          pendiente = null;
+        }
+      }
+    }
     _listaBuf = '';
     clearTimeout(_listaBufTimer);
+    renderListaItems();
     _cerrarListaConIA();
     return;
   }
