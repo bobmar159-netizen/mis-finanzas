@@ -7922,21 +7922,6 @@ function startListeningHandlers(rec) {
 
 // ── Detectar contexto en tiempo real mientras habla ──
 function _actualizarContextoMic(texto){
-  // ★ Detección INMEDIATA de comando de lista en interim — sin esperar silencio
-  if(isNotaCommand(texto)){
-    const tLow = texto.toLowerCase();
-    const tipo = tLow.includes('nota') && !tLow.includes('lista') ? 'nota' : 'lista';
-    let titulo = tipo==='lista' ? 'Lista de compras' : 'Nota';
-    const matchT = texto.match(/(?:lista|nota)\s+de\s+([\w\s]{2,40}?)(?:\s*$|,|\s+para\b)/i)
-      || texto.match(/(?:lista|nota)\s+para\s+([\w\s]{2,40}?)(?:\s*$|,)/i);
-    if(matchT){ let tt=matchT[1].trim().replace(/^(de |del |una |un |para |el |la )/i,'').trim(); titulo=tt.charAt(0).toUpperCase()+tt.slice(1); }
-    // Abrir inmediatamente sin esperar el timer de silencio
-    processVoiceResult._busy = false;
-    stopListening();
-    document.getElementById('micModal').style.display='none';
-    setTimeout(()=>abrirModoLista(tipo, titulo), 50);
-    return;
-  }
   const header = document.getElementById('micHeader');
   const icon   = document.getElementById('micContextIcon');
   const title  = document.getElementById('micContextTitle');
@@ -8705,7 +8690,7 @@ function abrirModoLista(tipo, tituloInicial){
           <input id="lista-titulo" value="${listaTitulo}" style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:#5D4037;border:none;background:transparent;width:100%;outline:none">
           <div style="font-size:11px;color:#8D6E63">Dictando en modo lista</div>
         </div>
-        <button onclick="cerrarListaModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+        <button id="lista-cerrar-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF;padding:8px;min-width:44px;min-height:44px">✕</button>
       </div>
 
       <!-- Items de la lista -->
@@ -8718,10 +8703,10 @@ function abrirModoLista(tipo, tituloInicial){
 
       <!-- Botones -->
       <div style="display:flex;gap:8px">
-        <button onclick="toggleListaMic()" id="lista-mic-btn" style="flex:1;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
+        <button id="lista-mic-btn" style="flex:1;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
           🎙 Dictar
         </button>
-        <button id="lista-guardar-btn" onclick="guardarListaFinal()" style="flex:1;background:#3A7D44;color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
+        <button id="lista-guardar-btn" style="flex:1;background:#3A7D44;color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
           ✓ Guardar
         </button>
       </div>
@@ -8732,9 +8717,14 @@ function abrirModoLista(tipo, tituloInicial){
       </div>
     </div>`;
   document.body.appendChild(overlay);
+  // ★ Usar addEventListener en lugar de onclick inline — más confiable en Android
+  document.getElementById('lista-cerrar-btn').addEventListener('click', ()=>cerrarListaModal());
+  document.getElementById('lista-mic-btn').addEventListener('click', ()=>toggleListaMic());
+  document.getElementById('lista-guardar-btn').addEventListener('click', ()=>guardarListaFinal());
   renderListaItems();
-  // Auto-iniciar mic
-  setTimeout(()=>iniciarListaMic(), 500);
+  // ★ Android necesita más tiempo para liberar el mic antes de iniciar lista
+  const micDelay = /android/i.test(navigator.userAgent) ? 900 : 500;
+  setTimeout(()=>iniciarListaMic(), micDelay);
 }
 
 function cerrarListaModal(){
@@ -8862,13 +8852,9 @@ function iniciarListaMic(){
 
   listaRec.onend = () => {
     if(listaMicActivo){
-      // ★ Antes de reiniciar: si hay buffer pendiente confirmarlo como ítem
-      if(_listaBuf.trim().length > 1){
-        clearTimeout(_listaBufTimer);
-        _confirmarItemActual();
-      }
-      _listaBuf = ''; // ★ limpiar buffer — evita procesar texto viejo en nueva sesión
-      const delay = /android/i.test(navigator.userAgent) ? 400 : 100;
+      // ★ NO confirmar ítem en cada reinicio — el timer de pausa ya lo maneja
+      // Solo limpiar si el buffer lleva más de 5s sin cambios (mic murió mid-item)
+      const delay = /android/i.test(navigator.userAgent) ? 350 : 100;
       setTimeout(()=>{
         if(listaMicActivo){
           try{ listaRec.start(); }catch(err){}
@@ -8981,13 +8967,11 @@ function _confirmarItemActual(){
 function _agregarItemLocal(texto){
   const t = texto.trim();
   if(!t || t.length < 2) return;
-  // ★ No agregar si es igual al último ítem (duplicado por reinicio de mic)
+  // ★ Solo bloquear duplicado EXACTO consecutivo
   const ultimos = listaItems.filter(i=>i.tipo==='item');
   if(ultimos.length > 0){
     const ultimo = ultimos[ultimos.length-1].texto.toLowerCase().trim();
-    if(ultimo === t.toLowerCase().trim()) return;
-    // También evitar si es subconjunto del último (ej: "mouse" si ya existe "computadora mouse")
-    if(ultimo.includes(t.toLowerCase()) || t.toLowerCase().includes(ultimo)) return;
+    if(ultimo === t.toLowerCase().trim()) return; // exactamente igual → skip
   }
 
   // Extraer precio si lo dice: "pan 5 soles" / "leche s/ 3.50"
