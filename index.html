@@ -7876,7 +7876,14 @@ function startListeningHandlers(rec) {
     if(textoParaTimer.trim()){
       const esAgenda = isAgendaCommand(textoParaTimer);
 
-      if(esAgenda){
+      // ★ Lista/nota: detección local — procesar rápido sin esperar silencio largo
+      if(isNotaCommand(textoParaTimer)){
+        const _textoNota = display;
+        micSilenceTimer = setTimeout(()=>{
+          const texto = (micFullTranscript.trim() || _textoNota).trim();
+          if(micListening && texto) processVoiceResult(texto);
+        }, 800);
+      } else if(esAgenda){
         const nrmText = textoParaTimer.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
         const tieneCliente  = /\b(se[nñ]or[a]?|don|do[nñ]a)\s+[a-z]/i.test(nrmText);
         const tieneServicio = /(punto adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion)/i.test(nrmText);
@@ -7886,7 +7893,6 @@ function startListeningHandlers(rec) {
         const espera = esAndroid
           ? (suficiente ? 3500 : 6000)
           : (suficiente ? 2000 : 4000);
-        // ★ Capturar display AHORA — no cuando dispare el timer (puede estar vacío)
         const _textoAgenda = display;
         micSilenceTimer = setTimeout(()=>{
           const texto = (micFullTranscript.trim() || _textoAgenda).trim();
@@ -8852,8 +8858,10 @@ function iniciarListaMic(){
 
   listaRec.onend = () => {
     if(listaMicActivo){
-      // ★ NO confirmar ítem en cada reinicio — el timer de pausa ya lo maneja
-      // Solo limpiar si el buffer lleva más de 5s sin cambios (mic murió mid-item)
+      // ★ Limpiar buffer al reiniciar — Android re-emite texto anterior causando duplicados
+      // El timer de pausa ya confirmó el ítem antes del corte si hubo suficiente silencio
+      clearTimeout(_listaBufTimer);
+      _listaBuf = '';
       const delay = /android/i.test(navigator.userAgent) ? 350 : 100;
       setTimeout(()=>{
         if(listaMicActivo){
