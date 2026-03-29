@@ -3757,7 +3757,7 @@ function confirmDeleteNota(id){
   render();
   toast('Nota eliminada ✓');
 }
-function abrirEditarNota(id){ abrirEditorNota(id); }
+function abrirEditarNota(id){ abrirEditorNotaBloque(id); }
 
 function setNotaFilter(f){ _notaFilter=f; render(); }
 function toggleNotaItem(notaId,idx){ if(!state.notas)return; const n=state.notas.find(x=>x.id===notaId); if(!n||!n.items)return; n.items[idx].done=!n.items[idx].done; save('fnz_notas',state.notas); render(); }
@@ -3784,7 +3784,7 @@ function abrirNotaTypeMenu(){
           <button onclick="cerrarNotaTypeMenu()" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;width:34px;height:34px;font-size:16px;cursor:pointer;color:var(--muted)">✕</button>
         </div>
 
-        <div class="nota-type-item" onclick="cerrarNotaTypeMenu();abrirEditorNota()">
+        <div class="nota-type-item" onclick="cerrarNotaTypeMenu();abrirEditorNotaBloque()">
           <div class="nota-type-ic" style="background:#FFF9C4">📝</div>
           <div>
             <div class="nota-type-lbl">Nota en blanco</div>
@@ -3991,9 +3991,12 @@ function cerrarGrabarAudio(){
   document.getElementById('audioRecModal')?.remove();
 }
 
+let _audSaving=false;
 function guardarNotaAudio(){
+  if(_audSaving) return;
+  _audSaving=true; setTimeout(()=>{_audSaving=false;},3000);
   const txt = _audTranscript.trim();
-  if(!txt){ toast('No hay texto grabado','error'); return; }
+  if(!txt){ _audSaving=false; toast('No hay texto grabado','error'); return; }
 
   // Formatear transcript en párrafos limpia
   const parrafos = txt.split(/(?<=[.!?])\s+/).filter(s=>s.trim().length>2)
@@ -4456,8 +4459,8 @@ function guardarNotaEditor(editId){
   toast('Nota guardada ✓');
 }
 
-function openNotaFoto(){ abrirEditorNota(); }
-function saveNotaFoto(){ abrirEditorNota(); }
+function openNotaFoto(){ abrirEditorNotaBloque(); }
+function saveNotaFoto(){ abrirEditorNotaBloque(); }
 
 function openNotaVoz(editId){
   // Redirigir al nuevo flujo unificado con Gemini
@@ -8907,16 +8910,10 @@ let _nedNota = null, _nedFotos = [], _nedRecordatorio = '', _nedColor = 'amarill
 let _nedHistory = [], _nedFuture = [];
 
 function abrirEditorNota(editId){
-  document.getElementById('ned-overlay')?.remove();
-
-  _nedNota = editId ? (state.notas||[]).find(x=>x.id===editId) : null;
-  _nedFotos = [...(_nedNota?.fotos||[])];
-  _nedRecordatorio = _nedNota?.recordatorio||'';
-  _nedColor = _nedNota?.colorHoja||'amarillo';
-  _nedHistory = []; _nedFuture = [];
-
-  const n = _nedNota||{};
-  const nc = NOTA_COLORES[_nedColor]||NOTA_COLORES.amarillo;
+  // ★ FIX: siempre redirige al editor premium — el viejo fue desactivado
+  abrirEditorNotaBloque(editId);
+  return;
+  const n = {}; const nc = NOTA_COLORES['amarillo'];
 
   const cdots = Object.entries(NOTA_COLORES).map(([k,v])=>
     `<div class="ned-cdot${_nedColor===k?' sel':''}" onclick="nedColor('${k}')"
@@ -9681,7 +9678,7 @@ function cerrarListaModal(){
     try{listaRec.stop();}catch(e){}
     listaRec = null;
   }
-  _listaSaved = false; // ★ reset para próxima lista
+  // ★ FIX NO resetear _listaSaved aquí — lo resetea abrirModoLista al iniciar
   const m = document.getElementById('listaModal');
   if(m) m.remove();
 }
@@ -9945,6 +9942,8 @@ function _setListaStatus(msg){
 
 // ── CIERRE CON IA — Gemini organiza todos los ítems al final ──
 async function _cerrarListaConIA(){
+  if(_listaSaved) return;  // ★ FIX: guard antes de cualquier async
+  _listaSaved = true;
   pararListaMicDefinitivo();
 
   // Si no hay ítems, guardar directo
@@ -9959,7 +9958,7 @@ async function _cerrarListaConIA(){
   if(!geminiKey){
     renderListaItems();
     _setListaStatus('✓ Guardando...');
-    setTimeout(()=>guardarListaFinal(), 400);
+    window._listaGuardarTimer=setTimeout(()=>guardarListaFinal(),400);
     return;
   }
 
@@ -10023,15 +10022,15 @@ Respondé SOLO con JSON válido:
       renderListaItems();
       _setListaStatus('✨ Gemini organizó la lista — guardando...');
       // ★ Guardar automáticamente después de mostrar 1.5s
-      setTimeout(()=>guardarListaFinal(), 1500);
+      window._listaGuardarTimer=setTimeout(()=>guardarListaFinal(),1500);
     } else {
       _setListaStatus('✓ Lista lista — guardando...');
-      setTimeout(()=>guardarListaFinal(), 500);
+      window._listaGuardarTimer=setTimeout(()=>guardarListaFinal(),500);
     }
   } catch(err){
     console.error('Gemini lista error:', err);
     _setListaStatus('⚠ Gemini falló — guardando como está...');
-    setTimeout(()=>guardarListaFinal(), 800);
+    window._listaGuardarTimer=setTimeout(()=>guardarListaFinal(),800);
   }
 
   if(btn){ btn.disabled = false; btn.textContent = '✓ Guardar lista'; btn.style.background='#3A7D44'; }
@@ -10062,11 +10061,11 @@ function _setListaMicBtn(activo){
 }
 
 function guardarListaFinal(){
-  if(_listaSaved) return;   // ★ anti-duplicado: solo guarda UNA vez
+  if(_listaSaved) return;   // ★ anti-duplicado
   _listaSaved = true;
-
-  // ★ Deshabilitar botón inmediatamente para evitar doble tap
-  const guardarBtn = document.querySelector('#listaModal button[onclick="guardarListaFinal()"]');
+  clearTimeout(window._listaGuardarTimer); // ★ FIX: cancela timers pendientes
+  // Deshabilitar botón para evitar doble tap
+  const guardarBtn = document.getElementById('lista-guardar-btn');
   if(guardarBtn){ guardarBtn.disabled = true; guardarBtn.textContent = '⏳ Guardando...'; }
 
   pararListaMicDefinitivo();
