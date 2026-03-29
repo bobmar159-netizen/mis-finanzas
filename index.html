@@ -5960,34 +5960,55 @@ function stopAgendaVoz(){
 
 // Extractor de cliente específico para agenda — patrones más simples
 function extractClienteAgenda(text){
-  const t2 = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  // ── Intentar sobre texto ORIGINAL primero (preserva tildes y ñ) ──
+  const SVCSTOP = /\b(servicio|punto|adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|boca|precio|soles|el|la|en|de|del|a|las)\b/i;
+  const DISTSW  = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|brena|miraflores|independencia|carabayllo|ventanilla|bellavista)$/i;
+  const DIASW   = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana)$/i;
 
-  // ★ Terminadores que indican fin del nombre (sin necesidad de coma)
-  const FIN = '(?:\\s+en\\b|\\s+de\\b|\\s*[,.]|\\s+servicio\\b|\\s+precio\\b|\\s+soles\\b|\\s+sol\\b|\\s+punto\\b|\\s+terma\\b|\\s+cocina\\b|\\s+horno\\b|\\s+calefon\\b|\\s+parrilla\\b|\\s+secadora\\b|\\s+instalacion\\b|\\s+conexion\\b|\\s+reparacion\\b|\\s+modificacion\\b|\\s+gasfiteria\\b|\\s+documentacion\\b|\\s+conversion\\b|\\s+a las\\b|$)';
-
-  const patterns = [
-    new RegExp('\\ba\\s+(?:la\\s+|el\\s+)?(?:senora?|don|dona|sr\\.?|sra\\.?)\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
-    new RegExp('para\\s+(?:la\\s+|el\\s+)?(?:senora?|don|dona|sr\\.?|sra\\.?)\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
-    new RegExp('con\\s+(?:la\\s+|el\\s+)?(?:senora?|don|dona)\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
-    new RegExp('donde\\s+(?:la\\s+|el\\s+)?(?:senora?|don|dona)?\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
-    new RegExp('(?:al|para el|para la)\\s+(?:cliente|clienta)\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
-    new RegExp('(?:trabajo|visita|servicio|instalacion|reparacion)\\s+para\\s+(?:el|la)?\\s*(?:senora?|don|dona)?\\s*([A-Za-z][A-Za-z\\s]{2,20}?)' + FIN, 'i'),
-    // sin preposición: "señora Paty Los Olivos"
-    new RegExp('(?:senora?|dona|don|sr\\.?|sra\\.?)\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
+  // ── MÉTODO 1: Regex sobre texto original con ñ y tildes ──
+  const patronesOrig = [
+    /(?:para\s+el\s+|para\s+la\s+|al\s+|a\s+la\s+)(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñ]+)?)/i,
+    /(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñ]{1,20})/i,
+    /(?:para|al|con)\s+(?:el\s+|la\s+)?(?:cliente|clienta)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñ]+)/i,
   ];
+  for(const p of patronesOrig){
+    const m = text.match(p);
+    if(m && m[1]){
+      const partes = m[1].trim().split(/\s+/).filter(Boolean);
+      // Cortar si segunda palabra es distrito o día
+      let nombre = (partes.length > 1 && (DISTSW.test(partes[1])||DIASW.test(partes[1])))
+        ? partes[0]
+        : partes.slice(0,2).join(' ');
+      // Verificar que no es palabra de servicio
+      if(nombre.length > 1 && !SVCSTOP.test(nombre.split(' ')[0])) return nombre;
+    }
+  }
 
-  const stopWords = /^(en|de|del|al|la|el|por|para|con|que|fue|era|los|las|un|una|dia|día|manana|mañana|hoy|ayer|servicio|precio|monto|cobro|trabajo|visita|agenda|lunes|martes|miercoles|jueves|viernes|sabado|domingo|soles|sol|a|las|punto|adicional|terma|cocina|horno|secadora|calefon|parrilla|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|este|esta|desde|hasta|cerca|mañana|siguiente|proximo|próximo|ese|eso|esto)$/i;
-  const distWords = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|brena|miraflores|independencia|carabayllo|ventanilla|bellavista)$/i;
-  const diasStop  = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|ayer)$/i;
-
-  for(const p of patterns){
+  // ── MÉTODO 2: Texto normalizado (sin tildes) ──
+  const t2 = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const FIN = '(?:\\s+en\\b|\\s+de\\b|\\s*[,.]|\\s+servicio\\b|\\s+precio\\b|\\s+soles\\b|\\s+punto\\b|\\s+terma\\b|\\s+cocina\\b|\\s+horno\\b|\\s+calefon\\b|\\s+parrilla\\b|\\s+secadora\\b|\\s+instalacion\\b|\\s+conexion\\b|\\s+reparacion\\b|\\s+a las\\b|$)';
+  const patronesNorm = [
+    new RegExp('(?:para\\s+(?:la\\s+|el\\s+)?)(?:senora?|don|dona|sr\\.?|sra\\.?)\\s+([A-Za-z][A-Za-z]{1,18})' + FIN, 'i'),
+    new RegExp('(?:senora?|dona|don|sr\\.?|sra\\.?)\\s+([A-Za-z][A-Za-z]{1,18})' + FIN, 'i'),
+    new RegExp('(?:al|para el|para la)\\s+(?:cliente|clienta)\\s+([A-Za-z][A-Za-z\\s]{1,20}?)' + FIN, 'i'),
+  ];
+  const stopW2 = /^(en|de|del|al|la|el|por|para|con|que|los|las|un|una|dia|manana|hoy|ayer|servicio|precio|trabajo|visita|agenda|soles|sol|a|las|punto|adicional|terma|cocina|horno|secadora|calefon|parrilla|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|este|esta|ese|eso|esto)$/i;
+  for(const p of patronesNorm){
     const m = t2.match(p);
     if(m && m[1]){
-      let partes = m[1].trim().split(/\s+/).filter(w => !stopWords.test(w));
-      if(partes.length > 1 && (distWords.test(partes[1]) || diasStop.test(partes[1]))) partes = [partes[0]];
-      const nombre = partes.slice(0, 2).join(' ').trim();
-      if(nombre.length > 1) return nombre;
+      const partes = m[1].trim().split(/\s+/).filter(w => !stopW2.test(w));
+      if(partes.length > 1 && DISTSW.test(partes[1])) partes.length = 1;
+      const nombre = partes.slice(0,2).join(' ').trim();
+      if(nombre.length > 1 && !SVCSTOP.test(nombre.split(' ')[0])) return nombre;
     }
+  }
+
+  // ── MÉTODO 3: Fallback ultrasimple — cualquier nombre propio después de "señor/don" ──
+  const ultSimple = text.match(/(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)/i)
+    || text.toLowerCase().match(/(?:senora?|dona|don)\s+([a-z][a-z]+)/i);
+  if(ultSimple && ultSimple[1]){
+    const n = ultSimple[1].trim();
+    if(!SVCSTOP.test(n) && n.length > 1) return n.charAt(0).toUpperCase()+n.slice(1);
   }
   return null;
 }
@@ -6868,11 +6889,27 @@ function pnedSave(close){
     return`<p>${b.content}</p>`;
   }).join('');
   if(!state.notas)state.notas=[];
+  // ★ FIX: construir n.items desde blocks para compatibilidad con renderNotaCard
+  const checkBlks = blocks.filter(b=>b.type==='check');
+  const syncedItems = checkBlks.map(b=>({texto:b.content||'',precio:b.price||null,done:b.done||false}));
+  const tipoFinal = checkBlks.length > 0 ? 'lista' : 'texto';
+
   if(window._pnedNota){
     const n=state.notas.find(x=>x.id===window._pnedNota.id);
-    if(n)Object.assign(n,{titulo,blocks,texto:htmlTexto,colorHoja:window._pnedColor,fontFamily:window._pnedFont,fotos:window._pnedFotos,modificado:new Date().toISOString()});
+    if(n) Object.assign(n,{
+      titulo, blocks, texto:htmlTexto,
+      colorHoja:window._pnedColor, fontFamily:window._pnedFont,
+      fotos:window._pnedFotos, modificado:new Date().toISOString(),
+      items: syncedItems.length ? syncedItems : (n.items||[]),
+      tipo: n.tipo==='audio' ? 'audio' : (syncedItems.length ? 'lista' : (n.tipo||'texto')),
+    });
   } else {
-    const nota={id:Date.now()+'',tipo:'texto',titulo,blocks,texto:htmlTexto,colorHoja:window._pnedColor,fontFamily:window._pnedFont,fotos:window._pnedFotos,creado:new Date().toISOString()};
+    const nota={
+      id:Date.now()+'', tipo:tipoFinal, titulo, blocks, texto:htmlTexto,
+      colorHoja:window._pnedColor, fontFamily:window._pnedFont,
+      fotos:window._pnedFotos, creado:new Date().toISOString(),
+      items: syncedItems,
+    };
     state.notas.unshift(nota);
     window._pnedNota=state.notas[0];
   }
@@ -7042,9 +7079,27 @@ Texto: "${transcript}"`;
     newBlocks=lines.length?lines.map(l=>({id:pnId(),type:'paragraph',content:l.trim(),price:null,done:false})):[{id:pnId(),type:'paragraph',content:transcript,price:null,done:false}];
   }
   const n=(state.notas||[]).find(x=>x.id===notaId);
-  if(n){if(!n.blocks)n.blocks=[];n.blocks.push(...newBlocks);n.texto=(n.texto||'')+newBlocks.map(b=>`<p>${b.content}</p>`).join('');n.modificado=new Date().toISOString();save('fnz_notas',state.notas);}
+  if(n){
+    if(!n.blocks) n.blocks=[];
+    n.blocks.push(...newBlocks);
+    // ★ FIX: sincronizar también n.items para compatibilidad con renderNotaCard
+    const checkBlocks = newBlocks.filter(b=>b.type==='check');
+    if(checkBlocks.length>0){
+      if(!n.items) n.items=[];
+      checkBlocks.forEach(b=>n.items.push({texto:b.content||'',precio:b.price||null,done:b.done||false}));
+      // Actualizar tipo si era texto y ahora tiene items
+      if(n.tipo==='texto' || !n.tipo) n.tipo='lista';
+    }
+    // Actualizar texto HTML para preview
+    n.texto = (n.texto||'') + newBlocks.map(b=>{
+      if(b.type==='check') return `<div>${b.done?'✓':'○'} ${b.content}${b.price?' - S/'+b.price:''}</div>`;
+      return `<p>${b.content||''}</p>`;
+    }).join('');
+    n.modificado=new Date().toISOString();
+    save('fnz_notas',state.notas);
+  }
   pnMicClose();
-  toast(`✓ ${newBlocks.length} bloque${newBlocks.length!==1?'s':''} agregados con IA`);
+  toast(`✓ ${newBlocks.length} bloque${newBlocks.length!==1?'s':''} agregados${localStorage.getItem('fnz_gemini_key')?' con IA':''}`);
   render();
 }
 
@@ -8078,6 +8133,21 @@ function extractCliente(text) {
       else nombre=partes.slice(0,2).join(' ');
       if (nombre.length > 1) return nombre;
     }
+  }
+  // ── FALLBACK ULTRASIMPLE: "señor/don + nombre" en cualquier posición ──
+  // Cubre casos donde los patrones complejos fallan por orden desordenado
+  const ULTRA_SVCSTOP = /^(servicio|punto|adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|precio|soles|para|en|de|del|al|la|el|a|las)$/i;
+  const ultFallback = t.match(/(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñ]{1,20})/i);
+  if(ultFallback && ultFallback[1]){
+    const fn = ultFallback[1].trim();
+    if(!ULTRA_SVCSTOP.test(fn) && fn.length > 1) return fn;
+  }
+  // ── FALLBACK 2: texto normalizado — "senor/don + nombre" ──
+  const t3 = t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const nrmFall = t3.match(/(?:senora?|dona|don)\s+([a-z][a-z]{1,18})/i);
+  if(nrmFall && nrmFall[1]){
+    const fn2 = nrmFall[1].trim();
+    if(!ULTRA_SVCSTOP.test(fn2) && fn2.length > 1) return fn2.charAt(0).toUpperCase()+fn2.slice(1);
   }
   return null;
 }
@@ -9497,8 +9567,29 @@ function isNotaCommand(text){
     'crea lista de','nueva lista de','haz lista de',
     'lista para el trabajo','lista del trabajo','lista de hoy',
     'lista rapida','lista rápida',
+    // ★ Patrones cortos — "lista de X" al inicio o sola
+    'lista de','lista para','mi lista','hacer mi lista',
+    'anotar una lista','apuntar una lista','tomar nota de',
+    'voy a anotar','voy a dictar','quiero dictar',
+    'registrar lista','nueva lista rápida','empezar lista',
+    // ★ Variantes fonéticas Chrome Android frecuentes
+    'crea me','hazme','hace me','make lista','ase me una lista',
+    'una lista de compras','una lista de materiales','una lista de trabajo',
+    'lista de insumos','lista de herramientas','lista de gastos del dia',
   ];
-  return notaKws.some(k => t.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
+  if(notaKws.some(k => t.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')))) return true;
+
+  // ★ DETECCIÓN ADICIONAL: si el texto empieza con "lista" directamente
+  if(t.trim().startsWith('lista')) return true;
+
+  // ★ DETECCIÓN POR PATRÓN: texto corto (< 6 palabras) que parece un ítem con precio
+  //    Ej: "pan 5 soles, leche 3" → probablemente dictando una lista
+  const words = t.trim().split(/\s+/);
+  const hasPrice = /\b(\d+(?:[.,]\d+)?\s*(?:soles?|sol\b)|s\/\.?\s*\d+)/i.test(t);
+  const hasComa  = t.includes(',') || t.includes(' y ');
+  if(words.length <= 10 && hasPrice && hasComa) return true;
+
+  return false;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -10222,14 +10313,32 @@ function testGeminiKey(){
   const key = document.getElementById('gemini-key-input')?.value.trim() || localStorage.getItem('fnz_gemini_key')||'';
   if(!key){ toast('Primero pega tu API key','error'); return; }
   const btn = document.querySelector('[onclick="testGeminiKey()"]');
-  if(btn) btn.textContent = 'Probando...';
-  callGemini('Responde solo: OK', key).then(r=>{
-    if(btn) btn.textContent = 'Probar';
+  if(btn){ btn.textContent = '⏳ Probando...'; btn.disabled = true; }
+
+  // ★ Test específico: simular extracción de agenda
+  const testPrompt = 'Respondé SOLO con este JSON exacto (sin cambios): {"ok":true,"modelo":"gemini","fecha":"2025-01-01","cliente":"Luis","servicio":"Punto Adicional","precio":400}';
+
+  callGemini(testPrompt, key).then(r=>{
+    if(btn){ btn.textContent = 'Probar'; btn.disabled = false; }
     if(r){
-      toast('✓ Gemini conectado correctamente ✨');
+      // Intentar parsear para ver si devuelve JSON válido
+      try{
+        const parsed = JSON.parse(r.replace(/```json|```/g,'').trim());
+        if(parsed.ok && parsed.cliente){
+          toast('✓ Gemini activo — extrae datos correctamente ✨');
+        } else {
+          toast('✓ Gemini conectado pero revisar el formato de respuesta');
+        }
+      } catch(e){
+        // Respuesta en texto — Gemini está activo pero responde diferente
+        toast('✓ Gemini conectado — respondió: '+r.substring(0,40));
+      }
     } else {
-      toast('Error — abrí la consola (F12) para ver el detalle','error');
+      toast('⚠ Gemini no respondió — verificá tu API key en aistudio.google.com','error');
     }
+  }).catch(()=>{
+    if(btn){ btn.textContent = 'Probar'; btn.disabled = false; }
+    toast('⚠ Error de conexión con Gemini','error');
   });
 }
 
@@ -10600,43 +10709,83 @@ Respondé SOLO con JSON válido, sin explicaciones:
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         contents:[{role:'user',parts:[{text:prompt}]}],
-        generationConfig:{temperature:0.05, maxOutputTokens:300}
+        generationConfig:{temperature:0.05, maxOutputTokens:350}
       })
     });
+    if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+
+    // ── Parser robusto: tolera JSON parcial o con texto extra ──
+    let parsed = null;
+    try{
+      parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    } catch(e1){
+      // Intentar extraer solo el objeto JSON del texto
+      const jsonMatch = raw.match(/\{[^]*\}/);
+      if(jsonMatch) try{ parsed = JSON.parse(jsonMatch[0]); }catch(e2){}
+    }
+    if(!parsed) throw new Error('JSON inválido: '+raw.substring(0,80));
+
     parsed.tipo = tipoDetectado;
 
-    // ★ Actualizar _agendaMicData con la versión mejorada de Gemini
+    // ★ Merge: Gemini gana SOLO si aporta dato que el local no tenía
+    //    Si Gemini da null pero local tenía dato → conservar el local
     Object.keys(parsed).forEach(k => {
-      if(parsed[k] !== null && parsed[k] !== undefined && parsed[k] !== '') {
-        _agendaMicData[k] = parsed[k];
+      const geminiVal = parsed[k];
+      const localVal  = _agendaMicData[k];
+      // Gemini gana si tiene valor Y (local no tenía O campo es cliente/hora/precio)
+      const camposCriticos = ['cliente','hora','precio','servicio','ubicacion'];
+      if(geminiVal !== null && geminiVal !== undefined && geminiVal !== ''){
+        if(!localVal || camposCriticos.includes(k)){
+          _agendaMicData[k] = geminiVal;
+        }
       }
     });
 
-    // Refrescar el panel del mic con los datos corregidos
+    // ── Limpiar cliente: quitar tratamiento si Gemini lo dejó ──
+    if(_agendaMicData.cliente){
+      _agendaMicData.cliente = _agendaMicData.cliente
+        .replace(/^(señora?|doña?|don|sr\.?|sra\.?|el|la)\s+/i,'')
+        .trim();
+      if(!_agendaMicData.cliente) _agendaMicData.cliente = null;
+    }
+
+    // ── Refrescar panel si sigue visible ──
     const panelPresente = document.getElementById('ag-mic-campos');
     if(panelPresente){
       _mostrarResumenAgendaEnMic(_agendaMicData, text, tipoDetectado);
     } else {
-      // Si el form ya está abierto, rellenar sus campos
       _rellenarFormularioAgenda(parsed);
     }
 
-    // Actualizar status
+    // ── Status OK ──
+    const st = document.getElementById('ag-mic-status');
+    if(st){
+      const faltantes = ['cliente','fecha','servicio'].filter(k=>!_agendaMicData[k]);
+      st.style.animation='none';
+      if(faltantes.length===0){
+        st.style.background='#F0FDF4'; st.style.color='#166534';
+        st.innerHTML='<span>✓</span> Completado por IA';
+      } else {
+        st.style.background='#FEF9EC'; st.style.color='#92400E';
+        st.innerHTML='⚠ Faltan: '+faltantes.join(', ')+' — completá en el formulario';
+      }
+      setTimeout(()=>{ if(st) st.style.animation=''; }, 4000);
+    }
+  } catch(e){
+    console.error('Gemini agenda error:', e.message);
     const st = document.getElementById('ag-mic-status');
     if(st){
       st.style.animation='none';
-      st.style.background='#F0FDF4';
-      st.style.color='#166534';
-      st.innerHTML='<span>✓</span> Verificado por IA';
-      setTimeout(()=>{ if(st) st.remove(); }, 2000);
+      st.style.background='#F5F5F5';
+      st.style.color='#64748B';
+      // Mostrar qué detectó el parser local
+      const localCliente = _agendaMicData.cliente;
+      st.textContent = localCliente
+        ? '✓ Parser local: cliente = '+localCliente
+        : '⚠ Sin Gemini — completá el cliente manualmente';
     }
-  } catch(e){
-    console.error('Gemini agenda error:', e);
-    const st = document.getElementById('ag-mic-status');
-    if(st){ st.style.animation='none'; st.textContent='Parser local activo'; }
   }
 }
 
