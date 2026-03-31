@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#F9F7F3">
 <title>Mis Finanzas</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=Inter:wght@300;400;500;600&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;600;700&family=Lora:wght@400;500;600;700&family=Merriweather:wght@300;400;700&family=Poppins:wght@300;400;500;600&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root {
@@ -556,6 +556,153 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 @keyframes pnWav{from{height:4px}to{height:34px}}
 .pn-ia-proc{display:flex;align-items:center;gap:8px;background:#F3E5F5;border:1px solid #CE93D8;border-radius:10px;padding:9px 12px;font-size:12px;color:#6A1B9A;font-weight:600}
 .pn-ia-dot{width:8px;height:8px;border-radius:50%;background:#9C27B0;animation:pulse 1s infinite}
+
+/* ★ BOTONES FLOTANTES DE OPERACIONES MÓVIL */
+.pn-cell-ops{position:absolute;display:flex;gap:4px;background:#FFF;border:1.5px solid #D4B896;border-radius:10px;padding:6px;box-shadow:0 6px 16px rgba(0,0,0,0.18);z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;transform:translateX(-50%)}
+.pn-cell-ops.visible{opacity:1;pointer-events:auto}
+.pn-op-btn{padding:8px 11px;border:none;border-radius:7px;font-size:14px;font-weight:700;color:#FFF;cursor:pointer;transition:all 0.15s;min-width:36px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+.pn-op-btn:active{transform:scale(0.92)}
+.pn-op-btn.suma{background:#2E7D32}
+.pn-op-btn.mult{background:#1565C0}
+.pn-op-btn.div{background:#E65100}
+.pn-op-btn.resta{background:#C62828}
+.pn-op-btn.igv{background:#854F0B}
+
+/* ★ SUGERENCIAS AUTOMÁTICAS IA */
+.pn-ai-sug{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#FFF3E0;border:2px solid #FF9800;border-radius:14px;padding:14px;box-shadow:0 8px 20px rgba(0,0,0,0.25);z-index:1001;max-width:310px;width:90%;opacity:0;pointer-events:none;transition:all 0.3s;animation:slideUp 0.3s}
+.pn-ai-sug.visible{opacity:1;pointer-events:auto}
+@keyframes slideUp{from{bottom:60px;opacity:0}to{bottom:80px;opacity:1}}
+.pn-ai-sug-icon{font-size:22px;margin-bottom:6px;text-align:center}
+.pn-ai-sug-text{font-size:13px;color:#5D4037;margin-bottom:12px;line-height:1.5;text-align:center;font-weight:500}
+.pn-ai-sug-btn{width:100%;padding:12px;background:linear-gradient(135deg,#FF9800,#F57C00);color:#FFF;border:none;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 8px rgba(255,152,0,0.3)}
+.pn-ai-sug-btn:active{transform:scale(0.96);box-shadow:0 2px 4px rgba(255,152,0,0.3)}
+.pn-ai-sug-close{position:absolute;top:8px;right:10px;background:none;border:none;font-size:20px;color:#999;cursor:pointer;padding:2px 8px;font-weight:700}
+.pn-ai-sug-close:active{color:#333;transform:scale(0.9)}
+
+/* ═══════════════════════════════════════════════════════════════════
+   🚀 NUEVAS FEATURES PREMIUM - NOTAS 5.0
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 🔍 BÚSQUEDA INTELIGENTE */
+.search-bar{position:sticky;top:0;background:var(--bg);padding:12px 18px;border-bottom:1px solid var(--border);z-index:100}
+.search-input-wrap{position:relative}
+.search-input{width:100%;padding:10px 14px 10px 40px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--card);color:var(--text);font-family:'DM Sans',sans-serif}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--muted);pointer-events:none}
+.search-filters{display:flex;gap:8px;margin-top:10px;overflow-x:auto;padding-bottom:4px}
+.search-filters::-webkit-scrollbar{height:4px}
+.search-filters::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.filter-chip{padding:6px 12px;background:var(--card);border:1px solid var(--border);border-radius:20px;font-size:12px;white-space:nowrap;cursor:pointer;transition:all .2s;font-weight:600;font-family:'DM Sans',sans-serif}
+.filter-chip:active{transform:scale(0.95)}
+.filter-chip.active{background:var(--gold);color:#FFF;border-color:var(--gold)}
+.search-no-results{padding:40px 20px;text-align:center;color:var(--muted);font-size:14px}
+
+/* 🏷️ TAGS Y CATEGORÍAS */
+.nota-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tag{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px;cursor:pointer;transition:all .2s}
+.tag:active{transform:scale(0.95)}
+.tag.obra{background:#FFF3E0;color:#E65100}
+.tag.cliente{background:#E3F2FD;color:#1565C0}
+.tag.urgente{background:#FFEBEE;color:#C62828}
+.tag.factura{background:#E8F5E9;color:#2E7D32}
+.tag.pendiente{background:#FFF9C4;color:#F57F17}
+.tag.completado{background:#E8F5E9;color:#2E7D32}
+.tag-input-wrap{position:relative;margin-top:12px}
+.tag-input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--card);color:var(--text);font-family:'DM Sans',sans-serif}
+.tag-suggestions{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:1000}
+.tag-suggestion{padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;transition:background .15s}
+.tag-suggestion:last-child{border-bottom:none}
+.tag-suggestion:active{background:var(--ing-bg)}
+.tag-remove{margin-left:4px;opacity:0.6;font-weight:700;cursor:pointer}
+.tag-remove:hover{opacity:1}
+
+/* ⏰ RECORDATORIOS */
+.nota-reminder{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#FFF9C4;border:1px solid #F9A825;border-radius:8px;margin-top:8px;font-size:12px;color:#F57F17;font-weight:500}
+.reminder-badge{position:absolute;top:8px;right:44px;background:#FF9800;color:#FFF;padding:4px 8px;border-radius:20px;font-size:10px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+.reminder-input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--card);color:var(--text);font-family:'DM Sans',sans-serif}
+
+/* 📤 COMPARTIR MODAL */
+.share-modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s}
+.share-content{background:var(--card);border-radius:16px;padding:24px;max-width:360px;width:90%;box-shadow:0 8px 24px rgba(0,0,0,0.3)}
+.share-title{font-size:18px;font-weight:700;margin-bottom:16px;color:var(--text);font-family:'Playfair Display',serif}
+.share-options{display:grid;gap:12px;margin-top:16px}
+.share-btn{display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all .2s;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text)}
+.share-btn:active{transform:scale(0.98);background:var(--border)}
+.share-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.share-icon.pdf{background:#FFEBEE;color:#C62828}
+.share-icon.whatsapp{background:#E8F5E9;color:#25D366}
+.share-icon.copy{background:#E3F2FD;color:#1565C0}
+.share-icon.excel{background:#E8F5E9;color:#0F6E56}
+.share-label{flex:1}
+.share-desc{font-size:11px;color:var(--muted);margin-top:2px}
+.share-close{position:absolute;top:12px;right:12px;background:none;border:none;font-size:24px;color:var(--muted);cursor:pointer;padding:4px}
+.share-close:active{color:var(--text);transform:scale(0.9)}
+
+/* 📸 GALERÍA MÚLTIPLE */
+.photo-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-top:12px}
+.gallery-item{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;background:var(--bg)}
+.gallery-item img{width:100%;height:100%;object-fit:cover;transition:transform .2s}
+.gallery-item:active img{transform:scale(0.95)}
+.gallery-delete{position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);color:#FFF;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;opacity:0;transition:opacity .2s}
+.gallery-item:hover .gallery-delete{opacity:1}
+.gallery-add{display:flex;align-items:center;justify-content:center;background:var(--border);color:var(--muted);font-size:32px;cursor:pointer;transition:all .2s}
+.gallery-add:active{background:var(--gold);color:#FFF}
+.photo-zoom{position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:1001;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s}
+.photo-zoom img{max-width:90%;max-height:90%;object-fit:contain}
+.photo-zoom-close{position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.2);color:#FFF;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;border:none}
+
+/* 🔗 VINCULACIÓN MOVIMIENTOS */
+.linked-items{margin-top:12px;padding:12px;background:var(--ing-bg);border-radius:8px;border:1px solid var(--border)}
+.linked-header{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.linked-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.linked-item:last-child{border-bottom:none}
+.linked-desc{flex:1;color:var(--text)}
+.linked-amount{font-weight:700;color:var(--ing-color)}
+.linked-amount.egreso{color:var(--red)}
+.linked-remove{margin-left:8px;opacity:0.6;cursor:pointer;font-size:16px}
+.linked-remove:hover{opacity:1;color:var(--red)}
+.add-link-btn{width:100%;padding:10px;background:var(--bg);border:1px dashed var(--border);border-radius:8px;cursor:pointer;font-size:13px;color:var(--muted);margin-top:8px;transition:all .2s;font-family:'DM Sans',sans-serif}
+.add-link-btn:active{background:var(--border)}
+
+/* 📋 TEMPLATES RÁPIDOS */
+.templates-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px}
+.template-card{padding:16px;background:var(--card);border:1px solid var(--border);border-radius:12px;text-align:center;cursor:pointer;transition:all .2s}
+.template-card:active{transform:scale(0.96);box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+.template-icon{font-size:32px;margin-bottom:8px}
+.template-name{font-size:12px;font-weight:600;color:var(--text);font-family:'DM Sans',sans-serif}
+.template-desc{font-size:10px;color:var(--muted);margin-top:4px}
+
+/* ⭐ FAVORITOS */
+.nota-star{position:absolute;top:12px;right:48px;font-size:20px;cursor:pointer;opacity:0.3;transition:all .2s;z-index:10}
+.nota-star:active{transform:scale(0.9)}
+.nota-star.active{opacity:1;color:#FFB300;filter:drop-shadow(0 2px 4px rgba(255,179,0,0.4))}
+
+/* 📊 ESTADÍSTICAS */
+.stats-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.stats-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;font-family:'Playfair Display',serif}
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.stat-item{text-align:center;padding:12px;background:var(--bg);border-radius:8px}
+.stat-value{font-size:24px;font-weight:700;color:var(--gold);font-family:'DM Sans',sans-serif}
+.stat-label{font-size:11px;color:var(--muted);margin-top:4px;font-family:'DM Sans',sans-serif}
+
+/* 📑 DUPLICAR BADGE */
+.duplicate-badge{position:absolute;top:12px;left:12px;background:var(--blue);color:#FFF;padding:4px 8px;border-radius:20px;font-size:10px;font-weight:700;opacity:0;transition:opacity .2s}
+.nc2:hover .duplicate-badge{opacity:1}
+
+/* 🎨 NOTA COLOR PICKER */
+.color-picker-wrap{margin-top:12px}
+.color-picker-label{font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600}
+.color-picker-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.color-option{width:100%;aspect-ratio:1;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:all .2s}
+.color-option:active{transform:scale(0.9)}
+.color-option.selected{border-color:var(--text);box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--text)}
+
+/* 🔔 NOTIFICACIONES */
+.notification-badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:#FFF;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+
+/* ⌨️ ATAJOS HINT */
+.keyboard-hint{position:fixed;bottom:20px;right:20px;background:rgba(0,0,0,0.8);color:#FFF;padding:8px 12px;border-radius:8px;font-size:11px;z-index:999;opacity:0;pointer-events:none;transition:opacity .2s}
+.keyboard-hint.show{opacity:1}
+.kbd{background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;font-family:monospace;margin:0 2px}
 
 </style>
 </head>
@@ -3538,6 +3685,9 @@ function renderNotas(){
     return n.tipo===filter;
   });
 
+  // ★ NUEVO: Aplicar búsqueda y filtros premium
+  notas = filterNotas(notas);
+
   const filterPills = [
     {k:'todas', lbl:'Todas'},
     {k:'lista',  lbl:'📋 Listas'},
@@ -3548,28 +3698,36 @@ function renderNotas(){
       ${lbl}${counts[k]>0?` <span style="font-size:10px;opacity:.65">${counts[k]}</span>`:''}
     </button>`).join('');
 
+  // ★ NUEVO: Renderizar barra de búsqueda y estadísticas
+  const searchBar = renderSearchBar();
+  const estadisticas = state.notas.length > 0 ? mostrarEstadisticas() : '';
+
   const notasHtml = notas.length === 0
     ? `<div style="text-align:center;padding:64px 20px">
         <div style="font-size:60px;margin-bottom:16px">📝</div>
-        <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">Sin notas aún</div>
-        <div style="font-size:13px;color:var(--muted)">Toca <b>+ Nueva nota</b> para empezar</div>
+        <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">${_searchQuery||_activeFilters.length?'No se encontraron notas':'Sin notas aún'}</div>
+        <div style="font-size:13px;color:var(--muted)">${_searchQuery||_activeFilters.length?'Prueba con otros filtros':'Toca <b>+ Nueva nota</b> para empezar'}</div>
        </div>`
     : notas.map(n=>renderNotaCard(n)).join('');
 
   return `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    ${searchBar}
+    ${estadisticas}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:0 18px">
       <div>
         <div class="section-title">Mis Notas</div>
-        <div class="section-sub">${state.notas.length} nota${state.notas.length!==1?'s':''}</div>
+        <div class="section-sub">${notas.length} de ${state.notas.length} nota${state.notas.length!==1?'s':''}</div>
       </div>
       <button onclick="abrirNotaTypeMenu()" style="background:var(--gold);color:#fff;border:none;border-radius:12px;padding:12px 18px;font-size:14px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;gap:7px">
         ＋ Nueva nota <span style="font-size:16px;opacity:.85">∨</span>
       </button>
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding:0 18px">
       ${filterPills}
     </div>
-    ${notasHtml}
+    <div style="padding:0 18px">
+      ${notasHtml}
+    </div>
     <div style="height:90px"></div>`;
 }
 
@@ -3632,8 +3790,20 @@ function renderNotaCard(n){
 
   const geminiKey = localStorage.getItem('fnz_gemini_key');
 
+  // ★ NUEVO: Tags HTML
+  const tagsHtml = (n.tags && n.tags.length) ? `
+    <div class="nota-tags" style="margin-left:54px;margin-top:8px">
+      ${n.tags.slice(0,3).map(t => `<span class="tag ${t.replace('#','')}">${t}</span>`).join('')}
+      ${n.tags.length > 3 ? `<span class="tag" style="background:var(--border);color:var(--muted)">+${n.tags.length-3}</span>` : ''}
+    </div>` : '';
+
   return `
-    <div class="nc2" style="border-color:${nc.border}55">
+    <div class="nc2" style="border-color:${nc.border}55;position:relative">
+      <!-- ★ NUEVO: Estrella favorito -->
+      <div class="nota-star ${n.favorita?'active':''}" onclick="event.stopPropagation();toggleFavorita('${n.id}')" title="${n.favorita?'Quitar de favoritas':'Agregar a favoritas'}">
+        ${n.favorita?'⭐':'☆'}
+      </div>
+      
       <!-- Accent bar -->
       <div class="nc2-accent" style="background:${nc.border}"></div>
 
@@ -3655,20 +3825,21 @@ function renderNotaCard(n){
         </div>
         ${preview}
         ${progressHtml}
+        ${tagsHtml}
       </div>
 
       <!-- Action bar -->
       <div class="nc2-actions" style="background:${nc.bg}">
-        <button class="nc2-act" onclick="event.stopPropagation();notaAgregarVoz('${n.id}')" style="color:${nc.footer}" title="Dictar">
-          🎙 <span style="color:${nc.footer}">Dictar</span>
+        <button class="nc2-act" onclick="event.stopPropagation();duplicarNota('${n.id}')" style="color:${nc.footer}" title="Duplicar">
+          📑 <span style="color:${nc.footer}">Duplicar</span>
         </button>
         <div style="width:1px;background:${nc.border}33;margin:8px 0"></div>
-        ${geminiKey?`<button class="nc2-act" onclick="event.stopPropagation();abrirChatIA('${n.id}')" style="color:${nc.footer}" title="Chat IA">
-          ✨ <span style="color:${nc.footer}">Chat IA</span>
-        </button>
-        <div style="width:1px;background:${nc.border}33;margin:8px 0"></div>`:''}
-        <button class="nc2-act" onclick="event.stopPropagation();compartirNota('${n.id}')" style="color:${nc.footer}" title="Compartir">
+        <button class="nc2-act" onclick="event.stopPropagation();abrirModalCompartir('${n.id}')" style="color:${nc.footer}" title="Compartir">
           📤 <span style="color:${nc.footer}">Compartir</span>
+        </button>
+        <div style="width:1px;background:${nc.border}33;margin:8px 0"></div>
+        <button class="nc2-act" onclick="event.stopPropagation();notaMenu('${n.id}')" style="color:${nc.footer}" title="Más opciones">
+          ⋯ <span style="color:${nc.footer}">Más</span>
         </button>
         <div style="width:1px;background:${nc.border}33;margin:8px 0"></div>
         <button class="nc2-act" onclick="event.stopPropagation();confirmarEliminarNota('${n.id}')" style="color:#E05252" title="Eliminar">
@@ -3688,12 +3859,15 @@ function notaMenu(id){
       <button onclick="closeModal();abrirEditorNota('${id}')"
         style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text);display:flex;align-items:center;gap:10px">
         ✏️ <span>Editar nota</span></button>
-      <button onclick="closeModal();notaAgregarVoz('${id}')"
+      <button onclick="closeModal();agregarRecordatorio('${id}')"
+        style="background:var(--card);border:1px solid #FF980033;border-radius:10px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:#FF9800;display:flex;align-items:center;gap:10px;font-weight:600">
+        ⏰ <span>Agregar recordatorio</span></button>
+      <button onclick="closeModal();abrirGaleriaFotos('${id}')"
         style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text);display:flex;align-items:center;gap:10px">
-        🎙 <span>Agregar por voz</span></button>
-      <button onclick="closeModal();compartirNotaWhatsApp('${id}')"
-        style="background:var(--card);border:1px solid #25D36633;border-radius:10px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:#15803D;display:flex;align-items:center;gap:10px;font-weight:600">
-        📱 <span>Compartir por WhatsApp</span></button>
+        📸 <span>Fotos (${n.fotos&&n.fotos.length?n.fotos.length:'0'})</span></button>
+      <button onclick="closeModal();vincularMovimiento('${id}')"
+        style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text);display:flex;align-items:center;gap:10px">
+        🔗 <span>Vincular movimientos</span></button>
       <button onclick="closeModal();pinNota('${id}')"
         style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text);display:flex;align-items:center;gap:10px">
         ${n.pinned?'📌 <span>Desanclar</span>':'📍 <span>Anclar arriba</span>'}</button>
@@ -3818,6 +3992,17 @@ function abrirNotaTypeMenu(){
             <div class="nota-type-sub">Crea una nota y añade imágenes</div>
           </div>
           <div style="font-size:18px;color:var(--muted);margin-left:auto">›</div>
+        </div>
+
+        <div style="height:1px;background:var(--border);margin:12px 0"></div>
+
+        <div class="nota-type-item" onclick="cerrarNotaTypeMenu();mostrarTemplates()">
+          <div class="nota-type-ic" style="background:#F3E5F5">⚡</div>
+          <div>
+            <div class="nota-type-lbl">Templates rápidos</div>
+            <div class="nota-type-sub">Reunión, cotización, compras y más</div>
+          </div>
+          <div style="font-size:18px;color:var(--gold);margin-left:auto">›</div>
         </div>
       </div>
     </div>`;
@@ -6517,24 +6702,37 @@ function abrirEditorNotaBloque(editId){
       <button onclick="pnedSave(true)" style="background:linear-gradient(135deg,#5D4037,#8D6E63);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0">Guardar</button>
     </div>
     <div id="pned-toolbar">
+      <button class="pnt-btn" onclick="pnedUndo()" title="Deshacer">⟲</button>
+      <button class="pnt-btn" onclick="pnedRedo()" title="Rehacer">⟳</button>
+      <div class="pnt-sep"></div>
       <button class="pnt-btn" id="pntb-b" onmousedown="event.preventDefault();pnedExec('bold')"><b>B</b></button>
       <button class="pnt-btn" id="pntb-i" onmousedown="event.preventDefault();pnedExec('italic')"><i>I</i></button>
       <button class="pnt-btn" id="pntb-u" onmousedown="event.preventDefault();pnedExec('underline')" style="text-decoration:underline">U</button>
       <button class="pnt-btn" id="pntb-s" onmousedown="event.preventDefault();pnedExec('strikeThrough')" style="text-decoration:line-through">S</button>
       <div class="pnt-sep"></div>
-      <select class="pnt-sel" onchange="pnedSetFontSz(this.value)" title="Tamaño">
-        ${[12,14,15,17,20,26].map(s=>`<option value="${s}" ${s===15?'selected':''}>${s}px</option>`).join('')}
+      <button class="pnt-btn" onclick="pnedChangeFontSize(-2)" title="Reducir tamaño">A-</button>
+      <select class="pnt-sel" id="pned-font-size" onchange="pnedSetFontSz(this.value)" title="Tamaño">
+        ${[12,14,15,17,20,24,28,32].map(s=>`<option value="${s}" ${s===15?'selected':''}>${s}px</option>`).join('')}
       </select>
-      <select class="pnt-sel" onchange="pnedSetFont(this.value)" title="Fuente">
+      <button class="pnt-btn" onclick="pnedChangeFontSize(2)" title="Aumentar tamaño">A+</button>
+      <div class="pnt-sep"></div>
+      <select class="pnt-sel" onchange="pnedSetFont(this.value)" title="Fuente" style="width:140px">
         <option value="dmsans" ${window._pnedFont==='dmsans'?'selected':''}>DM Sans</option>
-        <option value="playfair" ${window._pnedFont==='playfair'?'selected':''}>Playfair</option>
-        <option value="mono" ${window._pnedFont==='mono'?'selected':''}>Mono</option>
+        <option value="playfair" ${window._pnedFont==='playfair'?'selected':''}>Playfair Display</option>
+        <option value="inter" ${window._pnedFont==='inter'?'selected':''}>Inter</option>
+        <option value="roboto" ${window._pnedFont==='roboto'?'selected':''}>Roboto</option>
+        <option value="opensans" ${window._pnedFont==='opensans'?'selected':''}>Open Sans</option>
+        <option value="lora" ${window._pnedFont==='lora'?'selected':''}>Lora</option>
+        <option value="merriweather" ${window._pnedFont==='merriweather'?'selected':''}>Merriweather</option>
+        <option value="poppins" ${window._pnedFont==='poppins'?'selected':''}>Poppins</option>
+        <option value="montserrat" ${window._pnedFont==='montserrat'?'selected':''}>Montserrat</option>
+        <option value="mono" ${window._pnedFont==='mono'?'selected':''}>Courier</option>
       </select>
       <div class="pnt-sep"></div>
-      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#C62828')" style="color:#C62828;font-weight:900">A</button>
-      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#1565C0')" style="color:#1565C0;font-weight:900">A</button>
-      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#2E7D32')" style="color:#2E7D32;font-weight:900">A</button>
-      <button class="pnt-btn" onmousedown="event.preventDefault();pnedMark()" style="background:#FFF9C4;color:#92700A;font-weight:700;font-size:11px;border-radius:5px">Aa</button>
+      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#C62828')" style="color:#C62828;font-weight:900" title="Rojo">A</button>
+      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#1565C0')" style="color:#1565C0;font-weight:900" title="Azul">A</button>
+      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#2E7D32')" style="color:#2E7D32;font-weight:900" title="Verde">A</button>
+      <button class="pnt-btn" onmousedown="event.preventDefault();pnedMark()" style="background:#FFF9C4;color:#92700A;font-weight:700;font-size:11px;border-radius:5px" title="Resaltar">Aa</button>
       <div class="pnt-sep"></div>
       ${colorDots}
     </div>
@@ -6545,6 +6743,7 @@ function abrirEditorNotaBloque(editId){
       <button class="pned-foot-btn" onclick="pnedAddBlock('bullet')" title="Viñeta">•</button>
       <button class="pned-foot-btn" onclick="pnedInsTable()" title="Tabla">⊞</button>
       <button class="pned-foot-btn" onclick="pnedAddPhoto()" title="Foto">📷</button>
+      <button class="pned-foot-btn" onclick="pnedEditTags()" title="Tags">🏷️</button>
       <span id="pned-wc" style="font-size:11px;color:${nc.footer};flex:1;text-align:right"></span>
       <input type="file" id="pned-file-in" accept="image/*" multiple style="display:none" onchange="pnedPhotosIn(this)">
     </div>`;
@@ -6552,6 +6751,10 @@ function abrirEditorNotaBloque(editId){
   document.body.appendChild(ov);
   document.body.style.overflow='hidden';
   pnedRenderAll();
+  // ★ Inicializar sistema de historial
+  window._pnedHistory = [];
+  window._pnedHistoryIndex = -1;
+  pnedSaveHistory(); // Guardar estado inicial
   setTimeout(()=>{
     const first=document.querySelector('.pn-block');
     if(first) first.focus();
@@ -6674,13 +6877,44 @@ function pnedMkTable(b){
   if(!b.headers) b.headers=['Concepto','Detalle','Precio S/'];
   if(!b.rows) b.rows=[{c0:'',c1:'',c2:''}];
   const outer=document.createElement('div'); outer.style.flex='1';
+  
+  // ★ AGREGAR HANDLE para mover tabla
+  const handle = document.createElement('div');
+  handle.className = 'pn-block-handle';
+  handle.textContent = '⋮';
+  
   const tw=document.createElement('div'); tw.className='pn-tbl-wrap';
   const t=document.createElement('table'); t.className='pn-tbl';
   const tid='ptbl_'+b.id; t.id=tid;
+  
+  // ★ APLICAR ESTILOS DE BORDE PERSONALIZADOS
+  if(b.borderStyle || b.borderWidth || b.borderColor){
+    const borderStyle = b.borderStyle || 'solid';
+    const borderWidth = b.borderWidth || '1';
+    const borderColor = b.borderColor || '#D4B896';
+    t.style.border = `${borderWidth}px ${borderStyle} ${borderColor}`;
+  }
+  
   // Header
   const thead=document.createElement('thead');
   const hr=document.createElement('tr');
-  b.headers.forEach((h,hi)=>{ const th=document.createElement('th'); th.contentEditable='true'; th.textContent=h; if(hi===b.headers.length-1) th.className='pcol'; th.addEventListener('input',()=>{b.headers[hi]=th.textContent;window._pnedDirty=true;}); hr.appendChild(th); });
+  b.headers.forEach((h,hi)=>{ 
+    const th=document.createElement('th'); 
+    th.contentEditable='true'; 
+    th.textContent=h; 
+    if(hi===b.headers.length-1) th.className='pcol'; 
+    
+    // ★ Aplicar borde a headers
+    if(b.borderStyle || b.borderWidth || b.borderColor){
+      const borderStyle = b.borderStyle || 'solid';
+      const borderWidth = b.borderWidth || '1';
+      const borderColor = b.borderColor || '#D4B896';
+      th.style.border = `${borderWidth}px ${borderStyle} ${borderColor}`;
+    }
+    
+    th.addEventListener('input',()=>{b.headers[hi]=th.textContent;window._pnedDirty=true;}); 
+    hr.appendChild(th); 
+  });
   thead.appendChild(hr); t.appendChild(thead);
   // Body
   const tbody=document.createElement('tbody');
@@ -6693,7 +6927,236 @@ function pnedMkTable(b){
         const td=document.createElement('td'); td.contentEditable='true';
         td.textContent=row[keys[ci]]||'';
         if(ci===b.headers.length-1) td.className='pcol';
-        td.addEventListener('input',()=>{ row[keys[ci]]=td.textContent; window._pnedDirty=true; pnedTableTotal(b,tid,tbody); });
+        
+        // ★ Aplicar borde a celdas
+        if(b.borderStyle || b.borderWidth || b.borderColor){
+          const borderStyle = b.borderStyle || 'solid';
+          const borderWidth = b.borderWidth || '1';
+          const borderColor = b.borderColor || '#D4B896';
+          td.style.border = `${borderWidth}px ${borderStyle} ${borderColor}`;
+        }
+        
+        // ★ BOTONES FLOTANTES + SUGERENCIAS IA AL TOCAR CELDA
+        td.addEventListener('focus',()=>{
+          // Mostrar botones flotantes
+          pnShowCellOps(td, b, ri, ci, row, keys);
+          
+          // Detectar patrón y mostrar sugerencia IA
+          const pattern = pnDetectPattern(b.headers);
+          if(pattern){
+            setTimeout(() => pnShowAiSuggestion(pattern, b, ci), 300);
+          }
+        });
+        
+        td.addEventListener('blur',()=>{
+          // Ocultar botones cuando pierde el focus
+          setTimeout(() => {
+            if(!_pnCurrentCell || _pnCurrentCell !== td){
+              pnHideCellOps();
+            }
+          }, 150);
+        });
+        
+        td.addEventListener('input',()=>{ 
+          const text = td.textContent.trim();
+          // ★ SISTEMA DE FÓRMULAS EXPANDIDO
+          if(text.startsWith('=')){
+            const formula = text.slice(1).toUpperCase().trim();
+            const colIdx = ci;
+            
+            // =SUMA - sumar todos los valores de la columna
+            if(formula === 'SUMA'){
+              const sum = b.rows.reduce((total, r, idx) => {
+                if(idx === ri) return total;
+                return total + (parseFloat(r[keys[ci]]) || 0);
+              }, 0);
+              row[keys[ci]] = sum.toFixed(2);
+              td.textContent = sum.toFixed(2);
+              td.style.color = '#2E7D32';
+              td.style.fontWeight = '700';
+              td.title = '=SUMA';
+              window._pnedDirty = true;
+              pnedTableTotal(b,tid,tbody);
+              return;
+            }
+            
+            // =PROMEDIO - calcular promedio de la columna
+            if(formula === 'PROMEDIO'){
+              const vals = b.rows.map((r, idx) => {
+                if(idx === ri) return null;
+                return parseFloat(r[keys[ci]]) || 0;
+              }).filter(v => v !== null);
+              const avg = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+              row[keys[ci]] = avg.toFixed(2);
+              td.textContent = avg.toFixed(2);
+              td.style.color = '#1565C0';
+              td.style.fontWeight = '700';
+              td.title = '=PROMEDIO';
+              window._pnedDirty = true;
+              pnedTableTotal(b,tid,tbody);
+              return;
+            }
+            
+            // =MINIMO - valor mínimo de la columna
+            if(formula === 'MINIMO' || formula === 'MIN'){
+              const vals = b.rows.map((r, idx) => {
+                if(idx === ri) return null;
+                return parseFloat(r[keys[ci]]) || 0;
+              }).filter(v => v !== null && v !== 0);
+              const min = vals.length ? Math.min(...vals) : 0;
+              row[keys[ci]] = min.toFixed(2);
+              td.textContent = min.toFixed(2);
+              td.style.color = '#E65100';
+              td.style.fontWeight = '700';
+              td.title = '=MINIMO';
+              window._pnedDirty = true;
+              return;
+            }
+            
+            // =MAXIMO - valor máximo de la columna
+            if(formula === 'MAXIMO' || formula === 'MAX'){
+              const vals = b.rows.map((r, idx) => {
+                if(idx === ri) return null;
+                return parseFloat(r[keys[ci]]) || 0;
+              }).filter(v => v !== null);
+              const max = vals.length ? Math.max(...vals) : 0;
+              row[keys[ci]] = max.toFixed(2);
+              td.textContent = max.toFixed(2);
+              td.style.color = '#C62828';
+              td.style.fontWeight = '700';
+              td.title = '=MAXIMO';
+              window._pnedDirty = true;
+              return;
+            }
+            
+            // =CONTAR - contar valores no vacíos en la columna
+            if(formula === 'CONTAR'){
+              const count = b.rows.filter((r, idx) => {
+                if(idx === ri) return false;
+                const val = r[keys[ci]];
+                return val && val.toString().trim() !== '';
+              }).length;
+              row[keys[ci]] = count.toString();
+              td.textContent = count.toString();
+              td.style.color = '#7C3AED';
+              td.style.fontWeight = '700';
+              td.title = '=CONTAR';
+              window._pnedDirty = true;
+              return;
+            }
+            
+            // =MULTIPLICAR - multiplicar todos los valores de la columna
+            if(formula === 'MULTIPLICAR' || formula === 'MULT'){
+              const product = b.rows.reduce((total, r, idx) => {
+                if(idx === ri) return total;
+                const val = parseFloat(r[keys[ci]]);
+                return val ? total * val : total;
+              }, 1);
+              row[keys[ci]] = product.toFixed(2);
+              td.textContent = product.toFixed(2);
+              td.style.color = '#D4537E';
+              td.style.fontWeight = '700';
+              td.title = '=MULTIPLICAR';
+              window._pnedDirty = true;
+              return;
+            }
+            
+            // =IGV - calcular 18% IGV de la celda anterior en la fila
+            if(formula === 'IGV'){
+              const prevKey = keys[ci - 1];
+              const baseVal = parseFloat(row[prevKey]) || 0;
+              const igv = baseVal * 0.18;
+              row[keys[ci]] = igv.toFixed(2);
+              td.textContent = igv.toFixed(2);
+              td.style.color = '#854F0B';
+              td.style.fontWeight = '700';
+              td.title = '=IGV (18%)';
+              window._pnedDirty = true;
+              return;
+            }
+            
+            // =SUBTOTAL - suma sin IGV (suma de fila hasta aquí)
+            if(formula === 'SUBTOTAL' || formula === 'SUB'){
+              const sum = Object.keys(row).slice(0, ci).reduce((s, k) => {
+                return s + (parseFloat(row[k]) || 0);
+              }, 0);
+              row[keys[ci]] = sum.toFixed(2);
+              td.textContent = sum.toFixed(2);
+              td.style.color = '#0F6E56';
+              td.style.fontWeight = '700';
+              td.title = '=SUBTOTAL';
+              window._pnedDirty = true;
+              return;
+            }
+            
+            // =TOTAL - suma de toda la fila
+            if(formula === 'TOTAL'){
+              const sum = Object.keys(row).slice(0, ci).reduce((s, k) => {
+                return s + (parseFloat(row[k]) || 0);
+              }, 0);
+              row[keys[ci]] = sum.toFixed(2);
+              td.textContent = sum.toFixed(2);
+              td.style.color = '#2E7D32';
+              td.style.fontWeight = '700';
+              td.title = '=TOTAL';
+              window._pnedDirty = true;
+              return;
+            }
+            
+            // Operaciones entre celdas: =A1+B1, =A1*B1, =A1-B1, =A1/B1
+            const cellOp = formula.match(/^([A-Z]+)([0-9]+)([\+\-\*\/])([A-Z]+)([0-9]+)$/);
+            if(cellOp){
+              const [_, col1, row1, op, col2, row2] = cellOp;
+              const r1 = parseInt(row1) - 1;
+              const r2 = parseInt(row2) - 1;
+              const c1 = col1.charCodeAt(0) - 65;
+              const c2 = col2.charCodeAt(0) - 65;
+              
+              if(r1 >= 0 && r1 < b.rows.length && r2 >= 0 && r2 < b.rows.length){
+                const val1 = parseFloat(b.rows[r1][`c${c1}`]) || 0;
+                const val2 = parseFloat(b.rows[r2][`c${c2}`]) || 0;
+                let result = 0;
+                if(op === '+') result = val1 + val2;
+                else if(op === '-') result = val1 - val2;
+                else if(op === '*') result = val1 * val2;
+                else if(op === '/') result = val2 !== 0 ? val1 / val2 : 0;
+                
+                row[keys[ci]] = result.toFixed(2);
+                td.textContent = result.toFixed(2);
+                td.style.color = '#185FA5';
+                td.style.fontWeight = '700';
+                td.title = '=' + formula;
+                window._pnedDirty = true;
+                return;
+              }
+            }
+            
+            // Operación simple con columna actual: =*1.18 (IGV), =+100, =-50, =/2
+            const simpleOp = formula.match(/^([\+\-\*\/])([\d.]+)$/);
+            if(simpleOp){
+              const [_, op, num] = simpleOp;
+              const prevKey = keys[ci - 1];
+              const baseVal = parseFloat(row[prevKey]) || 0;
+              const opNum = parseFloat(num);
+              let result = 0;
+              if(op === '+') result = baseVal + opNum;
+              else if(op === '-') result = baseVal - opNum;
+              else if(op === '*') result = baseVal * opNum;
+              else if(op === '/') result = opNum !== 0 ? baseVal / opNum : 0;
+              
+              row[keys[ci]] = result.toFixed(2);
+              td.textContent = result.toFixed(2);
+              td.style.color = '#639922';
+              td.style.fontWeight = '700';
+              td.title = '=' + formula;
+              window._pnedDirty = true;
+              return;
+            }
+          }
+          
+          // Sin fórmula - guardar normal
+          row[keys[ci]]=td.textContent; window._pnedDirty=true; pnedTableTotal(b,tid,tbody); 
+        });
         td.addEventListener('keydown',e=>{ if(e.key==='Tab'&&!e.shiftKey&&ci===b.headers.length-1&&ri===b.rows.length-1){e.preventDefault();const nr={};keys.forEach(k=>nr[k]='');b.rows.push(nr);drawRows();pnedTableTotal(b,tid,tbody);} });
         tr.appendChild(td);
       });
@@ -6707,8 +7170,26 @@ function pnedMkTable(b){
   const btn=(lbl,fn,red=false)=>{ const b2=document.createElement('button'); b2.className='pn-tbl-btn'; b2.textContent=lbl; if(red) b2.style.color='#E05252'; b2.onclick=fn; ctrls.appendChild(b2); };
   btn('+ Fila',()=>{ const nr={};Object.keys(b.rows[0]).forEach(k=>nr[k]='');b.rows.push(nr);drawRows(); });
   btn('− Fila',()=>{ if(b.rows.length>1){b.rows.pop();drawRows();} });
+  // ★ BOTONES DE COLUMNAS
+  btn('+ Col',()=>{ 
+    const newColKey = `c${b.headers.length}`;
+    b.headers.push(`Col ${b.headers.length}`);
+    b.rows.forEach(row => row[newColKey] = '');
+    drawRows();
+  });
+  btn('− Col',()=>{ 
+    if(b.headers.length > 2){
+      const lastKey = `c${b.headers.length - 1}`;
+      b.headers.pop();
+      b.rows.forEach(row => delete row[lastKey]);
+      drawRows();
+    }
+  });
+  btn('🎨 Bordes',()=>pnedCustomizeBorders(b));
   btn('🗑 Tabla',()=>pnedDel(b.id),true);
-  outer.appendChild(tw); outer.appendChild(ctrls);
+  outer.appendChild(handle); // ★ Handle primero
+  outer.appendChild(tw); 
+  outer.appendChild(ctrls);
   return outer;
 }
 
@@ -6782,6 +7263,253 @@ function pnedSlashApply(key){
   window._pnedDirty=true;
 }
 
+// ★★★ SISTEMA DE OPERACIONES SIN FÓRMULAS (MÓVIL) ★★★
+let _pnCellOps = null; // Botones flotantes
+let _pnAiSug = null;   // Sugerencia IA
+let _pnCurrentCell = null; // Celda actual seleccionada
+let _pnCurrentBlock = null; // Bloque tabla actual
+let _pnCurrentCellInfo = null; // Info de celda: {ri, ci, row, keys}
+
+// Detectar patrones en headers de tabla
+function pnDetectPattern(headers){
+  const h = headers.map(x => x.toLowerCase().trim());
+  
+  // Patrón 1: Cantidad + Precio → Multiplicar
+  const hasCant = h.some(x => x.includes('cant') || x.includes('qty') || x.includes('cantidad'));
+  const hasPrice = h.some(x => x.includes('precio') || x.includes('price') || x.includes('p.unit') || x.includes('valor'));
+  if(hasCant && hasPrice) return {type:'mult', text:'Detecté "Cantidad" y "Precio"', action:'¿Multiplicar (Cant × Precio)?'};
+  
+  // Patrón 2: Subtotal + IGV → IGV
+  const hasSubtotal = h.some(x => x.includes('subtotal') || x.includes('sub') || x.includes('base'));
+  const hasIGV = h.some(x => x.includes('igv') || x.includes('impuesto') || x.includes('tax'));
+  if(hasSubtotal && hasIGV) return {type:'igv', text:'Detecté "Subtotal" e "IGV"', action:'¿Calcular IGV (18%)?'};
+  
+  // Patrón 3: Total → Sumar
+  const hasTotal = h.some(x => x.includes('total') || x.includes('suma'));
+  if(hasTotal) return {type:'suma', text:'Detecté columna "Total"', action:'¿Sumar toda la columna?'};
+  
+  return null;
+}
+
+// Mostrar sugerencia IA automática
+function pnShowAiSuggestion(pattern, block, ci){
+  if(!pattern) return;
+  pnHideAiSuggestion();
+  
+  _pnAiSug = document.createElement('div');
+  _pnAiSug.className = 'pn-ai-sug';
+  _pnAiSug.innerHTML = `
+    <button class="pn-ai-sug-close" onclick="pnHideAiSuggestion()">✕</button>
+    <div class="pn-ai-sug-icon">💡</div>
+    <div class="pn-ai-sug-text"><strong>${pattern.text}</strong><br>${pattern.action}</div>
+    <button class="pn-ai-sug-btn" onclick="pnApplyAiSuggestion('${pattern.type}',${ci})">✓ Sí, aplicar</button>
+  `;
+  
+  document.body.appendChild(_pnAiSug);
+  setTimeout(() => _pnAiSug.classList.add('visible'), 50);
+}
+
+function pnHideAiSuggestion(){
+  if(_pnAiSug){
+    _pnAiSug.classList.remove('visible');
+    setTimeout(() => _pnAiSug?.remove(), 300);
+    _pnAiSug = null;
+  }
+}
+
+// Aplicar sugerencia IA
+function pnApplyAiSuggestion(type, ci){
+  if(!_pnCurrentBlock || !_pnCurrentCellInfo) return;
+  const b = _pnCurrentBlock;
+  const {ri, row, keys} = _pnCurrentCellInfo;
+  
+  if(type === 'mult'){
+    // Buscar columnas de Cantidad y Precio
+    const cantIdx = b.headers.findIndex(h => h.toLowerCase().includes('cant') || h.toLowerCase().includes('qty'));
+    const priceIdx = b.headers.findIndex(h => h.toLowerCase().includes('precio') || h.toLowerCase().includes('price') || h.toLowerCase().includes('p.unit'));
+    if(cantIdx >= 0 && priceIdx >= 0){
+      const cant = parseFloat(row[keys[cantIdx]]) || 0;
+      const price = parseFloat(row[keys[priceIdx]]) || 0;
+      const result = cant * price;
+      row[keys[ci]] = result.toFixed(2);
+      
+      // Actualizar celda visualmente
+      if(_pnCurrentCell){
+        _pnCurrentCell.textContent = result.toFixed(2);
+        _pnCurrentCell.style.color = '#1565C0';
+        _pnCurrentCell.style.fontWeight = '700';
+      }
+      window._pnedDirty = true;
+      toast('✅ Multiplicado: ' + cant + ' × ' + price + ' = ' + result.toFixed(2), 'success');
+    }
+  } else if(type === 'igv'){
+    const prevKey = keys[ci - 1];
+    const baseVal = parseFloat(row[prevKey]) || 0;
+    const igv = baseVal * 0.18;
+    row[keys[ci]] = igv.toFixed(2);
+    
+    if(_pnCurrentCell){
+      _pnCurrentCell.textContent = igv.toFixed(2);
+      _pnCurrentCell.style.color = '#854F0B';
+      _pnCurrentCell.style.fontWeight = '700';
+    }
+    window._pnedDirty = true;
+    toast('✅ IGV calculado: ' + igv.toFixed(2), 'success');
+  } else if(type === 'suma'){
+    const sum = b.rows.reduce((total, r, idx) => {
+      if(idx === ri) return total;
+      return total + (parseFloat(r[keys[ci]]) || 0);
+    }, 0);
+    row[keys[ci]] = sum.toFixed(2);
+    
+    if(_pnCurrentCell){
+      _pnCurrentCell.textContent = sum.toFixed(2);
+      _pnCurrentCell.style.color = '#2E7D32';
+      _pnCurrentCell.style.fontWeight = '700';
+    }
+    window._pnedDirty = true;
+    toast('✅ Suma total: ' + sum.toFixed(2), 'success');
+  }
+  
+  pnHideAiSuggestion();
+  pnHideCellOps();
+}
+
+// Mostrar botones flotantes
+function pnShowCellOps(td, block, ri, ci, row, keys){
+  pnHideCellOps();
+  
+  _pnCurrentCell = td;
+  _pnCurrentBlock = block;
+  _pnCurrentCellInfo = {ri, ci, row, keys};
+  
+  _pnCellOps = document.createElement('div');
+  _pnCellOps.className = 'pn-cell-ops';
+  _pnCellOps.innerHTML = `
+    <button class="pn-op-btn suma" onclick="pnApplyOp('suma')" title="Sumar columna">+</button>
+    <button class="pn-op-btn mult" onclick="pnApplyOp('mult')" title="Multiplicar">×</button>
+    <button class="pn-op-btn div" onclick="pnApplyOp('div')" title="Dividir">÷</button>
+    <button class="pn-op-btn resta" onclick="pnApplyOp('resta')" title="Restar">−</button>
+    <button class="pn-op-btn igv" onclick="pnApplyOp('igv')" title="IGV 18%">%</button>
+  `;
+  
+  document.body.appendChild(_pnCellOps);
+  
+  // Posicionar botones debajo de la celda
+  const rect = td.getBoundingClientRect();
+  _pnCellOps.style.left = rect.left + (rect.width / 2) + 'px';
+  _pnCellOps.style.top = rect.bottom + 8 + 'px';
+  
+  setTimeout(() => _pnCellOps.classList.add('visible'), 50);
+}
+
+function pnHideCellOps(){
+  if(_pnCellOps){
+    _pnCellOps.classList.remove('visible');
+    setTimeout(() => _pnCellOps?.remove(), 200);
+    _pnCellOps = null;
+  }
+}
+
+// Aplicar operación
+function pnApplyOp(op){
+  if(!_pnCurrentBlock || !_pnCurrentCellInfo || !_pnCurrentCell) return;
+  
+  const b = _pnCurrentBlock;
+  const {ri, ci, row, keys} = _pnCurrentCellInfo;
+  
+  if(op === 'suma'){
+    // Sumar toda la columna
+    const sum = b.rows.reduce((total, r, idx) => {
+      if(idx === ri) return total;
+      return total + (parseFloat(r[keys[ci]]) || 0);
+    }, 0);
+    row[keys[ci]] = sum.toFixed(2);
+    _pnCurrentCell.textContent = sum.toFixed(2);
+    _pnCurrentCell.style.color = '#2E7D32';
+    _pnCurrentCell.style.fontWeight = '700';
+    _pnCurrentCell.title = 'Suma columna';
+    toast('✅ Suma: ' + sum.toFixed(2), 'success');
+    
+  } else if(op === 'mult'){
+    // Multiplicar con celda anterior
+    if(ci > 0){
+      const prevKey = keys[ci - 1];
+      const prev2Key = keys[ci - 2];
+      const val1 = parseFloat(row[prevKey]) || 0;
+      const val2 = parseFloat(row[prev2Key]) || 0;
+      const result = val1 * val2;
+      row[keys[ci]] = result.toFixed(2);
+      _pnCurrentCell.textContent = result.toFixed(2);
+      _pnCurrentCell.style.color = '#1565C0';
+      _pnCurrentCell.style.fontWeight = '700';
+      _pnCurrentCell.title = 'Multiplicación';
+      toast('✅ ' + val2 + ' × ' + val1 + ' = ' + result.toFixed(2), 'success');
+    }
+    
+  } else if(op === 'div'){
+    // Dividir celda anterior entre anterior-anterior
+    if(ci > 1){
+      const prevKey = keys[ci - 1];
+      const prev2Key = keys[ci - 2];
+      const num = parseFloat(row[prev2Key]) || 0;
+      const den = parseFloat(row[prevKey]) || 1;
+      const result = num / den;
+      row[keys[ci]] = result.toFixed(2);
+      _pnCurrentCell.textContent = result.toFixed(2);
+      _pnCurrentCell.style.color = '#E65100';
+      _pnCurrentCell.style.fontWeight = '700';
+      _pnCurrentCell.title = 'División';
+      toast('✅ ' + num + ' ÷ ' + den + ' = ' + result.toFixed(2), 'success');
+    }
+    
+  } else if(op === 'resta'){
+    // Restar celda anterior de anterior-anterior
+    if(ci > 1){
+      const prevKey = keys[ci - 1];
+      const prev2Key = keys[ci - 2];
+      const val1 = parseFloat(row[prev2Key]) || 0;
+      const val2 = parseFloat(row[prevKey]) || 0;
+      const result = val1 - val2;
+      row[keys[ci]] = result.toFixed(2);
+      _pnCurrentCell.textContent = result.toFixed(2);
+      _pnCurrentCell.style.color = '#C62828';
+      _pnCurrentCell.style.fontWeight = '700';
+      _pnCurrentCell.title = 'Resta';
+      toast('✅ ' + val1 + ' − ' + val2 + ' = ' + result.toFixed(2), 'success');
+    }
+    
+  } else if(op === 'igv'){
+    // Calcular IGV 18% de celda anterior
+    if(ci > 0){
+      const prevKey = keys[ci - 1];
+      const baseVal = parseFloat(row[prevKey]) || 0;
+      const igv = baseVal * 0.18;
+      row[keys[ci]] = igv.toFixed(2);
+      _pnCurrentCell.textContent = igv.toFixed(2);
+      _pnCurrentCell.style.color = '#854F0B';
+      _pnCurrentCell.style.fontWeight = '700';
+      _pnCurrentCell.title = 'IGV 18%';
+      toast('✅ IGV: ' + igv.toFixed(2), 'success');
+    }
+  }
+  
+  window._pnedDirty = true;
+  pnHideCellOps();
+}
+
+// Ocultar botones y sugerencias al hacer click fuera
+document.addEventListener('click', (e) => {
+  const target = e.target;
+  // Si el click no es en una celda, botón de operación, o sugerencia IA, ocultar todo
+  if(!target.closest('.pn-tbl td') && 
+     !target.closest('.pn-cell-ops') && 
+     !target.closest('.pn-ai-sug')){
+    pnHideCellOps();
+    pnHideAiSuggestion();
+  }
+});
+
 function pnedKD(e,el,b){
   const sm=document.getElementById('pn-slash-menu');
   if(sm){
@@ -6802,6 +7530,7 @@ function pnedAddAfter(afterId,type){
   const idx=window._pnedBlocks.findIndex(b=>b.id===afterId);
   if(idx>=0)window._pnedBlocks.splice(idx+1,0,nb);
   else window._pnedBlocks.push(nb);
+  pnedSaveHistory(); // ★ Guardar en historial
   pnedRenderAll();
   setTimeout(()=>{
     const el=document.querySelector(`[data-id="${nb.id}"]`);
@@ -6814,14 +7543,15 @@ function pnedAddAfter(afterId,type){
 function pnedAddBlock(type){
   const last=window._pnedBlocks.slice(-1)[0];
   if(last)pnedAddAfter(last.id,type);
-  else{window._pnedBlocks.push({id:pnId(),type,content:'',done:false});pnedRenderAll();}
+  else{window._pnedBlocks.push({id:pnId(),type,content:'',done:false});pnedSaveHistory();pnedRenderAll();}
 }
 
 function pnedDel(id){
-  if(window._pnedBlocks.length<=1){window._pnedBlocks[0].content='';pnedRenderAll();return;}
+  if(window._pnedBlocks.length<=1){window._pnedBlocks[0].content='';pnedSaveHistory();pnedRenderAll();return;}
   const idx=window._pnedBlocks.findIndex(b=>b.id===id);
   if(idx<0)return;
   window._pnedBlocks.splice(idx,1);
+  pnedSaveHistory(); // ★ Guardar en historial
   pnedRenderAll();
   setTimeout(()=>{
     const prev=window._pnedBlocks[Math.max(0,idx-1)];
@@ -6834,8 +7564,213 @@ function pnedDel(id){
 }
 
 function pnedInsTable(){
-  const b={id:pnId(),type:'table',headers:['Concepto','Detalle','Precio S/'],rows:[{c0:'',c1:'',c2:''},{c0:'',c1:'',c2:''}]};
+  // ★ MOSTRAR MENÚ DE PLANTILLAS
+  const templates = [
+    {id:'custom', name:'📊 Tabla Personalizada', desc:'Elige filas y columnas'},
+    {id:'presupuesto', name:'🏗️ Presupuesto de Obra', desc:'Material, Cant, P.Unit, Total'},
+    {id:'factura', name:'📄 Factura', desc:'Descripción, Cant, P.Unit, Subtotal, IGV, Total'},
+    {id:'precios', name:'💰 Lista de Precios', desc:'Producto, Precio'},
+    {id:'inventario', name:'📦 Control de Inventario', desc:'Producto, Stock, Min, Max'},
+    {id:'gastos', name:'💳 Gastos Mensuales', desc:'Categoría, Ene, Feb, Mar, Total'},
+    {id:'cotizacion', name:'📋 Cotización', desc:'Item, Detalle, Cant, P.Unit, Total'},
+    {id:'horas', name:'⏱️ Horas de Trabajo', desc:'Fecha, Proyecto, Horas, Tarifa, Total'},
+    {id:'compras', name:'🛒 Lista de Compras', desc:'Producto, Cantidad, Precio'},
+    {id:'comparacion', name:'⚖️ Comparación', desc:'Característica, Opción A, B, C'},
+    {id:'cuenta', name:'💵 Estado de Cuenta', desc:'Fecha, Concepto, Ingreso, Egreso, Saldo'}
+  ];
+  
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:600;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  modal.innerHTML = `<div style="background:#FFF;border-radius:20px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h3 style="font-family:'Playfair Display',serif;font-size:20px;color:#5D4037;margin:0">Elegir Plantilla</h3>
+      <button onclick="this.closest('.pned-tmpl-modal').remove()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999">✕</button>
+    </div>
+    <div style="display:grid;gap:12px">${templates.map(t=>`
+      <div onclick="pnedCreateFromTemplate('${t.id}')" style="background:#FAFAF8;border:1px solid #E8E6E0;border-radius:12px;padding:16px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='#F0EFE8';this.style.borderColor='#C9A84C'" onmouseout="this.style.background='#FAFAF8';this.style.borderColor='#E8E6E0'">
+        <div style="font-size:16px;font-weight:700;color:#3D3D3A;margin-bottom:4px">${t.name}</div>
+        <div style="font-size:12px;color:#94A3B8">${t.desc}</div>
+      </div>
+    `).join('')}</div>
+  </div>`;
+  modal.className = 'pned-tmpl-modal';
+  document.body.appendChild(modal);
+}
+
+function pnedCreateFromTemplate(templateId){
+  document.querySelector('.pned-tmpl-modal')?.remove();
+  
+  const templates = {
+    custom: ()=>{
+      document.querySelector('.pned-tmpl-modal')?.remove();
+      pnedShowCustomTableModal();
+      return null; // ★ El modal maneja la creación
+    },
+    presupuesto: ()=>({
+      headers:['Material','Cantidad','P. Unit. S/','Total S/'],
+      rows:[
+        {c0:'Cemento',c1:'40',c2:'28.50',c3:''},
+        {c0:'Arena',c1:'60',c2:'15.00',c3:''},
+        {c0:'Ladrillos',c1:'3000',c2:'0.85',c3:''},
+        {c0:'',c1:'',c2:'',c3:''}
+      ]
+    }),
+    factura: ()=>({
+      headers:['Descripción','Cant','P.Unit S/','Subtotal','IGV 18%','Total'],
+      rows:[
+        {c0:'',c1:'',c2:'',c3:'',c4:'',c5:''},
+        {c0:'',c1:'',c2:'',c3:'',c4:'',c5:''}
+      ]
+    }),
+    precios: ()=>({
+      headers:['Producto','Precio S/'],
+      rows:[{c0:'',c1:''},{c0:'',c1:''},{c0:'',c1:''}]
+    }),
+    inventario: ()=>({
+      headers:['Producto','Stock Actual','Mín','Máx','Estado'],
+      rows:[{c0:'',c1:'',c2:'',c3:'',c4:''},{c0:'',c1:'',c2:'',c3:'',c4:''}]
+    }),
+    gastos: ()=>({
+      headers:['Categoría','Ene','Feb','Mar','Abr','May','Total'],
+      rows:[
+        {c0:'Comida',c1:'',c2:'',c3:'',c4:'',c5:'',c6:''},
+        {c0:'Transporte',c1:'',c2:'',c3:'',c4:'',c5:'',c6:''},
+        {c0:'Servicios',c1:'',c2:'',c3:'',c4:'',c5:'',c6:''}
+      ]
+    }),
+    cotizacion: ()=>({
+      headers:['Ítem','Detalle','Cant','P.Unit S/','Total S/'],
+      rows:[{c0:'',c1:'',c2:'',c3:'',c4:''},{c0:'',c1:'',c2:'',c3:'',c4:''}]
+    }),
+    horas: ()=>({
+      headers:['Fecha','Proyecto','Horas','Tarifa S/','Total S/'],
+      rows:[{c0:'',c1:'',c2:'',c3:'',c4:''},{c0:'',c1:'',c2:'',c3:'',c4:''}]
+    }),
+    compras: ()=>({
+      headers:['Producto','Cantidad','Precio S/','Total S/'],
+      rows:[{c0:'',c1:'',c2:'',c3:''},{c0:'',c1:'',c2:'',c3:''}]
+    }),
+    comparacion: ()=>({
+      headers:['Característica','Opción A','Opción B','Opción C'],
+      rows:[{c0:'Precio',c1:'',c2:'',c3:''},{c0:'Calidad',c1:'',c2:'',c3:''}]
+    }),
+    cuenta: ()=>({
+      headers:['Fecha','Concepto','Ingreso S/','Egreso S/','Saldo S/'],
+      rows:[{c0:'',c1:'',c2:'',c3:'',c4:''},{c0:'',c1:'',c2:'',c3:'',c4:''}]
+    })
+  };
+  
+  const tmpl = templates[templateId]();
+  if(!tmpl) return;
+  
+  const b = {id:pnId(), type:'table', headers:tmpl.headers, rows:tmpl.rows};
   window._pnedBlocks.push(b);
+  pnedSaveHistory(); // ★ Guardar en historial
+  pnedRenderAll();
+  window._pnedDirty=true;
+}
+
+function pnedBuildCustomTable(numRows, numCols){
+  const headers = [];
+  for(let i=0; i<numCols; i++){
+    if(i===0) headers.push('Concepto');
+    else if(i===numCols-1) headers.push('Precio S/');
+    else headers.push(`Col ${i}`);
+  }
+  const rows = [];
+  for(let i=0; i<numRows; i++){
+    const row = {};
+    for(let j=0; j<numCols; j++) row[`c${j}`] = '';
+    rows.push(row);
+  }
+  return {headers, rows};
+}
+
+// ★ MODAL VISUAL PARA DIMENSIONES
+function pnedShowCustomTableModal(){
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:650;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  modal.innerHTML = `<div style="background:#FFF;border-radius:20px;padding:32px;max-width:400px;width:90%">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <h3 style="font-family:'Playfair Display',serif;font-size:20px;color:#5D4037;margin:0">Tabla Personalizada</h3>
+      <button onclick="this.closest('.pned-custom-modal').remove()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999">✕</button>
+    </div>
+    
+    <div style="background:#FAFAF8;border-radius:12px;padding:20px;margin-bottom:20px">
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:13px;color:#666;margin-bottom:8px">Filas (2-20)</label>
+        <input type="number" id="custom-rows" min="2" max="20" value="3" style="width:100%;padding:10px;border:1px solid #E8E6E0;border-radius:8px;font-size:15px">
+      </div>
+      
+      <div>
+        <label style="display:block;font-size:13px;color:#666;margin-bottom:8px">Columnas (2-10)</label>
+        <input type="number" id="custom-cols" min="2" max="10" value="3" style="width:100%;padding:10px;border:1px solid #E8E6E0;border-radius:8px;font-size:15px">
+      </div>
+    </div>
+    
+    <div style="background:#E8F5E9;border-radius:12px;padding:16px;margin-bottom:20px">
+      <div style="font-size:13px;color:#2E7D32;margin-bottom:8px">
+        <strong>Personalizar Bordes</strong>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="display:block;font-size:12px;color:#666;margin-bottom:4px">Estilo</label>
+          <select id="border-style" style="width:100%;padding:8px;border:1px solid #C9D9C5;border-radius:6px;font-size:13px">
+            <option value="solid">─── Sólido</option>
+            <option value="dashed">- - - Punteado</option>
+            <option value="dotted">· · · Puntos</option>
+            <option value="double">═══ Doble</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#666;margin-bottom:4px">Grosor</label>
+          <select id="border-width" style="width:100%;padding:8px;border:1px solid #C9D9C5;border-radius:6px;font-size:13px">
+            <option value="0.5">Fino (0.5px)</option>
+            <option value="1" selected>Normal (1px)</option>
+            <option value="1.5">Medio (1.5px)</option>
+            <option value="2">Grueso (2px)</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <label style="display:block;font-size:12px;color:#666;margin-bottom:4px">Color de Borde</label>
+        <input type="color" id="border-color" value="#D4B896" style="width:100%;height:36px;border:1px solid #C9D9C5;border-radius:6px;cursor:pointer">
+      </div>
+    </div>
+    
+    <button onclick="pnedCreateCustomTableFromModal()" style="width:100%;padding:14px;background:#5D4037;color:#FFF;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">
+      Crear Tabla
+    </button>
+  </div>`;
+  modal.className = 'pned-custom-modal';
+  document.body.appendChild(modal);
+}
+
+function pnedCreateCustomTableFromModal(){
+  const rows = parseInt(document.getElementById('custom-rows').value) || 3;
+  const cols = parseInt(document.getElementById('custom-cols').value) || 3;
+  const borderStyle = document.getElementById('border-style').value;
+  const borderWidth = document.getElementById('border-width').value;
+  const borderColor = document.getElementById('border-color').value;
+  
+  document.querySelector('.pned-custom-modal')?.remove();
+  
+  const tmpl = pnedBuildCustomTable(
+    Math.max(2, Math.min(20, rows)),
+    Math.max(2, Math.min(10, cols))
+  );
+  
+  const b = {
+    id:pnId(), 
+    type:'table', 
+    headers:tmpl.headers, 
+    rows:tmpl.rows,
+    borderStyle: borderStyle,
+    borderWidth: borderWidth,
+    borderColor: borderColor
+  };
+  window._pnedBlocks.push(b);
+  pnedSaveHistory();
   pnedRenderAll();
   window._pnedDirty=true;
 }
@@ -6855,10 +7790,183 @@ function pnedSetColor(color){
   document.querySelectorAll('.pnt-color').forEach(d=>{const sel=d.title===(NOTA_COLORES[color]?.label||'');d.classList.toggle('sel',sel);d.style.borderColor=sel?'rgba(0,0,0,.5)':'transparent';});
   window._pnedDirty=true;
 }
-function pnedSetFont(f){window._pnedFont=f;const F={dmsans:"'DM Sans',sans-serif",playfair:"'Playfair Display',serif",mono:"'Courier New',monospace"};const ov=document.getElementById('pned-overlay');if(ov)ov.style.fontFamily=F[f]||F.dmsans;window._pnedDirty=true;}
+function pnedSetFont(f){
+  window._pnedFont=f;
+  const F={
+    dmsans:"'DM Sans',sans-serif",
+    playfair:"'Playfair Display',serif",
+    inter:"'Inter',sans-serif",
+    roboto:"'Roboto',sans-serif",
+    opensans:"'Open Sans',sans-serif",
+    lora:"'Lora',serif",
+    merriweather:"'Merriweather',serif",
+    poppins:"'Poppins',sans-serif",
+    montserrat:"'Montserrat',sans-serif",
+    mono:"'Courier New',monospace"
+  };
+  const ov=document.getElementById('pned-overlay');
+  if(ov)ov.style.fontFamily=F[f]||F.dmsans;
+  window._pnedDirty=true;
+}
 function pnedWC(){const el=document.getElementById('pned-wc');if(!el)return;const w=(window._pnedBlocks||[]).map(b=>b.content||'').join(' ').replace(/<[^>]+>/g,'').trim().split(/\s+/).filter(x=>x.length).length;el.textContent=w+' palabra'+(w!==1?'s':'');}
 function pnedAddPhoto(){document.getElementById('pned-file-in')?.click();}
-function pnedPhotosIn(input){Array.from(input.files).forEach(f=>{const r=new FileReader();r.onload=e=>{const b={id:pnId(),type:'image',src:e.target.result,caption:''};window._pnedBlocks.push(b);pnedRenderAll();window._pnedDirty=true;};r.readAsDataURL(f);});input.value='';}
+
+function pnedEditTags(){
+  const notaId = window._pnedNota?.id;
+  if(!notaId){
+    // Si es nota nueva, guardar primero
+    pnedSave(false);
+  }
+  const nota = state.notas.find(n => n.id === (notaId || window._pnedNota?.id));
+  if(!nota) return;
+  
+  const modalHtml = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s" id="pned-tags-modal" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--card);border-radius:16px;padding:24px;max-width:400px;width:90%">
+        <div style="font-size:18px;font-weight:700;margin-bottom:16px;color:var(--text)">🏷️ Tags</div>
+        ${renderTagsInput(nota.id)}
+        <div style="margin-top:16px;display:flex;gap:8px">
+          <button onclick="document.getElementById('pned-tags-modal').remove()" style="flex:1;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text)">Cerrar</button>
+        </div>
+      </div>
+    </div>`;
+  
+  const existing = document.getElementById('pned-tags-modal');
+  if(existing) existing.remove();
+  
+  const div = document.createElement('div');
+  div.innerHTML = modalHtml;
+  document.body.appendChild(div.firstElementChild);
+}
+
+
+// ★ UNDO/REDO SYSTEM
+window._pnedHistory = [];
+window._pnedHistoryIndex = -1;
+
+function pnedSaveHistory(){
+  if(!window._pnedBlocks) return;
+  const snapshot = JSON.parse(JSON.stringify(window._pnedBlocks));
+  window._pnedHistory = window._pnedHistory.slice(0, window._pnedHistoryIndex + 1);
+  window._pnedHistory.push(snapshot);
+  window._pnedHistoryIndex = window._pnedHistory.length - 1;
+  if(window._pnedHistory.length > 50) window._pnedHistory.shift();
+}
+
+function pnedUndo(){
+  if(window._pnedHistoryIndex <= 0) return;
+  window._pnedHistoryIndex--;
+  window._pnedBlocks = JSON.parse(JSON.stringify(window._pnedHistory[window._pnedHistoryIndex]));
+  pnedRenderAll();
+  window._pnedDirty = true;
+}
+
+function pnedRedo(){
+  if(window._pnedHistoryIndex >= window._pnedHistory.length - 1) return;
+  window._pnedHistoryIndex++;
+  window._pnedBlocks = JSON.parse(JSON.stringify(window._pnedHistory[window._pnedHistoryIndex]));
+  pnedRenderAll();
+  window._pnedDirty = true;
+}
+
+function pnedChangeFontSize(delta){
+  const sel = document.getElementById('pned-font-size');
+  if(!sel) return;
+  const current = parseInt(sel.value) || 15;
+  const sizes = [12,14,15,17,20,24,28,32];
+  const idx = sizes.indexOf(current);
+  let newIdx = idx + (delta > 0 ? 1 : -1);
+  newIdx = Math.max(0, Math.min(sizes.length - 1, newIdx));
+  sel.value = sizes[newIdx];
+  pnedSetFontSz(sizes[newIdx]);
+  // ★ Forzar actualización visual
+  const focused = document.activeElement;
+  if(focused && focused.classList.contains('pn-block')){
+    focused.style.fontSize = sizes[newIdx] + 'px';
+  }
+}
+
+function pnedMicGemini(){
+  const geminiKey = localStorage.getItem('fnz_gemini_key');
+  if(!geminiKey){
+    toast('⚠ Configurá tu API de Gemini en Ajustes primero', 'error');
+    return;
+  }
+  // ★ Abrir modal de micrófono para dictar texto
+  toast('🎙 Dictá el texto que querés agregar...', 'info');
+  openMicModal();
+}
+
+// ★ PERSONALIZAR BORDES DE TABLA EXISTENTE
+function pnedCustomizeBorders(tableBlock){
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:650;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  
+  const currentStyle = tableBlock.borderStyle || 'solid';
+  const currentWidth = tableBlock.borderWidth || '1';
+  const currentColor = tableBlock.borderColor || '#D4B896';
+  
+  modal.innerHTML = `<div style="background:#FFF;border-radius:20px;padding:32px;max-width:400px;width:90%">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <h3 style="font-family:'Playfair Display',serif;font-size:20px;color:#5D4037;margin:0">🎨 Personalizar Bordes</h3>
+      <button onclick="this.closest('.pned-border-modal').remove()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999">✕</button>
+    </div>
+    
+    <div style="background:#FAFAF8;border-radius:12px;padding:20px;margin-bottom:20px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label style="display:block;font-size:12px;color:#666;margin-bottom:4px">Estilo</label>
+          <select id="border-style-edit" style="width:100%;padding:8px;border:1px solid #E8E6E0;border-radius:6px;font-size:13px">
+            <option value="solid" ${currentStyle==='solid'?'selected':''}>─── Sólido</option>
+            <option value="dashed" ${currentStyle==='dashed'?'selected':''}>- - - Punteado</option>
+            <option value="dotted" ${currentStyle==='dotted'?'selected':''}>· · · Puntos</option>
+            <option value="double" ${currentStyle==='double'?'selected':''}>═══ Doble</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#666;margin-bottom:4px">Grosor</label>
+          <select id="border-width-edit" style="width:100%;padding:8px;border:1px solid #E8E6E0;border-radius:6px;font-size:13px">
+            <option value="0.5" ${currentWidth==='0.5'?'selected':''}>Fino (0.5px)</option>
+            <option value="1" ${currentWidth==='1'?'selected':''}>Normal (1px)</option>
+            <option value="1.5" ${currentWidth==='1.5'?'selected':''}>Medio (1.5px)</option>
+            <option value="2" ${currentWidth==='2'?'selected':''}>Grueso (2px)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;color:#666;margin-bottom:4px">Color de Borde</label>
+        <input type="color" id="border-color-edit" value="${currentColor}" style="width:100%;height:36px;border:1px solid #E8E6E0;border-radius:6px;cursor:pointer">
+      </div>
+    </div>
+    
+    <div style="background:#E3F2FD;border-radius:12px;padding:12px;margin-bottom:20px;font-size:12px;color:#1565C0">
+      💡 Los cambios se aplicarán inmediatamente a toda la tabla
+    </div>
+    
+    <button onclick="pnedApplyBorderChanges('${tableBlock.id}')" style="width:100%;padding:14px;background:#5D4037;color:#FFF;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">
+      Aplicar Cambios
+    </button>
+  </div>`;
+  modal.className = 'pned-border-modal';
+  document.body.appendChild(modal);
+}
+
+function pnedApplyBorderChanges(blockId){
+  const block = window._pnedBlocks.find(b => b.id === blockId);
+  if(!block) return;
+  
+  block.borderStyle = document.getElementById('border-style-edit').value;
+  block.borderWidth = document.getElementById('border-width-edit').value;
+  block.borderColor = document.getElementById('border-color-edit').value;
+  
+  document.querySelector('.pned-border-modal')?.remove();
+  pnedSaveHistory();
+  pnedRenderAll();
+  window._pnedDirty = true;
+  toast('✅ Bordes actualizados', 'success');
+}
+
+function pnedPhotosIn(input){Array.from(input.files).forEach(f=>{const r=new FileReader();r.onload=e=>{const b={id:pnId(),type:'image',src:e.target.result,caption:''};window._pnedBlocks.push(b);pnedSaveHistory();pnedRenderAll();window._pnedDirty=true;};r.readAsDataURL(f);});input.value='';}
 
 function pnedCollect(){
   document.querySelectorAll('#pned-blocks .pn-block-wrap').forEach(wrap=>{
@@ -9670,6 +10778,7 @@ function cerrarListaModal(){
   // ★ Detener todo completamente — evitar bucles de reinicio
   listaMicActivo = false;
   clearTimeout(_listaBufTimer);
+  clearTimeout(window._listaGuardarTimer); // ★ CRÍTICO: Cancelar guardado pendiente
   _listaBuf = '';
   if(listaRec){
     listaRec.onend = null; // ★ quitar handler antes de stop — evita reinicio
@@ -11615,5 +12724,882 @@ function closeNegocioModal() {
     </div>
   </div>
 </div>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// 🚀 NOTAS PREMIUM 5.0 - TODAS LAS NUEVAS FEATURES
+// ═══════════════════════════════════════════════════════════════════
+
+// ── VARIABLES GLOBALES NUEVAS ──
+let _searchQuery = '';
+let _activeFilters = [];
+let _selectedTags = [];
+let _allTags = ['#obra', '#cliente', '#urgente', '#factura', '#pendiente', '#completado', '#presupuesto', '#reunion', '#importante'];
+
+// ═══════════════════════════════════════════════════════════════════
+// 1. 🔍 BÚSQUEDA INTELIGENTE
+// ═══════════════════════════════════════════════════════════════════
+
+function renderSearchBar(){
+  return `
+    <div class="search-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" 
+               class="search-input" 
+               placeholder="Buscar en notas..." 
+               value="${_searchQuery}" 
+               oninput="onSearchInput(this.value)"
+               onkeydown="if(event.key==='Escape'){this.value='';onSearchInput('');}">
+      </div>
+      <div class="search-filters">
+        <div class="filter-chip ${_activeFilters.includes('hoy')?'active':''}" onclick="toggleSearchFilter('hoy')">📅 Hoy</div>
+        <div class="filter-chip ${_activeFilters.includes('semana')?'active':''}" onclick="toggleSearchFilter('semana')">📆 Semana</div>
+        <div class="filter-chip ${_activeFilters.includes('fotos')?'active':''}" onclick="toggleSearchFilter('fotos')">📷 Con fotos</div>
+        <div class="filter-chip ${_activeFilters.includes('recordatorio')?'active':''}" onclick="toggleSearchFilter('recordatorio')">⏰ Recordatorio</div>
+        <div class="filter-chip ${_activeFilters.includes('vinculadas')?'active':''}" onclick="toggleSearchFilter('vinculadas')">🔗 Vinculadas</div>
+        <div class="filter-chip ${_activeFilters.includes('favoritas')?'active':''}" onclick="toggleSearchFilter('favoritas')">⭐ Favoritas</div>
+      </div>
+    </div>`;
+}
+
+function onSearchInput(query){
+  _searchQuery = query.toLowerCase().trim();
+  render();
+}
+
+function toggleSearchFilter(filter){
+  if(_activeFilters.includes(filter)){
+    _activeFilters = _activeFilters.filter(f => f !== filter);
+  } else {
+    _activeFilters.push(filter);
+  }
+  render();
+}
+
+function filterNotas(notas){
+  let filtered = [...notas];
+  
+  // Búsqueda por texto
+  if(_searchQuery){
+    filtered = filtered.filter(n => {
+      const searchIn = [
+        n.titulo || '',
+        n.texto || '',
+        (n.items || []).map(i => i.texto).join(' '),
+        (n.tags || []).join(' ')
+      ].join(' ').toLowerCase();
+      return searchIn.includes(_searchQuery);
+    });
+  }
+  
+  // Filtros
+  _activeFilters.forEach(f => {
+    switch(f){
+      case 'hoy':
+        const hoy = new Date().toISOString().split('T')[0];
+        filtered = filtered.filter(n => n.creado && n.creado.startsWith(hoy));
+        break;
+      case 'semana':
+        const hace7dias = new Date(Date.now() - 7*24*60*60*1000).toISOString();
+        filtered = filtered.filter(n => n.creado && n.creado >= hace7dias);
+        break;
+      case 'fotos':
+        filtered = filtered.filter(n => n.fotos && n.fotos.length > 0);
+        break;
+      case 'recordatorio':
+        filtered = filtered.filter(n => n.recordatorio);
+        break;
+      case 'vinculadas':
+        filtered = filtered.filter(n => n.vinculadoA && n.vinculadoA.length > 0);
+        break;
+      case 'favoritas':
+        filtered = filtered.filter(n => n.favorita);
+        break;
+    }
+  });
+  
+  return filtered;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 2. 🏷️ TAGS Y CATEGORÍAS
+// ═══════════════════════════════════════════════════════════════════
+
+function renderTagsInput(notaId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return '';
+  
+  const tags = nota.tags || [];
+  
+  return `
+    <div class="tag-input-wrap">
+      <input type="text" 
+             class="tag-input" 
+             placeholder="Agregar tag (#obra, #cliente, #urgente...)"
+             id="tag-input-${notaId}"
+             oninput="onTagInput(this.value, '${notaId}')"
+             onkeydown="if(event.key==='Enter'&&this.value)addTag(this.value,'${notaId}')">
+      <div id="tag-suggestions-${notaId}" style="display:none"></div>
+    </div>
+    <div class="nota-tags" id="tags-${notaId}">
+      ${tags.map(t => `<span class="tag ${t.replace('#','')}" onclick="removeTag('${t}','${notaId}')">${t} <span class="tag-remove">✕</span></span>`).join('')}
+    </div>`;
+}
+
+function onTagInput(value, notaId){
+  if(!value.startsWith('#')) value = '#' + value;
+  const suggestions = _allTags.filter(t => t.toLowerCase().includes(value.toLowerCase()));
+  
+  const sugDiv = document.getElementById(`tag-suggestions-${notaId}`);
+  if(suggestions.length > 0 && value.length > 1){
+    sugDiv.innerHTML = suggestions.map(t => 
+      `<div class="tag-suggestion" onclick="addTag('${t}','${notaId}')">${t}</div>`
+    ).join('');
+    sugDiv.style.display = 'block';
+  } else {
+    sugDiv.style.display = 'none';
+  }
+}
+
+function addTag(tag, notaId){
+  if(!tag.startsWith('#')) tag = '#' + tag;
+  tag = tag.toLowerCase().trim();
+  
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  if(!nota.tags) nota.tags = [];
+  if(nota.tags.includes(tag)) return;
+  
+  nota.tags.push(tag);
+  if(!_allTags.includes(tag)) _allTags.push(tag);
+  
+  saveAll();
+  
+  // Limpiar input
+  const input = document.getElementById(`tag-input-${notaId}`);
+  if(input) input.value = '';
+  
+  // Ocultar sugerencias
+  const sugDiv = document.getElementById(`tag-suggestions-${notaId}`);
+  if(sugDiv) sugDiv.style.display = 'none';
+  
+  // Re-renderizar tags
+  const tagsDiv = document.getElementById(`tags-${notaId}`);
+  if(tagsDiv){
+    tagsDiv.innerHTML = nota.tags.map(t => 
+      `<span class="tag ${t.replace('#','')}" onclick="removeTag('${t}','${notaId}')">${t} <span class="tag-remove">✕</span></span>`
+    ).join('');
+  }
+  
+  toast(`Tag ${tag} agregado`);
+}
+
+function removeTag(tag, notaId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  nota.tags = (nota.tags || []).filter(t => t !== tag);
+  saveAll();
+  
+  // Re-renderizar tags
+  const tagsDiv = document.getElementById(`tags-${notaId}`);
+  if(tagsDiv){
+    tagsDiv.innerHTML = nota.tags.map(t => 
+      `<span class="tag ${t.replace('#','')}" onclick="removeTag('${t}','${notaId}')">${t} <span class="tag-remove">✕</span></span>`
+    ).join('');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 3. 📤 COMPARTIR/EXPORTAR
+// ═══════════════════════════════════════════════════════════════════
+
+function abrirModalCompartir(notaId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  const modalHtml = `
+    <div class="share-modal" onclick="if(event.target===this)cerrarModalCompartir()">
+      <div class="share-content">
+        <button class="share-close" onclick="cerrarModalCompartir()">✕</button>
+        <div class="share-title">Compartir nota</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:16px">"${(nota.titulo||'Sin título').substring(0,40)}"</div>
+        
+        <div class="share-options">
+          <div class="share-btn" onclick="compartirPDF('${notaId}')">
+            <div class="share-icon pdf">📄</div>
+            <div class="share-label">
+              <div style="font-weight:600">Generar PDF</div>
+              <div class="share-desc">Descarga en PDF profesional</div>
+            </div>
+          </div>
+          
+          <div class="share-btn" onclick="compartirWhatsApp('${notaId}')">
+            <div class="share-icon whatsapp">📱</div>
+            <div class="share-label">
+              <div style="font-weight:600">Enviar WhatsApp</div>
+              <div class="share-desc">Compartir por WhatsApp</div>
+            </div>
+          </div>
+          
+          <div class="share-btn" onclick="copiarTexto('${notaId}')">
+            <div class="share-icon copy">📋</div>
+            <div class="share-label">
+              <div style="font-weight:600">Copiar texto</div>
+              <div class="share-desc">Copiar al portapapeles</div>
+            </div>
+          </div>
+          
+          <div class="share-btn" onclick="exportarExcel('${notaId}')">
+            <div class="share-icon excel">📊</div>
+            <div class="share-label">
+              <div style="font-weight:600">Exportar Excel</div>
+              <div class="share-desc">Si tiene tablas/datos</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  
+  const existing = document.getElementById('share-modal-container');
+  if(existing) existing.remove();
+  
+  const container = document.createElement('div');
+  container.id = 'share-modal-container';
+  container.innerHTML = modalHtml;
+  document.body.appendChild(container);
+}
+
+function cerrarModalCompartir(){
+  const modal = document.getElementById('share-modal-container');
+  if(modal) modal.remove();
+}
+
+function compartirPDF(notaId){
+  // Por ahora: simple conversión
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  const texto = `
+═══════════════════════════════════════════
+${nota.titulo || 'Nota sin título'}
+═══════════════════════════════════════════
+
+${nota.texto ? nota.texto.replace(/<[^>]+>/g,'\n').replace(/\n+/g,'\n') : ''}
+
+${nota.items ? nota.items.map(i => `${i.done?'✓':'○'} ${i.texto}`).join('\n') : ''}
+
+---
+Creado: ${nota.creado ? new Date(nota.creado).toLocaleString('es-PE') : ''}
+Tags: ${(nota.tags || []).join(', ')}
+`.trim();
+  
+  // Crear blob y descargar
+  const blob = new Blob([texto], {type: 'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(nota.titulo || 'nota').replace(/[^a-z0-9]/gi,'_')}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  toast('PDF generado (formato texto)');
+  cerrarModalCompartir();
+}
+
+function compartirWhatsApp(notaId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  let texto = `*${nota.titulo || 'Nota'}*\n\n`;
+  
+  if(nota.tipo === 'lista' && nota.items){
+    texto += nota.items.map(i => `${i.done?'✓':'○'} ${i.texto}`).join('\n');
+  } else if(nota.texto){
+    texto += nota.texto.replace(/<[^>]+>/g,'').trim();
+  }
+  
+  if(nota.tags && nota.tags.length){
+    texto += `\n\n${nota.tags.join(' ')}`;
+  }
+  
+  const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+  window.open(url, '_blank');
+  
+  toast('Abriendo WhatsApp...');
+  cerrarModalCompartir();
+}
+
+function copiarTexto(notaId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  let texto = `${nota.titulo || 'Nota'}\n\n`;
+  
+  if(nota.tipo === 'lista' && nota.items){
+    texto += nota.items.map(i => `${i.done?'✓':'○'} ${i.texto}`).join('\n');
+  } else if(nota.texto){
+    texto += nota.texto.replace(/<[^>]+>/g,'').trim();
+  }
+  
+  navigator.clipboard.writeText(texto).then(() => {
+    toast('✓ Copiado al portapapeles');
+    cerrarModalCompartir();
+  }).catch(() => {
+    toast('Error al copiar','error');
+  });
+}
+
+function exportarExcel(notaId){
+  toast('Excel export: próximamente');
+  // Implementación completa requiere librería externa
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 4. 📋 TEMPLATES RÁPIDOS
+// ═══════════════════════════════════════════════════════════════════
+
+const TEMPLATES_NOTAS = [
+  {
+    id: 'reunion',
+    icon: '👥',
+    nombre: 'Reunión cliente',
+    desc: 'Agenda + notas',
+    contenido: {
+      titulo: 'Reunión con ',
+      items: [
+        {texto: 'Fecha y hora', done: false},
+        {texto: 'Asistentes', done: false},
+        {texto: 'Agenda', done: false},
+        {texto: 'Acuerdos', done: false},
+        {texto: 'Próximos pasos', done: false}
+      ],
+      tipo: 'lista'
+    }
+  },
+  {
+    id: 'cotizacion',
+    icon: '💰',
+    nombre: 'Cotización obra',
+    desc: 'Presupuesto',
+    contenido: {
+      titulo: 'Cotización ',
+      tipo: 'editor',
+      texto: 'Cliente:\nObra:\nFecha:\n\nDetalle:\n- Materiales:\n- Mano de obra:\n- Otros:\n\nTotal:'
+    }
+  },
+  {
+    id: 'compras',
+    icon: '🛒',
+    nombre: 'Lista compras',
+    desc: 'Materiales',
+    contenido: {
+      titulo: 'Compras ',
+      items: [
+        {texto: 'Cemento', done: false},
+        {texto: 'Arena', done: false},
+        {texto: 'Fierro', done: false}
+      ],
+      tipo: 'lista'
+    }
+  },
+  {
+    id: 'daily',
+    icon: '✅',
+    nombre: 'Tareas del día',
+    desc: 'Checklist',
+    contenido: {
+      titulo: 'Tareas ' + new Date().toLocaleDateString('es-PE'),
+      items: [
+        {texto: 'Tarea importante', done: false},
+        {texto: 'Llamar a...', done: false},
+        {texto: 'Revisar...', done: false}
+      ],
+      tipo: 'lista'
+    }
+  },
+  {
+    id: 'seguimiento',
+    icon: '📞',
+    nombre: 'Seguimiento',
+    desc: 'Cliente/Obra',
+    contenido: {
+      titulo: 'Seguimiento ',
+      items: [
+        {texto: 'Llamada 1:', done: false},
+        {texto: 'Llamada 2:', done: false},
+        {texto: 'Enviar cotización', done: false},
+        {texto: 'Confirmar fecha', done: false}
+      ],
+      tipo: 'lista'
+    }
+  },
+  {
+    id: 'gastos',
+    icon: '💸',
+    nombre: 'Control gastos',
+    desc: 'Obra/Proyecto',
+    contenido: {
+      titulo: 'Gastos ',
+      tipo: 'editor',
+      texto: 'Proyecto:\nPresupuesto: S/ \n\nGastos:\n1. \n2. \n3. \n\nTotal gastado:\nRestante:'
+    }
+  }
+];
+
+function mostrarTemplates(){
+  const templatesHtml = TEMPLATES_NOTAS.map(t => `
+    <div class="template-card" onclick="crearDesdeTemplate('${t.id}')">
+      <div class="template-icon">${t.icon}</div>
+      <div class="template-name">${t.nombre}</div>
+      <div class="template-desc">${t.desc}</div>
+    </div>
+  `).join('');
+  
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title" style="color:var(--gold)">Templates rápidos</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">Elige una plantilla para empezar rápido</div>
+    <div class="templates-grid">
+      ${templatesHtml}
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+    </div>`;
+  showModal();
+}
+
+function crearDesdeTemplate(templateId){
+  const template = TEMPLATES_NOTAS.find(t => t.id === templateId);
+  if(!template) return;
+  
+  const nuevaNota = {
+    id: Date.now() + '',
+    ...template.contenido,
+    creado: new Date().toISOString(),
+    modificado: new Date().toISOString(),
+    tags: [],
+    favorita: false
+  };
+  
+  state.notas.push(nuevaNota);
+  saveAll();
+  closeModal();
+  
+  if(nuevaNota.tipo === 'lista'){
+    openEditNotaLista(nuevaNota);
+  } else {
+    abrirEditorNota(nuevaNota.id);
+  }
+  
+  toast(`Template "${template.nombre}" creado ✓`);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 5. ⏰ RECORDATORIOS
+// ═══════════════════════════════════════════════════════════════════
+
+function agregarRecordatorio(notaId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title" style="color:#FF9800">⏰ Recordatorio</div>
+    <div class="field">
+      <label class="field-label">Fecha y hora</label>
+      <input type="datetime-local" 
+             class="reminder-input" 
+             id="reminder-datetime"
+             value="${nota.recordatorio || ''}">
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px">
+      Recibirás una notificación en este momento
+    </div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+      ${nota.recordatorio ? `<button class="btn" onclick="quitarRecordatorio('${notaId}')" style="background:#E05252;color:#FFF">Quitar</button>` : ''}
+      <button class="btn-gold" onclick="guardarRecordatorio('${notaId}')">Guardar</button>
+    </div>`;
+  showModal();
+}
+
+function guardarRecordatorio(notaId){
+  const datetime = document.getElementById('reminder-datetime').value;
+  if(!datetime) return toast('Selecciona fecha y hora','error');
+  
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  nota.recordatorio = datetime;
+  saveAll();
+  
+  // Programar notificación
+  programarNotificacion(nota);
+  
+  closeModal();
+  render();
+  toast('Recordatorio configurado ✓');
+}
+
+function quitarRecordatorio(notaId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  delete nota.recordatorio;
+  saveAll();
+  
+  closeModal();
+  render();
+  toast('Recordatorio eliminado');
+}
+
+function programarNotificacion(nota){
+  if(!('Notification' in window)) return;
+  
+  if(Notification.permission === 'granted'){
+    const tiempoRecordatorio = new Date(nota.recordatorio).getTime();
+    const ahora = Date.now();
+    const delay = tiempoRecordatorio - ahora;
+    
+    if(delay > 0){
+      setTimeout(() => {
+        new Notification('📝 Recordatorio', {
+          body: nota.titulo || 'Nota sin título',
+          icon: '/favicon.ico'
+        });
+      }, delay);
+    }
+  } else if(Notification.permission !== 'denied'){
+    Notification.requestPermission();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 6. 📸 GALERÍA MÚLTIPLE
+// ═══════════════════════════════════════════════════════════════════
+
+function abrirGaleriaFotos(notaId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  if(!nota.fotos) nota.fotos = [];
+  
+  const fotosHtml = nota.fotos.map((foto, idx) => `
+    <div class="gallery-item">
+      <img src="${foto}" alt="Foto ${idx+1}">
+      <div class="gallery-delete" onclick="eliminarFoto('${notaId}', ${idx})">✕</div>
+    </div>
+  `).join('');
+  
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title" style="color:var(--text)">📸 Galería de fotos</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">${nota.fotos.length} foto${nota.fotos.length!==1?'s':''}</div>
+    
+    <div class="photo-gallery">
+      ${fotosHtml}
+      <div class="gallery-item gallery-add" onclick="agregarFotoGaleria('${notaId}')">
+        <div>+</div>
+      </div>
+    </div>
+    
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn-gold" onclick="closeModal()">Listo</button>
+    </div>`;
+  showModal();
+}
+
+function agregarFotoGaleria(notaId){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.multiple = true;
+  
+  input.onchange = e => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = evt => {
+        const nota = state.notas.find(n => n.id === notaId);
+        if(!nota) return;
+        
+        if(!nota.fotos) nota.fotos = [];
+        nota.fotos.push(evt.target.result);
+        saveAll();
+        
+        // Re-abrir modal actualizado
+        abrirGaleriaFotos(notaId);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+  
+  input.click();
+}
+
+function eliminarFoto(notaId, index){
+  if(!confirm('¿Eliminar esta foto?')) return;
+  
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota || !nota.fotos) return;
+  
+  nota.fotos.splice(index, 1);
+  saveAll();
+  
+  abrirGaleriaFotos(notaId);
+  toast('Foto eliminada');
+}
+
+function verFotoZoom(src){
+  const zoom = document.createElement('div');
+  zoom.className = 'photo-zoom';
+  zoom.innerHTML = `
+    <img src="${src}" alt="Foto">
+    <button class="photo-zoom-close" onclick="this.parentElement.remove()">✕</button>
+  `;
+  zoom.onclick = e => {
+    if(e.target === zoom) zoom.remove();
+  };
+  document.body.appendChild(zoom);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 7. 🔗 VINCULAR CON MOVIMIENTOS
+// ═══════════════════════════════════════════════════════════════════
+
+function mostrarMovimientosVinculados(notaId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return '';
+  
+  if(!nota.vinculadoA || nota.vinculadoA.length === 0) return '';
+  
+  const movimientos = nota.vinculadoA.map(movId => {
+    const mov = state.transactions.find(t => t.id === movId);
+    if(!mov) return null;
+    
+    return `
+      <div class="linked-item">
+        <div class="linked-desc">
+          ${mov.description || mov.category}
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">
+            ${new Date(mov.date).toLocaleDateString('es-PE')}
+          </div>
+        </div>
+        <div class="linked-amount ${mov.type==='egreso'?'egreso':''}">
+          ${mov.type==='ingreso'?'+':'-'} S/ ${parseFloat(mov.amount).toFixed(2)}
+        </div>
+        <div class="linked-remove" onclick="desvincularMovimiento('${notaId}','${movId}')">✕</div>
+      </div>
+    `;
+  }).filter(Boolean).join('');
+  
+  if(!movimientos) return '';
+  
+  return `
+    <div class="linked-items">
+      <div class="linked-header">
+        🔗 Movimientos vinculados
+      </div>
+      ${movimientos}
+    </div>`;
+}
+
+function vincularMovimiento(notaId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  const movimientosHtml = state.transactions
+    .filter(t => !(nota.vinculadoA || []).includes(t.id))
+    .sort((a,b) => b.date.localeCompare(a.date))
+    .slice(0, 20)
+    .map(t => `
+      <div class="share-btn" onclick="agregarVinculo('${notaId}','${t.id}')">
+        <div class="share-icon ${t.type==='ingreso'?'whatsapp':'pdf'}">
+          ${t.type==='ingreso'?'↑':'↓'}
+        </div>
+        <div class="share-label">
+          <div style="font-weight:600">${t.description || t.category}</div>
+          <div class="share-desc">
+            ${new Date(t.date).toLocaleDateString('es-PE')} · 
+            S/ ${parseFloat(t.amount).toFixed(2)}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title" style="color:var(--blue)">🔗 Vincular movimiento</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">Selecciona movimientos relacionados con esta nota</div>
+    
+    <div style="max-height:400px;overflow-y:auto">
+      ${movimientosHtml || '<div style="text-align:center;padding:40px;color:var(--muted)">No hay movimientos disponibles</div>'}
+    </div>
+    
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+    </div>`;
+  showModal();
+}
+
+function agregarVinculo(notaId, movId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  if(!nota.vinculadoA) nota.vinculadoA = [];
+  if(!nota.vinculadoA.includes(movId)){
+    nota.vinculadoA.push(movId);
+    saveAll();
+    toast('Movimiento vinculado ✓');
+    closeModal();
+    render();
+  }
+}
+
+function desvincularMovimiento(notaId, movId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  nota.vinculadoA = (nota.vinculadoA || []).filter(id => id !== movId);
+  saveAll();
+  render();
+  toast('Desvinculado');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 8. 📑 DUPLICAR NOTA
+// ═══════════════════════════════════════════════════════════════════
+
+function duplicarNota(notaId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  const nuevaNota = {
+    ...nota,
+    id: Date.now() + '',
+    titulo: (nota.titulo || 'Nota') + ' (copia)',
+    creado: new Date().toISOString(),
+    modificado: new Date().toISOString(),
+    // Clonar items si es lista
+    items: nota.items ? nota.items.map(i => ({...i})) : undefined
+  };
+  
+  state.notas.push(nuevaNota);
+  saveAll();
+  render();
+  toast('Nota duplicada ✓');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 9. ⌨️ ATAJOS DE TECLADO
+// ═══════════════════════════════════════════════════════════════════
+
+document.addEventListener('keydown', e => {
+  // Solo en editor de notas
+  if(!document.activeElement || !document.activeElement.closest('#pned-content')) return;
+  
+  // Ctrl+B → Negrita
+  if(e.ctrlKey && e.key === 'b'){
+    e.preventDefault();
+    pnedCmd('bold');
+    mostrarKeyboardHint('Negrita');
+  }
+  
+  // Ctrl+I → Itálica
+  if(e.ctrlKey && e.key === 'i'){
+    e.preventDefault();
+    pnedCmd('italic');
+    mostrarKeyboardHint('Itálica');
+  }
+  
+  // Ctrl+U → Subrayado
+  if(e.ctrlKey && e.key === 'u'){
+    e.preventDefault();
+    pnedCmd('underline');
+    mostrarKeyboardHint('Subrayado');
+  }
+  
+  // Ctrl+Z → Deshacer (ya implementado)
+  if(e.ctrlKey && e.key === 'z'){
+    mostrarKeyboardHint('Deshacer');
+  }
+  
+  // Ctrl+Y → Rehacer (ya implementado)
+  if(e.ctrlKey && e.key === 'y'){
+    mostrarKeyboardHint('Rehacer');
+  }
+});
+
+function mostrarKeyboardHint(texto){
+  const existing = document.querySelector('.keyboard-hint');
+  if(existing) existing.remove();
+  
+  const hint = document.createElement('div');
+  hint.className = 'keyboard-hint show';
+  hint.textContent = texto;
+  document.body.appendChild(hint);
+  
+  setTimeout(() => {
+    hint.classList.remove('show');
+    setTimeout(() => hint.remove(), 200);
+  }, 1500);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 10. 📊 ESTADÍSTICAS
+// ═══════════════════════════════════════════════════════════════════
+
+function calcularEstadisticasNotas(){
+  const total = state.notas.length;
+  const favoritas = state.notas.filter(n => n.favorita).length;
+  const conRecordatorio = state.notas.filter(n => n.recordatorio).length;
+  const vinculadas = state.notas.filter(n => n.vinculadoA && n.vinculadoA.length > 0).length;
+  
+  return {total, favoritas, conRecordatorio, vinculadas};
+}
+
+function mostrarEstadisticas(){
+  const stats = calcularEstadisticasNotas();
+  
+  return `
+    <div class="stats-card">
+      <div class="stats-title">📊 Estadísticas</div>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value">${stats.total}</div>
+          <div class="stat-label">Total notas</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${stats.favoritas}</div>
+          <div class="stat-label">Favoritas</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${stats.conRecordatorio}</div>
+          <div class="stat-label">Con recordatorio</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${stats.vinculadas}</div>
+          <div class="stat-label">Vinculadas</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FUNCIONES AUXILIARES
+// ═══════════════════════════════════════════════════════════════════
+
+function toggleFavorita(notaId){
+  const nota = state.notas.find(n => n.id === notaId);
+  if(!nota) return;
+  
+  nota.favorita = !nota.favorita;
+  saveAll();
+  render();
+  toast(nota.favorita ? '⭐ Agregada a favoritas' : 'Quitada de favoritas');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FIN DE NUEVAS FEATURES
+// ═══════════════════════════════════════════════════════════════════
+</script>
 </body>
 </html>
