@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#F9F7F3">
 <title>Mis Finanzas</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=Inter:wght@300;400;500;600&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;600;700&family=Lora:wght@400;500;600;700&family=Merriweather:wght@300;400;700&family=Poppins:wght@300;400;500;600&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root {
@@ -727,17 +727,25 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
       <button class="modo-btn active-personal" id="btn-modo-personal" onclick="switchModo('personal')">👤 Personal</button>
       <button class="modo-btn" id="btn-modo-negocio" onclick="switchModo('negocio')">🔵 Mi Negocio</button>
     </div>
-    <div class="tabs">
+    <!-- ── PERSONAL TABS (1 fila) ── -->
+    <div class="tabs tabs-personal" id="tabs-personal-row1" style="grid-template-columns:repeat(6,1fr)">
       <button class="tab active" onclick="switchPage('dashboard')" id="tab-dashboard"><span class="tab-icon">⊞</span>Inicio</button>
       <button class="tab" onclick="switchPage('movimientos')" id="tab-movimientos"><span class="tab-icon">↕</span>Movim.</button>
-      <button class="tab" onclick="switchPage('deudas')" id="tab-deudas"><span class="tab-icon">🏦</span>Deudas</button>
-      <button class="tab" onclick="switchPage('agenda')" id="tab-agenda"><span class="tab-icon">📅</span>Agenda</button>
-      <button class="tab" onclick="switchPage('servicios')" id="tab-servicios"><span class="tab-icon">🏠</span>Servic.</button>
-    </div>
-    <div class="tabs tabs-row2">
-      <button class="tab" onclick="switchPage('categorias')" id="tab-categorias"><span class="tab-icon">🏷</span>Categ.</button>
+      <button class="tab" onclick="switchPage('categorias')" id="tab-categorias-p"><span class="tab-icon">🏷</span>Categ.</button>
       <button class="tab" onclick="switchPage('metas')" id="tab-metas"><span class="tab-icon">🎯</span>Metas</button>
       <button class="tab" onclick="switchPage('presupuesto')" id="tab-presupuesto"><span class="tab-icon">📋</span>Presup.</button>
+      <button class="tab" onclick="switchPage('notas')" id="tab-notas-p"><span class="tab-icon">📝</span>Notas</button>
+    </div>
+    <!-- ── NEGOCIO TABS (2 filas de 4) ── -->
+    <div class="tabs tabs-negocio" id="tabs-negocio-row1" style="display:none;grid-template-columns:repeat(4,1fr)">
+      <button class="tab active" onclick="switchPage('dashboard')" id="tab-dashboard-n"><span class="tab-icon">⊞</span>Inicio</button>
+      <button class="tab" onclick="switchPage('movimientos')" id="tab-movimientos-n"><span class="tab-icon">↕</span>Movim.</button>
+      <button class="tab" onclick="switchPage('deudas')" id="tab-deudas"><span class="tab-icon">🏦</span>Deudas</button>
+      <button class="tab" onclick="switchPage('agenda')" id="tab-agenda"><span class="tab-icon">📅</span>Agenda</button>
+    </div>
+    <div class="tabs tabs-negocio tabs-row2" id="tabs-negocio-row2" style="display:none;grid-template-columns:repeat(4,1fr)">
+      <button class="tab" onclick="switchPage('servicios')" id="tab-servicios"><span class="tab-icon">🏠</span>Servic.</button>
+      <button class="tab" onclick="switchPage('categorias')" id="tab-categorias"><span class="tab-icon">🏷</span>Categ.</button>
       <button class="tab" onclick="switchPage('graficos')" id="tab-graficos"><span class="tab-icon">📊</span>Gráfic.</button>
       <button class="tab" onclick="switchPage('notas')" id="tab-notas"><span class="tab-icon">📝</span>Notas</button>
     </div>
@@ -1027,15 +1035,40 @@ function applyModoTheme(){
   const btnP = document.getElementById('btn-modo-personal');
   const btnN = document.getElementById('btn-modo-negocio');
   const title = document.getElementById('header-title');
-  if(state.modo==='negocio'){
+  const isNeg = state.modo === 'negocio';
+
+  // Tabs visibility
+  const tabsP  = document.getElementById('tabs-personal-row1');
+  const tabsN1 = document.getElementById('tabs-negocio-row1');
+  const tabsN2 = document.getElementById('tabs-negocio-row2');
+  if(tabsP)  tabsP.style.display  = isNeg ? 'none' : 'grid';
+  if(tabsN1) tabsN1.style.display = isNeg ? 'grid' : 'none';
+  if(tabsN2) tabsN2.style.display = isNeg ? 'grid' : 'none';
+
+  // Redirect to valid page for current mode if needed
+  const pagesPersonal = ['dashboard','movimientos','categorias','metas','presupuesto','notas','ajustes','graficos'];
+  const pagesNegocio  = ['dashboard','movimientos','deudas','agenda','servicios','categorias','graficos','notas','ajustes'];
+  const validPages    = isNeg ? pagesNegocio : pagesPersonal;
+  if(!validPages.includes(state.page)) state.page = 'dashboard';
+
+  // Active tab highlight — mark both personal and negocio tab sets
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const activeTabId = 'tab-' + state.page;
+  // Mark all tabs with matching page (handles duplicate IDs in both tab rows)
+  [activeTabId, activeTabId+'-n', activeTabId+'-p'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.classList.add('active');
+  });
+
+  if(isNeg){
     app.classList.add('modo-negocio');
-    btnP.className='modo-btn';
-    btnN.className='modo-btn active-negocio';
+    if(btnP) btnP.className='modo-btn';
+    if(btnN) btnN.className='modo-btn active-negocio';
     if(title) title.textContent='Mi Negocio';
   } else {
     app.classList.remove('modo-negocio');
-    btnP.className='modo-btn active-personal';
-    btnN.className='modo-btn';
+    if(btnP) btnP.className='modo-btn active-personal';
+    if(btnN) btnN.className='modo-btn';
     if(title) title.textContent='Mis Finanzas';
   }
 }
@@ -1093,6 +1126,8 @@ function getCatByName(name,type){
 }
 
 function filteredTx(){
+  // state.transactions is already mode-specific (loaded by loadStateForModo)
+  // Filter by selected month/year only
   return state.transactions.filter(t=>{
     const d=new Date(t.date+'T00:00:00');
     return d.getMonth()===state.filterMonth&&d.getFullYear()===state.filterYear;
@@ -1303,6 +1338,12 @@ function renderDashboard(){
     ${filtered.length>5?`<div style="text-align:center;font-size:12px;color:var(--muted);margin-top:10px;cursor:pointer" onclick="switchPage('movimientos')">Ver todos (${filtered.length}) →</div>`:''}
   </div>`:'';
 
+  // Pre-compute mode-dependent button to avoid nested template literals
+  const _isNeg = state.modo==='negocio';
+  const _btn2nd = _isNeg
+    ? '<button class="btn-ghost" onclick="openAddDebt()" style="border-color:#2E86AB44;color:var(--blue)">＋ Deuda</button>'
+    : '<button class="btn-ghost" onclick="openPresupuesto()" style="border-color:#C9A84C44;color:var(--gold)">📋 Presup.</button>';
+
   return `
     <div class="month-nav"><button onclick="prevMonth()">‹</button><span>${monthName()}</span><button onclick="nextMonth()">›</button></div>
     <div class="summary-card" style="background:var(--card);border:1.5px solid var(--border);text-align:center;margin-bottom:12px;box-shadow:0 2px 12px #00000008">
@@ -1342,7 +1383,7 @@ function renderDashboard(){
     ${renderNegocioCard()}
     <div class="btn-row" style="margin-bottom:8px">
       <button class="btn-gold" onclick="openAddTx()">＋ Movimiento</button>
-      <button class="btn-ghost" onclick="openAddDebt()" style="border-color:#2E86AB44;color:var(--blue)">＋ Deuda</button>
+      ${_btn2nd}
     </div>
     <button onclick="openTransferModal()" style="width:100%;margin-bottom:14px;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
       ⇄ Transferir entre cuentas
@@ -3365,6 +3406,7 @@ function buildCharts(){
 // MODALS: TRANSACTION
 // ─────────────────────────────────────────────
 function openAddTx(){ openTxModal(null); }
+function openPresupuesto(){ switchPage('presupuesto'); }
 function openEditTx(id){ openTxModal(state.transactions.find(t=>t.id===id)); }
 
 function openAddTxWithData(pre){ openTxModal(null, pre); }
@@ -4582,9 +4624,7 @@ function openNotaTexto(preData){
   }, 100);
 }
 
-function saveNotaTexto(editId){
-  guardarNotaEditor(editId);
-}
+// saveNotaTexto removed — use guardarNotaEditor(editId) directly
 
 function formatNota(cmd, val){
   document.execCommand(cmd, false, val||null);
@@ -5476,13 +5516,12 @@ function renderAgenda(){
   </div>`;
 
   function agendaCard(item){
-    const _migrarEstado = s => ({completado:'se_finalizo',cancelado:'se_desanimo'}[s]||s||'agendado');
-    const est = AGENDA_ESTADOS[_migrarEstado(item.estado)] || AGENDA_ESTADOS['agendado'];
+    const est = AGENDA_ESTADOS[_migEst(item.estado)] || AGENDA_ESTADOS['agendado'];
     const dias = diasHastaLabel(item.fecha);
     const ubic = parseUbicacionLink(item.ubicacion);
     const isVisita = item.tipo==='visita';
     const cardId = 'agcard_'+item.id;
-    const estaActivo = ['agendado','pendiente','reprogramo'].includes(_migrarEstado(item.estado));
+    const estaActivo = ['agendado','pendiente','reprogramo'].includes(_migEst(item.estado));
 
     // Icono y color según tipo
     const icono = isVisita ? '👁' : '🔧';
@@ -6148,6 +6187,14 @@ function stopAgendaVoz(){
 
 // Extractor de cliente específico para agenda — patrones más simples
 function extractClienteAgenda(text){
+  // Detectar tratamiento para conservarlo como Sr./Sra.
+  const _tratAg = (() => {
+    const m = text.match(/\b(señora|doña|sra\.?)\s+/i);
+    if(m) return 'Sra.';
+    const m2 = text.match(/\b(señor|don|sr\.?)\s+/i);
+    if(m2) return 'Sr.';
+    return '';
+  })();
   // ── Intentar sobre texto ORIGINAL primero (preserva tildes y ñ) ──
   const SVCSTOP = /\b(servicio|punto|adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|boca|precio|soles|el|la|en|de|del|a|las)\b/i;
   const DISTSW  = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|brena|miraflores|independencia|carabayllo|ventanilla|bellavista)$/i;
@@ -6168,7 +6215,7 @@ function extractClienteAgenda(text){
         ? partes[0]
         : partes.slice(0,2).join(' ');
       // Verificar que no es palabra de servicio
-      if(nombre.length > 1 && !SVCSTOP.test(nombre.split(' ')[0])) return nombre;
+      if(nombre.length > 1 && !SVCSTOP.test(nombre.split(' ')[0])) return (_tratAg ? _tratAg+' '+nombre : nombre);
     }
   }
 
@@ -6187,7 +6234,7 @@ function extractClienteAgenda(text){
       const partes = m[1].trim().split(/\s+/).filter(w => !stopW2.test(w));
       if(partes.length > 1 && DISTSW.test(partes[1])) partes.length = 1;
       const nombre = partes.slice(0,2).join(' ').trim();
-      if(nombre.length > 1 && !SVCSTOP.test(nombre.split(' ')[0])) return nombre;
+      if(nombre.length > 1 && !SVCSTOP.test(nombre.split(' ')[0])) return (_tratAg ? _tratAg+' '+nombre : nombre);
     }
   }
 
@@ -6196,7 +6243,10 @@ function extractClienteAgenda(text){
     || text.toLowerCase().match(/(?:senora?|dona|don)\s+([a-z][a-z]+)/i);
   if(ultSimple && ultSimple[1]){
     const n = ultSimple[1].trim();
-    if(!SVCSTOP.test(n) && n.length > 1) return n.charAt(0).toUpperCase()+n.slice(1);
+    if(!SVCSTOP.test(n) && n.length > 1) {
+      const nCap = n.charAt(0).toUpperCase()+n.slice(1);
+      return (_tratAg ? _tratAg+' '+nCap : nCap);
+    }
   }
   return null;
 }
@@ -6347,6 +6397,7 @@ function parseAgendaVoz(text){
   // ── Extracción robusta independiente del orden ──
 
   // Cliente — múltiples patrones desordenados
+  // extractCliente now returns with Sr./Sra. prefix when treatment detected
   const cliente = extractCliente(text) || extractClienteAgenda(text) || '';
 
   // Servicio — primero buscar con detectServicioNegocio,
@@ -6381,9 +6432,14 @@ function parseAgendaVoz(text){
       { keys:['reparacion de tuberia','reparar tuberia','tuberia rota','fuga de gas','escape de gas','arreglar tuberia','perdida de gas'], label:'Reparación Tubería' },
       { keys:['gasfiteria','gasfitería','desague','plomeria','tuberia de agua','trabajo de agua','gasfiter'], label:'Gasfitería' },
       { keys:['documentacion','documentación','tramite','certificado','planos','expediente','inspeccion','habilitacion'], label:'Documentación' },
+      { keys:['construccion','construcción','construcion'], label:'_GEMINI_DECIDE' },
     ];
     for(const s of SERVICIO_DIRECTO){
-      if(s.keys.some(k=>t.includes(nrm(k)))){ servicio=s.label; break; }
+      if(s.keys.some(k=>t.includes(nrm(k)))){
+        // _GEMINI_DECIDE = no asignar localmente, Gemini lo determina por contexto
+        if(s.label !== '_GEMINI_DECIDE') servicio=s.label;
+        break;
+      }
     }
   }
 
@@ -8231,10 +8287,7 @@ function switchPage(page){
   if(micListening) stopListening();
   if(listaMicActivo) pararListaMicDefinitivo();
   state.page=page;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  const tab=document.getElementById('tab-'+page);
-  if(tab)tab.classList.add('active');
-  render();
+  render(); // render calls applyModoTheme which handles tab highlighting
 }
 function prevMonth(){if(state.filterMonth===0){state.filterMonth=11;state.filterYear--;}else state.filterMonth--;render();}
 function nextMonth(){if(state.filterMonth===11){state.filterMonth=0;state.filterYear++;}else state.filterMonth++;render();}
@@ -9214,6 +9267,9 @@ function extractUbicacion(text){
 // Extraer nombre del cliente desde la voz
 function extractCliente(text) {
   const t = text;
+  // Detectar tratamiento para conservarlo (Sr./Sra.)
+  const _tratMatch = text.match(/\b(señor|señora|don|doña|sr\.?|sra\.?)\s+/i);
+  const _trat = _tratMatch ? (/(señora|doña|sra)/i.test(_tratMatch[1]) ? 'Sra.' : 'Sr.') : '';
   // ★ Palabras de servicio — cortar el nombre aquí
   const SERVICIO_STOP = /\b(punto\s+adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|punto|adicional|tuberia|red|boca|servicio)\b/i;
 
@@ -9242,7 +9298,7 @@ function extractCliente(text) {
       const DIASW = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana)$/i;
       if(partes.length>1 && (DISTW.test(partes[1])||DIASW.test(partes[1]))) nombre=partes[0];
       else nombre=partes.slice(0,2).join(' ');
-      if (nombre.length > 1) return nombre;
+      if (nombre.length > 1) return (_trat ? _trat + ' ' + nombre : nombre);
     }
   }
   // ── FALLBACK ULTRASIMPLE: "señor/don + nombre" en cualquier posición ──
@@ -9251,14 +9307,17 @@ function extractCliente(text) {
   const ultFallback = t.match(/(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñ]{1,20})/i);
   if(ultFallback && ultFallback[1]){
     const fn = ultFallback[1].trim();
-    if(!ULTRA_SVCSTOP.test(fn) && fn.length > 1) return fn;
+    if(!ULTRA_SVCSTOP.test(fn) && fn.length > 1) return (_trat ? _trat + ' ' + fn : fn);
   }
   // ── FALLBACK 2: texto normalizado — "senor/don + nombre" ──
   const t3 = t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const nrmFall = t3.match(/(?:senora?|dona|don)\s+([a-z][a-z]{1,18})/i);
   if(nrmFall && nrmFall[1]){
     const fn2 = nrmFall[1].trim();
-    if(!ULTRA_SVCSTOP.test(fn2) && fn2.length > 1) return fn2.charAt(0).toUpperCase()+fn2.slice(1);
+    if(!ULTRA_SVCSTOP.test(fn2) && fn2.length > 1) {
+      const fn2cap = fn2.charAt(0).toUpperCase()+fn2.slice(1);
+      return (_trat ? _trat + ' ' + fn2cap : fn2cap);
+    }
   }
   return null;
 }
@@ -9312,6 +9371,7 @@ function isAgendaCommand(text){
   const agendaKws = [
     // Visita explícita (incluir variantes fonéticas)
     'visita','vista','vistar','tengo visita','hacer una visita','ir a visitar','pasar a ver','agenda visita','agenda vista',
+    'crea una visita','crear una visita','nueva visita','pon una visita','agendame una visita',
     'pasar donde','pasar por donde','ir a ver','ir a revisar','ir a checar',
     'ir a chequear','ir a cotizar','ir a dar presupuesto','dar una vuelta',
     'pasaré a ver','pasare a ver','voy a visitar','voy a pasar',
@@ -10687,12 +10747,14 @@ function isNotaCommand(text){
   // ★ DETECCIÓN ADICIONAL: si el texto empieza con "lista" directamente
   if(t.trim().startsWith('lista')) return true;
 
-  // ★ DETECCIÓN POR PATRÓN: texto corto (< 6 palabras) que parece un ítem con precio
-  //    Ej: "pan 5 soles, leche 3" → probablemente dictando una lista
+  // ★ DETECCIÓN POR PATRÓN: texto corto que parece ítems de lista
+  //    Ej: "pan 5 soles, leche 3" → dictando una lista
+  //    NO aplica si hay verbos de ingreso/egreso ("cobré", "gasté")
   const words = t.trim().split(/\s+/);
   const hasPrice = /\b(\d+(?:[.,]\d+)?\s*(?:soles?|sol\b)|s\/\.?\s*\d+)/i.test(t);
-  const hasComa  = t.includes(',') || t.includes(' y ');
-  if(words.length <= 10 && hasPrice && hasComa) return true;
+  const hasComa  = t.includes(',');
+  const hasVerbTx = /\b(cobr[eé]|gast[eé]|pagu[eé]|deposit|ingres|gan[eé]|recibi)\b/.test(t);
+  if(words.length <= 12 && hasPrice && hasComa && !hasVerbTx) return true;
 
   return false;
 }
@@ -10714,7 +10776,10 @@ const CERRAR_KWS = [
   'graba eso','cierra','cerrar','guardar','ya terminé','termine',
   'ya estuvo','eso nomás','eso nomas','hasta ahí','hasta ahi',
   'nada más','nada mas','con eso basta','eso es','ok ya',
-  'perfecto guarda','así está bien','asi esta bien','terminar lista'
+  'perfecto guarda','así está bien','asi esta bien','terminar lista',
+  'finalizar','finalizar lista','guardar lista','ya está','ya esta',
+  'eso sería todo','eso seria todo','listo con eso','terminar',
+  'ok finaliza','ok termina','guardar ya','ya guarda','cerrar lista'
 ];
 
 function abrirModoLista(tipo, tituloInicial){
@@ -10735,7 +10800,7 @@ function abrirModoLista(tipo, tituloInicial){
         <div style="width:36px;height:36px;background:#FFF9C4;border:1px solid #F9A825;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">📋</div>
         <div style="flex:1">
           <input id="lista-titulo" value="${listaTitulo}" style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:#5D4037;border:none;background:transparent;width:100%;outline:none">
-          <div style="font-size:11px;color:#8D6E63">Dictando en modo lista</div>
+          <div style="font-size:11px;color:#8D6E63">Decí cada ítem · separá con <b>"aparte"</b> · cerrá con <b>"listo"</b></div>
         </div>
         <button id="lista-cerrar-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF;padding:8px;min-width:44px;min-height:44px">✕</button>
       </div>
@@ -10801,13 +10866,16 @@ function renderListaItems(){
   }
   el.innerHTML = listaItems.map((item,i) => {
     if(item.tipo === 'subtotal'){
-      return `<div style="border-top:1px dashed #F9A825;margin:6px 0;padding:6px 0;display:flex;justify-content:space-between;font-weight:700;color:#5D4037;font-size:13px">
+      return `<div style="border-top:2px dashed #F9A825;margin:8px 0 4px;padding:8px 0;display:flex;justify-content:space-between;font-weight:700;color:#5D4037;font-size:14px">
         <span>${item.texto}</span><span style="color:#3A7D44">S/ ${item.valor.toFixed(2)}</span>
       </div>`;
     }
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #FFF9C4;font-size:13px;color:#4E342E">
+    const precioStr = item.precio ? 'S/ '+item.precio.toFixed(2) : '';
+    const unitStr = (item._precioUnit && item._cantidad)
+      ? `<span style="font-size:10px;color:#A1887F">${item._cantidad} × S/${item._precioUnit.toFixed(2)}</span>` : '';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #FFF9C4;font-size:13px;color:#4E342E">
       <span style="flex:1">${item.texto}</span>
-      <span style="color:#5D4037;font-weight:600;margin-left:8px">${item.precio?'S/ '+item.precio.toFixed(2):''}</span>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;margin-left:8px">${unitStr}<span style="color:#5D4037;font-weight:600">${precioStr}</span></div>
       <button onclick="borrarItemLista(${i})" style="background:none;border:none;color:#D4949488;font-size:12px;cursor:pointer;margin-left:6px">✕</button>
     </div>`;
   }).join('');
@@ -10831,16 +10899,71 @@ function toggleListaMic(){
 // Palabras que separan ítems — capturadas localmente, NO se guardan como texto
 const SEPARADORES_KW = [
   'aparte','siguiente','siguiente ítem','siguiente item','nueva','nuevo',
-  'enter','punto','coma','y también','y tambien','también','tambien',
-  'más','mas','otro','otra','agrega','agregar','anota','añade',
+  'enter','punto','coma','y también','y tambien',
+  'otro','otra','agrega','agregar','anota','añade',
+  'también quiero','tambien quiero','y además','y ademas',
+  'más adelante','mas adelante',
   'próximo','proximo','listo el ítem','listo el item','ok siguiente',
-  'eso','eso aparte','separa','separar','divide','divide eso'
+  'eso aparte','separa','separar','divide','divide eso'
 ];
 
 // Buffer de texto acumulado para el ítem actual
 let _listaBuf = '';
 let _listaBufTimer = null;
 const LISTA_PAUSA_MS = 3500; // ★ 3.5s — tiempo para pensar sin cortar
+
+// ── Atajar handlers de lista a una instancia SR — permite reusar en onend ──
+function _attachListaHandlers(rec){
+  rec.onresult = (e) => {
+    let newFinal = '', interim = '';
+    for(let i = e.resultIndex; i < e.results.length; i++){
+      if(e.results[i].isFinal) newFinal += e.results[i][0].transcript + ' ';
+      else                     interim  += e.results[i][0].transcript;
+    }
+    if(newFinal){
+      _listaBuf += newFinal;
+      _setListaStatus('🎙 ' + _listaBuf.trim() + (interim ? ' '+interim : ''));
+      _procesarBufLista(_listaBuf.trim());
+    } else if(interim){
+      _setListaStatus('🎙 ' + (_listaBuf+interim).trim() + ' …');
+      const tNorm = (_listaBuf+interim).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const esCierre = CERRAR_KWS.some(k=>tNorm.endsWith(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
+      if(esCierre) return;
+      clearTimeout(_listaBufTimer);
+      if(_listaBuf.trim()){
+        _listaBufTimer = setTimeout(()=>{
+          if(_listaBuf.trim()) _confirmarItemActual();
+        }, LISTA_PAUSA_MS);
+      }
+    }
+  };
+  rec.onerror = (e) => {
+    if(e.error === 'no-speech') return;
+    if(e.error === 'aborted')  return;
+    if(e.error === 'not-allowed'){
+      _setListaStatus('⚠ Permiso de micrófono denegado');
+      pararListaMicDefinitivo();
+    }
+  };
+  rec.onend = () => {
+    if(listaMicActivo){
+      clearTimeout(_listaBufTimer);
+      _listaBuf = '';
+      const delay = /android/i.test(navigator.userAgent) ? 350 : 150;
+      setTimeout(()=>{
+        if(!listaMicActivo) return;
+        const SR2 = window.SpeechRecognition || window.webkitSpeechRecognition;
+        listaRec = new SR2();
+        listaRec.lang = 'es-PE';
+        listaRec.interimResults = true;
+        listaRec.continuous = true;
+        listaRec.maxAlternatives = 1;
+        _attachListaHandlers(listaRec);
+        try{ listaRec.start(); }catch(err){}
+      }, delay);
+    }
+  };
+}
 
 function iniciarListaMic(){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -10858,60 +10981,8 @@ function iniciarListaMic(){
   listaRec.continuous     = true;   // ★ UNA sola instancia, nunca para
   listaRec.maxAlternatives = 1;
 
-  listaRec.onresult = (e) => {
-    let newFinal = '', interim = '';
-    for(let i = e.resultIndex; i < e.results.length; i++){
-      if(e.results[i].isFinal) newFinal += e.results[i][0].transcript + ' ';
-      else                     interim  += e.results[i][0].transcript;
-    }
-
-    if(newFinal){
-      _listaBuf += newFinal;
-      // ── Mostrar en tiempo real ──
-      _setListaStatus('🎙 ' + _listaBuf.trim() + (interim ? ' '+interim : ''));
-
-      // ── Chequeo instantáneo local ──
-      _procesarBufLista(_listaBuf.trim());
-
-    } else if(interim){
-      _setListaStatus('🎙 ' + (_listaBuf+interim).trim() + ' …');
-
-      const tNorm = (_listaBuf+interim).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-      const esCierre = CERRAR_KWS.some(k=>tNorm.endsWith(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
-      if(esCierre) return;
-
-      clearTimeout(_listaBufTimer);
-      if(_listaBuf.trim()){
-        _listaBufTimer = setTimeout(()=>{
-          if(_listaBuf.trim()) _confirmarItemActual();
-        }, LISTA_PAUSA_MS);
-      }
-    }
-  };
-
-  listaRec.onerror = (e) => {
-    if(e.error === 'no-speech') return; // silencio normal — no hacer nada
-    if(e.error === 'aborted')  return;
-    if(e.error === 'not-allowed'){
-      _setListaStatus('⚠ Permiso de micrófono denegado');
-      pararListaMicDefinitivo();
-    }
-  };
-
-  listaRec.onend = () => {
-    if(listaMicActivo){
-      // ★ Limpiar buffer al reiniciar — Android re-emite texto anterior causando duplicados
-      // El timer de pausa ya confirmó el ítem antes del corte si hubo suficiente silencio
-      clearTimeout(_listaBufTimer);
-      _listaBuf = '';
-      const delay = /android/i.test(navigator.userAgent) ? 350 : 100;
-      setTimeout(()=>{
-        if(listaMicActivo){
-          try{ listaRec.start(); }catch(err){}
-        }
-      }, delay);
-    }
-  };
+  // ★ Usar helper centralizado — evita duplicar handlers en onend
+  _attachListaHandlers(listaRec);
 
   try{ listaRec.start(); }catch(e){}
 }
@@ -11030,8 +11101,9 @@ function _agregarItemLocal(texto){
     || t.match(/\b(\d{2,5}(?:[.,]\d{1,2})?)\s*$/);
   const precio = precioMatch ? parseFloat(precioMatch[1].replace(',','.')) : null;
 
-  // Limpiar precio del texto
+  // Limpiar precio del texto y palabras separadoras residuales al inicio
   let textoLimpio = t
+    .replace(/^(más|mas|también|tambien|otro|otra|agrega|siguiente|aparte|y)\s+/i,'')
     .replace(/s\/\.?\s*\d+(?:[.,]\d+)?/gi,'')
     .replace(/\d+(?:[.,]\d+)?\s*(?:soles?|sol\b)\s*$/i,'')
     .replace(/\s+/g,' ').trim();
@@ -11080,24 +11152,28 @@ async function _cerrarListaConIA(){
     `${i+1}. ${it.texto}${it.precio?' (S/ '+it.precio.toFixed(2)+')':''}`
   ).join('\n');
 
-  const prompt = `Sos el asistente de lista de compras de una app de finanzas en Perú.
+  const prompt = `Sos el asistente de lista de una app de finanzas en Lima, Perú.
 El usuario dictó esta lista por voz. Puede tener errores de dictado, ítems desordenados o texto sucio.
 
 Lista raw:
 ${rawItems}
 
 Tarea:
-1. Corregí errores de dictado
+1. Corregí errores de dictado (ej: "aseite" → "aceite")
 2. Unificá ítems duplicados o muy similares
-3. Ordená los ítems de forma lógica (frutas/verduras juntas, lácteos juntos, etc.)
-4. Conservá los precios si existen
-5. Extrae el título más apropiado para esta lista (ej: "Lista del mercado", "Lista de materiales", etc.)
+3. Ordená los ítems de forma lógica (categorías similares juntas)
+4. Extraé cantidad si se mencionó (ej: "dos kilos de arroz" → nombre:"Arroz", cantidad:2, unidad:"kg")
+5. Extraé precio unitario en soles si se mencionó
+6. Calculá el subtotal (cantidad × precio) si tenés ambos datos
+7. Calculá el total general de todos los ítems con precio
+8. Extraé el título más apropiado (ej: "Lista del mercado", "Lista de materiales")
 
-Respondé SOLO con JSON válido:
+Respondé SOLO con JSON válido, sin explicaciones ni markdown:
 {
   "titulo": "título sugerido",
+  "total": número_o_null,
   "items": [
-    {"texto": "nombre del ítem", "precio": número_o_null}
+    {"texto": "nombre del ítem", "cantidad": número_o_null, "unidad": "unidad_o_null", "precio": precio_unitario_o_null, "subtotal": subtotal_o_null}
   ]
 }`;
 
@@ -11114,18 +11190,27 @@ Respondé SOLO con JSON válido:
     const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
 
     if(parsed.items && parsed.items.length > 0){
-      // Reemplazar lista con versión organizada por Gemini
-      listaItems = parsed.items.map(it=>({
-        tipo: 'item',
-        texto: it.texto||'',
-        precio: it.precio||null
-      }));
-      listaTotal = listaItems.reduce((s,i)=>s+(i.precio||0),0);
+      // Reemplazar lista con versión organizada por Gemini (con qty/subtotal)
+      listaItems = parsed.items.map(it=>{
+        const precio = it.precio||null;
+        const cantidad = it.cantidad||null;
+        const unidad = it.unidad||null;
+        const subtotal = it.subtotal||(precio&&cantidad?precio*cantidad:null);
+        let textoDisplay = it.texto||'';
+        if(cantidad) textoDisplay = `${cantidad}${unidad?' '+unidad:''} ${textoDisplay}`.trim();
+        return { tipo:'item', texto: textoDisplay, precio: subtotal||precio||null, _precioUnit: precio, _cantidad: cantidad };
+      });
+      listaTotal = parsed.total || listaItems.reduce((s,i)=>s+(i.precio||0),0);
 
       if(parsed.titulo){
         listaTitulo = parsed.titulo;
         const tituloEl = document.getElementById('lista-titulo');
         if(tituloEl) tituloEl.value = parsed.titulo;
+      }
+
+      // Si hay precios, agregar fila de total
+      if(listaTotal > 0){
+        listaItems.push({tipo:'subtotal', texto:'TOTAL', valor: listaTotal});
       }
 
       renderListaItems();
@@ -11181,12 +11266,14 @@ function guardarListaFinal(){
   listaTitulo = document.getElementById('lista-titulo')?.value || listaTitulo;
 
   if(!state.notas) state.notas = [];
-  // ★ Guardar ítems con texto limpio y precio separado
+  // ★ Guardar ítems con texto limpio, precio, cantidad y subtotal
   const items = listaItems.map(it=>({
     texto: it.tipo==='subtotal'
       ? (it.texto + ': S/' + (it.valor||0).toFixed(2))
-      : it.texto,                   // ★ SOLO el texto — sin precio concatenado
+      : it.texto,
     precio: it.tipo==='subtotal' ? null : (it.precio||null),
+    precioUnit: it._precioUnit||null,
+    cantidad: it._cantidad||null,
     done: false
   }));
 
@@ -11513,10 +11600,10 @@ ${isNeg?
 'Ingresos: Punto Adicional, Modificacion Red, Instalacion Nueva, Conversion Artefacto, Conexion Artefacto, Reparacion Tuberia, Gasfiteria, Documentacion, Cocina, Horno, Terma, Secadora, Calefon, Parrilla. Egresos: GNV, Materiales, Herramientas, Gasolina, Viaticos, Mantenimiento':
 'Ingresos: Sueldo, Freelance, Bono, Venta, Otro ingreso. Egresos: Alimentacion, Transporte, Servicios, Salud, Educacion, Ocio, Ropa, Deuda, Otro gasto'}
 
-Para fechas relativas usa hoy (${hoy}) como referencia. "este sábado" = próximo sábado.
+Para fechas relativas usa hoy (${hoy}) como referencia. "este sábado" = próximo sábado. "construccion" es ambiguo: analizar contexto para determinar si es "Instalación Nueva", "Punto Adicional", "Modificación Red" u otro servicio.
 
 REGLAS IMPORTANTES:
-- "cliente": extrae SOLO el nombre propio de la persona. Ejemplos: "señor Mario" → "Mario", "la señora Leonor" → "Leonor", "don Carlos Quispe" → "Carlos Quispe". NUNCA pongas "el", "la", "señor", "señora", "don", "doña" como cliente — solo el nombre.
+- "cliente": conservar el tratamiento abreviado + nombre. Ejemplos: "señor Mario" → "Sr. Mario", "la señora Leonor" → "Sra. Leonor", "don Carlos" → "Sr. Carlos". NUNCA pongas "el", "la" solos sin tratamiento. "don", "doña" como cliente — solo el nombre.
 - Si no hay nombre de persona mencionado, cliente = null.
 - "ubicacion": solo el nombre del distrito de Lima. Si no hay distrito, null.
 - "hora": formato HH:MM en 24h. "9am" = "09:00", "3pm" = "15:00". Si no hay hora, null.`;
@@ -11651,6 +11738,13 @@ function _mostrarResumenAgendaEnMic(data, rawText, tipo){
   if(!box) return;
 
   const isVisita = tipo === 'visita';
+  // Para visita: cliente, fecha, hora y ubicacion son todos obligatorios
+  if(isVisita && data){
+    const camposObligVis = ['cliente','fecha','hora','ubicacion'];
+    camposObligVis.forEach(c => {
+      if(!data[c]) data[c] = null; // normalizar para que campo se muestre como faltante
+    });
+  }
   const iconTipo = isVisita ? '👁' : '🔧';
   const colorTipo = isVisita ? '#185FA5' : '#6C3483';
   const bgTipo    = isVisita ? '#EFF6FF' : '#F3F0FF';
@@ -11696,7 +11790,7 @@ function _mostrarResumenAgendaEnMic(data, rawText, tipo){
     <div id="ag-mic-campos" style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px">
       ${campo('Cliente', data.cliente, true)}
       ${campo('Fecha', fechaLbl, true)}
-      ${campo('Hora', horaLbl)}
+      ${campo('Hora', horaLbl, isVisita)}
       ${!isVisita ? campo('Servicio', data.servicio, true) : ''}
       ${!isVisita ? campo('Precio', data.precio ? 'S/ '+Number(data.precio).toFixed(2) : '') : ''}
       ${campo('Ubicación', data.ubicacion, true)}
@@ -11736,6 +11830,11 @@ function _agendaMicGuardarDirecto(){
   if(!d.cliente){ toast('Falta el nombre del cliente','error'); return; }
   if(!d.fecha)  { toast('Falta la fecha','error'); return; }
 
+  // Validar campos según tipo
+  if(d.tipo==='visita'){
+    if(!d.hora)     { toast('Falta la hora para la visita','error'); return; }
+    if(!d.ubicacion){ toast('Falta la ubicación','error'); return; }
+  }
   const hoy = new Date().toISOString().split('T')[0];
   const item = {
     id:       Date.now()+'',
@@ -11799,12 +11898,15 @@ REGLAS CRÍTICAS:
    - "doscientos cincuenta" = 250
    - "un millón" = 1000000
    - Si no hay precio: null
-4. cliente: SOLO el nombre propio. Eliminar "señor/señora/don/doña/el/la".
-   - "la señora Karen" → "Karen"
-   - "el señor Julio" → "Julio"
+4. cliente: Conservar el tratamiento abreviado + nombre propio.
+   - "la señora Karen" → "Sra. Karen"
+   - "el señor Julio" → "Sr. Julio"
+   - "don Pedro" → "Sr. Pedro"
+   - Si no hay tratamiento, solo el nombre propio.
 5. servicio (solo si tipo=trabajo): Elegí el más apropiado de: ${serviciosOk}
    - "punto adicional" → "Punto Adicional"
-   - "construccion" → analizar contexto para determinar servicio
+   - "construccion" → analizar contexto: si habla de nueva conexión → "Instalación Nueva", si es punto → "Punto Adicional", si es modificar → "Modificación Red"
+   - Si no se puede determinar con certeza → "Otro Servicio""
 6. ubicacion: Solo el distrito de Lima. Si dice "comas" → "Comas", "san juan de miraflores" → "San Juan de Miraflores"
 7. Si el campo ya está correcto en el parse local, confirmalo tal cual.
 
@@ -11851,10 +11953,14 @@ Respondé SOLO con JSON válido, sin explicaciones:
       }
     });
 
-    // ── Limpiar cliente: quitar tratamiento si Gemini lo dejó ──
+    // ── Normalizar cliente: convertir forma larga a abreviada ──
     if(_agendaMicData.cliente){
       _agendaMicData.cliente = _agendaMicData.cliente
-        .replace(/^(señora?|doña?|don|sr\.?|sra\.?|el|la)\s+/i,'')
+        .replace(/^señora\s+/i,'Sra. ')
+        .replace(/^señor\s+/i,'Sr. ')
+        .replace(/^doña\s+/i,'Sra. ')
+        .replace(/^don\s+/i,'Sr. ')
+        .replace(/^(el|la)\s+/i,'')
         .trim();
       if(!_agendaMicData.cliente) _agendaMicData.cliente = null;
     }
@@ -11933,18 +12039,21 @@ function _deduplicarTranscript(text){
   const words = text.trim().split(/\s+/);
   if(words.length < 6) return text;
 
-  // Buscar si la primera mitad se repite en la segunda
-  // Estrategia: buscar la secuencia más larga que aparece dos veces
+  // Buscar la secuencia más larga repetida (hasta 3 repeticiones)
   const half = Math.floor(words.length / 2);
   for(let len = half; len >= 4; len--){
     const head = words.slice(0, len).join(' ').toLowerCase();
-    const rest = words.slice(len).join(' ').toLowerCase();
-    if(rest.includes(head)){
-      // Hay repetición — devolver solo desde la segunda ocurrencia
-      // (la segunda contiene lo nuevo que se dijo después)
-      const idx = rest.indexOf(head);
-      const uniqueAfter = rest.slice(idx + head.length).trim();
-      return (head + (uniqueAfter ? ' ' + uniqueAfter : '')).trim();
+    const full = words.join(' ').toLowerCase();
+    const firstIdx = full.indexOf(head);
+    const secondIdx = full.indexOf(head, firstIdx + head.length);
+    if(secondIdx >= 0){
+      // Hay repetición — tomar desde la última ocurrencia completa
+      const thirdIdx = full.indexOf(head, secondIdx + head.length);
+      const lastIdx = thirdIdx >= 0 ? thirdIdx : secondIdx;
+      const afterLast = text.substring(lastIdx + head.length).trim();
+      const result = (head + (afterLast ? ' ' + afterLast : '')).trim();
+      // Capitalizar
+      return result.charAt(0).toUpperCase() + result.slice(1);
     }
   }
   return text;
@@ -12035,7 +12144,10 @@ function processVoiceResultManual(text) {
   if (parsed.cliente) {
     const clienteLimpio = parsed.cliente
       .replace(/^(el|la|los|las|un|una)\s+/i, '')
-      .replace(/^(señor|señora|don|doña|sr\.?|sra\.?|ing\.?|dr\.?)\s+/i, '')
+      .replace(/^señora\s+/i,'Sra. ')
+      .replace(/^señor\s+/i,'Sr. ')
+      .replace(/^doña\s+/i,'Sra. ')
+      .replace(/^don\s+/i,'Sr. ')
       .trim();
     if(clienteLimpio){
       clienteBadge.textContent = `👤 Cliente: ${clienteLimpio}`;
@@ -12149,15 +12261,12 @@ function startListeningForField(campoId, onDone){
       const match = DISTRITOS_LIMA.find(d=>d.toLowerCase()===norm) ||
                     DISTRITOS_LIMA.find(d=>norm.includes(d.toLowerCase())) ||
                     texto;
-      const inp = document.getElementById('pvDescEdit');
       if(micParsed) micParsed.ubicacion = match;
-      // Mostrar en el campo de descripción temporalmente
-      const ubicBadge = document.getElementById('pvClienteBadge');
-      if(ubicBadge){
-        ubicBadge.textContent = '📍 ' + match;
-        ubicBadge.style.display = 'block';
-        ubicBadge.style.background = '#F0FDF4';
-        ubicBadge.style.color = '#2E7D32';
+      // Mostrar en el campo descripción (no pisar el badge de cliente)
+      const descEl = document.getElementById('pvDescEdit');
+      if(descEl && micParsed && !micParsed.ubicacionEnDesc) {
+        micParsed.ubicacionEnDesc = true;
+        descEl.value = (descEl.value ? descEl.value + ' · ' : '') + match;
       }
       document.getElementById('micText').textContent = '✓ Ubicación: ' + match;
     } else if(campoId === 'cliente'){
@@ -12320,8 +12429,9 @@ function _saveMicByContext(){
   if(ctx==='nota'){
     const tipo   = d.tipo==='✓ Lista'?'lista': d.tipo==='⏰ Recordatorio'?'recordatorio':'texto';
     const titulo = d.titulo || 'Nota de voz';
-    // Abrir el modal de nota correspondiente
-    if(tipo==='texto') openNotaTexto();
+    // Abrir con datos pre-cargados del ghost form
+    if(tipo==='lista') abrirModoLista('lista', titulo);
+    else if(tipo==='texto') openNotaTexto({titulo: titulo});
     else openNotaVoz();
     toast('Nota lista — agrega el contenido','info');
     return;
@@ -12977,36 +13087,33 @@ function cerrarModalCompartir(){
 }
 
 function compartirPDF(notaId){
-  // Por ahora: simple conversión
   const nota = state.notas.find(n => n.id === notaId);
   if(!nota) return;
-  
-  const texto = `
-═══════════════════════════════════════════
-${nota.titulo || 'Nota sin título'}
-═══════════════════════════════════════════
 
-${nota.texto ? nota.texto.replace(/<[^>]+>/g,'\n').replace(/\n+/g,'\n') : ''}
+  const titulo = (nota.titulo || 'Nota sin título').replace(/</g,'&lt;');
+  const cuerpo = nota.texto
+    ? nota.texto.replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'')
+    : (nota.items ? nota.items.map(i=>(i.done?'✓':'○')+' '+i.texto).join('\n') : '');
+  const tags = (nota.tags||[]).join(', ');
+  const fecha = nota.creado ? new Date(nota.creado).toLocaleString('es-PE') : '';
 
-${nota.items ? nota.items.map(i => `${i.done?'✓':'○'} ${i.texto}`).join('\n') : ''}
+  const htmlContent = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + titulo + '</title>'
+    + '<style>body{font-family:sans-serif;padding:30px;max-width:700px;margin:0 auto}'
+    + 'h1{font-size:22px;border-bottom:2px solid #333;padding-bottom:8px}'
+    + 'pre{white-space:pre-wrap;font-size:14px;line-height:1.7}'
+    + '.footer{margin-top:24px;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:8px}'
+    + '@media print{button{display:none}}</style></head>'
+    + '<body><button onclick="window.print()" style="margin-bottom:16px;padding:8px 16px;cursor:pointer">🖨 Imprimir / Guardar PDF</button>'
+    + '<h1>' + titulo + '</h1><pre>' + cuerpo.replace(/</g,'&lt;') + '</pre>'
+    + '<div class="footer">Creado: ' + fecha + (tags ? ' · Tags: ' + tags : '') + '</div></body></html>';
 
----
-Creado: ${nota.creado ? new Date(nota.creado).toLocaleString('es-PE') : ''}
-Tags: ${(nota.tags || []).join(', ')}
-`.trim();
-  
-  // Crear blob y descargar
-  const blob = new Blob([texto], {type: 'text/plain'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${(nota.titulo || 'nota').replace(/[^a-z0-9]/gi,'_')}.txt`;
-  a.click();
-  URL.revokeObjectURL(url);
-  
-  toast('PDF generado (formato texto)');
+  const win = window.open('','_blank');
+  if(!win){ toast('Permitir ventanas emergentes para imprimir','error'); return; }
+  win.document.write(htmlContent);
+  win.document.close();
   cerrarModalCompartir();
 }
+
 
 function compartirWhatsApp(notaId){
   const nota = state.notas.find(n => n.id === notaId);
