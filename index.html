@@ -463,8 +463,8 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .pnc-body{flex:1;padding:13px 13px 6px}
 .pnc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px}
 .pnc-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
-.pnc-title{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;line-height:1.3;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.pnc-preview{font-size:11px;line-height:1.5;opacity:.7;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.pnc-title{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;line-height:1.3;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pnc-preview{font-size:11px;line-height:1.5;opacity:.7;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .pnc-price-tag{font-size:11px;font-weight:700;margin-top:6px;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:8px;background:rgba(0,0,0,.08)}
 .pnc-footer{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-top:1px solid rgba(0,0,0,.07);font-size:10px;opacity:.65}
 .pnc-actions{display:flex;gap:2px}
@@ -702,6 +702,9 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 /* ⌨️ ATAJOS HINT */
 .keyboard-hint{position:fixed;bottom:20px;right:20px;background:rgba(0,0,0,0.8);color:#FFF;padding:8px 12px;border-radius:8px;font-size:11px;z-index:999;opacity:0;pointer-events:none;transition:opacity .2s}
 .keyboard-hint.show{opacity:1}
+/* ★ Animación spin para el spinner de Gemini */
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
 .kbd{background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;font-family:monospace;margin:0 2px}
 
 </style>
@@ -761,7 +764,8 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 <div class="toast" id="toast" style="display:none"></div>
 
 <script>
-const GEMINI_URL = k => `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${k}`;
+// ★ FIX: usar gemini-1.5-flash que tiene mayor disponibilidad regional
+const GEMINI_URL = k => `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${k}`;
 
 // ── Colores de hoja de nota ──
 const NOTA_COLORES = {
@@ -1117,6 +1121,71 @@ const fmtSign=n=>(n>=0?'+':'-')+fmt(n);
 const todayStr=()=>new Date().toISOString().split('T')[0];
 const monthName=()=>MONTHS_FULL[state.filterMonth]+' '+state.filterYear;
 
+// ──────────────────────────────────────────────────────────────────
+// HELPER GLOBAL: normalizarCliente — consolida 4 copias duplicadas
+// Convierte "señor Mario" → "Sr. Mario", elimina artículos solos
+// ──────────────────────────────────────────────────────────────────
+function normalizarCliente(nombre){
+  if(!nombre || typeof nombre !== 'string') return null;
+  const result = nombre
+    .replace(/^(señora\s+)/i, 'Sra. ')
+    .replace(/^(señor\s+)/i,  'Sr. ')
+    .replace(/^(doña\s+)/i,   'Sra. ')
+    .replace(/^(don\s+)/i,    'Sr. ')
+    .replace(/^(sr\.?\s+)/i,  'Sr. ')
+    .replace(/^(sra\.?\s+)/i, 'Sra. ')
+    .replace(/^(el|la|los|las|un|una)\s+/i, '')
+    .trim();
+  return result || null;
+}
+
+// ──────────────────────────────────────────────────────────────────
+// HELPER GLOBAL: hoyISO — fecha local Lima (UTC-5) en YYYY-MM-DD
+// Consolida 3 cálculos manuales duplicados de fecha
+// ──────────────────────────────────────────────────────────────────
+function hoyISO(){
+  const ahora = new Date();
+  return ahora.getFullYear() + '-' +
+    String(ahora.getMonth() + 1).padStart(2, '0') + '-' +
+    String(ahora.getDate()).padStart(2, '0');
+}
+
+function mananaISO(){
+  const m = new Date();
+  m.setDate(m.getDate() + 1);
+  return m.getFullYear() + '-' +
+    String(m.getMonth() + 1).padStart(2, '0') + '-' +
+    String(m.getDate()).padStart(2, '0');
+}
+
+// ──────────────────────────────────────────────────────────────────
+// HELPERS de filtrado — con memoización para evitar recalcular
+// en cada render (filteredTx se llamaba 6+ veces por render)
+// ──────────────────────────────────────────────────────────────────
+let _filteredCache = { month: -1, year: -1, modo: '', data: [] };
+
+function filteredTx(){
+  // Invalidar cache si cambió el filtro o el modo
+  if(_filteredCache.month === state.filterMonth &&
+     _filteredCache.year  === state.filterYear  &&
+     _filteredCache.modo  === state.modo){
+    return _filteredCache.data;
+  }
+  _filteredCache = {
+    month: state.filterMonth,
+    year:  state.filterYear,
+    modo:  state.modo,
+    data:  state.transactions.filter(t=>{
+      const d = new Date(t.date+'T00:00:00');
+      return d.getMonth()===state.filterMonth && d.getFullYear()===state.filterYear;
+    })
+  };
+  return _filteredCache.data;
+}
+
+// Invalidar cache al guardar una transacción nueva
+const _invalidarCache = () => { _filteredCache.month = -1; };
+
 function getCatById(id){
   return [...state.catsIn,...state.catsEx].find(c=>c.id===id)||null;
 }
@@ -1125,14 +1194,6 @@ function getCatByName(name,type){
   return list.find(c=>c.name===name)||null;
 }
 
-function filteredTx(){
-  // state.transactions is already mode-specific (loaded by loadStateForModo)
-  // Filter by selected month/year only
-  return state.transactions.filter(t=>{
-    const d=new Date(t.date+'T00:00:00');
-    return d.getMonth()===state.filterMonth&&d.getFullYear()===state.filterYear;
-  });
-}
 const totalIncome=()=>filteredTx().filter(t=>t.type==='ingreso').reduce((s,t)=>s+t.amount,0);
 const totalExpense=()=>filteredTx().filter(t=>t.type==='egreso').reduce((s,t)=>s+t.amount,0);
 const balance=()=>totalIncome()-totalExpense();
@@ -1285,12 +1346,12 @@ function renderDashboard(){
   const manana=new Date(hoy); manana.setDate(hoy.getDate()+1);
   const hoyStr=hoy.toISOString().split('T')[0];
   const manStr=manana.toISOString().split('T')[0];
-  const meses2=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  // ★ Usar MONTHS_SHORT global en vez de redeclarar el array
   const fmtAgFecha=(f)=>{
     if(!f)return '';
     if(f===hoyStr)return 'Hoy';
     if(f===manStr)return 'Mañana';
-    try{const [y,m,d]=f.split('-');return `${parseInt(d)} ${meses2[parseInt(m)-1]}`;}catch(e){return f;}
+    try{const [y,m,d]=f.split('-');return `${parseInt(d)} ${MONTHS_SHORT[parseInt(m)-1]}`;}catch(e){return f;}
   };
   const proxFechas=(state.agenda||[])
     .filter(a=>a.estado!=='completado'&&a.fecha>=hoyStr)
@@ -9853,6 +9914,7 @@ function toggleListening() {
 let micSilenceTimer   = null;
 let micFullTranscript = '';
 let micRestartLock    = false;
+let _micAborted       = false; // ★ FIX: flag para cancelar async en vuelo
 let _micSessionBase   = ''; // ★ texto acumulado ANTES del restart actual
 let _micSessionFinals = ''; // ★ finales de la sesión actual (no del restart)
 const MIC_SILENCE_MS  = /android/i.test(navigator.userAgent) ? 3500 : 2500; // ★ Android necesita más tiempo
@@ -9869,6 +9931,7 @@ function startListening() {
   _micSessionBase   = '';
   _micSessionFinals = '';
   micRestartLock    = false;
+  _micAborted       = false; // ★ FIX: resetear flag de aborto al iniciar
   clearTimeout(micSilenceTimer);
 
   recognition = new SR();
@@ -10045,11 +10108,15 @@ function _actualizarContextoMic(texto){
 function stopListening() {
   micListening      = false;
   micRestartLock    = true;
+  _micAborted       = true;   // ★ FIX: señal de aborto para async en vuelo
   _micSessionBase   = '';
   _micSessionFinals = '';
   micFullTranscript = '';
   clearTimeout(micSilenceTimer);
-  if(recognition){ try{ recognition.stop(); }catch(e){} }
+  clearTimeout(processVoiceResult._busyTimer); // ★ FIX: cancelar timer de busy
+  processVoiceResult._busy = false;            // ★ FIX: liberar lock
+  // ★ FIX CRÍTICO: recognition = null para evitar doble instancia SR
+  if(recognition){ try{ recognition.stop(); }catch(e){} recognition = null; }
   // ★ Null-safe: elementos pueden no existir cuando el panel de agenda está activo
   const micBtn  = document.getElementById('micBtn');
   const micIcon = document.getElementById('micBtnIcon');
@@ -10069,119 +10136,16 @@ function stopListening() {
 // GEMINI AI — Asistente de Voz Inteligente
 // ══════════════════════════════════════════════════════════════
 
-
-
 // ═══════════════════════════════════════════════════════
-// EDITOR NOTAS — Evernote style, robusto
+// EDITOR NOTAS — Editor de bloques (activo)
 // ═══════════════════════════════════════════════════════
 let _nedNota = null, _nedFotos = [], _nedRecordatorio = '', _nedColor = 'amarillo';
 let _nedHistory = [], _nedFuture = [];
 
 function abrirEditorNota(editId){
-  // ★ FIX: siempre redirige al editor premium — el viejo fue desactivado
+  // Redirige siempre al editor activo (bloques estilo Notion)
+  // El editor viejo (Evernote style) fue desactivado y eliminado
   abrirEditorNotaBloque(editId);
-  return;
-  const n = {}; const nc = NOTA_COLORES['amarillo'];
-
-  const cdots = Object.entries(NOTA_COLORES).map(([k,v])=>
-    `<div class="ned-cdot${_nedColor===k?' sel':''}" onclick="nedColor('${k}')"
-      style="background:${v.bg};border-color:${v.border}" title="${v.label}"></div>`
-  ).join('');
-
-  const ov = document.createElement('div');
-  ov.id = 'ned-overlay';
-  ov.style.cssText = `position:fixed;inset:0;z-index:500;display:flex;flex-direction:column;background:${nc.bg};font-family:'DM Sans',sans-serif`;
-
-  ov.innerHTML = `
-    <div id="ned-topbar" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.1);flex-shrink:0;background:${nc.bg}">
-      <button onclick="nedClose()" style="background:none;border:none;font-size:22px;cursor:pointer;color:${nc.footer};padding:2px 6px;line-height:1;flex-shrink:0">←</button>
-      <span id="ned-status" style="font-size:11px;color:${nc.footer};flex:1"></span>
-      <button onclick="nedAddPhoto()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 6px;opacity:.75" title="Foto">📷</button>
-      <button id="ned-rec-btn" onclick="nedEditReminder()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 6px;opacity:${_nedRecordatorio?1:.5}" title="Recordatorio">⏰</button>
-      <button onclick="nedSave(true)" style="background:#3A7D44;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0">Guardar</button>
-    </div>
-
-    <div id="ned-rem" style="display:${_nedRecordatorio?'flex':'none'};align-items:center;gap:8px;padding:7px 20px;background:#FEF2F2;border-bottom:1px solid #FECACA;flex-shrink:0;font-size:12px;color:#DC2626">
-      ⏰ <span id="ned-rem-txt">${_nedRecordatorio}</span>
-      <button onclick="nedClearRem()" style="background:none;border:none;cursor:pointer;color:#DC2626;margin-left:auto;font-size:18px;line-height:1">✕</button>
-    </div>
-
-    <input id="ned-title-in" type="text" placeholder="Título..."
-      value="${(n.titulo||'').replace(/"/g,'&quot;')}"
-      style="border:none;outline:none;background:transparent;font-family:'Playfair Display',serif;font-size:22px;font-weight:700;padding:12px 20px 6px;width:100%;box-sizing:border-box;flex-shrink:0;color:${nc.title}"
-      oninput="nedDirty()">
-
-    <div id="ned-photos" style="display:${_nedFotos.length?'flex':'none'};gap:8px;padding:6px 20px 2px;flex-shrink:0;overflow-x:auto">
-      ${_nedFotos.map((f,i)=>`<div style="position:relative;flex-shrink:0">
-        <img src="${f}" onclick="verFotoNota('${f}')" style="width:70px;height:70px;object-fit:cover;border-radius:10px;cursor:pointer">
-        <button onclick="nedDelPhoto(${i})" style="position:absolute;top:-5px;right:-5px;width:20px;height:20px;border-radius:50%;background:#E05252;color:#fff;border:none;cursor:pointer;font-size:11px;font-weight:700">✕</button>
-      </div>`).join('')}
-    </div>
-
-    <div id="ned-toolbar" style="display:flex;align-items:center;gap:2px;padding:5px 10px;flex-shrink:0;border-bottom:1px solid rgba(0,0,0,.1);flex-wrap:wrap;row-gap:3px;background:rgba(255,255,255,.6)">
-      <button class="ned-btn" onclick="nedUndo()" title="Deshacer">↩</button>
-      <button class="ned-btn" onclick="nedRedo()" title="Rehacer">↪</button>
-      <div class="ned-sep"></div>
-      <button class="ned-btn" id="nb-b" onmousedown="event.preventDefault();nedExec('bold')"        ><b>B</b></button>
-      <button class="ned-btn" id="nb-i" onmousedown="event.preventDefault();nedExec('italic')"      ><i>I</i></button>
-      <button class="ned-btn" id="nb-u" onmousedown="event.preventDefault();nedExec('underline')"   style="text-decoration:underline">U</button>
-      <button class="ned-btn" id="nb-s" onmousedown="event.preventDefault();nedExec('strikeThrough')" style="text-decoration:line-through">S</button>
-      <div class="ned-sep"></div>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('formatBlock','h2')">T1</button>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('formatBlock','h3')">T2</button>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('formatBlock','p')">¶</button>
-      <div class="ned-sep"></div>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('insertUnorderedList')">• Lista</button>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('insertOrderedList')">1. Lista</button>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedAddCheck()">☑ Check</button>
-      <div class="ned-sep"></div>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedAddTable()">⊞ Tabla</button>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedMark()" style="background:#FFF9C4;color:#92700A;font-weight:600">Aa</button>
-      <div class="ned-sep"></div>
-      ${cdots}
-    </div>
-
-    <div id="ned-scroller" style="flex:1;overflow-y:auto;padding:0 20px 100px;background-image:repeating-linear-gradient(transparent,transparent 31px,rgba(0,0,0,.07) 31px,rgba(0,0,0,.07) 32px);background-attachment:local">
-      <div id="ned-editor" contenteditable="true" data-ph="Escribe aquí..."
-        style="outline:none;min-height:400px;padding-top:6px;font-size:15px;line-height:32px;color:${nc.text};word-break:break-word"
-        onkeydown="nedKey(event)"
-        oninput="nedDirty();nedBar()"
-        onmouseup="nedBar()"
-        onkeyup="nedBar()">
-        ${n.texto||''}
-      </div>
-    </div>
-
-    <div id="ned-footer" style="position:fixed;bottom:0;left:0;right:0;background:${nc.bg}ee;border-top:1px solid rgba(0,0,0,.1);padding:8px 16px;display:flex;align-items:center;gap:8px;z-index:501;backdrop-filter:blur(8px)">
-      <span id="ned-wc" style="font-size:11px;color:${nc.footer}">0 palabras</span>
-      <span style="flex:1"></span>
-      <span id="ned-saved" style="font-size:11px;color:${nc.footer}"></span>
-    </div>
-
-    <input type="file" id="ned-file" accept="image/*" multiple style="display:none" onchange="nedPhotosIn(this)">
-  `;
-
-  document.body.appendChild(ov);
-  document.body.style.overflow = 'hidden';
-
-  setTimeout(()=>{
-    const ed = document.getElementById('ned-editor');
-    if(ed){
-      ed.focus();
-      nedUpdateWC();
-      try{
-        const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false);
-        const s=window.getSelection(); s.removeAllRanges(); s.addRange(r);
-      }catch(e){}
-      // ★ Re-attach tab/calc handlers for any tables already in the content
-      ed.querySelectorAll('table.nt[id]').forEach(t=>{
-        _ntAttachTab(t.id);
-        ntRecalc(t.id);
-      });
-    }
-  }, 100);
-
-  window._nedTimer = setInterval(nedAutoSave, 15000);
 }
 
 function nedExec(cmd, val){
@@ -10783,6 +10747,15 @@ const CERRAR_KWS = [
 ];
 
 function abrirModoLista(tipo, tituloInicial){
+  // ★ FIX CRÍTICO: detener el mic principal antes de iniciar el mic de lista
+  // Evita que dos instancias SpeechRecognition corran en paralelo
+  if(recognition){
+    micListening = false;
+    micRestartLock = true;
+    clearTimeout(micSilenceTimer);
+    try{ recognition.stop(); }catch(e){}
+    recognition = null;
+  }
   listaTipo = tipo || 'lista';
   listaItems = [];
   listaTotal = 0;
@@ -11546,35 +11519,39 @@ async function callGemini(prompt, keyOverride){
     generationConfig:{temperature:0.1, maxOutputTokens:600}
   };
   try{
+    // ★ FIX: AbortController con timeout de 15s
+    const controller = new AbortController();
+    const timeoutId = setTimeout(()=>controller.abort(), 15000);
     const res = await fetch(url, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
+      signal: controller.signal,
       body: JSON.stringify(body)
     });
+    clearTimeout(timeoutId);
     const data = await res.json();
     if(!res.ok){
-      console.error('Gemini API error:', res.status, JSON.stringify(data));
+      // ★ FIX: mensajes de error específicos según status
+      if(res.status === 429) toast('⏱ Gemini: demasiadas solicitudes — esperá 10s e intentá', 'error');
+      else if(res.status === 403) toast('🔑 API key de Gemini inválida — verificá en Ajustes', 'error');
+      else console.error('Gemini API error:', res.status, JSON.stringify(data));
       return null;
     }
     return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
   } catch(e){
-    console.error('Gemini fetch error:', e.message);
+    if(e.name === 'AbortError') console.warn('Gemini timeout (15s)');
+    else console.error('Gemini fetch error:', e.message);
     return null;
   }
 }
 
 async function processWithGemini(text){
   const isNeg = state.modo === 'negocio';
-  // Usar fecha LOCAL (Lima, UTC-5) — no UTC
+  // ★ Usar helpers hoyISO() y mananaISO() — sin duplicar cálculo de fecha
+  const hoy = hoyISO();
+  const mananaStr = mananaISO();
   const ahora = new Date();
-  const hoy = ahora.getFullYear()+'-'+
-    String(ahora.getMonth()+1).padStart(2,'0')+'-'+
-    String(ahora.getDate()).padStart(2,'0');
   const diaSemana = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][ahora.getDay()];
-  const manana = new Date(ahora); manana.setDate(ahora.getDate()+1);
-  const mananaStr = manana.getFullYear()+'-'+
-    String(manana.getMonth()+1).padStart(2,'0')+'-'+
-    String(manana.getDate()).padStart(2,'0');
   
   const prompt = `Eres un asistente de finanzas personales para un gasfitero en Lima, Perú.
 Hoy es ${hoy} (${diaSemana}). Mañana es ${mananaStr}.
@@ -11614,14 +11591,8 @@ REGLAS IMPORTANTES:
   try{
     const clean = response.replace(/```json|```/g,'').trim();
     const parsed = JSON.parse(clean);
-    // Limpiar cliente — quitar títulos como "señor", "señora", "don", "doña", artículos
-    if(parsed.cliente && typeof parsed.cliente === 'string'){
-      parsed.cliente = parsed.cliente
-        .replace(/^(el|la|los|las|un|una)\s+/i, '')
-        .replace(/^(señor|señora|don|doña|sr\.?|sra\.?|ing\.?|dr\.?)\s+/i, '')
-        .trim();
-      if(!parsed.cliente) parsed.cliente = null;
-    }
+    // ★ Usar normalizarCliente() — función global única
+    if(parsed.cliente) parsed.cliente = normalizarCliente(parsed.cliente);
     return parsed;
   } catch(e){
     console.error('Gemini parse error:', e, response);
@@ -11634,6 +11605,9 @@ async function processVoiceWithGemini(text){
   // ── Chequeos locales PRIMERO — sin delay, sin Gemini ──
   const cleanText = text.replace(/^(oye|hey|ok|escucha|mira)\b/gi,'').trim();
   if(cleanText) text = cleanText;
+
+  // ★ Si el mic fue abortado mientras Gemini procesaba, salir
+  if(_micAborted) { processVoiceResult._busy = false; return; }
 
   // 1. Nota/Lista → abrir modo lista INMEDIATO
   if(isNotaCommand(text)){
@@ -11657,7 +11631,9 @@ async function processVoiceWithGemini(text){
 
     // Parser local inmediato
     try{ parseAgendaVoz(text); }catch(err){}
+    // ★ FIX: copiar y limpiar _avParsed para evitar herencia entre sesiones
     const localData = window._avParsed ? {...window._avParsed, tipo: tipoDetectado} : {tipo: tipoDetectado};
+    window._avParsed = null; // ★ FIX: limpiar para que la próxima agenda empiece limpia
 
     // ★ NO cerrar el mic modal — transformarlo en panel de confirmación de agenda
     _mostrarResumenAgendaEnMic(localData, text, tipoDetectado);
@@ -11669,7 +11645,11 @@ async function processVoiceWithGemini(text){
 
   // 3. Movimiento → Gemini procesa
   const micText = document.getElementById('micText');
-  if(micText) micText.textContent = '✨ Gemini analizando...';
+  // ★ Feedback visual mejorado: spinner animado mientras Gemini procesa
+  if(micText){
+    micText.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite">✨</span> Gemini analizando...';
+    micText.style.color = '#7C3AED';
+  }
 
   const result = await processWithGemini(text);
 
@@ -11867,11 +11847,11 @@ async function rellenarAgendaConGemini(text, tipoDetectado, localData){
   const geminiKey = localStorage.getItem('fnz_gemini_key');
   if(!geminiKey) return;
 
+  // ★ Usar helpers globales en vez de recalcular fecha
+  const hoy = hoyISO();
+  const mananaStr = mananaISO();
   const ahora = new Date();
-  const hoy = ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0')+'-'+String(ahora.getDate()).padStart(2,'0');
   const diaSemana = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][ahora.getDay()];
-  const manana = new Date(ahora); manana.setDate(ahora.getDate()+1);
-  const mananaStr = manana.getFullYear()+'-'+String(manana.getMonth()+1).padStart(2,'0')+'-'+String(manana.getDate()).padStart(2,'0');
 
   const serviciosOk = 'Punto Adicional|Modificación Red|Instalación Nueva|Conversión Artefacto|Conexión Artefacto|Reparación Tubería|Gasfitería|Documentación|Cocina / Cocinilla|Horno a Gas|Terma|Secadora a Gas|Calefón|Parrilla a Gas|Otro Servicio';
 
@@ -11914,14 +11894,19 @@ Respondé SOLO con JSON válido, sin explicaciones:
 {"fecha":"YYYY-MM-DD","hora":"HH:MM o null","cliente":"nombre o null","servicio":"${tipoDetectado==='trabajo'?serviciosOk:'null'} o null","precio":numero_o_null,"ubicacion":"distrito o null","notas":"texto extra o null"}`;
 
   try{
+    // ★ FIX: AbortController con timeout de 12s para evitar espera infinita
+    const controller = new AbortController();
+    const timeoutId = setTimeout(()=>controller.abort(), 12000);
     const res = await fetch(GEMINI_URL(geminiKey),{
       method:'POST',
       headers:{'Content-Type':'application/json'},
+      signal: controller.signal,
       body: JSON.stringify({
         contents:[{role:'user',parts:[{text:prompt}]}],
         generationConfig:{temperature:0.05, maxOutputTokens:350}
       })
     });
+    clearTimeout(timeoutId);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
@@ -11953,16 +11938,9 @@ Respondé SOLO con JSON válido, sin explicaciones:
       }
     });
 
-    // ── Normalizar cliente: convertir forma larga a abreviada ──
+    // ★ Usar normalizarCliente() — función global única (elimina duplicación)
     if(_agendaMicData.cliente){
-      _agendaMicData.cliente = _agendaMicData.cliente
-        .replace(/^señora\s+/i,'Sra. ')
-        .replace(/^señor\s+/i,'Sr. ')
-        .replace(/^doña\s+/i,'Sra. ')
-        .replace(/^don\s+/i,'Sr. ')
-        .replace(/^(el|la)\s+/i,'')
-        .trim();
-      if(!_agendaMicData.cliente) _agendaMicData.cliente = null;
+      _agendaMicData.cliente = normalizarCliente(_agendaMicData.cliente);
     }
 
     // ── Refrescar panel si sigue visible ──
@@ -12063,7 +12041,13 @@ function processVoiceResult(text) {
   if (processVoiceResult._busy) return;
   processVoiceResult._busy = true;
   clearTimeout(processVoiceResult._busyTimer);
-  processVoiceResult._busyTimer = setTimeout(()=>{ processVoiceResult._busy = false; }, 8000);
+  // ★ FIX: mostrar feedback si Gemini tarda más de 8 segundos
+  processVoiceResult._busyTimer = setTimeout(()=>{
+    processVoiceResult._busy = false;
+    const micText2 = document.getElementById('micText');
+    if(micText2 && micText2.textContent.includes('analizando'))
+      micText2.textContent = '⚠ Gemini tardó demasiado — toca el mic e intentá de nuevo';
+  }, 8000);
   stopListening();
 
   // ★ Deduplicar texto repetido por reinicios del mic
@@ -12139,16 +12123,10 @@ function processVoiceResultManual(text) {
   document.getElementById('pvAmt').style.color = parsed.type==='ingreso' ? '#4CAF85' : '#E05252';
   document.getElementById('pvDateLbl').textContent = '📅 ' + fmtDateLabel(parsed.date);
 
-  // Cliente detectado
+  // Cliente detectado — ★ usar normalizarCliente() global
   const clienteBadge = document.getElementById('pvClienteBadge');
   if (parsed.cliente) {
-    const clienteLimpio = parsed.cliente
-      .replace(/^(el|la|los|las|un|una)\s+/i, '')
-      .replace(/^señora\s+/i,'Sra. ')
-      .replace(/^señor\s+/i,'Sr. ')
-      .replace(/^doña\s+/i,'Sra. ')
-      .replace(/^don\s+/i,'Sr. ')
-      .trim();
+    const clienteLimpio = normalizarCliente(parsed.cliente);
     if(clienteLimpio){
       clienteBadge.textContent = `👤 Cliente: ${clienteLimpio}`;
       clienteBadge.style.display = 'block';
