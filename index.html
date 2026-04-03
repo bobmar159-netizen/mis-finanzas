@@ -1127,17 +1127,25 @@ const monthName=()=>MONTHS_FULL[state.filterMonth]+' '+state.filterYear;
 // ──────────────────────────────────────────────────────────────────
 function normalizarCliente(nombre){
   if(!nombre || typeof nombre !== 'string') return null;
-  const result = nombre
-    .replace(/^(señora\s+)/i, 'Sra. ')
-    .replace(/^(señor\s+)/i,  'Sr. ')
-    .replace(/^(doña\s+)/i,   'Sra. ')
-    .replace(/^(don\s+)/i,    'Sr. ')
-    .replace(/^(sr\.?\s+)/i,  'Sr. ')
-    .replace(/^(sra\.?\s+)/i, 'Sra. ')
+  // ORDEN: 1 quitar articulos, 2 reemplazar titulos
+  // Normalizar primero para que funcione tanto con tilde como sin ella
+  const norm = nombre.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const limpio = norm
     .replace(/^(el|la|los|las|un|una)\s+/i, '')
+    .replace(/^senoras?\s+/i, 'Sra. ')
+    .replace(/^senores?\s+/i, 'Sr. ')
+    .replace(/^senor\s+/i,   'Sr. ')
+    .replace(/^senora\s+/i,  'Sra. ')
+    .replace(/^dona\s+/i,    'Sra. ')
+    .replace(/^don\s+/i,     'Sr. ')
+    .replace(/^sr\.?\s+/i,   'Sr. ')
+    .replace(/^sra\.?\s+/i,  'Sra. ')
     .trim();
-  return result || null;
+  // Capitalizar primera letra del nombre resultante
+  const cap = limpio.replace(/\b([a-z])/g, c => c.toUpperCase());
+  return cap || null;
 }
+
 
 // ──────────────────────────────────────────────────────────────────
 // HELPER GLOBAL: hoyISO — fecha local Lima (UTC-5) en YYYY-MM-DD
@@ -6348,7 +6356,8 @@ function parseAgendaVoz(text){
     .replace(/\b(construccion|construcción|construcion)\b/gi, '')
     .replace(/\b(oye|hey|escucha|ok|mira|anota|registra|apunta|guarda|crea)\b/gi, '')
     .replace(/\b(para el dia de|para el dia|el dia de|día de mañana|dia de manana)\b(?!\s*(?:domingo|lunes|martes|miercoles|jueves|viernes|sabado))/gi, 'mañana')
-    .replace(/\bservicio\s+(punto|terma|cocina|horno|calefon|reparacion|instalacion|conexion|gasfiteria|documentacion|conversion|modificacion|parrilla|secadora)/gi, '$1')
+    // Pre-strip: "servicio X" -> "X" (con y sin acentos/tilde)
+    .replace(/\bservicio\s+(punto|terma|cocina|hornos?|calefons?|reparaci[oó]n|instalaci[oó]n|conexi[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|modificaci[oó]n|parrilla|secadora)/gi, '$1')
     .replace(/\s+/g, ' ')
     .trim();
   if(!text2) text2 = text;
@@ -9337,7 +9346,9 @@ function extractCliente(text) {
   const patterns = [
     // Con preposición explícita — máxima prioridad
     /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+\d|\s+en\b|\s+de\b|\s+del\b|\s+por\b|\s+a las|\s+precio|\s+soles|\s+servicio|$)/i,
-    /(?:para|al|a|con)\s+(?:el|la)\s+(?:cliente|clienta|señor|señora|vecino|vecina|casero|casera|propietario|propietaria|dueño|dueña)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+servicio|$)/i,
+    // patron 2: "para el cliente X" — excluir 'cliente' de stop para no cortar el nombre
+    /(?:para|al|a|con)\s+(?:el|la)\s+(?:se\u00f1or|se\u00f1ora|vecino|vecina|casero|casera|propietario|propietaria|due\u00f1o|due\u00f1a)\s+([A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1][A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+servicio|$)/i,
+    /(?:para|al|a|con)\s+(?:el|la)\s+cliente\s+([A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1][A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|$)/i,
     /(?:casa de|domicilio de|vivienda de|propiedad de)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|$)/i,
     /de(?:l|\s+la)?\s+(?:señor|señora|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+por\b|\s+precio|$)/i,
     /(?:para|al|con)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+en\b|\s+de\b|\s*[,.]|\s+precio|$)/,
@@ -11577,13 +11588,19 @@ ${isNeg?
 'Ingresos: Punto Adicional, Modificacion Red, Instalacion Nueva, Conversion Artefacto, Conexion Artefacto, Reparacion Tuberia, Gasfiteria, Documentacion, Cocina, Horno, Terma, Secadora, Calefon, Parrilla. Egresos: GNV, Materiales, Herramientas, Gasolina, Viaticos, Mantenimiento':
 'Ingresos: Sueldo, Freelance, Bono, Venta, Otro ingreso. Egresos: Alimentacion, Transporte, Servicios, Salud, Educacion, Ocio, Ropa, Deuda, Otro gasto'}
 
-Para fechas relativas usa hoy (${hoy}) como referencia. "este sábado" = próximo sábado. "construccion" es ambiguo: analizar contexto para determinar si es "Instalación Nueva", "Punto Adicional", "Modificación Red" u otro servicio.
+Para fechas relativas usa hoy (${hoy}) como referencia. "este sabado" = proximo sabado.
 
 REGLAS IMPORTANTES:
-- "cliente": conservar el tratamiento abreviado + nombre. Ejemplos: "señor Mario" → "Sr. Mario", "la señora Leonor" → "Sra. Leonor", "don Carlos" → "Sr. Carlos". NUNCA pongas "el", "la" solos sin tratamiento. "don", "doña" como cliente — solo el nombre.
-- Si no hay nombre de persona mencionado, cliente = null.
+- "cliente": SIEMPRE incluir tratamiento + nombre completo. Ejemplos:
+  * "el senor Manuel" -> "Sr. Manuel"  (NO devuelvas solo "el")
+  * "la senora Leonor" -> "Sra. Leonor"  (NO devuelvas solo "la")
+  * "don Carlos" -> "Sr. Carlos"
+  * "para Manuel" -> "Manuel"
+  * "al senor Rodriguez" -> "Sr. Rodriguez"
+  Si el usuario NO menciona un nombre de persona, cliente = null.
+- "servicio": si el usuario menciona EXPLICITAMENTE el servicio ("punto adicional", "instalacion", "terma", etc.), usa ese servicio EXACTO de la lista. "construccion" + "punto adicional" = "Punto Adicional". "construccion" solo = "Instalacion Nueva".
 - "ubicacion": solo el nombre del distrito de Lima. Si no hay distrito, null.
-- "hora": formato HH:MM en 24h. "9am" = "09:00", "3pm" = "15:00". Si no hay hora, null.`;
+- "hora": formato HH:MM en 24h. "9am"="09:00", "3pm"="15:00", "9 de la manana"="09:00", "3 de la tarde"="15:00". Si no hay hora, null.`;
 
   const response = await callGemini(prompt);
   if(!response) return null;
@@ -11878,15 +11895,18 @@ REGLAS CRÍTICAS:
    - "doscientos cincuenta" = 250
    - "un millón" = 1000000
    - Si no hay precio: null
-4. cliente: Conservar el tratamiento abreviado + nombre propio.
-   - "la señora Karen" → "Sra. Karen"
-   - "el señor Julio" → "Sr. Julio"
+4. cliente: SIEMPRE tratamiento abreviado + nombre. NUNCA devolver solo "el" o "la".
+   - "el senor Manuel" → "Sr. Manuel"  (NO "el")
+   - "la senora Karen" → "Sra. Karen"  (NO "la")
+   - "el senor Julio" → "Sr. Julio"
    - "don Pedro" → "Sr. Pedro"
-   - Si no hay tratamiento, solo el nombre propio.
+   - Si no hay nombre de persona: null
 5. servicio (solo si tipo=trabajo): Elegí el más apropiado de: ${serviciosOk}
-   - "punto adicional" → "Punto Adicional"
-   - "construccion" → analizar contexto: si habla de nueva conexión → "Instalación Nueva", si es punto → "Punto Adicional", si es modificar → "Modificación Red"
-   - Si no se puede determinar con certeza → "Otro Servicio""
+   - "punto adicional" → "Punto Adicional" (EXACTO)
+   - "construccion" + "punto adicional" → "Punto Adicional"
+   - "construccion" solo → "Instalación Nueva"
+   - "modificar red" o "modificacion" → "Modificación Red"
+   - Si no se puede determinar → "Otro Servicio"
 6. ubicacion: Solo el distrito de Lima. Si dice "comas" → "Comas", "san juan de miraflores" → "San Juan de Miraflores"
 7. Si el campo ya está correcto en el parse local, confirmalo tal cual.
 
