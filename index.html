@@ -569,9 +569,9 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .pn-op-btn.igv{background:#854F0B}
 
 /* ★ SUGERENCIAS AUTOMÁTICAS IA */
-.pn-ai-sug{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#FFF3E0;border:2px solid #FF9800;border-radius:14px;padding:14px;box-shadow:0 8px 20px rgba(0,0,0,0.25);z-index:1001;max-width:310px;width:90%;opacity:0;pointer-events:none;transition:all 0.3s;animation:slideUp 0.3s}
+.pn-ai-sug{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#FFF3E0;border:2px solid #FF9800;border-radius:14px;padding:14px;box-shadow:0 8px 20px rgba(0,0,0,0.25);z-index:1001;max-width:310px;width:90%;opacity:0;pointer-events:none;transition:all 0.3s;animation:slideUpAI 0.3s}
 .pn-ai-sug.visible{opacity:1;pointer-events:auto}
-@keyframes slideUp{from{bottom:60px;opacity:0}to{bottom:80px;opacity:1}}
+@keyframes slideUpAI{from{bottom:60px;opacity:0}to{bottom:80px;opacity:1}}
 .pn-ai-sug-icon{font-size:22px;margin-bottom:6px;text-align:center}
 .pn-ai-sug-text{font-size:13px;color:#5D4037;margin-bottom:12px;line-height:1.5;text-align:center;font-weight:500}
 .pn-ai-sug-btn{width:100%;padding:12px;background:linear-gradient(135deg,#FF9800,#F57C00);color:#FFF;border:none;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 8px rgba(255,152,0,0.3)}
@@ -1372,7 +1372,7 @@ function renderDashboard(){
       <div style="display:flex;gap:12px;align-items:flex-start">
         <div style="background:var(--gold);border-radius:10px;padding:8px 10px;text-align:center;flex-shrink:0;min-width:48px">
           <div style="font-size:20px;font-weight:700;color:#fff;line-height:1">${proxTrab.fecha?parseInt(proxTrab.fecha.split('-')[2]):'?'}</div>
-          <div style="font-size:9px;color:rgba(255,255,255,.7);text-transform:uppercase">${proxTrab.fecha?meses2[parseInt(proxTrab.fecha.split('-')[1])-1]:''}</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.7);text-transform:uppercase">${proxTrab.fecha?MONTHS_SHORT[parseInt(proxTrab.fecha.split('-')[1])-1]:''}</div>
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px">${proxTrab.servicio||'Sin servicio'}</div>
@@ -3623,6 +3623,7 @@ function saveTx(editId){
   } else {
     state.transactions.unshift(item);
   }
+  _invalidarCache();
   saveAll();
   syncToSheets(item);
   closeModal(); render();
@@ -3633,6 +3634,7 @@ function deleteTx(id){
   if(!confirm('¿Eliminar este movimiento?'))return;
   const tx=state.transactions.find(t=>t.id===id);
   state.transactions=state.transactions.filter(t=>t.id!==id);
+  _invalidarCache();
   saveAll();
   if(tx&&tx.negocio) syncSeccionToSheets('tx_delete',{id});
   render();toast('Eliminado');
@@ -8666,7 +8668,7 @@ const NUM_WORDS = {
   'setecientos':700,'setecientas':700,'ochocientos':800,'ochocientas':800,
   'novecientos':900,'novecientas':900,'mil':1000,'miles':1000,'millon':1000000,'millones':1000000,
   // variantes separadas: "dos mil", "tres cientos"
-  'cientos':100,'cien':100
+  'cientos':100
 };
 
 // ── Keywords INGRESO — todas las variaciones ──
