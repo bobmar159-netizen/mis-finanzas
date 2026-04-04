@@ -4834,7 +4834,8 @@ function _setBtnMicNota(on){const btn=document.getElementById('nv-mic-btn');if(!
 
 function _procesarFragmentoNota(texto){
   const t=nrm(texto);
-  if(/\b(listo|ya\s+listo|termine|terminar|termino|fin\b|guardar|eso\s+es\s+todo|nada\s+mas|hasta\s+ahi|eso\s+nomas)\b/.test(t)){_stopNotaVoz();_notaVozBuffer='';setTimeout(saveNotaVoz,400);return;}
+  // ★ Comandos de FIN — 10 variaciones
+  if(/\b(listo|ya\s+listo|termine|termin[eé]|termino|terminamos|fin\b|guardar|guarda\s+(eso|esto|ya)|eso\s+es\s+todo|nada\s+m[aá]s|hasta\s+ah[ií]|eso\s+nomas|eso\s+nomás|ya\s+no\s+m[aá]s|ya\s+basta|ya\s+estuvo)\b/.test(t)){_stopNotaVoz();_notaVozBuffer='';setTimeout(saveNotaVoz,400);return;}
   if(/\b(borra(r)?|elimina(r)?|quita(r)?|cancela(r)?)\s+(el\s+)?(ultimo|ultim[oa]|anterior|ese|eso)\b/.test(t)||/\b(eso\s+no|ese\s+no)\b/.test(t)){if(_notaVozItems.length>0)_notaVozItems.pop();_notaVozBuffer='';_refreshNotaPreview();return;}
   const recM=texto.match(/(?:recordatorio|recordarme|alarma|av[ií]same)\s+(?:a\s+las?\s+)?(\d{1,2}(?::\d{2})?)\s*(am|pm|de la tarde|de la mañana)?/i);
   if(recM){let h=parseInt(recM[1]),min=0;const per=(recM[2]||'').toLowerCase();if(recM[1].includes(':'))min=parseInt(recM[1].split(':')[1]);if(per.includes('pm')||per.includes('tarde'))if(h<12)h+=12;if(!per&&h>=1&&h<=6)h+=12;_notaVozRecordatorio=`Hoy a las ${h}:${String(min).padStart(2,'0')}${h>=12?'pm':'am'}`;if(_notaVozTipo==='texto')_notaVozTipo='recordatorio';_notaVozBuffer='';_refreshNotaPreview();return;}
@@ -4873,7 +4874,8 @@ function _procesarFragmentoNota(texto){
           return;
         }}}}
   if(_notaVozTipo==='lista'||_notaVozTipo==='recordatorio'){
-    const SEP=/\b(?:aparte|a\s+parte|siguiente|despu[eé]s|y\s+despu[eé]s|tambi[eé]n|y\s+tambi[eé]n|adem[aá]s|y\s+luego|luego|finalmente|otro\s+(?:es|ser[ií]a)|el\s+(?:siguiente|otro|pr[oó]ximo)|por\s+[uú]ltimo|uno\s+m[aá]s|y\s+por\s+[uú]ltimo|igualmente|por\s+otra\s+parte|y\s+tambi[eé]n|y\s+adem[aá]s|punto\s+y|coma|agrega|a[ñn]ade|a[ñn]adir|m[aá]s\s+uno|otro\s+m[aá]s|otra\s+cosa|otra\s+m[aá]s|y\s+otro|y\s+otra|separar|nueva\s+l[ií]nea|nuevo\s+[ií]tem|nueva\s+entrada)\b/gi;
+    // ★ Separadores — 12 variaciones de "siguiente ítem"
+    const SEP=/\b(?:aparte|a\s+parte|siguiente|despu[eé]s|y\s+despu[eé]s|tambi[eé]n|y\s+tambi[eé]n|adem[aá]s|y\s+luego|luego|finalmente|otro\s+(?:es|ser[ií]a)|el\s+(?:siguiente|otro|pr[oó]ximo)|por\s+[uú]ltimo|uno\s+m[aá]s|y\s+por\s+[uú]ltimo|igualmente|por\s+otra\s+parte|punto\s+y|qu[eé]\s+m[aá]s|lo\s+siguiente|uno\s+m[aá]s\s+es|agrega|a[ñn]ade|separar|nueva\s+l[ií]nea|nuevo\s+[ií]tem|nueva\s+entrada|y\s+otro|y\s+otra)\b/gi;
     const partes=t.split(SEP).map(p=>p.trim()).filter(p=>p.length>0);
     if(partes.length>1||(partes.length===1&&texto.trim().length>2)){
       const RUIDO=/^(um+|eh+|ah+|ok|oye|este|bueno|entonces|pues)$/i;
@@ -6201,18 +6203,21 @@ function registrarIngresoAgenda(id){
 }
 
 // ── Voz para agenda ──
+// ══════════════════════════════════════════════════════════════
+// AGENDA VOZ — mic continuo, parse local, autoguardado sin teléfono
+// Gemini NO se llama para agendar. Solo parser local.
+// ══════════════════════════════════════════════════════════════
+let _avRec=null, _avFinalBuffer='';
+
 function openAgendaVoz(){
+  _avFinalBuffer='';
+  window._avListening=false;
+  window._avParsed=null;
   document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title" style="color:var(--gold)">Agenda por Voz</div>
-    <div style="text-align:center;margin-bottom:14px;font-size:12px;color:var(--muted)">
-      Ejemplos:<br>
-      <em>"Visita mañana a las 3 al señor Víctor en La Victoria"</em><br>
-      <em>"Trabajo el lunes a las 9 punto adicional para la señora Rosa en Miraflores, 400 soles"</em>
-    </div>
-    <div id="av-text" style="min-height:60px;background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:14px;font-size:14px;color:#94A3B8;text-align:center;margin-bottom:14px">
-      Presiona el micrófono y habla...
-    </div>
-    <div id="av-preview" style="display:none;background:#F3F0FF;border:1px solid #9B59B644;border-radius:12px;padding:12px;margin-bottom:14px"></div>
+    <div class="modal-title" style="color:var(--gold)">🎙 Agenda — Trabajo</div>
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:10px">El parser local llena los campos automáticamente</div>
+    <div id="av-text" style="min-height:52px;background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13px;color:#94A3B8;text-align:center;margin-bottom:12px;line-height:1.5">Presiona el micrófono y habla...</div>
+    <div id="av-preview" style="display:none;border:1px solid #9B59B633;border-radius:12px;padding:12px;margin-bottom:12px;background:#F3F0FF"></div>
     <div style="display:flex;gap:8px">
       <button id="av-btn" onclick="toggleAgendaVoz()" style="flex:1;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:12px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">🎙 Escuchar</button>
     </div>
@@ -6220,38 +6225,62 @@ function openAgendaVoz(){
       <button class="btn-ghost" onclick="closeModal()" style="flex:1">Cancelar</button>
       <button id="av-save" class="btn-gold" onclick="saveAgendaVoz()" style="flex:2;display:none">✓ Guardar</button>
     </div>`;
-  window._avListening=false;
-  window._avParsed=null;
   showModal();
+  // ★ Auto-inicio del mic
+  setTimeout(toggleAgendaVoz, 350);
 }
 
 function toggleAgendaVoz(){
-  if(window._avListening){ stopAgendaVoz(); return; }
+  if(window._avListening){ _stopAV(); return; }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ toast('Necesitás Chrome para usar el micrófono','error'); return; }
-  const rec=new SR(); rec.lang='es-PE'; rec.interimResults=true; rec.continuous=false;
+  _avFinalBuffer='';
   window._avListening=true;
-  document.getElementById('av-btn').style.background='linear-gradient(135deg,#E05252,#f87171)';
-  document.getElementById('av-btn').textContent='⏹ Detener';
-  rec.onresult=(e)=>{
-    let txt='';
-    for(let i=0;i<e.results.length;i++) txt+=e.results[i][0].transcript;
-    document.getElementById('av-text').textContent=txt;
-    document.getElementById('av-text').style.color='#1E293B';
-    if(e.results[e.results.length-1].isFinal){ stopAgendaVoz(); parseAgendaVoz(txt); }
-  };
-  rec.onerror=()=>stopAgendaVoz();
-  rec.onend=()=>{ if(window._avListening) stopAgendaVoz(); };
-  rec.start();
-  window._avRec=rec;
+  const btn=document.getElementById('av-btn');
+  if(btn){btn.style.background='linear-gradient(135deg,#E05252,#f87171)';btn.textContent='⏹ Detener';}
+  _iniciarAVRec();
 }
 
-function stopAgendaVoz(){
+function _iniciarAVRec(){
+  if(!window._avListening) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR) return;
+  try{
+    _avRec=new SR();
+    _avRec.lang='es-PE';
+    _avRec.interimResults=true;
+    _avRec.continuous=true;
+    _avRec.maxAlternatives=1;
+    _avRec.onresult=(e)=>{
+      let interim='', finalChunk='';
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        if(e.results[i].isFinal) finalChunk+=e.results[i][0].transcript+' ';
+        else interim+=e.results[i][0].transcript;
+      }
+      const display=(_avFinalBuffer+finalChunk+interim).trim();
+      const el=document.getElementById('av-text');
+      if(el){el.textContent=display||'Escuchando...';el.style.color='#1E293B';}
+      if(finalChunk){
+        _avFinalBuffer+=finalChunk;
+        // Parsear en tiempo real con cada fragmento final
+        parseAgendaVoz(_avFinalBuffer.trim());
+      }
+    };
+    _avRec.onerror=(e)=>{if(e.error==='aborted'||e.error==='no-speech')return;_stopAV();};
+    // Reiniciar automáticamente (Chrome cierra al silencio)
+    _avRec.onend=()=>{if(window._avListening)setTimeout(()=>{if(window._avListening)_iniciarAVRec();},150);};
+    _avRec.start();
+  }catch(e){_stopAV();}
+}
+
+function _stopAV(){
   window._avListening=false;
   const btn=document.getElementById('av-btn');
-  if(btn){ btn.style.background='linear-gradient(135deg,#C9A84C,#E8C96A)'; btn.textContent='🎙 Escuchar'; }
-  if(window._avRec){ try{ window._avRec.stop(); }catch(e){} }
+  if(btn){btn.style.background='linear-gradient(135deg,#C9A84C,#E8C96A)';btn.textContent='🎙 Escuchar';}
+  try{if(_avRec){_avRec.onend=null;_avRec.stop();}}catch(e){}
 }
+
+function stopAgendaVoz(){ _stopAV(); }
 
 
 // Extractor de cliente específico para agenda — patrones más simples
@@ -6534,39 +6563,52 @@ function parseAgendaVoz(text){
   const prev=document.getElementById('av-preview');
   if(prev){
     prev.style.display='block';
-    const missingFields=[];
-    if(!ubicacion) missingFields.push('ubicación');
-    if(!telefono) missingFields.push('teléfono');
+    // ★ Solo cliente es obligatorio; teléfono no aparece como campo faltante
+    const falta=[];
+    if(!cliente) falta.push('cliente');
+    if(!servicio) falta.push('servicio');
+    const filas=[
+      `<div><span style="color:var(--muted)">Fecha:</span> ${fecha||'—'}</div>`,
+      `<div><span style="color:var(--muted)">Hora:</span> ${hora?horaTo12(hora):'—'}</div>`,
+      `<div style="color:${!cliente?'#E05252':'inherit'}"><span style="color:var(--muted)">Cliente:</span> ${cliente||'⚠ falta'}</div>`,
+      `<div style="color:${!ubicacion?'#94A3B8':'inherit'}"><span style="color:var(--muted)">Ubicación:</span> ${ubicacion||'—'}</div>`,
+      servicio?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Servicio:</span> ${servicio}</div>`:'',
+      precio?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Precio:</span> ${fmt(precio)}</div>`:'',
+      telefono?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Tel:</span> ${telefono}</div>`:'',
+    ].filter(Boolean).join('');
     prev.innerHTML=`
-      <div style="font-size:11px;color:#6C3483;font-weight:600;margin-bottom:8px">${tipo==='visita'?'👁 Visita':'🔧 Trabajo'} detectado:</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">
-        <div><span style="color:var(--muted)">Fecha:</span> ${fecha}</div>
-        <div><span style="color:var(--muted)">Hora:</span> ${hora?horaTo12(hora):'—'}</div>
-        <div style="color:${!cliente?'#E05252':'inherit'}"><span style="color:var(--muted)">Cliente:</span> ${cliente||'⚠ falta'}</div>
-        <div style="color:${!ubicacion?'#E05252':'inherit'}"><span style="color:var(--muted)">Ubicación:</span> ${ubicacion||'⚠ falta'}</div>
-        ${servicio?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Servicio:</span> ${servicio}</div>`:''}
-        ${precio?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Precio:</span> ${fmt(precio)}</div>`:''}
-        ${telefono?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Teléfono:</span> ${telefono}</div>`:''}
-        ${notas?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Notas:</span> ${notas}</div>`:''}
-      </div>
-      ${missingFields.length?`<div style="margin-top:8px;background:#FEF2F2;border-radius:6px;padding:6px 8px;font-size:11px;color:#E05252">⚠ Faltan: ${missingFields.join(', ')} — podés completarlos en el formulario</div>`:''}`;
+      <div style="font-size:11px;color:#6C3483;font-weight:700;margin-bottom:8px">${tipo==='visita'?'👁 Visita':'🔧 Trabajo'} detectado — Parser local</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:12px">${filas}</div>
+      ${falta.length?`<div style="margin-top:6px;background:#FEF9C3;border-radius:6px;padding:5px 8px;font-size:11px;color:#92400E">⚠ Sigue hablando — falta: ${falta.join(', ')}</div>`:''}`;
   }
+  // ★ Mostrar Guardar apenas tengamos cliente (teléfono no requerido)
   const saveBtn=document.getElementById('av-save');
-  if(saveBtn) saveBtn.style.display='block';
+  if(saveBtn) saveBtn.style.display = cliente ? 'block' : 'none';
 }
 
 function saveAgendaVoz(){
+  _stopAV();
   const p=window._avParsed;
   if(!p) return;
+  // ★ El teléfono es opcional — guardamos siempre sin bloquear
   if(!state.agenda) state.agenda=[];
   state.agenda.unshift({
-    id:Date.now()+'', tipo:p.tipo, cliente:p.cliente||'Sin cliente',
-    fecha:p.fecha, hora:p.hora, servicio:p.servicio, precio:p.precio,
-    ubicacion:p.ubicacion, telefono:p.telefono||'', notas:p.notas||'', estado:'pendiente'
+    id:Date.now()+'',
+    tipo:    p.tipo        || 'trabajo',
+    cliente: p.cliente     || 'Sin cliente',
+    fecha:   p.fecha       || hoyISO(),
+    hora:    p.hora        || '',
+    servicio:p.servicio    || '',
+    precio:  p.precio      || 0,
+    ubicacion:p.ubicacion  || '',
+    telefono: p.telefono   || '',   // opcional
+    notas:   p.notas       || '',
+    estado:  'pendiente'
   });
-  save('fnz_agenda',state.agenda);
-  closeModal(); render();
-  toast((p.tipo==='visita'?'Visita':'Trabajo')+' agregado por voz ✓');
+  save('fnz_agenda', state.agenda);
+  closeModal();
+  render();
+  toast('✓ '+(p.tipo==='visita'?'Visita':'Trabajo')+' guardado'+(p.cliente?' para '+p.cliente:''));
 }
 
 // ─────────────────────────────────────────────
