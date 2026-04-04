@@ -1836,7 +1836,7 @@ function renderDeudas(){
     : debts.map(d=>{
       const restantes=d.cuotasTotales-d.cuotasPagadas;
       const pendiente=restantes*d.cuotaMonto;
-      const pct=Math.round((d.cuotasPagadas/d.cuotasTotales)*100);
+      const pct=d.cuotasTotales>0?Math.round((d.cuotasPagadas/d.cuotasTotales)*100):0;
       const msg=motivationMsg(restantes,d.name);
       const done=restantes===0;
       const dw=d.cuotasTotales<=12?16:d.cuotasTotales<=24?12:8;
@@ -2521,7 +2521,7 @@ function renderGraficos(){
       <div class="section-title" style="color:var(--blue)">Progreso de deudas</div>
       <div class="section-sub">Cuotas pagadas</div>
       ${state.debts.length===0?`<div style="text-align:center;color:var(--dim);padding:16px 0;font-size:13px">Sin deudas registradas</div>`
-      :state.debts.map(d=>{const pct=Math.round((d.cuotasPagadas/d.cuotasTotales)*100);return `
+      :state.debts.map(d=>{const pct=d.cuotasTotales>0?Math.round((d.cuotasPagadas/d.cuotasTotales)*100):0;return `
         <div style="margin-bottom:12px">
           <div style="display:flex;justify-content:space-between;margin-bottom:5px">
             <span style="font-size:13px;color:var(--text)">${d.name}</span><span style="font-size:11px;color:${d.color}">${pct}%</span>
@@ -10794,7 +10794,7 @@ let listaRec = null;
 let _listaSaved = false;     // ★ guard anti-duplicado
 
 const CERRAR_KWS = [
-  'listo','eso es todo','finaliza','fin','termina','guarda','ok guarda',
+  'listo','es todo','eso es todo','ya listo','finaliza','fin','termina','guarda','ok guarda',
   'graba eso','cierra','cerrar','guardar','ya terminé','termine',
   'ya estuvo','eso nomás','eso nomas','hasta ahí','hasta ahi',
   'nada más','nada mas','con eso basta','eso es','ok ya',
@@ -10820,6 +10820,7 @@ function abrirModoLista(tipo, tituloInicial){
   listaSubtotales = [];
   listaTitulo = tituloInicial || (tipo==='lista' ? 'Lista de compras' : 'Nota');
   _listaSaved = false;  // ★ reset guard
+  _cierreEnCurso = false; // ★ reset cierre
 
   // Crear modal de lista
   const overlay = document.createElement('div');
@@ -10904,16 +10905,25 @@ function renderListaItems(){
     const precioStr = item.precio ? 'S/ '+item.precio.toFixed(2) : '';
     const unitStr = (item._precioUnit && item._cantidad)
       ? `<span style="font-size:10px;color:#A1887F">${item._cantidad} × S/${item._precioUnit.toFixed(2)}</span>` : '';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #FFF9C4;font-size:13px;color:#4E342E">
-      <span style="flex:1">${item.texto}</span>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;margin-left:8px">${unitStr}<span style="color:#5D4037;font-weight:600">${precioStr}</span></div>
-      <button onclick="borrarItemLista(${i})" style="background:none;border:none;color:#D4949488;font-size:12px;cursor:pointer;margin-left:6px">✕</button>
+    const isDone = item.done || false;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #FFF9C4;font-size:13px;color:#4E342E">
+      <input type="checkbox" ${isDone?'checked':''} onchange="toggleItemListaCheck(${i},this.checked)"
+        style="width:18px;height:18px;accent-color:#3A7D44;cursor:pointer;flex-shrink:0;border-radius:4px">
+      <span style="flex:1;${isDone?'text-decoration:line-through;opacity:.45':''}">${item.texto}</span>
+      <div style="display:flex;flex-direction:column;align-items:flex-end">${unitStr}<span style="color:#5D4037;font-weight:600">${precioStr}</span></div>
+      <button onclick="borrarItemLista(${i})" style="background:none;border:none;color:#D4949488;font-size:12px;cursor:pointer;margin-left:4px">✕</button>
     </div>`;
   }).join('');
 }
 
 function borrarItemLista(idx){
   listaItems.splice(idx,1);
+  renderListaItems();
+}
+
+function toggleItemListaCheck(idx, checked){
+  if(listaItems[idx]) listaItems[idx].done = checked;
+  // Re-renderizar solo la fila afectada sin redibujar todo
   renderListaItems();
 }
 
@@ -11153,9 +11163,10 @@ function _setListaStatus(msg){
 }
 
 // ── CIERRE CON IA — Gemini organiza todos los ítems al final ──
+let _cierreEnCurso = false; // ★ guard separado — evita conflicto con _listaSaved
 async function _cerrarListaConIA(){
-  if(_listaSaved) return;  // ★ FIX: guard antes de cualquier async
-  _listaSaved = true;
+  if(_cierreEnCurso || _listaSaved) return;
+  _cierreEnCurso = true;
   pararListaMicDefinitivo();
 
   // Si no hay ítems, guardar directo
@@ -11305,7 +11316,7 @@ function guardarListaFinal(){
     precio: it.tipo==='subtotal' ? null : (it.precio||null),
     precioUnit: it._precioUnit||null,
     cantidad: it._cantidad||null,
-    done: false
+    done: it.done || false
   }));
 
   // ★ Si venimos de "Dictar" en una nota existente → actualizar, no crear nueva
@@ -11338,9 +11349,7 @@ function guardarListaFinal(){
   state.notas.unshift(nota);
   save('fnz_notas', state.notas);
 
-  // ★ Generar imagen ANTES de cerrar modal (listaItems aún disponible)
-  try{ generarNotaJPG(nota); }catch(e){}
-  toast('✓ Lista guardada — ' + items.filter(i=>i.done===false||i.done===true).length + ' ítems', 'success');
+  toast('✓ Lista guardada — ' + items.length + ' ítems', 'success');
 
   cerrarListaModal();
   setTimeout(()=>{ switchPage('notas'); render(); }, 150);
