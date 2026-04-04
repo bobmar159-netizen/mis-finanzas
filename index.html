@@ -6210,14 +6210,17 @@ function registrarIngresoAgenda(id){
 let _avRec=null, _avFinalBuffer='';
 
 function openAgendaVoz(){
-  _avFinalBuffer='';
-  window._avListening=false;
-  window._avParsed=null;
   document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title" style="color:var(--gold)">🎙 Agenda — Trabajo</div>
-    <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:10px">El parser local llena los campos automáticamente</div>
-    <div id="av-text" style="min-height:52px;background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13px;color:#94A3B8;text-align:center;margin-bottom:12px;line-height:1.5">Presiona el micrófono y habla...</div>
-    <div id="av-preview" style="display:none;border:1px solid #9B59B633;border-radius:12px;padding:12px;margin-bottom:12px;background:#F3F0FF"></div>
+    <div class="modal-title" style="color:var(--gold)">Agenda por Voz</div>
+    <div style="text-align:center;margin-bottom:14px;font-size:12px;color:var(--muted)">
+      Ejemplos:<br>
+      <em>"Visita mañana a las 3 al señor Víctor en La Victoria"</em><br>
+      <em>"Trabajo el lunes a las 9 punto adicional para la señora Rosa en Miraflores, 400 soles"</em>
+    </div>
+    <div id="av-text" style="min-height:60px;background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:14px;font-size:14px;color:#94A3B8;text-align:center;margin-bottom:14px">
+      Presiona el micrófono y habla...
+    </div>
+    <div id="av-preview" style="display:none;background:#F3F0FF;border:1px solid #9B59B644;border-radius:12px;padding:12px;margin-bottom:14px"></div>
     <div style="display:flex;gap:8px">
       <button id="av-btn" onclick="toggleAgendaVoz()" style="flex:1;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:12px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">🎙 Escuchar</button>
     </div>
@@ -6225,20 +6228,30 @@ function openAgendaVoz(){
       <button class="btn-ghost" onclick="closeModal()" style="flex:1">Cancelar</button>
       <button id="av-save" class="btn-gold" onclick="saveAgendaVoz()" style="flex:2;display:none">✓ Guardar</button>
     </div>`;
+  window._avListening=false;
+  window._avParsed=null;
   showModal();
-  // ★ Auto-inicio del mic
-  setTimeout(toggleAgendaVoz, 350);
 }
 
 function toggleAgendaVoz(){
-  if(window._avListening){ _stopAV(); return; }
+  if(window._avListening){ stopAgendaVoz(); return; }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ toast('Necesitás Chrome para usar el micrófono','error'); return; }
-  _avFinalBuffer='';
+  const rec=new SR(); rec.lang='es-PE'; rec.interimResults=true; rec.continuous=false;
   window._avListening=true;
-  const btn=document.getElementById('av-btn');
-  if(btn){btn.style.background='linear-gradient(135deg,#E05252,#f87171)';btn.textContent='⏹ Detener';}
-  _iniciarAVRec();
+  document.getElementById('av-btn').style.background='linear-gradient(135deg,#E05252,#f87171)';
+  document.getElementById('av-btn').textContent='⏹ Detener';
+  rec.onresult=(e)=>{
+    let txt='';
+    for(let i=0;i<e.results.length;i++) txt+=e.results[i][0].transcript;
+    document.getElementById('av-text').textContent=txt;
+    document.getElementById('av-text').style.color='#1E293B';
+    if(e.results[e.results.length-1].isFinal){ stopAgendaVoz(); parseAgendaVoz(txt); }
+  };
+  rec.onerror=()=>stopAgendaVoz();
+  rec.onend=()=>{ if(window._avListening) stopAgendaVoz(); };
+  rec.start();
+  window._avRec=rec;
 }
 
 function _iniciarAVRec(){
@@ -6294,7 +6307,7 @@ function extractClienteAgenda(text){
     return '';
   })();
   // ── Intentar sobre texto ORIGINAL primero (preserva tildes y ñ) ──
-  const SVCSTOP = /\b(servicio|punto|adicional|terma|cocina|horno|calef[oó]n|parrilla|secadora|instalaci[oó]n|conexi[oó]n|reparaci[oó]n|modificaci[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|construcci[oó]n|tuber[ií]a|red|boca|precio|soles|el|la|en|de|del|a|las)\b/i;
+  const SVCSTOP = /\b(servicio|punto|adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|boca|precio|soles|el|la|en|de|del|a|las)\b/i;
   const DISTSW  = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|brena|miraflores|independencia|carabayllo|ventanilla|bellavista)$/i;
   const DIASW   = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana)$/i;
 
@@ -6308,14 +6321,12 @@ function extractClienteAgenda(text){
     const m = text.match(p);
     if(m && m[1]){
       const partes = m[1].trim().split(/\s+/).filter(Boolean);
-      // Cortar si segunda palabra es distrito, día o servicio (normalizar tildes)
-      const p1Norm = partes.length > 1 ? partes[1].normalize('NFD').replace(/[\u0300-\u036f]/g,'') : '';
-      let nombre = (partes.length > 1 && (DISTSW.test(partes[1])||DIASW.test(partes[1])||SVCSTOP.test(p1Norm)))
+      // Cortar si segunda palabra es distrito o día
+      let nombre = (partes.length > 1 && (DISTSW.test(partes[1])||DIASW.test(partes[1])))
         ? partes[0]
         : partes.slice(0,2).join(' ');
-      // Verificar que no es palabra de servicio (normalizar para manejar tildes)
-      const n0Norm = nombre.split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-      if(nombre.length > 1 && !SVCSTOP.test(n0Norm)) return (_tratAg ? _tratAg+' '+nombre : nombre);
+      // Verificar que no es palabra de servicio
+      if(nombre.length > 1 && !SVCSTOP.test(nombre.split(' ')[0])) return (_tratAg ? _tratAg+' '+nombre : nombre);
     }
   }
 
@@ -6387,10 +6398,7 @@ function parseAgendaVoz(text){
     .replace(/\b(construccion|construcción|construcion)\b/gi, '')
     .replace(/\b(oye|hey|escucha|ok|mira|anota|registra|apunta|guarda|crea)\b/gi, '')
     .replace(/\b(para el dia de|para el dia|el dia de|día de mañana|dia de manana)\b(?!\s*(?:domingo|lunes|martes|miercoles|jueves|viernes|sabado))/gi, 'mañana')
-    // Pre-strip: "servicio X" → "X" (con y sin acentos/tilde)
-    .replace(/\bservicio\s+(punto\s+adicional|punto|terma|cocina|hornos?|calefons?|reparaci[oó]n|instalaci[oó]n|conexi[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|modificaci[oó]n|parrilla|secadora)/gi, '$1')
-    // Pre-strip: eliminar "punto adicional" como frase completa cuando queda suelto
-    .replace(/\bpunto\s+adicional\b/gi, '_SVC_PUNTO_')
+    .replace(/\bservicio\s+(punto|terma|cocina|horno|calefon|reparacion|instalacion|conexion|gasfiteria|documentacion|conversion|modificacion|parrilla|secadora)/gi, '$1')
     .replace(/\s+/g, ' ')
     .trim();
   if(!text2) text2 = text;
@@ -6565,27 +6573,25 @@ function parseAgendaVoz(text){
   const prev=document.getElementById('av-preview');
   if(prev){
     prev.style.display='block';
-    // ★ Solo cliente es obligatorio; teléfono no aparece como campo faltante
-    const falta=[];
-    if(!cliente) falta.push('cliente');
-    if(!servicio) falta.push('servicio');
-    const filas=[
-      `<div><span style="color:var(--muted)">Fecha:</span> ${fecha||'—'}</div>`,
-      `<div><span style="color:var(--muted)">Hora:</span> ${hora?horaTo12(hora):'—'}</div>`,
-      `<div style="color:${!cliente?'#E05252':'inherit'}"><span style="color:var(--muted)">Cliente:</span> ${cliente||'⚠ falta'}</div>`,
-      `<div style="color:${!ubicacion?'#94A3B8':'inherit'}"><span style="color:var(--muted)">Ubicación:</span> ${ubicacion||'—'}</div>`,
-      servicio?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Servicio:</span> ${servicio}</div>`:'',
-      precio?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Precio:</span> ${fmt(precio)}</div>`:'',
-      telefono?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Tel:</span> ${telefono}</div>`:'',
-    ].filter(Boolean).join('');
+    const missingFields=[];
+    if(!ubicacion) missingFields.push('ubicación');
+    if(!telefono) missingFields.push('teléfono');
     prev.innerHTML=`
-      <div style="font-size:11px;color:#6C3483;font-weight:700;margin-bottom:8px">${tipo==='visita'?'👁 Visita':'🔧 Trabajo'} detectado — Parser local</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:12px">${filas}</div>
-      ${falta.length?`<div style="margin-top:6px;background:#FEF9C3;border-radius:6px;padding:5px 8px;font-size:11px;color:#92400E">⚠ Sigue hablando — falta: ${falta.join(', ')}</div>`:''}`;
+      <div style="font-size:11px;color:#6C3483;font-weight:600;margin-bottom:8px">${tipo==='visita'?'👁 Visita':'🔧 Trabajo'} detectado:</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">
+        <div><span style="color:var(--muted)">Fecha:</span> ${fecha}</div>
+        <div><span style="color:var(--muted)">Hora:</span> ${hora?horaTo12(hora):'—'}</div>
+        <div style="color:${!cliente?'#E05252':'inherit'}"><span style="color:var(--muted)">Cliente:</span> ${cliente||'⚠ falta'}</div>
+        <div style="color:${!ubicacion?'#E05252':'inherit'}"><span style="color:var(--muted)">Ubicación:</span> ${ubicacion||'⚠ falta'}</div>
+        ${servicio?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Servicio:</span> ${servicio}</div>`:''}
+        ${precio?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Precio:</span> ${fmt(precio)}</div>`:''}
+        ${telefono?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Teléfono:</span> ${telefono}</div>`:''}
+        ${notas?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Notas:</span> ${notas}</div>`:''}
+      </div>
+      ${missingFields.length?`<div style="margin-top:8px;background:#FEF2F2;border-radius:6px;padding:6px 8px;font-size:11px;color:#E05252">⚠ Faltan: ${missingFields.join(', ')} — podés completarlos en el formulario</div>`:''}`;
   }
-  // ★ Mostrar Guardar apenas tengamos cliente (teléfono no requerido)
   const saveBtn=document.getElementById('av-save');
-  if(saveBtn) saveBtn.style.display = cliente ? 'block' : 'none';
+  if(saveBtn) saveBtn.style.display='block';
 }
 
 function saveAgendaVoz(){
@@ -9386,28 +9392,25 @@ function extractCliente(text) {
   // Detectar tratamiento para conservarlo (Sr./Sra.)
   const _tratMatch = text.match(/\b(señor|señora|don|doña|sr\.?|sra\.?)\s+/i);
   const _trat = _tratMatch ? (/(señora|doña|sra)/i.test(_tratMatch[1]) ? 'Sra.' : 'Sr.') : '';
-  // ★ Palabras de servicio — cortar el nombre aquí (con y sin tildes)
-  const SERVICIO_STOP = /\b(punto\s+adicional|terma|cocina|horno|calef[oó]n|parrilla|secadora|instalaci[oó]n|conexi[oó]n|reparaci[oó]n|modificaci[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|construcci[oó]n|punto|adicional|tuber[ií]a|red|boca|servicio)\b/i;
+  // ★ Palabras de servicio — cortar el nombre aquí
+  const SERVICIO_STOP = /\b(punto\s+adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|punto|adicional|tuberia|red|boca|servicio)\b/i;
 
   const patterns = [
     // Con preposición explícita — máxima prioridad
-    /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+\d|\s+en\b|\s+de\b|\s+del\b|\s+por\b|\s+a las|\s+precio|\s+soles|\s+servicio|\s+adicional|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+conversi[oó]n|\s+construcci[oó]n|\s+gasfiter[ií]a|\s+documentaci[oó]n|\s+punto|\s+terma|\s+cocina|\s+horno|\s+calef[oó]n|\s+parrilla|\s+secadora|$)/i,
-    // patron 2: "para el cliente X" — excluir 'cliente' de stop para no cortar el nombre
-    /(?:para|al|a|con)\s+(?:el|la)\s+(?:se\u00f1or|se\u00f1ora|vecino|vecina|casero|casera|propietario|propietaria|due\u00f1o|due\u00f1a)\s+([A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1][A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+servicio|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+punto|\s+terma|\s+cocina|\s+horno|$)/i,
-    /(?:para|al|a|con)\s+(?:el|la)\s+cliente\s+([A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1][A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+punto|\s+terma|$)/i,
+    /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+\d|\s+en\b|\s+de\b|\s+del\b|\s+por\b|\s+a las|\s+precio|\s+soles|\s+servicio|$)/i,
+    /(?:para|al|a|con)\s+(?:el|la)\s+(?:cliente|clienta|señor|señora|vecino|vecina|casero|casera|propietario|propietaria|dueño|dueña)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+servicio|$)/i,
     /(?:casa de|domicilio de|vivienda de|propiedad de)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|$)/i,
     /de(?:l|\s+la)?\s+(?:señor|señora|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+por\b|\s+precio|$)/i,
     /(?:para|al|con)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+en\b|\s+de\b|\s*[,.]|\s+precio|$)/,
     // ★ Sin preposición: "señora Carmen Lince", "señor Pedro viernes"
-    /(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+la\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|\s+servicio\b|\s+precio\b|\s+soles\b|\s+adicional\b|\s+punto\b|\s+terma\b|\s+cocina\b|\s+horno\b|\s+calef[oó]n\b|\s+parrilla\b|\s+instalaci[oó]n\b|\s+conexi[oó]n\b|\s+reparaci[oó]n\b|\s+modificaci[oó]n\b|\s+gasfiter[ií]a\b|\s+documentaci[oó]n\b|\s+conversi[oó]n\b|\s+construcci[oó]n\b|$)/i,
+    /(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+la\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|\s+servicio\b|\s+precio\b|\s+soles\b|\s+punto\b|\s+terma\b|\s+cocina\b|\s+horno\b|\s+calefon\b|\s+parrilla\b|\s+instalacion\b|\s+conexion\b|\s+reparacion\b|$)/i,
   ];
   for (const p of patterns) {
     const m = t.match(p);
     if (m && m[1]) {
       let nombre = m[1].trim().replace(/\s+/g,' ');
-      // ★ Cortar en la primera palabra de servicio — normalizar para manejar tildes
-      const nombreNorm = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-      const svcIdx = nombreNorm.search(SERVICIO_STOP);
+      // ★ Cortar en la primera palabra de servicio
+      const svcIdx = nombre.search(SERVICIO_STOP);
       if(svcIdx > 0) nombre = nombre.slice(0, svcIdx).trim();
       // Limpiar preposiciones y días de semana
       nombre = nombre.replace(/\b(en|de|del|al|la|el|por|para|con|que|fue|era|un|una|este|esta|dia|día|lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana|siguiente|proximo|próximo)\b/gi,'').trim();
@@ -9415,16 +9418,14 @@ function extractCliente(text) {
       const partes = nombre.split(/\s+/).filter(Boolean);
       const DISTW = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|breña|brena|miraflores|independencia|carabayllo|ventanilla)$/i;
       const DIASW = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana)$/i;
-      // ★ También verificar si segunda palabra es un servicio (con normalización)
-      const SVCW = /^(terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|punto|servicio|red|boca|adicional|precio|soles)$/i;
-      if(partes.length>1 && (DISTW.test(partes[1])||DIASW.test(partes[1])||SVCW.test(partes[1].normalize('NFD').replace(/[\u0300-\u036f]/g,'')))) nombre=partes[0];
+      if(partes.length>1 && (DISTW.test(partes[1])||DIASW.test(partes[1]))) nombre=partes[0];
       else nombre=partes.slice(0,2).join(' ');
       if (nombre.length > 1) return (_trat ? _trat + ' ' + nombre : nombre);
     }
   }
   // ── FALLBACK ULTRASIMPLE: "señor/don + nombre" en cualquier posición ──
   // Cubre casos donde los patrones complejos fallan por orden desordenado
-  const ULTRA_SVCSTOP = /^(servicio|punto|adicional|terma|cocina|horno|calef[oó]n|parrilla|secadora|instalaci[oó]n|conexi[oó]n|reparaci[oó]n|modificaci[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|construcci[oó]n|tuber[ií]a|red|precio|soles|para|en|de|del|al|la|el|a|las|_svc_punto_)$/i;
+  const ULTRA_SVCSTOP = /^(servicio|punto|adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|precio|soles|para|en|de|del|al|la|el|a|las)$/i;
   const ultFallback = t.match(/(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñ]{1,20})/i);
   if(ultFallback && ultFallback[1]){
     const fn = ultFallback[1].trim();
@@ -9991,7 +9992,6 @@ function startListening() {
   _micSessionBase   = '';
   _micSessionFinals = '';
   micRestartLock    = false;
-  _micAborted       = false; // ★ FIX: resetear flag de aborto al iniciar
   clearTimeout(micSilenceTimer);
 
   recognition = new SR();
@@ -10168,15 +10168,11 @@ function _actualizarContextoMic(texto){
 function stopListening() {
   micListening      = false;
   micRestartLock    = true;
-  _micAborted       = true;   // ★ FIX: señal de aborto para async en vuelo
   _micSessionBase   = '';
   _micSessionFinals = '';
   micFullTranscript = '';
   clearTimeout(micSilenceTimer);
-  clearTimeout(processVoiceResult._busyTimer); // ★ FIX: cancelar timer de busy
-  processVoiceResult._busy = false;            // ★ FIX: liberar lock
-  // ★ FIX CRÍTICO: recognition = null para evitar doble instancia SR
-  if(recognition){ try{ recognition.stop(); }catch(e){} recognition = null; }
+  if(recognition){ try{ recognition.stop(); }catch(e){} }
   // ★ Null-safe: elementos pueden no existir cuando el panel de agenda está activo
   const micBtn  = document.getElementById('micBtn');
   const micIcon = document.getElementById('micBtnIcon');
@@ -12110,13 +12106,7 @@ function processVoiceResult(text) {
   if (processVoiceResult._busy) return;
   processVoiceResult._busy = true;
   clearTimeout(processVoiceResult._busyTimer);
-  // ★ FIX: mostrar feedback si Gemini tarda más de 8 segundos
-  processVoiceResult._busyTimer = setTimeout(()=>{
-    processVoiceResult._busy = false;
-    const micText2 = document.getElementById('micText');
-    if(micText2 && micText2.textContent.includes('analizando'))
-      micText2.textContent = '⚠ Gemini tardó demasiado — toca el mic e intentá de nuevo';
-  }, 8000);
+  processVoiceResult._busyTimer = setTimeout(()=>{ processVoiceResult._busy = false; }, 8000);
   stopListening();
 
   // ★ Deduplicar texto repetido por reinicios del mic
