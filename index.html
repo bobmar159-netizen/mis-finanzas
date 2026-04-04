@@ -463,8 +463,8 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .pnc-body{flex:1;padding:13px 13px 6px}
 .pnc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px}
 .pnc-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
-.pnc-title{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;line-height:1.3;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.pnc-preview{font-size:11px;line-height:1.5;opacity:.7;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.pnc-title{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;line-height:1.3;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pnc-preview{font-size:11px;line-height:1.5;opacity:.7;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .pnc-price-tag{font-size:11px;font-weight:700;margin-top:6px;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:8px;background:rgba(0,0,0,.08)}
 .pnc-footer{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-top:1px solid rgba(0,0,0,.07);font-size:10px;opacity:.65}
 .pnc-actions{display:flex;gap:2px}
@@ -702,6 +702,9 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 /* ⌨️ ATAJOS HINT */
 .keyboard-hint{position:fixed;bottom:20px;right:20px;background:rgba(0,0,0,0.8);color:#FFF;padding:8px 12px;border-radius:8px;font-size:11px;z-index:999;opacity:0;pointer-events:none;transition:opacity .2s}
 .keyboard-hint.show{opacity:1}
+/* ★ Animación spin para el spinner de Gemini */
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
 .kbd{background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;font-family:monospace;margin:0 2px}
 
 </style>
@@ -761,7 +764,8 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 <div class="toast" id="toast" style="display:none"></div>
 
 <script>
-const GEMINI_URL = k => `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${k}`;
+// ★ FIX: usar gemini-1.5-flash que tiene mayor disponibilidad regional
+const GEMINI_URL = k => `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${k}`;
 
 // ── Colores de hoja de nota ──
 const NOTA_COLORES = {
@@ -1117,6 +1121,79 @@ const fmtSign=n=>(n>=0?'+':'-')+fmt(n);
 const todayStr=()=>new Date().toISOString().split('T')[0];
 const monthName=()=>MONTHS_FULL[state.filterMonth]+' '+state.filterYear;
 
+// ──────────────────────────────────────────────────────────────────
+// HELPER GLOBAL: normalizarCliente — consolida 4 copias duplicadas
+// Convierte "señor Mario" → "Sr. Mario", elimina artículos solos
+// ──────────────────────────────────────────────────────────────────
+function normalizarCliente(nombre){
+  if(!nombre || typeof nombre !== 'string') return null;
+  // ORDEN: 1 quitar articulos, 2 reemplazar titulos
+  // Normalizar primero para que funcione tanto con tilde como sin ella
+  const norm = nombre.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const limpio = norm
+    .replace(/^(el|la|los|las|un|una)\s+/i, '')
+    .replace(/^senoras?\s+/i, 'Sra. ')
+    .replace(/^senores?\s+/i, 'Sr. ')
+    .replace(/^senor\s+/i,   'Sr. ')
+    .replace(/^senora\s+/i,  'Sra. ')
+    .replace(/^dona\s+/i,    'Sra. ')
+    .replace(/^don\s+/i,     'Sr. ')
+    .replace(/^sr\.?\s+/i,   'Sr. ')
+    .replace(/^sra\.?\s+/i,  'Sra. ')
+    .trim();
+  // Capitalizar primera letra del nombre resultante
+  const cap = limpio.replace(/\b([a-z])/g, c => c.toUpperCase());
+  return cap || null;
+}
+
+
+// ──────────────────────────────────────────────────────────────────
+// HELPER GLOBAL: hoyISO — fecha local Lima (UTC-5) en YYYY-MM-DD
+// Consolida 3 cálculos manuales duplicados de fecha
+// ──────────────────────────────────────────────────────────────────
+function hoyISO(){
+  const ahora = new Date();
+  return ahora.getFullYear() + '-' +
+    String(ahora.getMonth() + 1).padStart(2, '0') + '-' +
+    String(ahora.getDate()).padStart(2, '0');
+}
+
+function mananaISO(){
+  const m = new Date();
+  m.setDate(m.getDate() + 1);
+  return m.getFullYear() + '-' +
+    String(m.getMonth() + 1).padStart(2, '0') + '-' +
+    String(m.getDate()).padStart(2, '0');
+}
+
+// ──────────────────────────────────────────────────────────────────
+// HELPERS de filtrado — con memoización para evitar recalcular
+// en cada render (filteredTx se llamaba 6+ veces por render)
+// ──────────────────────────────────────────────────────────────────
+let _filteredCache = { month: -1, year: -1, modo: '', data: [] };
+
+function filteredTx(){
+  // Invalidar cache si cambió el filtro o el modo
+  if(_filteredCache.month === state.filterMonth &&
+     _filteredCache.year  === state.filterYear  &&
+     _filteredCache.modo  === state.modo){
+    return _filteredCache.data;
+  }
+  _filteredCache = {
+    month: state.filterMonth,
+    year:  state.filterYear,
+    modo:  state.modo,
+    data:  state.transactions.filter(t=>{
+      const d = new Date(t.date+'T00:00:00');
+      return d.getMonth()===state.filterMonth && d.getFullYear()===state.filterYear;
+    })
+  };
+  return _filteredCache.data;
+}
+
+// Invalidar cache al guardar una transacción nueva
+const _invalidarCache = () => { _filteredCache.month = -1; };
+
 function getCatById(id){
   return [...state.catsIn,...state.catsEx].find(c=>c.id===id)||null;
 }
@@ -1125,14 +1202,6 @@ function getCatByName(name,type){
   return list.find(c=>c.name===name)||null;
 }
 
-function filteredTx(){
-  // state.transactions is already mode-specific (loaded by loadStateForModo)
-  // Filter by selected month/year only
-  return state.transactions.filter(t=>{
-    const d=new Date(t.date+'T00:00:00');
-    return d.getMonth()===state.filterMonth&&d.getFullYear()===state.filterYear;
-  });
-}
 const totalIncome=()=>filteredTx().filter(t=>t.type==='ingreso').reduce((s,t)=>s+t.amount,0);
 const totalExpense=()=>filteredTx().filter(t=>t.type==='egreso').reduce((s,t)=>s+t.amount,0);
 const balance=()=>totalIncome()-totalExpense();
@@ -1285,12 +1354,12 @@ function renderDashboard(){
   const manana=new Date(hoy); manana.setDate(hoy.getDate()+1);
   const hoyStr=hoy.toISOString().split('T')[0];
   const manStr=manana.toISOString().split('T')[0];
-  const meses2=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  // ★ Usar MONTHS_SHORT global en vez de redeclarar el array
   const fmtAgFecha=(f)=>{
     if(!f)return '';
     if(f===hoyStr)return 'Hoy';
     if(f===manStr)return 'Mañana';
-    try{const [y,m,d]=f.split('-');return `${parseInt(d)} ${meses2[parseInt(m)-1]}`;}catch(e){return f;}
+    try{const [y,m,d]=f.split('-');return `${parseInt(d)} ${MONTHS_SHORT[parseInt(m)-1]}`;}catch(e){return f;}
   };
   const proxFechas=(state.agenda||[])
     .filter(a=>a.estado!=='completado'&&a.fecha>=hoyStr)
@@ -4765,7 +4834,8 @@ function _setBtnMicNota(on){const btn=document.getElementById('nv-mic-btn');if(!
 
 function _procesarFragmentoNota(texto){
   const t=nrm(texto);
-  if(/\b(listo|ya\s+listo|termine|terminar|termino|fin\b|guardar|eso\s+es\s+todo|nada\s+mas|hasta\s+ahi|eso\s+nomas)\b/.test(t)){_stopNotaVoz();_notaVozBuffer='';setTimeout(saveNotaVoz,400);return;}
+  // ★ Comandos de FIN — 10 variaciones
+  if(/\b(listo|ya\s+listo|termine|termin[eé]|termino|terminamos|fin\b|guardar|guarda\s+(eso|esto|ya)|eso\s+es\s+todo|nada\s+m[aá]s|hasta\s+ah[ií]|eso\s+nomas|eso\s+nomás|ya\s+no\s+m[aá]s|ya\s+basta|ya\s+estuvo)\b/.test(t)){_stopNotaVoz();_notaVozBuffer='';setTimeout(saveNotaVoz,400);return;}
   if(/\b(borra(r)?|elimina(r)?|quita(r)?|cancela(r)?)\s+(el\s+)?(ultimo|ultim[oa]|anterior|ese|eso)\b/.test(t)||/\b(eso\s+no|ese\s+no)\b/.test(t)){if(_notaVozItems.length>0)_notaVozItems.pop();_notaVozBuffer='';_refreshNotaPreview();return;}
   const recM=texto.match(/(?:recordatorio|recordarme|alarma|av[ií]same)\s+(?:a\s+las?\s+)?(\d{1,2}(?::\d{2})?)\s*(am|pm|de la tarde|de la mañana)?/i);
   if(recM){let h=parseInt(recM[1]),min=0;const per=(recM[2]||'').toLowerCase();if(recM[1].includes(':'))min=parseInt(recM[1].split(':')[1]);if(per.includes('pm')||per.includes('tarde'))if(h<12)h+=12;if(!per&&h>=1&&h<=6)h+=12;_notaVozRecordatorio=`Hoy a las ${h}:${String(min).padStart(2,'0')}${h>=12?'pm':'am'}`;if(_notaVozTipo==='texto')_notaVozTipo='recordatorio';_notaVozBuffer='';_refreshNotaPreview();return;}
@@ -4804,7 +4874,8 @@ function _procesarFragmentoNota(texto){
           return;
         }}}}
   if(_notaVozTipo==='lista'||_notaVozTipo==='recordatorio'){
-    const SEP=/\b(?:aparte|a\s+parte|siguiente|despu[eé]s|y\s+despu[eé]s|tambi[eé]n|y\s+tambi[eé]n|adem[aá]s|y\s+luego|luego|finalmente|otro\s+(?:es|ser[ií]a)|el\s+(?:siguiente|otro|pr[oó]ximo)|por\s+[uú]ltimo|uno\s+m[aá]s|y\s+por\s+[uú]ltimo|igualmente|por\s+otra\s+parte|y\s+tambi[eé]n|y\s+adem[aá]s|punto\s+y|coma|agrega|a[ñn]ade|a[ñn]adir|m[aá]s\s+uno|otro\s+m[aá]s|otra\s+cosa|otra\s+m[aá]s|y\s+otro|y\s+otra|separar|nueva\s+l[ií]nea|nuevo\s+[ií]tem|nueva\s+entrada)\b/gi;
+    // ★ Separadores — 12 variaciones de "siguiente ítem"
+    const SEP=/\b(?:aparte|a\s+parte|siguiente|despu[eé]s|y\s+despu[eé]s|tambi[eé]n|y\s+tambi[eé]n|adem[aá]s|y\s+luego|luego|finalmente|otro\s+(?:es|ser[ií]a)|el\s+(?:siguiente|otro|pr[oó]ximo)|por\s+[uú]ltimo|uno\s+m[aá]s|y\s+por\s+[uú]ltimo|igualmente|por\s+otra\s+parte|punto\s+y|qu[eé]\s+m[aá]s|lo\s+siguiente|uno\s+m[aá]s\s+es|agrega|a[ñn]ade|separar|nueva\s+l[ií]nea|nuevo\s+[ií]tem|nueva\s+entrada|y\s+otro|y\s+otra)\b/gi;
     const partes=t.split(SEP).map(p=>p.trim()).filter(p=>p.length>0);
     if(partes.length>1||(partes.length===1&&texto.trim().length>2)){
       const RUIDO=/^(um+|eh+|ah+|ok|oye|este|bueno|entonces|pues)$/i;
@@ -6132,18 +6203,21 @@ function registrarIngresoAgenda(id){
 }
 
 // ── Voz para agenda ──
+// ══════════════════════════════════════════════════════════════
+// AGENDA VOZ — mic continuo, parse local, autoguardado sin teléfono
+// Gemini NO se llama para agendar. Solo parser local.
+// ══════════════════════════════════════════════════════════════
+let _avRec=null, _avFinalBuffer='';
+
 function openAgendaVoz(){
+  _avFinalBuffer='';
+  window._avListening=false;
+  window._avParsed=null;
   document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title" style="color:var(--gold)">Agenda por Voz</div>
-    <div style="text-align:center;margin-bottom:14px;font-size:12px;color:var(--muted)">
-      Ejemplos:<br>
-      <em>"Visita mañana a las 3 al señor Víctor en La Victoria"</em><br>
-      <em>"Trabajo el lunes a las 9 punto adicional para la señora Rosa en Miraflores, 400 soles"</em>
-    </div>
-    <div id="av-text" style="min-height:60px;background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:14px;font-size:14px;color:#94A3B8;text-align:center;margin-bottom:14px">
-      Presiona el micrófono y habla...
-    </div>
-    <div id="av-preview" style="display:none;background:#F3F0FF;border:1px solid #9B59B644;border-radius:12px;padding:12px;margin-bottom:14px"></div>
+    <div class="modal-title" style="color:var(--gold)">🎙 Agenda — Trabajo</div>
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:10px">El parser local llena los campos automáticamente</div>
+    <div id="av-text" style="min-height:52px;background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13px;color:#94A3B8;text-align:center;margin-bottom:12px;line-height:1.5">Presiona el micrófono y habla...</div>
+    <div id="av-preview" style="display:none;border:1px solid #9B59B633;border-radius:12px;padding:12px;margin-bottom:12px;background:#F3F0FF"></div>
     <div style="display:flex;gap:8px">
       <button id="av-btn" onclick="toggleAgendaVoz()" style="flex:1;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:12px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">🎙 Escuchar</button>
     </div>
@@ -6151,38 +6225,62 @@ function openAgendaVoz(){
       <button class="btn-ghost" onclick="closeModal()" style="flex:1">Cancelar</button>
       <button id="av-save" class="btn-gold" onclick="saveAgendaVoz()" style="flex:2;display:none">✓ Guardar</button>
     </div>`;
-  window._avListening=false;
-  window._avParsed=null;
   showModal();
+  // ★ Auto-inicio del mic
+  setTimeout(toggleAgendaVoz, 350);
 }
 
 function toggleAgendaVoz(){
-  if(window._avListening){ stopAgendaVoz(); return; }
+  if(window._avListening){ _stopAV(); return; }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ toast('Necesitás Chrome para usar el micrófono','error'); return; }
-  const rec=new SR(); rec.lang='es-PE'; rec.interimResults=true; rec.continuous=false;
+  _avFinalBuffer='';
   window._avListening=true;
-  document.getElementById('av-btn').style.background='linear-gradient(135deg,#E05252,#f87171)';
-  document.getElementById('av-btn').textContent='⏹ Detener';
-  rec.onresult=(e)=>{
-    let txt='';
-    for(let i=0;i<e.results.length;i++) txt+=e.results[i][0].transcript;
-    document.getElementById('av-text').textContent=txt;
-    document.getElementById('av-text').style.color='#1E293B';
-    if(e.results[e.results.length-1].isFinal){ stopAgendaVoz(); parseAgendaVoz(txt); }
-  };
-  rec.onerror=()=>stopAgendaVoz();
-  rec.onend=()=>{ if(window._avListening) stopAgendaVoz(); };
-  rec.start();
-  window._avRec=rec;
+  const btn=document.getElementById('av-btn');
+  if(btn){btn.style.background='linear-gradient(135deg,#E05252,#f87171)';btn.textContent='⏹ Detener';}
+  _iniciarAVRec();
 }
 
-function stopAgendaVoz(){
+function _iniciarAVRec(){
+  if(!window._avListening) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR) return;
+  try{
+    _avRec=new SR();
+    _avRec.lang='es-PE';
+    _avRec.interimResults=true;
+    _avRec.continuous=true;
+    _avRec.maxAlternatives=1;
+    _avRec.onresult=(e)=>{
+      let interim='', finalChunk='';
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        if(e.results[i].isFinal) finalChunk+=e.results[i][0].transcript+' ';
+        else interim+=e.results[i][0].transcript;
+      }
+      const display=(_avFinalBuffer+finalChunk+interim).trim();
+      const el=document.getElementById('av-text');
+      if(el){el.textContent=display||'Escuchando...';el.style.color='#1E293B';}
+      if(finalChunk){
+        _avFinalBuffer+=finalChunk;
+        // Parsear en tiempo real con cada fragmento final
+        parseAgendaVoz(_avFinalBuffer.trim());
+      }
+    };
+    _avRec.onerror=(e)=>{if(e.error==='aborted'||e.error==='no-speech')return;_stopAV();};
+    // Reiniciar automáticamente (Chrome cierra al silencio)
+    _avRec.onend=()=>{if(window._avListening)setTimeout(()=>{if(window._avListening)_iniciarAVRec();},150);};
+    _avRec.start();
+  }catch(e){_stopAV();}
+}
+
+function _stopAV(){
   window._avListening=false;
   const btn=document.getElementById('av-btn');
-  if(btn){ btn.style.background='linear-gradient(135deg,#C9A84C,#E8C96A)'; btn.textContent='🎙 Escuchar'; }
-  if(window._avRec){ try{ window._avRec.stop(); }catch(e){} }
+  if(btn){btn.style.background='linear-gradient(135deg,#C9A84C,#E8C96A)';btn.textContent='🎙 Escuchar';}
+  try{if(_avRec){_avRec.onend=null;_avRec.stop();}}catch(e){}
 }
+
+function stopAgendaVoz(){ _stopAV(); }
 
 
 // Extractor de cliente específico para agenda — patrones más simples
@@ -6196,7 +6294,7 @@ function extractClienteAgenda(text){
     return '';
   })();
   // ── Intentar sobre texto ORIGINAL primero (preserva tildes y ñ) ──
-  const SVCSTOP = /\b(servicio|punto|adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|boca|precio|soles|el|la|en|de|del|a|las)\b/i;
+  const SVCSTOP = /\b(servicio|punto|adicional|terma|cocina|horno|calef[oó]n|parrilla|secadora|instalaci[oó]n|conexi[oó]n|reparaci[oó]n|modificaci[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|construcci[oó]n|tuber[ií]a|red|boca|precio|soles|el|la|en|de|del|a|las)\b/i;
   const DISTSW  = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|brena|miraflores|independencia|carabayllo|ventanilla|bellavista)$/i;
   const DIASW   = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana)$/i;
 
@@ -6210,12 +6308,14 @@ function extractClienteAgenda(text){
     const m = text.match(p);
     if(m && m[1]){
       const partes = m[1].trim().split(/\s+/).filter(Boolean);
-      // Cortar si segunda palabra es distrito o día
-      let nombre = (partes.length > 1 && (DISTSW.test(partes[1])||DIASW.test(partes[1])))
+      // Cortar si segunda palabra es distrito, día o servicio (normalizar tildes)
+      const p1Norm = partes.length > 1 ? partes[1].normalize('NFD').replace(/[\u0300-\u036f]/g,'') : '';
+      let nombre = (partes.length > 1 && (DISTSW.test(partes[1])||DIASW.test(partes[1])||SVCSTOP.test(p1Norm)))
         ? partes[0]
         : partes.slice(0,2).join(' ');
-      // Verificar que no es palabra de servicio
-      if(nombre.length > 1 && !SVCSTOP.test(nombre.split(' ')[0])) return (_tratAg ? _tratAg+' '+nombre : nombre);
+      // Verificar que no es palabra de servicio (normalizar para manejar tildes)
+      const n0Norm = nombre.split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if(nombre.length > 1 && !SVCSTOP.test(n0Norm)) return (_tratAg ? _tratAg+' '+nombre : nombre);
     }
   }
 
@@ -6287,7 +6387,10 @@ function parseAgendaVoz(text){
     .replace(/\b(construccion|construcción|construcion)\b/gi, '')
     .replace(/\b(oye|hey|escucha|ok|mira|anota|registra|apunta|guarda|crea)\b/gi, '')
     .replace(/\b(para el dia de|para el dia|el dia de|día de mañana|dia de manana)\b(?!\s*(?:domingo|lunes|martes|miercoles|jueves|viernes|sabado))/gi, 'mañana')
-    .replace(/\bservicio\s+(punto|terma|cocina|horno|calefon|reparacion|instalacion|conexion|gasfiteria|documentacion|conversion|modificacion|parrilla|secadora)/gi, '$1')
+    // Pre-strip: "servicio X" → "X" (con y sin acentos/tilde)
+    .replace(/\bservicio\s+(punto\s+adicional|punto|terma|cocina|hornos?|calefons?|reparaci[oó]n|instalaci[oó]n|conexi[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|modificaci[oó]n|parrilla|secadora)/gi, '$1')
+    // Pre-strip: eliminar "punto adicional" como frase completa cuando queda suelto
+    .replace(/\bpunto\s+adicional\b/gi, '_SVC_PUNTO_')
     .replace(/\s+/g, ' ')
     .trim();
   if(!text2) text2 = text;
@@ -6462,39 +6565,52 @@ function parseAgendaVoz(text){
   const prev=document.getElementById('av-preview');
   if(prev){
     prev.style.display='block';
-    const missingFields=[];
-    if(!ubicacion) missingFields.push('ubicación');
-    if(!telefono) missingFields.push('teléfono');
+    // ★ Solo cliente es obligatorio; teléfono no aparece como campo faltante
+    const falta=[];
+    if(!cliente) falta.push('cliente');
+    if(!servicio) falta.push('servicio');
+    const filas=[
+      `<div><span style="color:var(--muted)">Fecha:</span> ${fecha||'—'}</div>`,
+      `<div><span style="color:var(--muted)">Hora:</span> ${hora?horaTo12(hora):'—'}</div>`,
+      `<div style="color:${!cliente?'#E05252':'inherit'}"><span style="color:var(--muted)">Cliente:</span> ${cliente||'⚠ falta'}</div>`,
+      `<div style="color:${!ubicacion?'#94A3B8':'inherit'}"><span style="color:var(--muted)">Ubicación:</span> ${ubicacion||'—'}</div>`,
+      servicio?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Servicio:</span> ${servicio}</div>`:'',
+      precio?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Precio:</span> ${fmt(precio)}</div>`:'',
+      telefono?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Tel:</span> ${telefono}</div>`:'',
+    ].filter(Boolean).join('');
     prev.innerHTML=`
-      <div style="font-size:11px;color:#6C3483;font-weight:600;margin-bottom:8px">${tipo==='visita'?'👁 Visita':'🔧 Trabajo'} detectado:</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">
-        <div><span style="color:var(--muted)">Fecha:</span> ${fecha}</div>
-        <div><span style="color:var(--muted)">Hora:</span> ${hora?horaTo12(hora):'—'}</div>
-        <div style="color:${!cliente?'#E05252':'inherit'}"><span style="color:var(--muted)">Cliente:</span> ${cliente||'⚠ falta'}</div>
-        <div style="color:${!ubicacion?'#E05252':'inherit'}"><span style="color:var(--muted)">Ubicación:</span> ${ubicacion||'⚠ falta'}</div>
-        ${servicio?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Servicio:</span> ${servicio}</div>`:''}
-        ${precio?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Precio:</span> ${fmt(precio)}</div>`:''}
-        ${telefono?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Teléfono:</span> ${telefono}</div>`:''}
-        ${notas?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Notas:</span> ${notas}</div>`:''}
-      </div>
-      ${missingFields.length?`<div style="margin-top:8px;background:#FEF2F2;border-radius:6px;padding:6px 8px;font-size:11px;color:#E05252">⚠ Faltan: ${missingFields.join(', ')} — podés completarlos en el formulario</div>`:''}`;
+      <div style="font-size:11px;color:#6C3483;font-weight:700;margin-bottom:8px">${tipo==='visita'?'👁 Visita':'🔧 Trabajo'} detectado — Parser local</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:12px">${filas}</div>
+      ${falta.length?`<div style="margin-top:6px;background:#FEF9C3;border-radius:6px;padding:5px 8px;font-size:11px;color:#92400E">⚠ Sigue hablando — falta: ${falta.join(', ')}</div>`:''}`;
   }
+  // ★ Mostrar Guardar apenas tengamos cliente (teléfono no requerido)
   const saveBtn=document.getElementById('av-save');
-  if(saveBtn) saveBtn.style.display='block';
+  if(saveBtn) saveBtn.style.display = cliente ? 'block' : 'none';
 }
 
 function saveAgendaVoz(){
+  _stopAV();
   const p=window._avParsed;
   if(!p) return;
+  // ★ El teléfono es opcional — guardamos siempre sin bloquear
   if(!state.agenda) state.agenda=[];
   state.agenda.unshift({
-    id:Date.now()+'', tipo:p.tipo, cliente:p.cliente||'Sin cliente',
-    fecha:p.fecha, hora:p.hora, servicio:p.servicio, precio:p.precio,
-    ubicacion:p.ubicacion, telefono:p.telefono||'', notas:p.notas||'', estado:'pendiente'
+    id:Date.now()+'',
+    tipo:    p.tipo        || 'trabajo',
+    cliente: p.cliente     || 'Sin cliente',
+    fecha:   p.fecha       || hoyISO(),
+    hora:    p.hora        || '',
+    servicio:p.servicio    || '',
+    precio:  p.precio      || 0,
+    ubicacion:p.ubicacion  || '',
+    telefono: p.telefono   || '',   // opcional
+    notas:   p.notas       || '',
+    estado:  'pendiente'
   });
-  save('fnz_agenda',state.agenda);
-  closeModal(); render();
-  toast((p.tipo==='visita'?'Visita':'Trabajo')+' agregado por voz ✓');
+  save('fnz_agenda', state.agenda);
+  closeModal();
+  render();
+  toast('✓ '+(p.tipo==='visita'?'Visita':'Trabajo')+' guardado'+(p.cliente?' para '+p.cliente:''));
 }
 
 // ─────────────────────────────────────────────
@@ -9270,25 +9386,28 @@ function extractCliente(text) {
   // Detectar tratamiento para conservarlo (Sr./Sra.)
   const _tratMatch = text.match(/\b(señor|señora|don|doña|sr\.?|sra\.?)\s+/i);
   const _trat = _tratMatch ? (/(señora|doña|sra)/i.test(_tratMatch[1]) ? 'Sra.' : 'Sr.') : '';
-  // ★ Palabras de servicio — cortar el nombre aquí
-  const SERVICIO_STOP = /\b(punto\s+adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|punto|adicional|tuberia|red|boca|servicio)\b/i;
+  // ★ Palabras de servicio — cortar el nombre aquí (con y sin tildes)
+  const SERVICIO_STOP = /\b(punto\s+adicional|terma|cocina|horno|calef[oó]n|parrilla|secadora|instalaci[oó]n|conexi[oó]n|reparaci[oó]n|modificaci[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|construcci[oó]n|punto|adicional|tuber[ií]a|red|boca|servicio)\b/i;
 
   const patterns = [
     // Con preposición explícita — máxima prioridad
-    /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+\d|\s+en\b|\s+de\b|\s+del\b|\s+por\b|\s+a las|\s+precio|\s+soles|\s+servicio|$)/i,
-    /(?:para|al|a|con)\s+(?:el|la)\s+(?:cliente|clienta|señor|señora|vecino|vecina|casero|casera|propietario|propietaria|dueño|dueña)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+servicio|$)/i,
+    /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+\d|\s+en\b|\s+de\b|\s+del\b|\s+por\b|\s+a las|\s+precio|\s+soles|\s+servicio|\s+adicional|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+conversi[oó]n|\s+construcci[oó]n|\s+gasfiter[ií]a|\s+documentaci[oó]n|\s+punto|\s+terma|\s+cocina|\s+horno|\s+calef[oó]n|\s+parrilla|\s+secadora|$)/i,
+    // patron 2: "para el cliente X" — excluir 'cliente' de stop para no cortar el nombre
+    /(?:para|al|a|con)\s+(?:el|la)\s+(?:se\u00f1or|se\u00f1ora|vecino|vecina|casero|casera|propietario|propietaria|due\u00f1o|due\u00f1a)\s+([A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1][A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+servicio|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+punto|\s+terma|\s+cocina|\s+horno|$)/i,
+    /(?:para|al|a|con)\s+(?:el|la)\s+cliente\s+([A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1][A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+punto|\s+terma|$)/i,
     /(?:casa de|domicilio de|vivienda de|propiedad de)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|$)/i,
     /de(?:l|\s+la)?\s+(?:señor|señora|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+por\b|\s+precio|$)/i,
     /(?:para|al|con)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+en\b|\s+de\b|\s*[,.]|\s+precio|$)/,
     // ★ Sin preposición: "señora Carmen Lince", "señor Pedro viernes"
-    /(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+la\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|\s+servicio\b|\s+precio\b|\s+soles\b|\s+punto\b|\s+terma\b|\s+cocina\b|\s+horno\b|\s+calefon\b|\s+parrilla\b|\s+instalacion\b|\s+conexion\b|\s+reparacion\b|$)/i,
+    /(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+la\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|\s+servicio\b|\s+precio\b|\s+soles\b|\s+adicional\b|\s+punto\b|\s+terma\b|\s+cocina\b|\s+horno\b|\s+calef[oó]n\b|\s+parrilla\b|\s+instalaci[oó]n\b|\s+conexi[oó]n\b|\s+reparaci[oó]n\b|\s+modificaci[oó]n\b|\s+gasfiter[ií]a\b|\s+documentaci[oó]n\b|\s+conversi[oó]n\b|\s+construcci[oó]n\b|$)/i,
   ];
   for (const p of patterns) {
     const m = t.match(p);
     if (m && m[1]) {
       let nombre = m[1].trim().replace(/\s+/g,' ');
-      // ★ Cortar en la primera palabra de servicio
-      const svcIdx = nombre.search(SERVICIO_STOP);
+      // ★ Cortar en la primera palabra de servicio — normalizar para manejar tildes
+      const nombreNorm = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const svcIdx = nombreNorm.search(SERVICIO_STOP);
       if(svcIdx > 0) nombre = nombre.slice(0, svcIdx).trim();
       // Limpiar preposiciones y días de semana
       nombre = nombre.replace(/\b(en|de|del|al|la|el|por|para|con|que|fue|era|un|una|este|esta|dia|día|lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana|siguiente|proximo|próximo)\b/gi,'').trim();
@@ -9296,14 +9415,16 @@ function extractCliente(text) {
       const partes = nombre.split(/\s+/).filter(Boolean);
       const DISTW = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|breña|brena|miraflores|independencia|carabayllo|ventanilla)$/i;
       const DIASW = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana)$/i;
-      if(partes.length>1 && (DISTW.test(partes[1])||DIASW.test(partes[1]))) nombre=partes[0];
+      // ★ También verificar si segunda palabra es un servicio (con normalización)
+      const SVCW = /^(terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|punto|servicio|red|boca|adicional|precio|soles)$/i;
+      if(partes.length>1 && (DISTW.test(partes[1])||DIASW.test(partes[1])||SVCW.test(partes[1].normalize('NFD').replace(/[\u0300-\u036f]/g,'')))) nombre=partes[0];
       else nombre=partes.slice(0,2).join(' ');
       if (nombre.length > 1) return (_trat ? _trat + ' ' + nombre : nombre);
     }
   }
   // ── FALLBACK ULTRASIMPLE: "señor/don + nombre" en cualquier posición ──
   // Cubre casos donde los patrones complejos fallan por orden desordenado
-  const ULTRA_SVCSTOP = /^(servicio|punto|adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|precio|soles|para|en|de|del|al|la|el|a|las)$/i;
+  const ULTRA_SVCSTOP = /^(servicio|punto|adicional|terma|cocina|horno|calef[oó]n|parrilla|secadora|instalaci[oó]n|conexi[oó]n|reparaci[oó]n|modificaci[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|construcci[oó]n|tuber[ií]a|red|precio|soles|para|en|de|del|al|la|el|a|las|_svc_punto_)$/i;
   const ultFallback = t.match(/(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñ]{1,20})/i);
   if(ultFallback && ultFallback[1]){
     const fn = ultFallback[1].trim();
@@ -9853,6 +9974,7 @@ function toggleListening() {
 let micSilenceTimer   = null;
 let micFullTranscript = '';
 let micRestartLock    = false;
+let _micAborted       = false; // ★ FIX: flag para cancelar async en vuelo
 let _micSessionBase   = ''; // ★ texto acumulado ANTES del restart actual
 let _micSessionFinals = ''; // ★ finales de la sesión actual (no del restart)
 const MIC_SILENCE_MS  = /android/i.test(navigator.userAgent) ? 3500 : 2500; // ★ Android necesita más tiempo
@@ -9869,6 +9991,7 @@ function startListening() {
   _micSessionBase   = '';
   _micSessionFinals = '';
   micRestartLock    = false;
+  _micAborted       = false; // ★ FIX: resetear flag de aborto al iniciar
   clearTimeout(micSilenceTimer);
 
   recognition = new SR();
@@ -10045,11 +10168,15 @@ function _actualizarContextoMic(texto){
 function stopListening() {
   micListening      = false;
   micRestartLock    = true;
+  _micAborted       = true;   // ★ FIX: señal de aborto para async en vuelo
   _micSessionBase   = '';
   _micSessionFinals = '';
   micFullTranscript = '';
   clearTimeout(micSilenceTimer);
-  if(recognition){ try{ recognition.stop(); }catch(e){} }
+  clearTimeout(processVoiceResult._busyTimer); // ★ FIX: cancelar timer de busy
+  processVoiceResult._busy = false;            // ★ FIX: liberar lock
+  // ★ FIX CRÍTICO: recognition = null para evitar doble instancia SR
+  if(recognition){ try{ recognition.stop(); }catch(e){} recognition = null; }
   // ★ Null-safe: elementos pueden no existir cuando el panel de agenda está activo
   const micBtn  = document.getElementById('micBtn');
   const micIcon = document.getElementById('micBtnIcon');
@@ -10069,119 +10196,16 @@ function stopListening() {
 // GEMINI AI — Asistente de Voz Inteligente
 // ══════════════════════════════════════════════════════════════
 
-
-
 // ═══════════════════════════════════════════════════════
-// EDITOR NOTAS — Evernote style, robusto
+// EDITOR NOTAS — Editor de bloques (activo)
 // ═══════════════════════════════════════════════════════
 let _nedNota = null, _nedFotos = [], _nedRecordatorio = '', _nedColor = 'amarillo';
 let _nedHistory = [], _nedFuture = [];
 
 function abrirEditorNota(editId){
-  // ★ FIX: siempre redirige al editor premium — el viejo fue desactivado
+  // Redirige siempre al editor activo (bloques estilo Notion)
+  // El editor viejo (Evernote style) fue desactivado y eliminado
   abrirEditorNotaBloque(editId);
-  return;
-  const n = {}; const nc = NOTA_COLORES['amarillo'];
-
-  const cdots = Object.entries(NOTA_COLORES).map(([k,v])=>
-    `<div class="ned-cdot${_nedColor===k?' sel':''}" onclick="nedColor('${k}')"
-      style="background:${v.bg};border-color:${v.border}" title="${v.label}"></div>`
-  ).join('');
-
-  const ov = document.createElement('div');
-  ov.id = 'ned-overlay';
-  ov.style.cssText = `position:fixed;inset:0;z-index:500;display:flex;flex-direction:column;background:${nc.bg};font-family:'DM Sans',sans-serif`;
-
-  ov.innerHTML = `
-    <div id="ned-topbar" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.1);flex-shrink:0;background:${nc.bg}">
-      <button onclick="nedClose()" style="background:none;border:none;font-size:22px;cursor:pointer;color:${nc.footer};padding:2px 6px;line-height:1;flex-shrink:0">←</button>
-      <span id="ned-status" style="font-size:11px;color:${nc.footer};flex:1"></span>
-      <button onclick="nedAddPhoto()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 6px;opacity:.75" title="Foto">📷</button>
-      <button id="ned-rec-btn" onclick="nedEditReminder()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 6px;opacity:${_nedRecordatorio?1:.5}" title="Recordatorio">⏰</button>
-      <button onclick="nedSave(true)" style="background:#3A7D44;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0">Guardar</button>
-    </div>
-
-    <div id="ned-rem" style="display:${_nedRecordatorio?'flex':'none'};align-items:center;gap:8px;padding:7px 20px;background:#FEF2F2;border-bottom:1px solid #FECACA;flex-shrink:0;font-size:12px;color:#DC2626">
-      ⏰ <span id="ned-rem-txt">${_nedRecordatorio}</span>
-      <button onclick="nedClearRem()" style="background:none;border:none;cursor:pointer;color:#DC2626;margin-left:auto;font-size:18px;line-height:1">✕</button>
-    </div>
-
-    <input id="ned-title-in" type="text" placeholder="Título..."
-      value="${(n.titulo||'').replace(/"/g,'&quot;')}"
-      style="border:none;outline:none;background:transparent;font-family:'Playfair Display',serif;font-size:22px;font-weight:700;padding:12px 20px 6px;width:100%;box-sizing:border-box;flex-shrink:0;color:${nc.title}"
-      oninput="nedDirty()">
-
-    <div id="ned-photos" style="display:${_nedFotos.length?'flex':'none'};gap:8px;padding:6px 20px 2px;flex-shrink:0;overflow-x:auto">
-      ${_nedFotos.map((f,i)=>`<div style="position:relative;flex-shrink:0">
-        <img src="${f}" onclick="verFotoNota('${f}')" style="width:70px;height:70px;object-fit:cover;border-radius:10px;cursor:pointer">
-        <button onclick="nedDelPhoto(${i})" style="position:absolute;top:-5px;right:-5px;width:20px;height:20px;border-radius:50%;background:#E05252;color:#fff;border:none;cursor:pointer;font-size:11px;font-weight:700">✕</button>
-      </div>`).join('')}
-    </div>
-
-    <div id="ned-toolbar" style="display:flex;align-items:center;gap:2px;padding:5px 10px;flex-shrink:0;border-bottom:1px solid rgba(0,0,0,.1);flex-wrap:wrap;row-gap:3px;background:rgba(255,255,255,.6)">
-      <button class="ned-btn" onclick="nedUndo()" title="Deshacer">↩</button>
-      <button class="ned-btn" onclick="nedRedo()" title="Rehacer">↪</button>
-      <div class="ned-sep"></div>
-      <button class="ned-btn" id="nb-b" onmousedown="event.preventDefault();nedExec('bold')"        ><b>B</b></button>
-      <button class="ned-btn" id="nb-i" onmousedown="event.preventDefault();nedExec('italic')"      ><i>I</i></button>
-      <button class="ned-btn" id="nb-u" onmousedown="event.preventDefault();nedExec('underline')"   style="text-decoration:underline">U</button>
-      <button class="ned-btn" id="nb-s" onmousedown="event.preventDefault();nedExec('strikeThrough')" style="text-decoration:line-through">S</button>
-      <div class="ned-sep"></div>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('formatBlock','h2')">T1</button>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('formatBlock','h3')">T2</button>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('formatBlock','p')">¶</button>
-      <div class="ned-sep"></div>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('insertUnorderedList')">• Lista</button>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedExec('insertOrderedList')">1. Lista</button>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedAddCheck()">☑ Check</button>
-      <div class="ned-sep"></div>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedAddTable()">⊞ Tabla</button>
-      <button class="ned-btn" onmousedown="event.preventDefault();nedMark()" style="background:#FFF9C4;color:#92700A;font-weight:600">Aa</button>
-      <div class="ned-sep"></div>
-      ${cdots}
-    </div>
-
-    <div id="ned-scroller" style="flex:1;overflow-y:auto;padding:0 20px 100px;background-image:repeating-linear-gradient(transparent,transparent 31px,rgba(0,0,0,.07) 31px,rgba(0,0,0,.07) 32px);background-attachment:local">
-      <div id="ned-editor" contenteditable="true" data-ph="Escribe aquí..."
-        style="outline:none;min-height:400px;padding-top:6px;font-size:15px;line-height:32px;color:${nc.text};word-break:break-word"
-        onkeydown="nedKey(event)"
-        oninput="nedDirty();nedBar()"
-        onmouseup="nedBar()"
-        onkeyup="nedBar()">
-        ${n.texto||''}
-      </div>
-    </div>
-
-    <div id="ned-footer" style="position:fixed;bottom:0;left:0;right:0;background:${nc.bg}ee;border-top:1px solid rgba(0,0,0,.1);padding:8px 16px;display:flex;align-items:center;gap:8px;z-index:501;backdrop-filter:blur(8px)">
-      <span id="ned-wc" style="font-size:11px;color:${nc.footer}">0 palabras</span>
-      <span style="flex:1"></span>
-      <span id="ned-saved" style="font-size:11px;color:${nc.footer}"></span>
-    </div>
-
-    <input type="file" id="ned-file" accept="image/*" multiple style="display:none" onchange="nedPhotosIn(this)">
-  `;
-
-  document.body.appendChild(ov);
-  document.body.style.overflow = 'hidden';
-
-  setTimeout(()=>{
-    const ed = document.getElementById('ned-editor');
-    if(ed){
-      ed.focus();
-      nedUpdateWC();
-      try{
-        const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false);
-        const s=window.getSelection(); s.removeAllRanges(); s.addRange(r);
-      }catch(e){}
-      // ★ Re-attach tab/calc handlers for any tables already in the content
-      ed.querySelectorAll('table.nt[id]').forEach(t=>{
-        _ntAttachTab(t.id);
-        ntRecalc(t.id);
-      });
-    }
-  }, 100);
-
-  window._nedTimer = setInterval(nedAutoSave, 15000);
 }
 
 function nedExec(cmd, val){
@@ -10783,6 +10807,15 @@ const CERRAR_KWS = [
 ];
 
 function abrirModoLista(tipo, tituloInicial){
+  // ★ FIX CRÍTICO: detener el mic principal antes de iniciar el mic de lista
+  // Evita que dos instancias SpeechRecognition corran en paralelo
+  if(recognition){
+    micListening = false;
+    micRestartLock = true;
+    clearTimeout(micSilenceTimer);
+    try{ recognition.stop(); }catch(e){}
+    recognition = null;
+  }
   listaTipo = tipo || 'lista';
   listaItems = [];
   listaTotal = 0;
@@ -11546,35 +11579,39 @@ async function callGemini(prompt, keyOverride){
     generationConfig:{temperature:0.1, maxOutputTokens:600}
   };
   try{
+    // ★ FIX: AbortController con timeout de 15s
+    const controller = new AbortController();
+    const timeoutId = setTimeout(()=>controller.abort(), 15000);
     const res = await fetch(url, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
+      signal: controller.signal,
       body: JSON.stringify(body)
     });
+    clearTimeout(timeoutId);
     const data = await res.json();
     if(!res.ok){
-      console.error('Gemini API error:', res.status, JSON.stringify(data));
+      // ★ FIX: mensajes de error específicos según status
+      if(res.status === 429) toast('⏱ Gemini: demasiadas solicitudes — esperá 10s e intentá', 'error');
+      else if(res.status === 403) toast('🔑 API key de Gemini inválida — verificá en Ajustes', 'error');
+      else console.error('Gemini API error:', res.status, JSON.stringify(data));
       return null;
     }
     return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
   } catch(e){
-    console.error('Gemini fetch error:', e.message);
+    if(e.name === 'AbortError') console.warn('Gemini timeout (15s)');
+    else console.error('Gemini fetch error:', e.message);
     return null;
   }
 }
 
 async function processWithGemini(text){
   const isNeg = state.modo === 'negocio';
-  // Usar fecha LOCAL (Lima, UTC-5) — no UTC
+  // ★ Usar helpers hoyISO() y mananaISO() — sin duplicar cálculo de fecha
+  const hoy = hoyISO();
+  const mananaStr = mananaISO();
   const ahora = new Date();
-  const hoy = ahora.getFullYear()+'-'+
-    String(ahora.getMonth()+1).padStart(2,'0')+'-'+
-    String(ahora.getDate()).padStart(2,'0');
   const diaSemana = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][ahora.getDay()];
-  const manana = new Date(ahora); manana.setDate(ahora.getDate()+1);
-  const mananaStr = manana.getFullYear()+'-'+
-    String(manana.getMonth()+1).padStart(2,'0')+'-'+
-    String(manana.getDate()).padStart(2,'0');
   
   const prompt = `Eres un asistente de finanzas personales para un gasfitero en Lima, Perú.
 Hoy es ${hoy} (${diaSemana}). Mañana es ${mananaStr}.
@@ -11600,13 +11637,19 @@ ${isNeg?
 'Ingresos: Punto Adicional, Modificacion Red, Instalacion Nueva, Conversion Artefacto, Conexion Artefacto, Reparacion Tuberia, Gasfiteria, Documentacion, Cocina, Horno, Terma, Secadora, Calefon, Parrilla. Egresos: GNV, Materiales, Herramientas, Gasolina, Viaticos, Mantenimiento':
 'Ingresos: Sueldo, Freelance, Bono, Venta, Otro ingreso. Egresos: Alimentacion, Transporte, Servicios, Salud, Educacion, Ocio, Ropa, Deuda, Otro gasto'}
 
-Para fechas relativas usa hoy (${hoy}) como referencia. "este sábado" = próximo sábado. "construccion" es ambiguo: analizar contexto para determinar si es "Instalación Nueva", "Punto Adicional", "Modificación Red" u otro servicio.
+Para fechas relativas usa hoy (${hoy}) como referencia. "este sabado" = proximo sabado.
 
 REGLAS IMPORTANTES:
-- "cliente": conservar el tratamiento abreviado + nombre. Ejemplos: "señor Mario" → "Sr. Mario", "la señora Leonor" → "Sra. Leonor", "don Carlos" → "Sr. Carlos". NUNCA pongas "el", "la" solos sin tratamiento. "don", "doña" como cliente — solo el nombre.
-- Si no hay nombre de persona mencionado, cliente = null.
+- "cliente": SIEMPRE incluir tratamiento + nombre completo. Ejemplos:
+  * "el senor Manuel" -> "Sr. Manuel"  (NO devuelvas solo "el")
+  * "la senora Leonor" -> "Sra. Leonor"  (NO devuelvas solo "la")
+  * "don Carlos" -> "Sr. Carlos"
+  * "para Manuel" -> "Manuel"
+  * "al senor Rodriguez" -> "Sr. Rodriguez"
+  Si el usuario NO menciona un nombre de persona, cliente = null.
+- "servicio": si el usuario menciona EXPLICITAMENTE el servicio ("punto adicional", "instalacion", "terma", etc.), usa ese servicio EXACTO de la lista. "construccion" + "punto adicional" = "Punto Adicional". "construccion" solo = "Instalacion Nueva".
 - "ubicacion": solo el nombre del distrito de Lima. Si no hay distrito, null.
-- "hora": formato HH:MM en 24h. "9am" = "09:00", "3pm" = "15:00". Si no hay hora, null.`;
+- "hora": formato HH:MM en 24h. "9am"="09:00", "3pm"="15:00", "9 de la manana"="09:00", "3 de la tarde"="15:00". Si no hay hora, null.`;
 
   const response = await callGemini(prompt);
   if(!response) return null;
@@ -11614,14 +11657,8 @@ REGLAS IMPORTANTES:
   try{
     const clean = response.replace(/```json|```/g,'').trim();
     const parsed = JSON.parse(clean);
-    // Limpiar cliente — quitar títulos como "señor", "señora", "don", "doña", artículos
-    if(parsed.cliente && typeof parsed.cliente === 'string'){
-      parsed.cliente = parsed.cliente
-        .replace(/^(el|la|los|las|un|una)\s+/i, '')
-        .replace(/^(señor|señora|don|doña|sr\.?|sra\.?|ing\.?|dr\.?)\s+/i, '')
-        .trim();
-      if(!parsed.cliente) parsed.cliente = null;
-    }
+    // ★ Usar normalizarCliente() — función global única
+    if(parsed.cliente) parsed.cliente = normalizarCliente(parsed.cliente);
     return parsed;
   } catch(e){
     console.error('Gemini parse error:', e, response);
@@ -11634,6 +11671,9 @@ async function processVoiceWithGemini(text){
   // ── Chequeos locales PRIMERO — sin delay, sin Gemini ──
   const cleanText = text.replace(/^(oye|hey|ok|escucha|mira)\b/gi,'').trim();
   if(cleanText) text = cleanText;
+
+  // ★ Si el mic fue abortado mientras Gemini procesaba, salir
+  if(_micAborted) { processVoiceResult._busy = false; return; }
 
   // 1. Nota/Lista → abrir modo lista INMEDIATO
   if(isNotaCommand(text)){
@@ -11657,7 +11697,9 @@ async function processVoiceWithGemini(text){
 
     // Parser local inmediato
     try{ parseAgendaVoz(text); }catch(err){}
+    // ★ FIX: copiar y limpiar _avParsed para evitar herencia entre sesiones
     const localData = window._avParsed ? {...window._avParsed, tipo: tipoDetectado} : {tipo: tipoDetectado};
+    window._avParsed = null; // ★ FIX: limpiar para que la próxima agenda empiece limpia
 
     // ★ NO cerrar el mic modal — transformarlo en panel de confirmación de agenda
     _mostrarResumenAgendaEnMic(localData, text, tipoDetectado);
@@ -11669,7 +11711,11 @@ async function processVoiceWithGemini(text){
 
   // 3. Movimiento → Gemini procesa
   const micText = document.getElementById('micText');
-  if(micText) micText.textContent = '✨ Gemini analizando...';
+  // ★ Feedback visual mejorado: spinner animado mientras Gemini procesa
+  if(micText){
+    micText.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite">✨</span> Gemini analizando...';
+    micText.style.color = '#7C3AED';
+  }
 
   const result = await processWithGemini(text);
 
@@ -11867,11 +11913,11 @@ async function rellenarAgendaConGemini(text, tipoDetectado, localData){
   const geminiKey = localStorage.getItem('fnz_gemini_key');
   if(!geminiKey) return;
 
+  // ★ Usar helpers globales en vez de recalcular fecha
+  const hoy = hoyISO();
+  const mananaStr = mananaISO();
   const ahora = new Date();
-  const hoy = ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0')+'-'+String(ahora.getDate()).padStart(2,'0');
   const diaSemana = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][ahora.getDay()];
-  const manana = new Date(ahora); manana.setDate(ahora.getDate()+1);
-  const mananaStr = manana.getFullYear()+'-'+String(manana.getMonth()+1).padStart(2,'0')+'-'+String(manana.getDate()).padStart(2,'0');
 
   const serviciosOk = 'Punto Adicional|Modificación Red|Instalación Nueva|Conversión Artefacto|Conexión Artefacto|Reparación Tubería|Gasfitería|Documentación|Cocina / Cocinilla|Horno a Gas|Terma|Secadora a Gas|Calefón|Parrilla a Gas|Otro Servicio';
 
@@ -11898,15 +11944,18 @@ REGLAS CRÍTICAS:
    - "doscientos cincuenta" = 250
    - "un millón" = 1000000
    - Si no hay precio: null
-4. cliente: Conservar el tratamiento abreviado + nombre propio.
-   - "la señora Karen" → "Sra. Karen"
-   - "el señor Julio" → "Sr. Julio"
+4. cliente: SIEMPRE tratamiento abreviado + nombre. NUNCA devolver solo "el" o "la".
+   - "el senor Manuel" → "Sr. Manuel"  (NO "el")
+   - "la senora Karen" → "Sra. Karen"  (NO "la")
+   - "el senor Julio" → "Sr. Julio"
    - "don Pedro" → "Sr. Pedro"
-   - Si no hay tratamiento, solo el nombre propio.
+   - Si no hay nombre de persona: null
 5. servicio (solo si tipo=trabajo): Elegí el más apropiado de: ${serviciosOk}
-   - "punto adicional" → "Punto Adicional"
-   - "construccion" → analizar contexto: si habla de nueva conexión → "Instalación Nueva", si es punto → "Punto Adicional", si es modificar → "Modificación Red"
-   - Si no se puede determinar con certeza → "Otro Servicio""
+   - "punto adicional" → "Punto Adicional" (EXACTO)
+   - "construccion" + "punto adicional" → "Punto Adicional"
+   - "construccion" solo → "Instalación Nueva"
+   - "modificar red" o "modificacion" → "Modificación Red"
+   - Si no se puede determinar → "Otro Servicio"
 6. ubicacion: Solo el distrito de Lima. Si dice "comas" → "Comas", "san juan de miraflores" → "San Juan de Miraflores"
 7. Si el campo ya está correcto en el parse local, confirmalo tal cual.
 
@@ -11914,14 +11963,19 @@ Respondé SOLO con JSON válido, sin explicaciones:
 {"fecha":"YYYY-MM-DD","hora":"HH:MM o null","cliente":"nombre o null","servicio":"${tipoDetectado==='trabajo'?serviciosOk:'null'} o null","precio":numero_o_null,"ubicacion":"distrito o null","notas":"texto extra o null"}`;
 
   try{
+    // ★ FIX: AbortController con timeout de 12s para evitar espera infinita
+    const controller = new AbortController();
+    const timeoutId = setTimeout(()=>controller.abort(), 12000);
     const res = await fetch(GEMINI_URL(geminiKey),{
       method:'POST',
       headers:{'Content-Type':'application/json'},
+      signal: controller.signal,
       body: JSON.stringify({
         contents:[{role:'user',parts:[{text:prompt}]}],
         generationConfig:{temperature:0.05, maxOutputTokens:350}
       })
     });
+    clearTimeout(timeoutId);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
@@ -11953,16 +12007,9 @@ Respondé SOLO con JSON válido, sin explicaciones:
       }
     });
 
-    // ── Normalizar cliente: convertir forma larga a abreviada ──
+    // ★ Usar normalizarCliente() — función global única (elimina duplicación)
     if(_agendaMicData.cliente){
-      _agendaMicData.cliente = _agendaMicData.cliente
-        .replace(/^señora\s+/i,'Sra. ')
-        .replace(/^señor\s+/i,'Sr. ')
-        .replace(/^doña\s+/i,'Sra. ')
-        .replace(/^don\s+/i,'Sr. ')
-        .replace(/^(el|la)\s+/i,'')
-        .trim();
-      if(!_agendaMicData.cliente) _agendaMicData.cliente = null;
+      _agendaMicData.cliente = normalizarCliente(_agendaMicData.cliente);
     }
 
     // ── Refrescar panel si sigue visible ──
@@ -12063,7 +12110,13 @@ function processVoiceResult(text) {
   if (processVoiceResult._busy) return;
   processVoiceResult._busy = true;
   clearTimeout(processVoiceResult._busyTimer);
-  processVoiceResult._busyTimer = setTimeout(()=>{ processVoiceResult._busy = false; }, 8000);
+  // ★ FIX: mostrar feedback si Gemini tarda más de 8 segundos
+  processVoiceResult._busyTimer = setTimeout(()=>{
+    processVoiceResult._busy = false;
+    const micText2 = document.getElementById('micText');
+    if(micText2 && micText2.textContent.includes('analizando'))
+      micText2.textContent = '⚠ Gemini tardó demasiado — toca el mic e intentá de nuevo';
+  }, 8000);
   stopListening();
 
   // ★ Deduplicar texto repetido por reinicios del mic
@@ -12139,16 +12192,10 @@ function processVoiceResultManual(text) {
   document.getElementById('pvAmt').style.color = parsed.type==='ingreso' ? '#4CAF85' : '#E05252';
   document.getElementById('pvDateLbl').textContent = '📅 ' + fmtDateLabel(parsed.date);
 
-  // Cliente detectado
+  // Cliente detectado — ★ usar normalizarCliente() global
   const clienteBadge = document.getElementById('pvClienteBadge');
   if (parsed.cliente) {
-    const clienteLimpio = parsed.cliente
-      .replace(/^(el|la|los|las|un|una)\s+/i, '')
-      .replace(/^señora\s+/i,'Sra. ')
-      .replace(/^señor\s+/i,'Sr. ')
-      .replace(/^doña\s+/i,'Sra. ')
-      .replace(/^don\s+/i,'Sr. ')
-      .trim();
+    const clienteLimpio = normalizarCliente(parsed.cliente);
     if(clienteLimpio){
       clienteBadge.textContent = `👤 Cliente: ${clienteLimpio}`;
       clienteBadge.style.display = 'block';
