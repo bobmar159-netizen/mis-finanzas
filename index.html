@@ -6265,7 +6265,7 @@ function extractClienteAgenda(text){
     return '';
   })();
   // ── Intentar sobre texto ORIGINAL primero (preserva tildes y ñ) ──
-  const SVCSTOP = /\b(servicio|punto|adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|boca|precio|soles|el|la|en|de|del|a|las)\b/i;
+  const SVCSTOP = /\b(servicio|punto|adicional|terma|cocina|horno|calef[oó]n|parrilla|secadora|instalaci[oó]n|conexi[oó]n|reparaci[oó]n|modificaci[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|construcci[oó]n|tuber[ií]a|red|boca|precio|soles|el|la|en|de|del|a|las)\b/i;
   const DISTSW  = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|brena|miraflores|independencia|carabayllo|ventanilla|bellavista)$/i;
   const DIASW   = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana)$/i;
 
@@ -6279,12 +6279,14 @@ function extractClienteAgenda(text){
     const m = text.match(p);
     if(m && m[1]){
       const partes = m[1].trim().split(/\s+/).filter(Boolean);
-      // Cortar si segunda palabra es distrito o día
-      let nombre = (partes.length > 1 && (DISTSW.test(partes[1])||DIASW.test(partes[1])))
+      // Cortar si segunda palabra es distrito, día o servicio (normalizar tildes)
+      const p1Norm = partes.length > 1 ? partes[1].normalize('NFD').replace(/[\u0300-\u036f]/g,'') : '';
+      let nombre = (partes.length > 1 && (DISTSW.test(partes[1])||DIASW.test(partes[1])||SVCSTOP.test(p1Norm)))
         ? partes[0]
         : partes.slice(0,2).join(' ');
-      // Verificar que no es palabra de servicio
-      if(nombre.length > 1 && !SVCSTOP.test(nombre.split(' ')[0])) return (_tratAg ? _tratAg+' '+nombre : nombre);
+      // Verificar que no es palabra de servicio (normalizar para manejar tildes)
+      const n0Norm = nombre.split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if(nombre.length > 1 && !SVCSTOP.test(n0Norm)) return (_tratAg ? _tratAg+' '+nombre : nombre);
     }
   }
 
@@ -9340,27 +9342,28 @@ function extractCliente(text) {
   // Detectar tratamiento para conservarlo (Sr./Sra.)
   const _tratMatch = text.match(/\b(señor|señora|don|doña|sr\.?|sra\.?)\s+/i);
   const _trat = _tratMatch ? (/(señora|doña|sra)/i.test(_tratMatch[1]) ? 'Sra.' : 'Sr.') : '';
-  // ★ Palabras de servicio — cortar el nombre aquí
-  const SERVICIO_STOP = /\b(punto\s+adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|punto|adicional|tuberia|red|boca|servicio)\b/i;
+  // ★ Palabras de servicio — cortar el nombre aquí (con y sin tildes)
+  const SERVICIO_STOP = /\b(punto\s+adicional|terma|cocina|horno|calef[oó]n|parrilla|secadora|instalaci[oó]n|conexi[oó]n|reparaci[oó]n|modificaci[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|construcci[oó]n|punto|adicional|tuber[ií]a|red|boca|servicio)\b/i;
 
   const patterns = [
     // Con preposición explícita — máxima prioridad
-    /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+\d|\s+en\b|\s+de\b|\s+del\b|\s+por\b|\s+a las|\s+precio|\s+soles|\s+servicio|$)/i,
+    /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+\d|\s+en\b|\s+de\b|\s+del\b|\s+por\b|\s+a las|\s+precio|\s+soles|\s+servicio|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+conversi[oó]n|\s+construcci[oó]n|\s+gasfiter[ií]a|\s+documentaci[oó]n|\s+punto|\s+terma|\s+cocina|\s+horno|\s+calef[oó]n|\s+parrilla|\s+secadora|$)/i,
     // patron 2: "para el cliente X" — excluir 'cliente' de stop para no cortar el nombre
-    /(?:para|al|a|con)\s+(?:el|la)\s+(?:se\u00f1or|se\u00f1ora|vecino|vecina|casero|casera|propietario|propietaria|due\u00f1o|due\u00f1a)\s+([A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1][A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+servicio|$)/i,
-    /(?:para|al|a|con)\s+(?:el|la)\s+cliente\s+([A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1][A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|$)/i,
+    /(?:para|al|a|con)\s+(?:el|la)\s+(?:se\u00f1or|se\u00f1ora|vecino|vecina|casero|casera|propietario|propietaria|due\u00f1o|due\u00f1a)\s+([A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1][A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+servicio|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+punto|\s+terma|\s+cocina|\s+horno|$)/i,
+    /(?:para|al|a|con)\s+(?:el|la)\s+cliente\s+([A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1][A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+punto|\s+terma|$)/i,
     /(?:casa de|domicilio de|vivienda de|propiedad de)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|$)/i,
     /de(?:l|\s+la)?\s+(?:señor|señora|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+por\b|\s+precio|$)/i,
     /(?:para|al|con)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+en\b|\s+de\b|\s*[,.]|\s+precio|$)/,
     // ★ Sin preposición: "señora Carmen Lince", "señor Pedro viernes"
-    /(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+la\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|\s+servicio\b|\s+precio\b|\s+soles\b|\s+punto\b|\s+terma\b|\s+cocina\b|\s+horno\b|\s+calefon\b|\s+parrilla\b|\s+instalacion\b|\s+conexion\b|\s+reparacion\b|$)/i,
+    /(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+la\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|\s+servicio\b|\s+precio\b|\s+soles\b|\s+punto\b|\s+terma\b|\s+cocina\b|\s+horno\b|\s+calef[oó]n\b|\s+parrilla\b|\s+instalaci[oó]n\b|\s+conexi[oó]n\b|\s+reparaci[oó]n\b|\s+modificaci[oó]n\b|\s+gasfiter[ií]a\b|\s+documentaci[oó]n\b|\s+conversi[oó]n\b|\s+construcci[oó]n\b|$)/i,
   ];
   for (const p of patterns) {
     const m = t.match(p);
     if (m && m[1]) {
       let nombre = m[1].trim().replace(/\s+/g,' ');
-      // ★ Cortar en la primera palabra de servicio
-      const svcIdx = nombre.search(SERVICIO_STOP);
+      // ★ Cortar en la primera palabra de servicio — normalizar para manejar tildes
+      const nombreNorm = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const svcIdx = nombreNorm.search(SERVICIO_STOP);
       if(svcIdx > 0) nombre = nombre.slice(0, svcIdx).trim();
       // Limpiar preposiciones y días de semana
       nombre = nombre.replace(/\b(en|de|del|al|la|el|por|para|con|que|fue|era|un|una|este|esta|dia|día|lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana|siguiente|proximo|próximo)\b/gi,'').trim();
@@ -9368,7 +9371,9 @@ function extractCliente(text) {
       const partes = nombre.split(/\s+/).filter(Boolean);
       const DISTW = /^(los|san|la|el|villa|santa|jesus|pueblo|puente|ate|callao|surco|lince|rimac|comas|barranco|lurin|chorrillos|breña|brena|miraflores|independencia|carabayllo|ventanilla)$/i;
       const DIASW = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|mañana)$/i;
-      if(partes.length>1 && (DISTW.test(partes[1])||DIASW.test(partes[1]))) nombre=partes[0];
+      // ★ También verificar si segunda palabra es un servicio (con normalización)
+      const SVCW = /^(terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|punto|servicio|red|boca|adicional|precio|soles)$/i;
+      if(partes.length>1 && (DISTW.test(partes[1])||DIASW.test(partes[1])||SVCW.test(partes[1].normalize('NFD').replace(/[\u0300-\u036f]/g,'')))) nombre=partes[0];
       else nombre=partes.slice(0,2).join(' ');
       if (nombre.length > 1) return (_trat ? _trat + ' ' + nombre : nombre);
     }
