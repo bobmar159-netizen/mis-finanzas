@@ -6387,8 +6387,10 @@ function parseAgendaVoz(text){
     .replace(/\b(construccion|construcción|construcion)\b/gi, '')
     .replace(/\b(oye|hey|escucha|ok|mira|anota|registra|apunta|guarda|crea)\b/gi, '')
     .replace(/\b(para el dia de|para el dia|el dia de|día de mañana|dia de manana)\b(?!\s*(?:domingo|lunes|martes|miercoles|jueves|viernes|sabado))/gi, 'mañana')
-    // Pre-strip: "servicio X" -> "X" (con y sin acentos/tilde)
-    .replace(/\bservicio\s+(punto|terma|cocina|hornos?|calefons?|reparaci[oó]n|instalaci[oó]n|conexi[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|modificaci[oó]n|parrilla|secadora)/gi, '$1')
+    // Pre-strip: "servicio X" → "X" (con y sin acentos/tilde)
+    .replace(/\bservicio\s+(punto\s+adicional|punto|terma|cocina|hornos?|calefons?|reparaci[oó]n|instalaci[oó]n|conexi[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|modificaci[oó]n|parrilla|secadora)/gi, '$1')
+    // Pre-strip: eliminar "punto adicional" como frase completa cuando queda suelto
+    .replace(/\bpunto\s+adicional\b/gi, '_SVC_PUNTO_')
     .replace(/\s+/g, ' ')
     .trim();
   if(!text2) text2 = text;
@@ -9389,7 +9391,7 @@ function extractCliente(text) {
 
   const patterns = [
     // Con preposición explícita — máxima prioridad
-    /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+\d|\s+en\b|\s+de\b|\s+del\b|\s+por\b|\s+a las|\s+precio|\s+soles|\s+servicio|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+conversi[oó]n|\s+construcci[oó]n|\s+gasfiter[ií]a|\s+documentaci[oó]n|\s+punto|\s+terma|\s+cocina|\s+horno|\s+calef[oó]n|\s+parrilla|\s+secadora|$)/i,
+    /(?:al|para el|para la|a la|para|con el|con la)\s+(?:señor|señora|don|doña|sr\.?|sra\.?|ing\.?|ingeniero|ingeniera|doctor|doctora|prof\.?|profesor|profesora|arquitecto|arquitecta|licenciado|licenciada)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+\d|\s+en\b|\s+de\b|\s+del\b|\s+por\b|\s+a las|\s+precio|\s+soles|\s+servicio|\s+adicional|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+conversi[oó]n|\s+construcci[oó]n|\s+gasfiter[ií]a|\s+documentaci[oó]n|\s+punto|\s+terma|\s+cocina|\s+horno|\s+calef[oó]n|\s+parrilla|\s+secadora|$)/i,
     // patron 2: "para el cliente X" — excluir 'cliente' de stop para no cortar el nombre
     /(?:para|al|a|con)\s+(?:el|la)\s+(?:se\u00f1or|se\u00f1ora|vecino|vecina|casero|casera|propietario|propietaria|due\u00f1o|due\u00f1a)\s+([A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1][A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+servicio|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+punto|\s+terma|\s+cocina|\s+horno|$)/i,
     /(?:para|al|a|con)\s+(?:el|la)\s+cliente\s+([A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1][A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\s]{1,20}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+precio|\s+soles|\s+modificaci[oó]n|\s+instalaci[oó]n|\s+conexi[oó]n|\s+reparaci[oó]n|\s+punto|\s+terma|$)/i,
@@ -9397,7 +9399,7 @@ function extractCliente(text) {
     /de(?:l|\s+la)?\s+(?:señor|señora|don|doña|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,25}?)(?:\s*[,.]|\s+en\b|\s+de\b|\s+por\b|\s+precio|$)/i,
     /(?:para|al|con)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+en\b|\s+de\b|\s*[,.]|\s+precio|$)/,
     // ★ Sin preposición: "señora Carmen Lince", "señor Pedro viernes"
-    /(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+la\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|\s+servicio\b|\s+precio\b|\s+soles\b|\s+punto\b|\s+terma\b|\s+cocina\b|\s+horno\b|\s+calef[oó]n\b|\s+parrilla\b|\s+instalaci[oó]n\b|\s+conexi[oó]n\b|\s+reparaci[oó]n\b|\s+modificaci[oó]n\b|\s+gasfiter[ií]a\b|\s+documentaci[oó]n\b|\s+conversi[oó]n\b|\s+construcci[oó]n\b|$)/i,
+    /(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-Za-záéíóúñÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\s]{1,20}?)(?:\s+en\b|\s+de\b|\s*[,.]|\s+\d|\s+este\b|\s+el\b|\s+la\b|\s+lunes|\s+martes|\s+miercoles|\s+jueves|\s+viernes|\s+sabado|\s+domingo|\s+hoy|\s+manana|\s+mañana|\s+servicio\b|\s+precio\b|\s+soles\b|\s+adicional\b|\s+punto\b|\s+terma\b|\s+cocina\b|\s+horno\b|\s+calef[oó]n\b|\s+parrilla\b|\s+instalaci[oó]n\b|\s+conexi[oó]n\b|\s+reparaci[oó]n\b|\s+modificaci[oó]n\b|\s+gasfiter[ií]a\b|\s+documentaci[oó]n\b|\s+conversi[oó]n\b|\s+construcci[oó]n\b|$)/i,
   ];
   for (const p of patterns) {
     const m = t.match(p);
@@ -9422,7 +9424,7 @@ function extractCliente(text) {
   }
   // ── FALLBACK ULTRASIMPLE: "señor/don + nombre" en cualquier posición ──
   // Cubre casos donde los patrones complejos fallan por orden desordenado
-  const ULTRA_SVCSTOP = /^(servicio|punto|adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|construccion|tuberia|red|precio|soles|para|en|de|del|al|la|el|a|las)$/i;
+  const ULTRA_SVCSTOP = /^(servicio|punto|adicional|terma|cocina|horno|calef[oó]n|parrilla|secadora|instalaci[oó]n|conexi[oó]n|reparaci[oó]n|modificaci[oó]n|gasfiter[ií]a|documentaci[oó]n|conversi[oó]n|construcci[oó]n|tuber[ií]a|red|precio|soles|para|en|de|del|al|la|el|a|las|_svc_punto_)$/i;
   const ultFallback = t.match(/(?:señora?|doña?|don|sr\.?|sra\.?)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñ]{1,20})/i);
   if(ultFallback && ultFallback[1]){
     const fn = ultFallback[1].trim();
