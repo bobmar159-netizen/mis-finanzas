@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#F9F7F3">
 <title>Mis Finanzas</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;600&family=Roboto:wght@400;700&family=Open+Sans:wght@400;600&family=Lora:ital,wght@0,400;0,600&family=Merriweather:wght@400;700&family=Poppins:wght@400;600&family=Montserrat:wght@400;600&family=Lato:wght@400;700&family=Oswald:wght@400;600&family=Raleway:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
@@ -6839,7 +6839,15 @@ function abrirEditorNotaBloque(editId){
   window._pnedBlocks=blocks;
 
   const nc=NOTA_COLORES[window._pnedColor]||NOTA_COLORES.amarillo;
-  const FONTS={dmsans:"'DM Sans',sans-serif",playfair:"'Playfair Display',serif",mono:"'Courier New',monospace"};
+  const FONTS={
+    dmsans:"'DM Sans',sans-serif",playfair:"'Playfair Display',serif",inter:"'Inter',sans-serif",
+    roboto:"'Roboto',sans-serif",opensans:"'Open Sans',sans-serif",lora:"'Lora',serif",
+    merriweather:"'Merriweather',serif",poppins:"'Poppins',sans-serif",montserrat:"'Montserrat',sans-serif",
+    lato:"'Lato',sans-serif",oswald:"'Oswald',sans-serif",raleway:"'Raleway',sans-serif",
+    arial:"Arial,sans-serif", times:"'Times New Roman',serif", courier:"'Courier New',monospace",
+    verdana:"Verdana,sans-serif", tahoma:"Tahoma,sans-serif", trebuchet:"'Trebuchet MS',sans-serif",
+    georgia:"Georgia,serif", garamond:"Garamond,serif"
+  };
 
   const colorDots=Object.entries(NOTA_COLORES).map(([k,v])=>
     `<div class="pnt-color${window._pnedColor===k?' sel':''}" title="${v.label}" style="background:${v.bg};border-color:${window._pnedColor===k?'rgba(0,0,0,.5)':'transparent'}" onclick="pnedSetColor('${k}')"></div>`
@@ -6847,32 +6855,32 @@ function abrirEditorNotaBloque(editId){
 
   const ov=document.createElement('div');
   ov.id='pned-overlay';
-  ov.style.cssText=`position:fixed;inset:0;z-index:500;display:flex;flex-direction:column;background:${nc.bg};font-family:${FONTS[window._pnedFont]||FONTS.dmsans}`;
+  ov.style.cssText=`position:fixed;inset:0;z-index:500;display:flex;flex-direction:column;background:#F8FAFC;font-family:${FONTS[window._pnedFont]||FONTS.dmsans}`;
 
   ov.innerHTML=`
-    <div id="pned-topbar" style="background:${nc.bg}">
-      <button onclick="pnedClose()" style="background:none;border:none;font-size:22px;cursor:pointer;color:${nc.footer};padding:2px 6px;flex-shrink:0">←</button>
-      <input id="pned-title-inp" type="text" placeholder="Título..." value="${(n?.titulo||'').replace(/"/g,'&quot;')}"
-        style="color:${nc.title}" oninput="window._pnedDirty=true">
-      <button onclick="pnedIAPanel()" style="background:linear-gradient(135deg,#7C3AED,#9F5AE5);color:#fff;border:none;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0">✨ IA</button>
+    <div id="pned-topbar" style="background:#FFFFFF;border-bottom:1px solid #E2E8F0;box-shadow:0 2px 10px rgba(0,0,0,0.02)">
+      <button onclick="pnedClose()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:2px 6px;flex-shrink:0">←</button>
+      <div style="flex:1"></div>
+      <button onclick="exportNotaPnedWA()" style="background:#E3F2FD;color:#1565C0;border:none;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0;margin-right:8px">🟢 JPG A4</button>
+      <button onclick="pnedIAPanel()" style="background:linear-gradient(135deg,#7C3AED,#9F5AE5);color:#fff;border:none;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0;margin-right:8px">✨ IA</button>
       <button onclick="pnedSave(true)" style="background:linear-gradient(135deg,#5D4037,#8D6E63);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0">Guardar</button>
     </div>
-    <div id="pned-toolbar">
-      <button class="pnt-btn" onclick="pnedUndo()" title="Deshacer">⟲</button>
-      <button class="pnt-btn" onclick="pnedRedo()" title="Rehacer">⟳</button>
+    <div id="pned-toolbar" style="background:white;padding:8px;border-bottom:1px solid #E2E8F0;display:flex;gap:6px;overflow-x:auto">
+      <button class="pnt-btn" onclick="pnedUndo()" title="Deshacer (Ctrl+Z)">⟲</button>
+      <button class="pnt-btn" onclick="pnedRedo()" title="Rehacer (Ctrl+Y)">⟳</button>
       <div class="pnt-sep"></div>
-      <button class="pnt-btn" id="pntb-b" onmousedown="event.preventDefault();pnedExec('bold')"><b>B</b></button>
-      <button class="pnt-btn" id="pntb-i" onmousedown="event.preventDefault();pnedExec('italic')"><i>I</i></button>
-      <button class="pnt-btn" id="pntb-u" onmousedown="event.preventDefault();pnedExec('underline')" style="text-decoration:underline">U</button>
-      <button class="pnt-btn" id="pntb-s" onmousedown="event.preventDefault();pnedExec('strikeThrough')" style="text-decoration:line-through">S</button>
+      <button class="pnt-btn" id="pntb-b" onmousedown="event.preventDefault();pnedExec('bold')" title="Negrita"><b>B</b></button>
+      <button class="pnt-btn" id="pntb-i" onmousedown="event.preventDefault();pnedExec('italic')" title="Cursiva"><i>I</i></button>
+      <button class="pnt-btn" id="pntb-u" onmousedown="event.preventDefault();pnedExec('underline')" style="text-decoration:underline" title="Subrayado">U</button>
+      <button class="pnt-btn" id="pntb-s" onmousedown="event.preventDefault();pnedExec('strikeThrough')" style="text-decoration:line-through" title="Tachado">S</button>
       <div class="pnt-sep"></div>
-      <button class="pnt-btn" onclick="pnedChangeFontSize(-2)" title="Reducir tamaño">A-</button>
-      <select class="pnt-sel" id="pned-font-size" onchange="pnedSetFontSz(this.value)" title="Tamaño">
-        ${[12,14,15,17,20,24,28,32].map(s=>`<option value="${s}" ${s===15?'selected':''}>${s}px</option>`).join('')}
+      <button class="pnt-btn" onclick="pnedChangeFontSize(-2)" title="Reducir tamaño (A-)">A-</button>
+      <select class="pnt-sel" id="pned-font-size" onchange="pnedSetFontSz(this.value)" title="Tamaño exacto de fuente">
+        ${[10,11,12,14,16,18,20,24,28,32,36,48].map(s=>`<option value="${s}" ${s===16?'selected':''}>${s}px</option>`).join('')}
       </select>
-      <button class="pnt-btn" onclick="pnedChangeFontSize(2)" title="Aumentar tamaño">A+</button>
+      <button class="pnt-btn" onclick="pnedChangeFontSize(2)" title="Aumentar tamaño (A+)">A+</button>
       <div class="pnt-sep"></div>
-      <select class="pnt-sel" onchange="pnedSetFont(this.value)" title="Fuente" style="width:140px">
+      <select class="pnt-sel" onchange="pnedSetFont(this.value)" title="Fuente / Tipografía" style="width:140px;font-family:inherit">
         <option value="dmsans" ${window._pnedFont==='dmsans'?'selected':''}>DM Sans</option>
         <option value="playfair" ${window._pnedFont==='playfair'?'selected':''}>Playfair Display</option>
         <option value="inter" ${window._pnedFont==='inter'?'selected':''}>Inter</option>
@@ -6882,25 +6890,44 @@ function abrirEditorNotaBloque(editId){
         <option value="merriweather" ${window._pnedFont==='merriweather'?'selected':''}>Merriweather</option>
         <option value="poppins" ${window._pnedFont==='poppins'?'selected':''}>Poppins</option>
         <option value="montserrat" ${window._pnedFont==='montserrat'?'selected':''}>Montserrat</option>
-        <option value="mono" ${window._pnedFont==='mono'?'selected':''}>Courier</option>
+        <option value="lato" ${window._pnedFont==='lato'?'selected':''}>Lato</option>
+        <option value="oswald" ${window._pnedFont==='oswald'?'selected':''}>Oswald</option>
+        <option value="raleway" ${window._pnedFont==='raleway'?'selected':''}>Raleway</option>
+        <option value="arial" ${window._pnedFont==='arial'?'selected':''}>Arial</option>
+        <option value="times" ${window._pnedFont==='times'?'selected':''}>Times New Roman</option>
+        <option value="courier" ${window._pnedFont==='courier'?'selected':''}>Courier New</option>
+        <option value="verdana" ${window._pnedFont==='verdana'?'selected':''}>Verdana</option>
+        <option value="tahoma" ${window._pnedFont==='tahoma'?'selected':''}>Tahoma</option>
+        <option value="trebuchet" ${window._pnedFont==='trebuchet'?'selected':''}>Trebuchet MS</option>
+        <option value="georgia" ${window._pnedFont==='georgia'?'selected':''}>Georgia</option>
+        <option value="garamond" ${window._pnedFont==='garamond'?'selected':''}>Garamond</option>
       </select>
       <div class="pnt-sep"></div>
+      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#000000')" style="color:#000;font-weight:900" title="Negro">A</button>
       <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#C62828')" style="color:#C62828;font-weight:900" title="Rojo">A</button>
       <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#1565C0')" style="color:#1565C0;font-weight:900" title="Azul">A</button>
       <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#2E7D32')" style="color:#2E7D32;font-weight:900" title="Verde">A</button>
-      <button class="pnt-btn" onmousedown="event.preventDefault();pnedMark()" style="background:#FFF9C4;color:#92700A;font-weight:700;font-size:11px;border-radius:5px" title="Resaltar">Aa</button>
+      <button class="pnt-btn" onmousedown="event.preventDefault();pnedMark()" style="background:#FFF9C4;color:#92700A;font-weight:700;font-size:11px;border-radius:5px" title="Resaltar texto">Aa</button>
       <div class="pnt-sep"></div>
       ${colorDots}
     </div>
-    <div id="pned-scroller"><div id="pned-blocks" style="padding-top:4px"></div></div>
-    <div id="pned-footer" style="background:${nc.bg}ee">
-      <button class="pned-foot-btn" onclick="pnedMicGemini()" title="Mic IA">🎙</button>
-      <button class="pned-foot-btn" onclick="pnedAddBlock('check')" title="Check">☑</button>
+    
+    <div id="pned-scroller" style="flex:1;overflow-y:auto;padding:30px 20px;display:flex;flex-direction:column;align-items:center;">
+      <div id="pned-a4-sheet" style="width:100%;max-width:794px;min-height:1123px;background:${nc.bg};border-radius:4px;box-shadow:0 8px 30px rgba(0,0,0,0.1);padding:50px 40px;box-sizing:border-box;margin-bottom:60px;">
+        <input id="pned-title-inp" type="text" placeholder="Título..." value="${(n?.titulo||'').replace(/"/g,'&quot;')}" style="width:100%;border:none;outline:none;font-size:28px;font-weight:700;color:${nc.title};background:transparent;border-bottom:1px dashed rgba(0,0,0,0.1);padding-bottom:10px;margin-bottom:20px;" oninput="window._pnedDirty=true">
+        <div id="pned-blocks" style="padding-top:4px"></div>
+      </div>
+    </div>
+    
+    <div id="pned-footer" style="background:#FFFFFF;border-top:1px solid #E2E8F0;">
+      <button class="pned-foot-btn" onclick="pnedMicGemini()" title="Mic IA dictado">🎙</button>
+      <button class="pned-foot-btn" onclick="pnedAddBlock('blueprint')" title="Plano Arquitectónico">📐</button>
+      <button class="pned-foot-btn" onclick="pnedAddBlock('check')" title="Lista Checklist">☑</button>
       <button class="pned-foot-btn" onclick="pnedAddBlock('bullet')" title="Viñeta">•</button>
-      <button class="pned-foot-btn" onclick="pnedInsTable()" title="Tabla">⊞</button>
-      <button class="pned-foot-btn" onclick="pnedAddPhoto()" title="Foto">📷</button>
-      <button class="pned-foot-btn" onclick="pnedEditTags()" title="Tags">🏷️</button>
-      <span id="pned-wc" style="font-size:11px;color:${nc.footer};flex:1;text-align:right"></span>
+      <button class="pned-foot-btn" onclick="pnedInsTable()" title="Insertar Tabla Editable">⊞</button>
+      <button class="pned-foot-btn" onclick="pnedAddPhoto()" title="Insertar Fotografía">📷</button>
+      <button class="pned-foot-btn" onclick="pnedEditTags()" title="Tags / Etiquetas">🏷️</button>
+      <span id="pned-wc" style="font-size:11px;color:#64748B;flex:1;text-align:right"></span>
       <input type="file" id="pned-file-in" accept="image/*" multiple style="display:none" onchange="pnedPhotosIn(this)">
     </div>`;
 
@@ -6941,6 +6968,7 @@ function pnedMkEl(b){
   if(b.type==='bullet'||b.type==='numbered') { wrap.appendChild(handle); wrap.appendChild(pnedMkList(b)); return wrap; }
   if(b.type==='image')  { wrap.appendChild(pnedMkImg(b)); return wrap; }
   if(b.type==='table')  { wrap.appendChild(pnedMkTable(b)); return wrap; }
+  if(b.type==='blueprint'){ wrap.appendChild(handle); wrap.appendChild(pnedMkBlueprint(b)); return wrap; }
   if(b.type==='divider'){ const d=document.createElement('div'); d.style.cssText='border-top:1.5px dashed rgba(0,0,0,.2);margin:10px 0;width:100%'; wrap.appendChild(d); return wrap; }
 
   const el=document.createElement('div');
@@ -9061,7 +9089,7 @@ function render(){
     case 'agenda':content.innerHTML=renderAgenda();break;
     case 'graficos':content.innerHTML=renderGraficos();setTimeout(buildCharts,50);break;
     case 'ajustes':content.innerHTML=renderAjustes();break;
-    case 'notas':content.innerHTML=renderNotas6();break;
+    case 'notas':content.innerHTML=renderNotas();break;
   }
   setTimeout(()=>{ renderSoundsList(); renderRemindersList(); checkNotifBtn(); },50);
 }
