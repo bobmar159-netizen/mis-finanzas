@@ -7724,6 +7724,216 @@ function pnedAddAfter(afterId,type){
   },30);
 }
 
+// ── BLUEPRINT BLOCK (Plano Arquitectónico) ──
+function pnedMkBlueprint(b){
+  const row = document.createElement('div');
+  row.className = 'pn-blueprint-row';
+  row.style.cssText = 'width:100%;min-height:220px;position:relative;background:#f8fafc;border:1.5px dashed #CBD5E1;border-radius:12px;margin-bottom:10px;overflow:hidden;flex:1;touch-action:none;';
+  if(!b.lines) b.lines = [];
+  if(!b.img) b.img = '';
+
+  const imgEl = document.createElement('img');
+  imgEl.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;position:absolute;inset:0;';
+  if(b.img){ imgEl.src = b.img; row.style.border='none'; row.style.background='transparent'; }
+
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair;';
+
+  const dimLayer = document.createElement('div');
+  dimLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:3;';
+
+  const addImgBtn = document.createElement('div');
+  addImgBtn.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:10px 22px;background:rgba(30,30,30,0.65);color:#fff;border-radius:24px;cursor:pointer;font-size:13px;font-weight:700;z-index:10;backdrop-filter:blur(4px);letter-spacing:.03em;';
+  addImgBtn.innerHTML = '📷 ' + (b.img ? 'Cambiar Foto' : 'Cargar Plano / Foto');
+  addImgBtn.onclick = () => {
+    const i = document.createElement('input'); i.type='file'; i.accept='image/*';
+    i.onchange = (e) => {
+      const file = e.target.files[0]; if(!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        b.img = ev.target.result;
+        imgEl.src = b.img;
+        row.style.border='none'; row.style.background='transparent';
+        addImgBtn.innerHTML = '📷 Cambiar Foto';
+        window._pnedDirty=true;
+        setTimeout(()=>resize(), 100);
+      };
+      reader.readAsDataURL(file);
+    };
+    i.click();
+  };
+
+  const cTools = document.createElement('div');
+  cTools.style.cssText = 'position:absolute;top:8px;right:8px;display:flex;gap:5px;z-index:10;align-items:center;';
+  const cLabel = document.createElement('span');
+  cLabel.style.cssText='font-size:10px;color:#fff;background:rgba(0,0,0,.5);padding:3px 6px;border-radius:6px;font-weight:600;';
+  cLabel.textContent='Color cota:';
+  const cColor = document.createElement('input');
+  cColor.type = 'color'; cColor.value = '#DC2626';
+  cColor.style.cssText = 'width:32px;height:32px;border:2px solid #fff;border-radius:50%;overflow:hidden;padding:0;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+  cTools.appendChild(cLabel); cTools.appendChild(cColor);
+
+  // Magnifier / Lupa
+  let magnifier = document.getElementById('_pned_magnifier');
+  if(!magnifier){
+    magnifier = document.createElement('div');
+    magnifier.id='_pned_magnifier';
+    magnifier.style.cssText='position:fixed;width:90px;height:90px;border-radius:50%;border:3px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,.4);pointer-events:none;display:none;background-repeat:no-repeat;z-index:2000;';
+    document.body.appendChild(magnifier);
+  }
+
+  row.appendChild(imgEl);
+  row.appendChild(canvas);
+  row.appendChild(dimLayer);
+  row.appendChild(addImgBtn);
+  row.appendChild(cTools);
+
+  let ctx = null, w = 0, h = 0;
+  let isDragging = false, dragType = null, dragLineId = null, startX = 0, startY = 0;
+
+  const resize = () => {
+    w = row.clientWidth; h = row.clientHeight || 220;
+    canvas.width = w; canvas.height = h;
+    ctx = canvas.getContext('2d');
+    draw(); rebuildLabels();
+  };
+  setTimeout(resize, 150);
+
+  const getPos = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const src = e.touches && e.touches.length > 0 ? e.touches[0] : (e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches[0] : e);
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top, cx: src.clientX, cy: src.clientY };
+  };
+
+  const drawArrow = (c, x1, y1, x2, y2, color, width) => {
+    const headlen = 13, dx = x2-x1, dy = y2-y1, angle = Math.atan2(dy,dx);
+    c.strokeStyle = color; c.lineWidth = width; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2);
+    c.moveTo(x1+headlen*Math.cos(angle+Math.PI/6), y1+headlen*Math.sin(angle+Math.PI/6)); c.lineTo(x1,y1);
+    c.lineTo(x1+headlen*Math.cos(angle-Math.PI/6), y1+headlen*Math.sin(angle-Math.PI/6));
+    c.moveTo(x2-headlen*Math.cos(angle-Math.PI/6), y2-headlen*Math.sin(angle-Math.PI/6)); c.lineTo(x2,y2);
+    c.lineTo(x2-headlen*Math.cos(angle+Math.PI/6), y2-headlen*Math.sin(angle+Math.PI/6));
+    c.stroke();
+    c.fillStyle = color;
+    c.beginPath(); c.arc(x1,y1,7,0,2*Math.PI); c.fill();
+    c.beginPath(); c.arc(x2,y2,7,0,2*Math.PI); c.fill();
+  };
+
+  const draw = (tx, ty) => {
+    if(!ctx) return;
+    ctx.clearRect(0,0,w,h);
+    for(let l of b.lines){
+      if(dragType==='move_line' && dragLineId===l.id){ let dx=tx-startX,dy=ty-startY; drawArrow(ctx,l.x1+dx,l.y1+dy,l.x2+dx,l.y2+dy,l.color,2.5); continue; }
+      if(dragType==='move_p1'  && dragLineId===l.id){ drawArrow(ctx,tx,ty,l.x2,l.y2,l.color,2.5); continue; }
+      if(dragType==='move_p2'  && dragLineId===l.id){ drawArrow(ctx,l.x1,l.y1,tx,ty,l.color,2.5); continue; }
+      drawArrow(ctx,l.x1,l.y1,l.x2,l.y2,l.color,2.5);
+    }
+    if(dragType==='new' && tx!=null) drawArrow(ctx,startX,startY,tx,ty,cColor.value,2.5);
+  };
+
+  const rebuildLabels = () => {
+    dimLayer.innerHTML = '';
+    for(let l of b.lines){
+      const div = document.createElement('div');
+      div.style.cssText='position:absolute;background:rgba(255,255,255,0.95);border:1.5px solid '+l.color+';color:'+l.color+';font-weight:700;font-size:12px;padding:2px 8px;border-radius:6px;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.15);z-index:4;';
+      div.style.left = ((l.x1+l.x2)/2)+'px';
+      div.style.top  = ((l.y1+l.y2)/2)+'px';
+      div.innerText  = l.text;
+      div.ontouchstart = div.onmousedown = (e) => {
+        e.stopPropagation(); e.preventDefault();
+        const nl = prompt('Editar cota (escribe X para borrar):', div.innerText);
+        if(nl !== null){
+          if(nl.trim().toUpperCase()==='X') b.lines = b.lines.filter(x=>x.id!==l.id);
+          else l.text = nl;
+          window._pnedDirty=true; draw(); rebuildLabels();
+        }
+      };
+      dimLayer.appendChild(div);
+    }
+  };
+
+  const getTarget = (x, y) => {
+    for(let l of b.lines){
+      if(Math.hypot(l.x1-x,l.y1-y)<18) return {type:'p1',id:l.id};
+      if(Math.hypot(l.x2-x,l.y2-y)<18) return {type:'p2',id:l.id};
+      if(Math.hypot((l.x1+l.x2)/2-x,(l.y1+l.y2)/2-y)<22) return {type:'line',id:l.id};
+    }
+    return null;
+  };
+
+  const showMagnifier = (cx, cy) => {
+    magnifier.style.display='block';
+    magnifier.style.left=(cx-45)+'px';
+    magnifier.style.top=(cy-120)+'px';
+    magnifier.style.backgroundImage='url('+canvas.toDataURL()+')';
+    magnifier.style.backgroundPosition='-'+(cx-45)+'px -'+(cy-45)+'px';
+    magnifier.style.backgroundSize=w+'px '+h+'px';
+  };
+
+  const down = (e) => {
+    if(e.target===addImgBtn||e.target===cColor||e.target===cLabel) return;
+    e.preventDefault();
+    const pos=getPos(e); startX=pos.x; startY=pos.y;
+    const tgt=getTarget(pos.x,pos.y);
+    isDragging=true;
+    if(tgt){ dragType='move_'+tgt.type; dragLineId=tgt.id; showMagnifier(pos.cx,pos.cy); }
+    else { dragType='new'; }
+  };
+  const move = (e) => {
+    if(!isDragging) return;
+    e.preventDefault();
+    const pos=getPos(e); draw(pos.x,pos.y);
+    if(dragType!=='new') showMagnifier(pos.cx,pos.cy);
+  };
+  const up = (e) => {
+    if(!isDragging) return;
+    isDragging=false; magnifier.style.display='none';
+    const pos=getPos(e);
+    if(dragType==='new'){
+      if(Math.hypot(pos.x-startX,pos.y-startY)>20)
+        b.lines.push({id:Date.now()+'',x1:startX,y1:startY,x2:pos.x,y2:pos.y,text:'1.00 m',color:cColor.value});
+    } else if(dragType==='move_p1'){
+      let l=b.lines.find(x=>x.id===dragLineId); if(l){l.x1=pos.x;l.y1=pos.y;}
+    } else if(dragType==='move_p2'){
+      let l=b.lines.find(x=>x.id===dragLineId); if(l){l.x2=pos.x;l.y2=pos.y;}
+    } else if(dragType==='move_line'){
+      let l=b.lines.find(x=>x.id===dragLineId);
+      if(l){let dx=pos.x-startX,dy=pos.y-startY;l.x1+=dx;l.y1+=dy;l.x2+=dx;l.y2+=dy;}
+    }
+    dragType=null; window._pnedDirty=true; draw(); rebuildLabels();
+  };
+
+  canvas.addEventListener('mousedown',down);
+  canvas.addEventListener('touchstart',down,{passive:false});
+  window.addEventListener('mousemove',move);
+  window.addEventListener('touchmove',move,{passive:false});
+  window.addEventListener('mouseup',up);
+  window.addEventListener('touchend',up);
+
+  return row;
+}
+
+// ── EXPORT JPG A4 → WhatsApp ──
+async function exportNotaPnedWA(){
+  const sheet = document.getElementById('pned-a4-sheet');
+  if(!sheet){ toast('No se encontró la hoja A4'); return; }
+  toast('📸 Generando imagen A4… espera');
+  try {
+    const cnv = await html2canvas(sheet, {scale:2,useCORS:true,backgroundColor:'#FFFFFF',logging:false});
+    cnv.toBlob(async (blob) => {
+      if(!blob){ toast('❌ Fallo generar imagen'); return; }
+      const file = new File([blob],'Nota_A4.jpg',{type:'image/jpeg'});
+      if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
+        try{ await navigator.share({title:'Mi Nota',text:'Desde Mis Finanzas',files:[file]}); }catch(err){}
+      } else {
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a'); a.href=url; a.download='Nota_A4.jpg'; a.click();
+        setTimeout(()=>URL.revokeObjectURL(url),2000);
+      }
+    },'image/jpeg',0.95);
+  } catch(e){ toast('❌ Error: '+e.message); }
+}
+
 function pnedAddBlock(type){
   const last=window._pnedBlocks.slice(-1)[0];
   if(last)pnedAddAfter(last.id,type);
