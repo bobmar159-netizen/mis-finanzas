@@ -546,8 +546,8 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .pned-ia-chip:active{transform:scale(.97)}
 /* Editor footer */
 #pned-footer{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.92);border-top:1px solid rgba(0,0,0,.08);padding:8px 14px;display:flex;align-items:center;gap:7px;z-index:501;backdrop-filter:blur(10px);max-width:430px;margin:0 auto}
-.pned-foot-btn{width:38px;height:38px;border-radius:11px;border:none;background:rgba(0,0,0,.06);cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;transition:background .12s;flex-shrink:0}
-.pned-foot-btn:active{background:rgba(0,0,0,.14)}
+.pned-foot-btn{width:48px;height:48px;border-radius:14px;border:none;background:rgba(0,0,0,.06);cursor:pointer;font-size:24px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.pned-foot-btn:active{background:rgba(0,0,0,.16);transform:scale(0.95)}
 /* Mic overlay notas */
 .pn-mic-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .18s}
 .pn-mic-box{background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:22px 18px 38px}
@@ -6832,7 +6832,7 @@ function abrirEditorNotaBloque(editId){
 
   const n = window._pnedNota;
   let blocks=[];
-  if(n&&n.blocks&&n.blocks.length) blocks=n.blocks;
+  if(n&&n.blocks&&n.blocks.length) blocks=JSON.parse(JSON.stringify(n.blocks));
   else if(n&&n.items&&n.items.length) blocks=n.items.map(it=>({id:pnId(),type:'check',content:it.texto||it.content||'',price:it.precio||null,done:it.done||false}));
   else if(n&&n.texto) blocks=[{id:pnId(),type:'paragraph',content:n.texto}];
   else blocks=[{id:pnId(),type:'paragraph',content:''}];
@@ -7728,7 +7728,7 @@ function pnedAddAfter(afterId,type){
 function pnedMkBlueprint(b){
   const row = document.createElement('div');
   row.className = 'pn-blueprint-row';
-  b.h = b.h || 350;
+  b.h = b.h || 550;
   row.style.cssText = 'width:100%;height:'+b.h+'px;position:relative;background:#f8fafc;border:1.5px dashed #CBD5E1;border-radius:12px;margin-bottom:10px;display:flex;flex-direction:column;';
   if(!b.lines) b.lines = [];
   if(!b.img) b.img = '';
@@ -7765,14 +7765,15 @@ function pnedMkBlueprint(b){
       reader.onload = (ev) => {
          const tmp = new Image();
          tmp.onload = () => {
-             const mx = 1200; let ww = tmp.width, hh = tmp.height;
+             const mx = 900; let ww = tmp.width, hh = tmp.height;
              if(ww>mx || hh>mx){ if(ww>hh){hh=Math.round(hh*mx/ww); ww=mx;}else{ww=Math.round(ww*mx/hh); hh=mx;} }
              const tc = document.createElement('canvas'); tc.width=ww; tc.height=hh;
              tc.getContext('2d').drawImage(tmp,0,0,ww,hh);
-             b.img = tc.toDataURL('image/jpeg', 0.6); // Compress to save space in localStorage
+             b.img = tc.toDataURL('image/jpeg', 0.45); // Compress heavily to bypass localStorage quota
              row.style.border='1px solid var(--border)';
              addImgBtn.innerHTML = '📷 Cambiar Foto';
              window._pnedDirty=true;
+             if(typeof pnedSaveHistory==='function') pnedSaveHistory(); // Guardar estado
              loadImgToCanvas(b.img, resize);
          };
          tmp.src = ev.target.result;
@@ -7881,6 +7882,7 @@ function pnedMkBlueprint(b){
           if(nl.trim().toUpperCase()==='X') b.lines = b.lines.filter(x=>x.id!==l.id);
           else l.text = nl;
           window._pnedDirty=true; draw(); rebuildLabels();
+          if(typeof pnedSaveHistory==='function') pnedSaveHistory();
         }
       };
       dimLayer.appendChild(div);
@@ -7896,14 +7898,14 @@ function pnedMkBlueprint(b){
     return null;
   };
 
-  const showMagnifier = (cx, cy) => {
+  const showMagnifier = (cx, cy, px, py) => {
     magnifier.style.display='block';
     magnifier.style.left=(cx-50)+'px';
     magnifier.style.top=(cy-130)+'px';
     magnifier.style.backgroundImage='url('+canvas.toDataURL()+')';
     // Zoom 2x to show better detail
     magnifier.style.backgroundSize=(w*2.5)+'px '+(h*2.5)+'px';
-    magnifier.style.backgroundPosition='-'+(cx*2.5-50)+'px -'+(cy*2.5-50)+'px';
+    magnifier.style.backgroundPosition='-'+(px*2.5-50)+'px -'+(py*2.5-50)+'px';
   };
 
   const down = (e) => {
@@ -7912,14 +7914,14 @@ function pnedMkBlueprint(b){
     const pos=getPos(e); startX=pos.x; startY=pos.y;
     const tgt=getTarget(pos.x,pos.y);
     isDragging=true;
-    if(tgt){ dragType='move_'+tgt.type; dragLineId=tgt.id; showMagnifier(pos.cx,pos.cy); }
+    if(tgt){ dragType='move_'+tgt.type; dragLineId=tgt.id; showMagnifier(pos.cx,pos.cy,pos.x,pos.y); }
     else { dragType='new'; }
   };
   const move = (e) => {
     if(!isDragging) return;
     e.preventDefault();
     const pos=getPos(e); draw(pos.x,pos.y);
-    if(dragType!=='new') showMagnifier(pos.cx,pos.cy);
+    if(dragType!=='new') showMagnifier(pos.cx,pos.cy,pos.x,pos.y);
   };
   const up = (e) => {
     if(!isDragging) return;
@@ -7937,6 +7939,7 @@ function pnedMkBlueprint(b){
       if(l){let dx=pos.x-startX,dy=pos.y-startY;l.x1+=dx;l.y1+=dy;l.x2+=dx;l.y2+=dy;}
     }
     dragType=null; window._pnedDirty=true; draw(); rebuildLabels();
+    if(typeof pnedSaveHistory==='function') pnedSaveHistory(); // Guardar historia
   };
 
   canvas.addEventListener('mousedown',down);  canvas.addEventListener('touchstart',down,{passive:false});
