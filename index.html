@@ -483,9 +483,13 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 #pned-title-inp::placeholder{color:rgba(0,0,0,.2)}
 #pned-toolbar{display:flex;align-items:center;gap:1px;padding:4px 10px;flex-shrink:0;border-bottom:1px solid rgba(0,0,0,.07);flex-wrap:wrap;row-gap:2px;background:rgba(255,255,255,.55);overflow-x:auto;-webkit-overflow-scrolling:touch}
 #pned-toolbar::-webkit-scrollbar{display:none}
-.pnt-btn{background:none;border:none;border-radius:7px;padding:6px 8px;font-size:13px;cursor:pointer;color:#5D4037;font-family:'DM Sans',sans-serif;min-width:28px;text-align:center;flex-shrink:0;transition:background .1s;line-height:1.2;white-space:nowrap}
-.pnt-btn:hover{background:rgba(0,0,0,.08)}
-.pnt-btn.on{background:rgba(0,0,0,.13);font-weight:700}
+.pnt-btn{background:none;border:none;border-radius:4px;padding:6px 8px;font-size:14px;cursor:pointer;color:#374151;font-family:'Segoe UI',system-ui,sans-serif;min-width:28px;text-align:center;flex-shrink:0;transition:all .1s;line-height:1.2;white-space:nowrap;display:flex;align-items:center;justify-content:center}
+.pnt-btn:hover{background:#e5e7eb}
+.pnt-btn.on{background:#d1d5db;font-weight:700}
+.rib-group { display:flex; flex-direction:column; align-items:center;  padding:0 12px; border-right:1px solid #d1d5db; }
+.rib-group:last-child { border-right:none; }
+.rib-row { display:flex; align-items:center; }
+.rib-label { font-size:10px; color:#6b7280; margin-top:4px; text-transform:uppercase; letter-spacing:0.02em; font-weight:600; font-family:'Segoe UI',sans-serif; pointer-events:none; }
 .pnt-sep{width:1px;height:16px;background:rgba(0,0,0,.12);margin:0 3px;flex-shrink:0}
 .pnt-color{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:transform .12s}
 .pnt-color.sel{border-color:rgba(0,0,0,.4);transform:scale(1.2)}
@@ -6865,51 +6869,84 @@ function abrirEditorNotaBloque(editId){
       <button onclick="pnedIAPanel()" style="background:linear-gradient(135deg,#7C3AED,#9F5AE5);color:#fff;border:none;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0;margin-right:8px">✨ IA</button>
       <button onclick="pnedSave(true)" style="background:linear-gradient(135deg,#5D4037,#8D6E63);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0">Guardar</button>
     </div>
-    <div id="pned-toolbar" style="background:white;padding:8px;border-bottom:1px solid #E2E8F0;display:flex;gap:6px;overflow-x:auto">
-      <button class="pnt-btn" onclick="pnedUndo()" title="Deshacer (Ctrl+Z)">⟲</button>
-      <button class="pnt-btn" onclick="pnedRedo()" title="Rehacer (Ctrl+Y)">⟳</button>
-      <div class="pnt-sep"></div>
-      <button class="pnt-btn" id="pntb-b" onmousedown="event.preventDefault();pnedExec('bold')" title="Negrita"><b>B</b></button>
-      <button class="pnt-btn" id="pntb-i" onmousedown="event.preventDefault();pnedExec('italic')" title="Cursiva"><i>I</i></button>
-      <button class="pnt-btn" id="pntb-u" onmousedown="event.preventDefault();pnedExec('underline')" style="text-decoration:underline" title="Subrayado">U</button>
-      <button class="pnt-btn" id="pntb-s" onmousedown="event.preventDefault();pnedExec('strikeThrough')" style="text-decoration:line-through" title="Tachado">S</button>
-      <div class="pnt-sep"></div>
-      <button class="pnt-btn" onclick="pnedChangeFontSize(-2)" title="Reducir tamaño (A-)">A-</button>
-      <select class="pnt-sel" id="pned-font-size" onchange="pnedSetFontSz(this.value)" title="Tamaño exacto de fuente">
-        ${[10,11,12,14,16,18,20,24,28,32,36,48].map(s=>`<option value="${s}" ${s===16?'selected':''}>${s}px</option>`).join('')}
-      </select>
-      <button class="pnt-btn" onclick="pnedChangeFontSize(2)" title="Aumentar tamaño (A+)">A+</button>
-      <div class="pnt-sep"></div>
-      <select class="pnt-sel" onchange="pnedSetFont(this.value)" title="Fuente / Tipografía" style="width:140px;font-family:inherit">
-        <option value="dmsans" ${window._pnedFont==='dmsans'?'selected':''}>DM Sans</option>
-        <option value="playfair" ${window._pnedFont==='playfair'?'selected':''}>Playfair Display</option>
-        <option value="inter" ${window._pnedFont==='inter'?'selected':''}>Inter</option>
-        <option value="roboto" ${window._pnedFont==='roboto'?'selected':''}>Roboto</option>
-        <option value="opensans" ${window._pnedFont==='opensans'?'selected':''}>Open Sans</option>
-        <option value="lora" ${window._pnedFont==='lora'?'selected':''}>Lora</option>
-        <option value="merriweather" ${window._pnedFont==='merriweather'?'selected':''}>Merriweather</option>
-        <option value="poppins" ${window._pnedFont==='poppins'?'selected':''}>Poppins</option>
-        <option value="montserrat" ${window._pnedFont==='montserrat'?'selected':''}>Montserrat</option>
-        <option value="lato" ${window._pnedFont==='lato'?'selected':''}>Lato</option>
-        <option value="oswald" ${window._pnedFont==='oswald'?'selected':''}>Oswald</option>
-        <option value="raleway" ${window._pnedFont==='raleway'?'selected':''}>Raleway</option>
-        <option value="arial" ${window._pnedFont==='arial'?'selected':''}>Arial</option>
-        <option value="times" ${window._pnedFont==='times'?'selected':''}>Times New Roman</option>
-        <option value="courier" ${window._pnedFont==='courier'?'selected':''}>Courier New</option>
-        <option value="verdana" ${window._pnedFont==='verdana'?'selected':''}>Verdana</option>
-        <option value="tahoma" ${window._pnedFont==='tahoma'?'selected':''}>Tahoma</option>
-        <option value="trebuchet" ${window._pnedFont==='trebuchet'?'selected':''}>Trebuchet MS</option>
-        <option value="georgia" ${window._pnedFont==='georgia'?'selected':''}>Georgia</option>
-        <option value="garamond" ${window._pnedFont==='garamond'?'selected':''}>Garamond</option>
-      </select>
-      <div class="pnt-sep"></div>
-      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#000000')" style="color:#000;font-weight:900" title="Negro">A</button>
-      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#C62828')" style="color:#C62828;font-weight:900" title="Rojo">A</button>
-      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#1565C0')" style="color:#1565C0;font-weight:900" title="Azul">A</button>
-      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#2E7D32')" style="color:#2E7D32;font-weight:900" title="Verde">A</button>
-      <button class="pnt-btn" onmousedown="event.preventDefault();pnedMark()" style="background:#FFF9C4;color:#92700A;font-weight:700;font-size:11px;border-radius:5px" title="Resaltar texto">Aa</button>
-      <div class="pnt-sep"></div>
-      ${colorDots}
+    <div id="pned-toolbar" style="background:#F3F2F1;padding:6px 8px 4px 8px;border-bottom:1px solid #E2E8F0;display:flex;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;user-select:none;font-family:'Segoe UI',sans-serif;align-items:center">
+  
+      <!-- Historial -->
+      <div class="rib-group">
+         <div class="rib-row">
+           <button class="pnt-btn" onclick="pnedUndo()" title="Deshacer (Ctrl+Z)"><b style="font-size:16px;">⟲</b></button>
+           <button class="pnt-btn" onclick="pnedRedo()" title="Rehacer (Ctrl+Y)"><b style="font-size:16px;">⟳</b></button>
+         </div>
+         <div class="rib-label">Historial</div>
+      </div>
+
+      <!-- Fuente -->
+      <div class="rib-group">
+         <div class="rib-row" style="gap:4px">
+            <select class="pnt-sel" onmousedown="pnedSaveRange()" onchange="pnedRestoreRange();pnedExec('fontName', this.value)" title="Fuente" style="width:115px;background:#fff;border:1px solid #d1d5db;border-radius:3px">
+              <option value="Arial">Arial</option>
+              <option value="'DM Sans'">DM Sans</option>
+              <option value="'Playfair Display'">Playfair Display</option>
+              <option value="Inter">Inter</option>
+              <option value="Roboto">Roboto</option>
+              <option value="'Courier New'">Courier New</option>
+              <option value="Georgia">Georgia</option>
+              <option value="Tahoma">Tahoma</option>
+              <option value="'Times New Roman'">Times New Roman</option>
+              <option value="Verdana">Verdana</option>
+            </select>
+            <select class="pnt-sel" id="pned-font-size" onchange="pnedSetFontSz(this.value)" title="Tamaño" style="background:#fff;border:1px solid #d1d5db;border-radius:3px;margin-left:2px">
+              ${[10,11,12,14,16,18,20,24,28,32,36,48].map(s=>`<option value="${s}" ${s===16?'selected':''}>${s}</option>`).join('')}
+            </select>
+            <div style="display:flex;gap:1px;border:1px solid #d1d5db;border-radius:3px;padding:1px;background:#fff;margin-left:2px">
+               <button class="pnt-btn" style="border-radius:2px;padding:2px 6px;min-width:24px" onclick="pnedChangeFontSize(2)" title="Aumentar">A^</button>
+               <button class="pnt-btn" style="border-radius:2px;padding:2px 6px;min-width:24px" onclick="pnedChangeFontSize(-2)" title="Disminuir">A⌄</button>
+            </div>
+            <button class="pnt-btn" onmousedown="event.preventDefault();pnedExec('removeFormat')" title="Borrar formato" style="color:#d97706;margin-left:4px">A🧹</button>
+         </div>
+         <div class="rib-row" style="gap:2px;margin-top:4px">
+            <button class="pnt-btn" id="pntb-b" onmousedown="event.preventDefault();pnedExec('bold')" title="Negrita" style="font-family:'Times New Roman',serif"><b>N</b></button>
+            <button class="pnt-btn" id="pntb-i" onmousedown="event.preventDefault();pnedExec('italic')" title="Cursiva" style="font-family:'Times New Roman',serif"><i>K</i></button>
+            <button class="pnt-btn" id="pntb-u" onmousedown="event.preventDefault();pnedExec('underline')" title="Subrayado" style="font-family:'Times New Roman',serif"><u>S</u></button>
+            <button class="pnt-btn" id="pntb-s" onmousedown="event.preventDefault();pnedExec('strikeThrough')" title="Tachado" style="font-family:'Times New Roman',serif"><s>abc</s></button>
+            <button class="pnt-btn" id="pntb-sub" onmousedown="event.preventDefault();pnedExec('subscript')" title="Subíndice">x₂</button>
+            <button class="pnt-btn" id="pntb-sup" onmousedown="event.preventDefault();pnedExec('superscript')" title="Superíndice">x²</button>
+            
+            <div style="position:relative;display:flex;align-items:center;margin-left:6px;border:1px solid #d1d5db;border-radius:3px;background:#fff;overflow:hidden;width:32px;height:24px">
+              <input type="color" onmousedown="pnedSaveRange()" onchange="pnedRestoreRange();pnedExec('hiliteColor',this.value)" value="#FFF9C4" style="position:absolute;opacity:0;width:200%;height:200%;left:-50%;top:-50%;cursor:pointer">
+              <div style="width:100%;font-size:12px;font-weight:700;display:flex;flex-direction:column;align-items:center;pointer-events:none">
+                 ab <div style="height:3px;width:14px;background:#ffeb3b;margin-top:1px"></div>
+              </div>
+            </div>
+            <div style="position:relative;display:flex;align-items:center;margin-left:2px;border:1px solid #d1d5db;border-radius:3px;background:#fff;overflow:hidden;width:32px;height:24px">
+              <input type="color" onmousedown="pnedSaveRange()" onchange="pnedRestoreRange();pnedExec('foreColor',this.value)" value="#C62828" style="position:absolute;opacity:0;width:200%;height:200%;left:-50%;top:-50%;cursor:pointer">
+              <div style="width:100%;font-size:12px;font-weight:700;display:flex;flex-direction:column;align-items:center;pointer-events:none;color:#C62828">
+                 A <div style="height:3px;width:14px;background:#C62828;margin-top:1px"></div>
+              </div>
+            </div>
+         </div>
+         <div class="rib-label">Fuente</div>
+      </div>
+
+      <!-- Párrafo -->
+      <div class="rib-group">
+         <div class="rib-row" style="gap:2px">
+            <button class="pnt-btn" onmousedown="event.preventDefault();pnedAddBlock('bullet')" title="Viñetas"><b style="font-size:16px;">⋮≡</b></button>
+            <button class="pnt-btn" onmousedown="event.preventDefault();pnedAddBlock('numbered')" title="Numeración"><b style="font-size:16px;letter-spacing:-1px">₁₂³</b></button>
+            <div class="pnt-sep" style="height:16px;margin:0 4px"></div>
+            <button class="pnt-btn" onmousedown="event.preventDefault();pnedExec('outdent')" title="Disminuir Sangría">↤≡</button>
+            <button class="pnt-btn" onmousedown="event.preventDefault();pnedExec('indent')" title="Aumentar Sangría">↦≡</button>
+         </div>
+         <div class="rib-row" style="gap:2px;margin-top:4px">
+            <button class="pnt-btn" id="pntb-jl" onmousedown="event.preventDefault();pnedExec('justifyLeft')" title="Alinear a la Izquierda">≡</button>
+            <button class="pnt-btn" id="pntb-jc" onmousedown="event.preventDefault();pnedExec('justifyCenter')" title="Centrar">≣</button>
+            <button class="pnt-btn" id="pntb-jr" onmousedown="event.preventDefault();pnedExec('justifyRight')" title="Alinear a la Derecha">≢</button>
+            <button class="pnt-btn" id="pntb-jf" onmousedown="event.preventDefault();pnedExec('justifyFull')" title="Justificar">▦</button>
+         </div>
+         <div class="rib-label">Párrafo</div>
+      </div>
+
+    </div>
     </div>
     
     <div id="pned-scroller" style="flex:1;overflow-y:auto;padding:30px 20px;display:flex;flex-direction:column;align-items:center;">
@@ -8226,11 +8263,15 @@ function pnedCreateCustomTableFromModal(){
   window._pnedDirty=true;
 }
 
+window._pnedSavedRange = null;
+function pnedSaveRange() { const sel = window.getSelection(); if(sel.rangeCount > 0) window._pnedSavedRange = sel.getRangeAt(0); }
+function pnedRestoreRange() { if(window._pnedSavedRange) { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(window._pnedSavedRange); } }
+
 function pnedExec(cmd,val){try{document.execCommand(cmd,false,val||null);}catch(e){}pnedTBState();window._pnedDirty=true;}
-function pnedSetFontSz(sz){try{document.execCommand('fontSize','7');document.querySelectorAll('.pn-block font[size="7"]').forEach(el=>{el.removeAttribute('size');el.style.fontSize=sz+'px';});}catch(e){}}
+function pnedSetFontSz(sz){try{document.execCommand('fontSize',false,'7');document.querySelectorAll('.pn-block font[size="7"]').forEach(el=>{el.removeAttribute('size');el.style.fontSize=sz+'px';});}catch(e){}}
 function pnedTextColor(c){try{document.execCommand('foreColor',false,c);}catch(e){}}
 function pnedMark(){const s=window.getSelection();if(s?.toString())try{document.execCommand('insertHTML',false,`<mark style="background:#FFF9C4;padding:0 2px;border-radius:3px">${s.toString()}</mark>`);}catch(e){}}
-function pnedTBState(){try{[['bold','pntb-b'],['italic','pntb-i'],['underline','pntb-u']].forEach(([c,id])=>document.getElementById(id)?.classList.toggle('on',document.queryCommandState(c)));}catch(e){}}
+function pnedTBState(){try{[['bold','pntb-b'],['italic','pntb-i'],['underline','pntb-u'],['strikeThrough','pntb-s'],['subscript','pntb-sub'],['superscript','pntb-sup'],['justifyLeft','pntb-jl'],['justifyCenter','pntb-jc'],['justifyRight','pntb-jr'],['justifyFull','pntb-jf']].forEach(([c,id])=>document.getElementById(id)?.classList.toggle('on',document.queryCommandState(c))); pnedSaveRange(); }catch(e){}}
 function pnedSetColor(color){
   window._pnedColor=color;
   const nc=NOTA_COLORES[color]||NOTA_COLORES.amarillo;
