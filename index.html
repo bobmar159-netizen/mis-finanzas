@@ -6726,7 +6726,7 @@ function renderNotas(){
 
   let gridHtml;
   if(notas.length===0){
-    gridHtml=`<div style="text-align:center;padding:60px 20px"><div style="font-size:56px;margin-bottom:14px">📓</div><div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">Sin notas aún</div><div style="font-size:13px;color:var(--muted)">Toca <b>+ Nueva nota</b> para comenzar</div></div>`;
+    gridHtml=`<div style="text-align:center;padding:60px 20px"><div style="font-size:56px;margin-bottom:14px">📓</div><div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">Sin notas aún</div><div style="font-size:13px;color:var(--muted)">Toca uno de los iconos arriba para comenzar</div></div>`;
   } else {
     const pinnedHtml = pinned.map(n=>renderNotaCard(n,true)).join('');
     const normalHtml = `<div class="pnc-wrap">${normal.map(n=>renderNotaCard(n,false)).join('')}</div>`;
@@ -6734,9 +6734,40 @@ function renderNotas(){
   }
 
   return `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div><div class="section-title">Mis Notas</div><div class="section-sub">${state.notas.length} nota${state.notas.length!==1?'s':''}</div></div>
-      <button onclick="abrirNotaTypeMenu()" style="background:var(--gold);color:#fff;border:none;border-radius:12px;padding:11px 18px;font-size:14px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer">＋ Nueva</button>
+    <div style="margin-bottom:20px;padding:0 4px">
+      <div class="section-title" style="margin-bottom:14px;text-align:center;font-size:16px;color:#1E293B">5 Herramientas Core</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;background:#F8FAFC;padding:16px 8px;border-radius:20px;border:1px solid #E2E8F0;box-shadow:inset 0 2px 4px rgba(0,0,0,0.02)">
+        
+        <div onclick="abrirEditorModo('word')" style="display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer">
+           <div style="width:52px;height:52px;background:#E3F2FD;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 10px rgba(21,101,192,0.12);color:#1565C0;transition:transform 0.1s" onactive="this.style.transform='scale(0.92)'">📄</div>
+           <span style="font-size:11px;font-weight:700;color:#475569;text-align:center;line-height:1.1">Documento</span>
+        </div>
+
+        <div onclick="abrirEditorModo('excel')" style="display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer">
+           <div style="width:52px;height:52px;background:#E8F5E9;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 10px rgba(46,125,50,0.12);color:#2E7D32">📊</div>
+           <span style="font-size:11px;font-weight:700;color:#475569;text-align:center;line-height:1.1">Cálculo</span>
+        </div>
+
+        <div onclick="abrirEditorModo('paint')" style="display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer">
+           <div style="width:52px;height:52px;background:#FFF3E0;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 10px rgba(230,81,0,0.12);color:#E65100">🎨</div>
+           <span style="font-size:11px;font-weight:700;color:#475569;text-align:center;line-height:1.1">Pizarra</span>
+        </div>
+
+        <div onclick="abrirEditorModo('blueprint')" style="display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer">
+           <div style="width:52px;height:52px;background:#F3E5F5;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 10px rgba(106,27,154,0.12);color:#6A1B9A">📐</div>
+           <span style="font-size:11px;font-weight:700;color:#475569;text-align:center;line-height:1.1">Plano</span>
+        </div>
+
+        <div onclick="abrirGrabarAudio()" style="display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer">
+           <div style="width:52px;height:52px;background:#FFF8E1;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 10px rgba(245,127,23,0.12);color:#F57F17">🎙️</div>
+           <span style="font-size:11px;font-weight:700;color:#475569;text-align:center;line-height:1.1">Micrófono</span>
+        </div>
+
+      </div>
+    </div>
+    
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:0 4px">
+      <div><div class="section-title">Mi Cuaderno</div><div class="section-sub">${state.notas.length} archivo${state.notas.length!==1?'s':''}</div></div>
     </div>
     <div class="pn-filters">${filters}</div>
     ${gridHtml}
@@ -6824,6 +6855,25 @@ function renderNotaCard(n, fullWidth=false){
 function pnId(){ return 'pnb_'+Date.now()+'_'+Math.random().toString(36).slice(2,6); }
 
 // ── EDITOR POR BLOQUES ──
+function abrirEditorModo(modo) {
+  abrirEditorNotaBloque();
+  if(modo === 'word') return;
+  setTimeout(() => {
+    if(modo === 'excel') pnedInsTable();
+    if(modo === 'blueprint') {
+      pnedAddBlock('blueprint');
+      setTimeout(()=>{
+         const el = document.querySelector('.pn-blueprint-row');
+         if(el){ el.style.height = (window.innerHeight - 150)+'px'; }
+      }, 50);
+    }
+    if(modo === 'paint') pnedAddBlock('paint');
+    if(modo === 'paint' || modo === 'blueprint' || modo === 'excel') {
+       document.getElementById('pned-title-inp').value = (modo==='excel'?'Cálculo':modo==='paint'?'Boceto':'Plano') + ' Nuevo';
+    }
+  }, 100);
+}
+
 function abrirEditorNotaBloque(editId){
   document.getElementById('pned-overlay')?.remove();
   window._pnedNota   = editId?(state.notas||[]).find(x=>x.id===editId):null;
@@ -6946,30 +6996,34 @@ function abrirEditorNotaBloque(editId){
          <div class="rib-label">Párrafo</div>
       </div>
 
-    </div>
+      <!-- Insertar -->
+      <div class="rib-group">
+         <div class="rib-row" style="gap:2px">
+            <button class="pnt-btn" onclick="pnedAddPhoto()" title="Fotografía"><b style="font-size:16px;">📸</b></button>
+            <button class="pnt-btn" onclick="pnedAddBlock('blueprint')" title="Plano Arquitectónico"><b style="font-size:16px;">📐</b></button>
+            <button class="pnt-btn" onclick="pnedInsTable()" title="Tabla"><b style="font-size:16px;">📊</b></button>
+            <button class="pnt-btn" onclick="pnedMicGemini()" title="Mic IA"><b style="font-size:16px;">🎙️</b></button>
+            <div class="pnt-sep" style="height:16px;margin:0 4px"></div>
+            <button class="pnt-btn" onclick="pnedEditTags()" title="Tags">🏷️</button>
+         </div>
+         <div class="rib-label">Insertar</div>
+      </div>
+      <span id="pned-wc" style="font-size:11px;color:#64748B;margin-left:auto;padding-right:8px"></span>
+      <input type="file" id="pned-file-in" accept="image/*" multiple style="display:none" onchange="pnedPhotosIn(this)">
     </div>
     
     <div id="pned-scroller" style="flex:1;overflow-y:auto;padding:30px 20px;display:flex;flex-direction:column;align-items:center;">
-      <div id="pned-a4-sheet" style="width:100%;max-width:794px;min-height:1123px;background:${nc.bg};border-radius:4px;box-shadow:0 8px 30px rgba(0,0,0,0.1);padding:50px 40px;box-sizing:border-box;margin-bottom:60px;">
+      <div id="pned-a4-sheet" style="width:100%;max-width:794px;min-height:1123px;background:var(--hoja-bg, ${nc.bg});border-radius:4px;box-shadow:0 8px 30px rgba(0,0,0,0.1);padding:50px 40px;box-sizing:border-box;margin-bottom:60px;">
         <input id="pned-title-inp" type="text" placeholder="Título..." value="${(n?.titulo||'').replace(/"/g,'&quot;')}" style="width:100%;border:none;outline:none;font-size:28px;font-weight:700;color:${nc.title};background:transparent;border-bottom:1px dashed rgba(0,0,0,0.1);padding-bottom:10px;margin-bottom:20px;" oninput="window._pnedDirty=true">
         <div id="pned-blocks" style="padding-top:4px"></div>
       </div>
     </div>
     
-    <div id="pned-footer" style="background:#FFFFFF;border-top:1px solid #E2E8F0;">
-      <button class="pned-foot-btn" onclick="pnedMicGemini()" title="Mic IA dictado">🎙</button>
-      <button class="pned-foot-btn" onclick="pnedAddBlock('blueprint')" title="Plano Arquitectónico">📐</button>
-      <button class="pned-foot-btn" onclick="pnedAddBlock('check')" title="Lista Checklist">☑</button>
-      <button class="pned-foot-btn" onclick="pnedAddBlock('bullet')" title="Viñeta">•</button>
-      <button class="pned-foot-btn" onclick="pnedInsTable()" title="Insertar Tabla Editable">⊞</button>
-      <button class="pned-foot-btn" onclick="pnedAddPhoto()" title="Insertar Fotografía">📷</button>
-      <button class="pned-foot-btn" onclick="pnedEditTags()" title="Tags / Etiquetas">🏷️</button>
-      <span id="pned-wc" style="font-size:11px;color:#64748B;flex:1;text-align:right"></span>
-      <input type="file" id="pned-file-in" accept="image/*" multiple style="display:none" onchange="pnedPhotosIn(this)">
-    </div>`;
+  `;
 
   document.body.appendChild(ov);
   document.body.style.overflow='hidden';
+  if(nc.bg) ov.style.setProperty('--hoja-bg', nc.bg);
   pnedRenderAll();
   // ★ Inicializar sistema de historial
   window._pnedHistory = [];
@@ -7005,6 +7059,7 @@ function pnedMkEl(b){
   if(b.type==='bullet'||b.type==='numbered') { wrap.appendChild(handle); wrap.appendChild(pnedMkList(b)); return wrap; }
   if(b.type==='image')  { wrap.appendChild(pnedMkImg(b)); return wrap; }
   if(b.type==='table')  { wrap.appendChild(pnedMkTable(b)); return wrap; }
+  if(b.type==='paint')  { wrap.appendChild(handle); wrap.appendChild(pnedMkPaint(b)); return wrap; }
   if(b.type==='blueprint'){ wrap.appendChild(handle); wrap.appendChild(pnedMkBlueprint(b)); return wrap; }
   if(b.type==='divider'){ const d=document.createElement('div'); d.style.cssText='border-top:1.5px dashed rgba(0,0,0,.2);margin:10px 0;width:100%'; wrap.appendChild(d); return wrap; }
 
@@ -7765,7 +7820,8 @@ function pnedAddAfter(afterId,type){
 function pnedMkBlueprint(b){
   const row = document.createElement('div');
   row.className = 'pn-blueprint-row';
-  b.h = b.h || 550;
+  b.h = b.h || (window.innerHeight * 0.7) || 550;
+  if(b.h < 350) b.h = 350;
   row.style.cssText = 'width:100%;height:'+b.h+'px;position:relative;background:#f8fafc;border:1.5px dashed #CBD5E1;border-radius:12px;margin-bottom:10px;display:flex;flex-direction:column;';
   if(!b.lines) b.lines = [];
   if(!b.img) b.img = '';
@@ -7780,8 +7836,8 @@ function pnedMkBlueprint(b){
   dimLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:3;';
 
   const addImgBtn = document.createElement('div');
-  addImgBtn.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:10px 22px;background:rgba(30,30,30,0.65);color:#fff;border-radius:24px;cursor:pointer;font-size:13px;font-weight:700;z-index:10;backdrop-filter:blur(4px);letter-spacing:.03em;';
-  addImgBtn.innerHTML = '📷 ' + (b.img ? 'Cambiar Foto' : 'Cargar Plano / Foto');
+  addImgBtn.style.cssText = 'position:absolute;top:10px;right:10px;padding:8px 16px;background:rgba(255,255,255,0.85);color:#333;border:1px solid #ccc;border-radius:24px;cursor:pointer;font-size:12px;font-weight:700;z-index:10;backdrop-filter:blur(4px);box-shadow:0 2px 4px rgba(0,0,0,0.1);';
+  addImgBtn.innerHTML = '📷 ' + (b.img ? 'Cambiar Foto' : 'Cargar Plano');
   
   let imgLoaded = null;
   const loadImgToCanvas = (src, drawCall) => {
@@ -7820,15 +7876,7 @@ function pnedMkBlueprint(b){
     i.click();
   };
 
-  const cTools = document.createElement('div');
-  cTools.style.cssText = 'position:absolute;top:12px;right:12px;display:flex;gap:5px;z-index:10;align-items:center;';
-  const cLabel = document.createElement('span');
-  cLabel.style.cssText='font-size:10px;color:#fff;background:rgba(0,0,0,.6);padding:3px 6px;border-radius:6px;font-weight:600;pointer-events:none;';
-  cLabel.textContent='Color cota:';
-  const cColor = document.createElement('input');
-  cColor.type = 'color'; cColor.value = '#DC2626';
-  cColor.style.cssText = 'width:32px;height:32px;border:2px solid #fff;border-radius:50%;overflow:hidden;padding:0;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
-  cTools.appendChild(cLabel); cTools.appendChild(cColor);
+  // Selector de color removido (auto rotación implementada más abajo)
 
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'bp-resize-handle';
@@ -7853,6 +7901,9 @@ function pnedMkBlueprint(b){
   let ctx = null, w = 0, h = 0;
   let isDragging = false, dragType = null, dragLineId = null, startX = 0, startY = 0;
   let isResizing = false, startRH = 0, startRY = 0;
+
+  const bpColors = ['#E53935','#1D4ED8','#047857','#F59E0B','#7C3AED'];
+  if(typeof b.cIdx !== 'number') b.cIdx = 0;
 
   const resize = () => {
     w = wrapCanvas.clientWidth; h = wrapCanvas.clientHeight;
@@ -7901,7 +7952,10 @@ function pnedMkBlueprint(b){
       if(dragType==='move_p2'  && dragLineId===l.id){ drawArrow(ctx,l.x1,l.y1,tx,ty,l.color,1.5); continue; }
       drawArrow(ctx,l.x1,l.y1,l.x2,l.y2,l.color,1.5);
     }
-    if(dragType==='new' && tx!=null) drawArrow(ctx,startX,startY,tx,ty,cColor.value,1.5);
+    if(dragType==='new' && tx!=null){
+       const tc = bpColors[b.cIdx % bpColors.length];
+       drawArrow(ctx,startX,startY,tx,ty,tc,1.5);
+    }
   };
 
   const rebuildLabels = () => {
@@ -7946,27 +8000,30 @@ function pnedMkBlueprint(b){
   };
 
   const down = (e) => {
-    if(e.target===addImgBtn||e.target===cColor||e.target===cLabel) return;
+    if(e.target===addImgBtn) return;
     e.preventDefault();
     const pos=getPos(e); startX=pos.x; startY=pos.y;
     const tgt=getTarget(pos.x,pos.y);
     isDragging=true;
-    if(tgt){ dragType='move_'+tgt.type; dragLineId=tgt.id; showMagnifier(pos.cx,pos.cy,pos.x,pos.y); }
+    if(tgt){ dragType='move_'+tgt.type; dragLineId=tgt.id; }
     else { dragType='new'; }
+    showMagnifier(pos.cx,pos.cy,pos.x,pos.y);
   };
   const move = (e) => {
     if(!isDragging) return;
     e.preventDefault();
     const pos=getPos(e); draw(pos.x,pos.y);
-    if(dragType!=='new') showMagnifier(pos.cx,pos.cy,pos.x,pos.y);
+    showMagnifier(pos.cx,pos.cy,pos.x,pos.y);
   };
   const up = (e) => {
     if(!isDragging) return;
     isDragging=false; magnifier.style.display='none';
     const pos=getPos(e);
     if(dragType==='new'){
-      if(Math.hypot(pos.x-startX,pos.y-startY)>20)
-        b.lines.push({id:Date.now()+'',x1:startX,y1:startY,x2:pos.x,y2:pos.y,text:'1.00',color:cColor.value});
+      if(Math.hypot(pos.x-startX,pos.y-startY)>20){
+        const newColor = bpColors[b.cIdx % bpColors.length]; b.cIdx++;
+        b.lines.push({id:Date.now()+'',x1:startX,y1:startY,x2:pos.x,y2:pos.y,text:'1.00',color:newColor});
+      }
     } else if(dragType==='move_p1'){
       let l=b.lines.find(x=>x.id===dragLineId); if(l){l.x1=pos.x;l.y1=pos.y;}
     } else if(dragType==='move_p2'){
@@ -8003,6 +8060,116 @@ function pnedMkBlueprint(b){
   resizeHandle.addEventListener('mousedown', rDown); resizeHandle.addEventListener('touchstart', rDown, {passive:false});
   window.addEventListener('mousemove', rMove);       window.addEventListener('touchmove', rMove, {passive:false});
   window.addEventListener('mouseup', rUp);           window.addEventListener('touchend', rUp);
+
+  return row;
+}
+
+// ── PAINT BLOCK (Dibujo Libre) ──
+function pnedMkPaint(b){
+  const row = document.createElement('div');
+  row.className = 'pn-paint-row';
+  b.h = b.h || 400;
+  row.style.cssText = 'width:100%;height:'+b.h+'px;position:relative;background:#fff;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:10px;display:flex;flex-direction:column;overflow:hidden;box-shadow:inset 0 0 10px rgba(0,0,0,0.02)';
+  if(!b.lines) b.lines = []; 
+  
+  const ctxLayer = document.createElement('canvas');
+  ctxLayer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;cursor:crosshair;touch-action:none;';
+  row.appendChild(ctxLayer);
+
+  const tools = document.createElement('div');
+  tools.style.cssText = 'position:absolute;top:10px;right:10px;display:flex;gap:6px;background:rgba(255,255,255,0.9);padding:6px;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,0.1);z-index:10';
+  
+  const colors = ['#0F172A','#E53935','#2563EB','#16A34A','#EA580C'];
+  let curColor = '#0F172A';
+  colors.forEach(c => {
+     const dot = document.createElement('div');
+     dot.style.cssText = `width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;border:2.5px solid ${c==curColor?'#94A3B8':'#fff'};transition:all .1s;box-shadow:0 1px 3px rgba(0,0,0,.2)`;
+     dot.onclick = () => { curColor=c; Array.from(tools.children).forEach(k=>k.style.borderColor='#fff'); dot.style.borderColor='#94A3B8'; };
+     tools.appendChild(dot);
+  });
+  
+  const clearBtn = document.createElement('button');
+  clearBtn.innerHTML='🧹'; clearBtn.style.cssText='background:none;border:none;font-size:16px;cursor:pointer;padding:0 6px';
+  clearBtn.onclick=()=>{ b.lines=[]; redraw(); window._pnedDirty=true; if(typeof pnedSaveHistory==='function')pnedSaveHistory(); };
+  tools.appendChild(clearBtn);
+  row.appendChild(tools);
+
+  let w=0, h=0, ctx=null, isDrawing=false, currentStroke=null;
+
+  const redraw = () => {
+     if(!ctx)return; ctx.clearRect(0,0,w,h);
+     ctx.lineJoin='round'; ctx.lineCap='round'; ctx.lineWidth=3;
+     for(let stroke of b.lines){
+        ctx.strokeStyle = stroke.color;
+        ctx.beginPath();
+        for(let i=0; i<stroke.pts.length; i++){
+           const p=stroke.pts[i];
+           if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+        }
+        ctx.stroke();
+     }
+  };
+
+  const resize = () => {
+    w=row.clientWidth; h=row.clientHeight; if(w<=0)return;
+    ctxLayer.width=w; ctxLayer.height=h; ctx=ctxLayer.getContext('2d');
+    redraw();
+  };
+  setTimeout(resize, 150);
+
+  const getPos = (e) => {
+    const rect = ctxLayer.getBoundingClientRect();
+    const src = e.touches && e.touches.length > 0 ? e.touches[0] : (e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches[0] : e);
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+  };
+
+  ctxLayer.onmousedown = ctxLayer.ontouchstart = (e) => {
+     if(e.target !== ctxLayer) return;
+     e.preventDefault(); isDrawing=true;
+     const pos=getPos(e);
+     currentStroke = {color:curColor, pts:[pos]};
+     b.lines.push(currentStroke);
+  };
+  ctxLayer.onmousemove = ctxLayer.ontouchmove = (e) => {
+     if(!isDrawing) return; e.preventDefault();
+     currentStroke.pts.push(getPos(e)); redraw();
+  };
+  ctxLayer.onmouseup = ctxLayer.ontouchend = ctxLayer.onmouseleave = () => {
+     if(!isDrawing) return; isDrawing=false;
+     if(currentStroke && currentStroke.pts.length<2) b.lines.pop(); // discard dots
+     window._pnedDirty=true; if(typeof pnedSaveHistory==='function')pnedSaveHistory();
+     redraw();
+  };
+
+  const resizeHandle = document.createElement('div');
+  resizeHandle.className = 'bp-resize-handle';
+  resizeHandle.style.cssText = 'height:24px;background:#f1f5f9;display:flex;justify-content:center;align-items:center;cursor:ns-resize;border-top:1px solid #cbd5e1;flex-shrink:0;';
+  resizeHandle.innerHTML = '<div style="width:36px;height:4px;border-radius:2px;background:#94a3b8;pointer-events:none;"></div>';
+  
+  let isResizing = false, startRH = 0, startRY = 0;
+  resizeHandle.onmousedown = resizeHandle.ontouchstart = (e) => {
+    e.preventDefault(); isResizing = true;
+    startRY = e.touches ? e.touches[0].clientY : e.clientY;
+    startRH = b.h;
+  };
+  document.addEventListener('mousemove', (e)=>{
+    if(!isResizing)return;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    b.h = Math.max(100, startRH + (cy - startRY));
+    row.style.height = b.h + 'px';
+    resize();
+  });
+  document.addEventListener('touchmove', (e)=>{
+    if(!isResizing)return;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    b.h = Math.max(100, startRH + (cy - startRY));
+    row.style.height = b.h + 'px';
+    resize();
+  });
+  document.addEventListener('mouseup', () => { if(isResizing){ isResizing=false; window._pnedDirty=true; if(typeof pnedSaveHistory==='function')pnedSaveHistory(); } });
+  document.addEventListener('touchend', () => { if(isResizing){ isResizing=false; window._pnedDirty=true; if(typeof pnedSaveHistory==='function')pnedSaveHistory(); } });
+
+  row.appendChild(resizeHandle);
 
   return row;
 }
@@ -8275,9 +8442,8 @@ function pnedTBState(){try{[['bold','pntb-b'],['italic','pntb-i'],['underline','
 function pnedSetColor(color){
   window._pnedColor=color;
   const nc=NOTA_COLORES[color]||NOTA_COLORES.amarillo;
-  const ov=document.getElementById('pned-overlay');if(ov)ov.style.background=nc.bg;
+  const ov=document.getElementById('pned-overlay');if(ov){ov.style.background=nc.bg;ov.style.setProperty('--hoja-bg', nc.bg);}
   const tb=document.getElementById('pned-topbar');if(tb)tb.style.background=nc.bg;
-  const ft=document.getElementById('pned-footer');if(ft)ft.style.background=nc.bg+'ee';
   const ti=document.getElementById('pned-title-inp');if(ti)ti.style.color=nc.title;
   document.querySelectorAll('.pnt-color').forEach(d=>{const sel=d.title===(NOTA_COLORES[color]?.label||'');d.classList.toggle('sel',sel);d.style.borderColor=sel?'rgba(0,0,0,.5)':'transparent';});
   window._pnedDirty=true;
