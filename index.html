@@ -7728,16 +7728,16 @@ function pnedAddAfter(afterId,type){
 function pnedMkBlueprint(b){
   const row = document.createElement('div');
   row.className = 'pn-blueprint-row';
-  row.style.cssText = 'width:100%;min-height:220px;position:relative;background:#f8fafc;border:1.5px dashed #CBD5E1;border-radius:12px;margin-bottom:10px;overflow:hidden;flex:1;touch-action:none;';
+  b.h = b.h || 350;
+  row.style.cssText = 'width:100%;height:'+b.h+'px;position:relative;background:#f8fafc;border:1.5px dashed #CBD5E1;border-radius:12px;margin-bottom:10px;display:flex;flex-direction:column;';
   if(!b.lines) b.lines = [];
   if(!b.img) b.img = '';
 
-  const imgEl = document.createElement('img');
-  imgEl.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;position:absolute;inset:0;';
-  if(b.img){ imgEl.src = b.img; row.style.border='none'; row.style.background='transparent'; }
+  const wrapCanvas = document.createElement('div');
+  wrapCanvas.style.cssText ='flex:1;position:relative;overflow:hidden;touch-action:none;';
 
   const canvas = document.createElement('canvas');
-  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair;';
+  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;cursor:crosshair;';
 
   const dimLayer = document.createElement('div');
   dimLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:3;';
@@ -7745,18 +7745,37 @@ function pnedMkBlueprint(b){
   const addImgBtn = document.createElement('div');
   addImgBtn.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:10px 22px;background:rgba(30,30,30,0.65);color:#fff;border-radius:24px;cursor:pointer;font-size:13px;font-weight:700;z-index:10;backdrop-filter:blur(4px);letter-spacing:.03em;';
   addImgBtn.innerHTML = '📷 ' + (b.img ? 'Cambiar Foto' : 'Cargar Plano / Foto');
+  
+  let imgLoaded = null;
+  const loadImgToCanvas = (src, drawCall) => {
+     imgLoaded = new Image();
+     imgLoaded.onload = () => { if(drawCall) drawCall(); };
+     imgLoaded.src = src;
+  };
+  if(b.img){
+     loadImgToCanvas(b.img);
+     row.style.border='1px solid var(--border)';
+  }
+
   addImgBtn.onclick = () => {
     const i = document.createElement('input'); i.type='file'; i.accept='image/*';
     i.onchange = (e) => {
       const file = e.target.files[0]; if(!file) return;
       const reader = new FileReader();
       reader.onload = (ev) => {
-        b.img = ev.target.result;
-        imgEl.src = b.img;
-        row.style.border='none'; row.style.background='transparent';
-        addImgBtn.innerHTML = '📷 Cambiar Foto';
-        window._pnedDirty=true;
-        setTimeout(()=>resize(), 100);
+         const tmp = new Image();
+         tmp.onload = () => {
+             const mx = 1200; let ww = tmp.width, hh = tmp.height;
+             if(ww>mx || hh>mx){ if(ww>hh){hh=Math.round(hh*mx/ww); ww=mx;}else{ww=Math.round(ww*mx/hh); hh=mx;} }
+             const tc = document.createElement('canvas'); tc.width=ww; tc.height=hh;
+             tc.getContext('2d').drawImage(tmp,0,0,ww,hh);
+             b.img = tc.toDataURL('image/jpeg', 0.6); // Compress to save space in localStorage
+             row.style.border='1px solid var(--border)';
+             addImgBtn.innerHTML = '📷 Cambiar Foto';
+             window._pnedDirty=true;
+             loadImgToCanvas(b.img, resize);
+         };
+         tmp.src = ev.target.result;
       };
       reader.readAsDataURL(file);
     };
@@ -7764,35 +7783,42 @@ function pnedMkBlueprint(b){
   };
 
   const cTools = document.createElement('div');
-  cTools.style.cssText = 'position:absolute;top:8px;right:8px;display:flex;gap:5px;z-index:10;align-items:center;';
+  cTools.style.cssText = 'position:absolute;top:12px;right:12px;display:flex;gap:5px;z-index:10;align-items:center;';
   const cLabel = document.createElement('span');
-  cLabel.style.cssText='font-size:10px;color:#fff;background:rgba(0,0,0,.5);padding:3px 6px;border-radius:6px;font-weight:600;';
+  cLabel.style.cssText='font-size:10px;color:#fff;background:rgba(0,0,0,.6);padding:3px 6px;border-radius:6px;font-weight:600;pointer-events:none;';
   cLabel.textContent='Color cota:';
   const cColor = document.createElement('input');
   cColor.type = 'color'; cColor.value = '#DC2626';
   cColor.style.cssText = 'width:32px;height:32px;border:2px solid #fff;border-radius:50%;overflow:hidden;padding:0;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
   cTools.appendChild(cLabel); cTools.appendChild(cColor);
 
-  // Magnifier / Lupa
+  const resizeHandle = document.createElement('div');
+  resizeHandle.className = 'bp-resize-handle';
+  resizeHandle.style.cssText = 'height:24px;background:#f1f5f9;display:flex;justify-content:center;align-items:center;cursor:ns-resize;border-top:1px solid #cbd5e1;flex-shrink:0;';
+  resizeHandle.innerHTML = '<div style="width:36px;height:4px;border-radius:2px;background:#94a3b8;pointer-events:none;"></div>';
+
   let magnifier = document.getElementById('_pned_magnifier');
   if(!magnifier){
     magnifier = document.createElement('div');
     magnifier.id='_pned_magnifier';
-    magnifier.style.cssText='position:fixed;width:90px;height:90px;border-radius:50%;border:3px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,.4);pointer-events:none;display:none;background-repeat:no-repeat;z-index:2000;';
+    magnifier.style.cssText='position:fixed;width:100px;height:100px;border-radius:50%;border:3px solid #fff;box-shadow:0 6px 20px rgba(0,0,0,.4);pointer-events:none;display:none;background-repeat:no-repeat;z-index:2000;';
     document.body.appendChild(magnifier);
   }
 
-  row.appendChild(imgEl);
-  row.appendChild(canvas);
-  row.appendChild(dimLayer);
-  row.appendChild(addImgBtn);
-  row.appendChild(cTools);
+  wrapCanvas.appendChild(canvas);
+  wrapCanvas.appendChild(dimLayer);
+  wrapCanvas.appendChild(addImgBtn);
+  wrapCanvas.appendChild(cTools);
+  row.appendChild(wrapCanvas);
+  row.appendChild(resizeHandle);
 
   let ctx = null, w = 0, h = 0;
   let isDragging = false, dragType = null, dragLineId = null, startX = 0, startY = 0;
+  let isResizing = false, startRH = 0, startRY = 0;
 
   const resize = () => {
-    w = row.clientWidth; h = row.clientHeight || 220;
+    w = wrapCanvas.clientWidth; h = wrapCanvas.clientHeight;
+    if(w<=0)return;
     canvas.width = w; canvas.height = h;
     ctx = canvas.getContext('2d');
     draw(); rebuildLabels();
@@ -7805,8 +7831,16 @@ function pnedMkBlueprint(b){
     return { x: src.clientX - rect.left, y: src.clientY - rect.top, cx: src.clientX, cy: src.clientY };
   };
 
+  const drawImgContain = (c, img) => {
+    let ir = img.width/img.height; let cr = w/h;
+    let tw = w, th = h, tx = 0, ty = 0;
+    if (ir > cr) { th = w / ir; ty = (h - th)/2; }
+    else { tw = h * ir; tx = (w - tw)/2; }
+    c.drawImage(img, tx, ty, tw, th);
+  };
+
   const drawArrow = (c, x1, y1, x2, y2, color, width) => {
-    const headlen = 13, dx = x2-x1, dy = y2-y1, angle = Math.atan2(dy,dx);
+    const headlen = 8, dx = x2-x1, dy = y2-y1, angle = Math.atan2(dy,dx);
     c.strokeStyle = color; c.lineWidth = width; c.lineCap = 'round';
     c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2);
     c.moveTo(x1+headlen*Math.cos(angle+Math.PI/6), y1+headlen*Math.sin(angle+Math.PI/6)); c.lineTo(x1,y1);
@@ -7815,27 +7849,28 @@ function pnedMkBlueprint(b){
     c.lineTo(x2-headlen*Math.cos(angle+Math.PI/6), y2-headlen*Math.sin(angle+Math.PI/6));
     c.stroke();
     c.fillStyle = color;
-    c.beginPath(); c.arc(x1,y1,7,0,2*Math.PI); c.fill();
-    c.beginPath(); c.arc(x2,y2,7,0,2*Math.PI); c.fill();
+    c.beginPath(); c.arc(x1,y1,5,0,2*Math.PI); c.fill();
+    c.beginPath(); c.arc(x2,y2,5,0,2*Math.PI); c.fill();
   };
 
   const draw = (tx, ty) => {
     if(!ctx) return;
     ctx.clearRect(0,0,w,h);
+    if(imgLoaded) drawImgContain(ctx, imgLoaded);
     for(let l of b.lines){
-      if(dragType==='move_line' && dragLineId===l.id){ let dx=tx-startX,dy=ty-startY; drawArrow(ctx,l.x1+dx,l.y1+dy,l.x2+dx,l.y2+dy,l.color,2.5); continue; }
-      if(dragType==='move_p1'  && dragLineId===l.id){ drawArrow(ctx,tx,ty,l.x2,l.y2,l.color,2.5); continue; }
-      if(dragType==='move_p2'  && dragLineId===l.id){ drawArrow(ctx,l.x1,l.y1,tx,ty,l.color,2.5); continue; }
-      drawArrow(ctx,l.x1,l.y1,l.x2,l.y2,l.color,2.5);
+      if(dragType==='move_line' && dragLineId===l.id){ let dx=tx-startX,dy=ty-startY; drawArrow(ctx,l.x1+dx,l.y1+dy,l.x2+dx,l.y2+dy,l.color,1.5); continue; }
+      if(dragType==='move_p1'  && dragLineId===l.id){ drawArrow(ctx,tx,ty,l.x2,l.y2,l.color,1.5); continue; }
+      if(dragType==='move_p2'  && dragLineId===l.id){ drawArrow(ctx,l.x1,l.y1,tx,ty,l.color,1.5); continue; }
+      drawArrow(ctx,l.x1,l.y1,l.x2,l.y2,l.color,1.5);
     }
-    if(dragType==='new' && tx!=null) drawArrow(ctx,startX,startY,tx,ty,cColor.value,2.5);
+    if(dragType==='new' && tx!=null) drawArrow(ctx,startX,startY,tx,ty,cColor.value,1.5);
   };
 
   const rebuildLabels = () => {
     dimLayer.innerHTML = '';
     for(let l of b.lines){
       const div = document.createElement('div');
-      div.style.cssText='position:absolute;background:rgba(255,255,255,0.95);border:1.5px solid '+l.color+';color:'+l.color+';font-weight:700;font-size:12px;padding:2px 8px;border-radius:6px;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.15);z-index:4;';
+      div.style.cssText='position:absolute;background:rgba(255,255,255,0.95);border:1px solid '+l.color+';color:'+l.color+';font-weight:700;font-size:12px;padding:2px 8px;border-radius:6px;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.15);z-index:4;font-family:"DM Sans",sans-serif;';
       div.style.left = ((l.x1+l.x2)/2)+'px';
       div.style.top  = ((l.y1+l.y2)/2)+'px';
       div.innerText  = l.text;
@@ -7854,20 +7889,21 @@ function pnedMkBlueprint(b){
 
   const getTarget = (x, y) => {
     for(let l of b.lines){
-      if(Math.hypot(l.x1-x,l.y1-y)<18) return {type:'p1',id:l.id};
-      if(Math.hypot(l.x2-x,l.y2-y)<18) return {type:'p2',id:l.id};
-      if(Math.hypot((l.x1+l.x2)/2-x,(l.y1+l.y2)/2-y)<22) return {type:'line',id:l.id};
+      if(Math.hypot(l.x1-x,l.y1-y)<22) return {type:'p1',id:l.id};
+      if(Math.hypot(l.x2-x,l.y2-y)<22) return {type:'p2',id:l.id};
+      if(Math.hypot((l.x1+l.x2)/2-x,(l.y1+l.y2)/2-y)<26) return {type:'line',id:l.id};
     }
     return null;
   };
 
   const showMagnifier = (cx, cy) => {
     magnifier.style.display='block';
-    magnifier.style.left=(cx-45)+'px';
-    magnifier.style.top=(cy-120)+'px';
+    magnifier.style.left=(cx-50)+'px';
+    magnifier.style.top=(cy-130)+'px';
     magnifier.style.backgroundImage='url('+canvas.toDataURL()+')';
-    magnifier.style.backgroundPosition='-'+(cx-45)+'px -'+(cy-45)+'px';
-    magnifier.style.backgroundSize=w+'px '+h+'px';
+    // Zoom 2x to show better detail
+    magnifier.style.backgroundSize=(w*2.5)+'px '+(h*2.5)+'px';
+    magnifier.style.backgroundPosition='-'+(cx*2.5-50)+'px -'+(cy*2.5-50)+'px';
   };
 
   const down = (e) => {
@@ -7891,7 +7927,7 @@ function pnedMkBlueprint(b){
     const pos=getPos(e);
     if(dragType==='new'){
       if(Math.hypot(pos.x-startX,pos.y-startY)>20)
-        b.lines.push({id:Date.now()+'',x1:startX,y1:startY,x2:pos.x,y2:pos.y,text:'1.00 m',color:cColor.value});
+        b.lines.push({id:Date.now()+'',x1:startX,y1:startY,x2:pos.x,y2:pos.y,text:'1.00',color:cColor.value});
     } else if(dragType==='move_p1'){
       let l=b.lines.find(x=>x.id===dragLineId); if(l){l.x1=pos.x;l.y1=pos.y;}
     } else if(dragType==='move_p2'){
@@ -7903,12 +7939,30 @@ function pnedMkBlueprint(b){
     dragType=null; window._pnedDirty=true; draw(); rebuildLabels();
   };
 
-  canvas.addEventListener('mousedown',down);
-  canvas.addEventListener('touchstart',down,{passive:false});
-  window.addEventListener('mousemove',move);
-  window.addEventListener('touchmove',move,{passive:false});
-  window.addEventListener('mouseup',up);
-  window.addEventListener('touchend',up);
+  canvas.addEventListener('mousedown',down);  canvas.addEventListener('touchstart',down,{passive:false});
+  window.addEventListener('mousemove',move);  window.addEventListener('touchmove',move,{passive:false});
+  window.addEventListener('mouseup',up);      window.addEventListener('touchend',up);
+
+  const rDown = (e) => {
+    isResizing = true;
+    startRH = row.offsetHeight;
+    startRY = e.touches ? e.touches[0].clientY : e.clientY;
+    e.preventDefault();
+  };
+  const rMove = (e) => {
+    if(!isResizing) return;
+    let cy = e.touches ? e.touches[0].clientY : e.clientY;
+    let newH = startRH + (cy - startRY);
+    if(newH < 150) newH = 150;
+    row.style.height = newH + 'px';
+    b.h = newH;
+    resize();
+  };
+  const rUp = () => { if(isResizing){ isResizing=false; window._pnedDirty=true; } };
+  
+  resizeHandle.addEventListener('mousedown', rDown); resizeHandle.addEventListener('touchstart', rDown, {passive:false});
+  window.addEventListener('mousemove', rMove);       window.addEventListener('touchmove', rMove, {passive:false});
+  window.addEventListener('mouseup', rUp);           window.addEventListener('touchend', rUp);
 
   return row;
 }
