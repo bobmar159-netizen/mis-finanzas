@@ -5276,9 +5276,23 @@ function _notionResultsToCSV(results){
 }
 
 // ── Ajuste section toggle ─────────────────────────────────────────
-if(!window._ajSection) window._ajSection = {ia:true};
-function ajToggle(k){ window._ajSection[k]=!window._ajSection[k]; render(); }
-function ajOpen(k){ return window._ajSection[k]!==false; }
+// Todas cerradas por defecto — el usuario abre lo que necesita
+if(!window._ajSection) window._ajSection = {};
+
+function ajToggle(k){
+  window._ajSection[k] = !window._ajSection[k];
+  const open  = window._ajSection[k];
+  const body  = document.getElementById('aj-body-'+k);
+  const arrow = document.getElementById('aj-arrow-'+k);
+  const hdr   = document.querySelector('#aj-card-'+k+' > div:first-child');
+  if(!body){ render(); return; }
+  body.style.display  = open ? 'block' : 'none';
+  body.style.padding  = open ? '14px 14px 16px' : '0';
+  if(arrow) arrow.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+  if(hdr)   hdr.style.borderBottom = open ? '1px solid var(--border)' : '0';
+}
+
+function ajOpen(k){ return !!window._ajSection[k]; }
 
 function renderAjustes(){
   const txCount=state.transactions.length;
@@ -5295,22 +5309,25 @@ function renderAjustes(){
 
   const sec=(key,icon,title,subtitle,accentColor,content)=>{
     const open=ajOpen(key);
-    return `<div class="card" style="margin-bottom:10px;${open?'':'padding-bottom:0'}">
-      <div onclick="ajToggle('${key}')" style="display:flex;align-items:center;gap:10px;cursor:pointer;${open?'margin-bottom:14px':''}">
-        <div style="width:40px;height:40px;border-radius:11px;background:${accentColor}22;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${icon}</div>
-        <div style="flex:1">
-          <div style="font-family:'Playfair Display',serif;font-size:15px;color:${accentColor}">${title}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:1px">${subtitle}</div>
+    return `
+    <div id="aj-card-${key}" class="card" style="margin-bottom:7px;padding:0;overflow:hidden">
+      <div onclick="ajToggle('${key}')" style="display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;border-bottom:${open?'1px solid var(--border)':'0'}">
+        <div style="width:36px;height:36px;border-radius:10px;background:${accentColor}18;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">${icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:700;color:${accentColor};font-family:'DM Sans',sans-serif">${title}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${subtitle}</div>
         </div>
-        <span style="font-size:16px;color:var(--muted);transition:transform .2s;display:inline-block;transform:rotate(${open?'180':'0'}deg)">⌄</span>
+        <span id="aj-arrow-${key}" style="font-size:13px;color:var(--muted);flex-shrink:0;transition:transform .18s;transform:rotate(${open?'180':'0'}deg)">⌄</span>
       </div>
-      ${open?content:''}
+      <div id="aj-body-${key}" style="display:${open?'block':'none'};padding:14px 14px 16px" onclick="event.stopPropagation()">
+        ${content}
+      </div>
     </div>`;
   };
 
   return `
-    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:16px">Ajustes</div>
-
+    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:6px">Ajustes</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Toca para expandir cada sección</div>
 
     ${sec('temas','🎨','Personalización','Tema visual de la app','var(--gold)',`
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
