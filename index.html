@@ -2935,11 +2935,37 @@ function syncToSheets(lastTx){
   _syncTimer=setTimeout(()=>{
     _syncStatus='syncing';
     _updateSyncBadge();
+    // Siempre enviar la tx específica que cambió (insert/update)
     const tx = lastTx || (state.transactions.length ? state.transactions[0] : null);
     if(!tx) return;
     const payload={type:'tx',modo:state.modo,timestamp:'tx_'+tx.id+'_'+Date.now(),tx};
     _sendToSheets(url,payload);
   },200);
+}
+
+// ── Sincronizar TODO el historial de transacciones a Sheets (batch) ──
+function syncAllTxToSheets(silencioso){
+  const url=localStorage.getItem('fnz_sheets_url')||'';
+  if(!url) return;
+  const txs=state.transactions||[];
+  if(!txs.length) return;
+  if(!silencioso) toast('⬆ Enviando '+txs.length+' movimientos a Sheets...');
+  _syncStatus='syncing'; _updateSyncBadge();
+  // Enviar en batch de 20, con delay entre cada uno
+  let idx=0;
+  function sendNext(){
+    if(idx>=txs.length){
+      _syncStatus='ok';_updateSyncBadge();
+      setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},4000);
+      if(!silencioso) toast('✓ '+txs.length+' movimientos sincronizados a Sheets');
+      return;
+    }
+    const tx=txs[idx++];
+    const payload={type:'tx',modo:state.modo,timestamp:'tx_'+tx.id+'_'+Date.now(),tx};
+    const fullUrl=url+'?data='+encodeURIComponent(JSON.stringify(payload));
+    fetch(fullUrl,{method:'GET',mode:'no-cors'}).finally(()=>setTimeout(sendNext,120));
+  }
+  sendNext();
 }
 
 function _updateSyncBadge(){
@@ -3171,17 +3197,25 @@ function _procesarCsvNotionTexto(csv, statusElId) {
 
         // ── Crear tx de INGRESO ──
         if (precio > 0) {
+          // Descripción limpia: servicio real, cliente separado, obs solo si aporta info nueva
+          const descBase = servicio; // nombre del servicio (ya mapeado)
+          const clienteLimpio = cliente.split('@')[0].trim(); // quitar emails si vienen
+          // Solo agregar obs si tiene contenido distinto al servicio y al cliente
+          const obsFiltrado = obs && obs.toLowerCase() !== servicio.toLowerCase() && obs.toLowerCase() !== clienteLimpio.toLowerCase() ? obs : '';
+          const descripcion = descBase + (clienteLimpio ? ' — ' + clienteLimpio : '') + (obsFiltrado ? ' · ' + obsFiltrado : '');
+
           nuevasTx.push({
-            // ★ ID estable y único: fecha + índice de fila + tipo
             id: 'not_' + fecha + '_ing_r' + i,
             type: 'ingreso',
             amount: precio,
             category: servicio,
             catId: _getCatIdByName(servicio),
-            description: (obs || servicio) + (cliente ? ' — ' + cliente : ''),
+            description: descripcion,
             date: fecha,
-            cliente: cliente,
+            cliente: clienteLimpio,
+            contacto: iContacto >= 0 ? r[iContacto]?.trim() : '',
             ubicacion: iDistrito >= 0 ? r[iDistrito]?.trim() : '',
+            formaPago: forma,
             negocio: true,
             moneda: 'PEN',
             _importadoDeNotion: true,
@@ -5103,60 +5137,142 @@ async function notionApiPoll(){
   if(!token||!dbId) return;
   const statusEl = document.getElementById('notion-api-status');
   if(statusEl) statusEl.textContent = '↻ Consultando Notion...';
+
   try{
+    // Notion API requiere server-side por CORS. Usamos el Apps Script como proxy si está configurado,
+    // si no, intentamos con un proxy CORS público de solo-lectura.
     const sheetsUrl = localStorage.getItem('fnz_sheets_url');
-    if(!sheetsUrl){
-      if(statusEl) statusEl.textContent = '⚠ Necesitás configurar Google Sheets para el proxy';
-      return;
+    const lastSync  = localStorage.getItem('fnz_notion_last_sync')||'2000-01-01T00:00:00.000Z';
+
+    let csvText = null;
+
+    if(sheetsUrl){
+      // ── Ruta 1: Apps Script como proxy (recomendado) ──
+      const url = sheetsUrl
+        + '?action=notionQuery'
+        + '&token=' + encodeURIComponent(token)
+        + '&dbId='  + encodeURIComponent(dbId)
+        + '&since=' + encodeURIComponent(lastSync);
+      const res = await fetch(url, {method:'GET'});
+      if(res.ok){
+        const ct = res.headers.get('content-type')||'';
+        if(ct.includes('csv')||ct.includes('text/plain')){
+          csvText = await res.text();
+        } else {
+          const data = await res.json().catch(()=>({}));
+          csvText = data.csv || null;
+          if(!csvText && data.rows === 0){
+            if(statusEl) statusEl.textContent = '✓ Sin cambios · '+new Date().toLocaleTimeString('es-PE');
+            localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
+            return;
+          }
+        }
+      }
     }
-    const lastSync = localStorage.getItem('fnz_notion_last_sync')||'2000-01-01T00:00:00Z';
-    // El Apps Script recibe action=notionQuery, consulta la API de Notion
-    // y devuelve el CSV con exactamente las mismas columnas que exporta Notion
-    const url = sheetsUrl
-      + '?action=notionQuery'
-      + '&token=' + encodeURIComponent(token)
-      + '&dbId='  + encodeURIComponent(dbId)
-      + '&since=' + encodeURIComponent(lastSync);
 
-    const res = await fetch(url);
-    if(!res.ok) throw new Error('HTTP ' + res.status);
+    if(!csvText){
+      // ── Ruta 2: Notion API directamente (necesita CORS proxy) ──
+      // Usamos allorigins.win como proxy transparente
+      const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
+      const proxyUrl  = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(notionUrl);
+      const body = JSON.stringify({
+        filter: {
+          timestamp: 'last_edited_time',
+          last_edited_time: { after: lastSync }
+        },
+        sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }],
+        page_size: 100
+      });
 
-    const contentType = res.headers.get('content-type')||'';
+      const res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Notion-Version': '2022-06-28',
+          'Content-Type': 'application/json'
+        },
+        body
+      });
 
-    if(contentType.includes('text/csv') || contentType.includes('text/plain')){
-      // ── El proxy devuelve CSV directamente (formato igual al export de Notion)
-      // Usamos EXACTAMENTE el mismo núcleo que la importación manual
-      const csvText = await res.text();
-      if(!csvText || csvText.trim().length < 10){
-        if(statusEl) statusEl.textContent = '✓ Sin cambios · ' + new Date().toLocaleTimeString('es-PE');
+      if(!res.ok) throw new Error('Notion API HTTP ' + res.status);
+      const data = await res.json();
+      if(!data.results || data.results.length === 0){
+        if(statusEl) statusEl.textContent = '✓ Sin cambios · '+new Date().toLocaleTimeString('es-PE');
         localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
         return;
       }
-      const result = _procesarCsvNotionTexto(csvText, 'notion-api-status');
-      if(result.ok){
-        localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
-        if(statusEl) statusEl.textContent =
-          '✓ ' + result.txImportadas + ' ingresos · ' + new Date().toLocaleTimeString('es-PE');
-      }
-    } else {
-      // ── El proxy devuelve JSON con {csv: "..."} o {rows: 0} (sin cambios)
-      const data = await res.json();
-      if(data.csv && data.csv.trim().length > 10){
-        const result = _procesarCsvNotionTexto(data.csv, 'notion-api-status');
-        if(result.ok){
-          localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
-          if(statusEl) statusEl.textContent =
-            '✓ ' + result.txImportadas + ' ingresos · ' + new Date().toLocaleTimeString('es-PE');
-        }
-      } else {
-        localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
-        if(statusEl) statusEl.textContent = '✓ Sin cambios · ' + new Date().toLocaleTimeString('es-PE');
-      }
+      // Convertir resultados de Notion API al mismo formato CSV que exporta Notion
+      csvText = _notionResultsToCSV(data.results);
     }
+
+    if(!csvText || csvText.trim().length < 10){
+      if(statusEl) statusEl.textContent = '✓ Sin cambios · '+new Date().toLocaleTimeString('es-PE');
+      localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
+      return;
+    }
+
+    // Usar EXACTAMENTE el mismo núcleo que la importación manual
+    const result = _procesarCsvNotionTexto(csvText, 'notion-api-status');
+    if(result.ok){
+      localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
+      if(statusEl) statusEl.textContent =
+        '✓ '+result.txImportadas+' ingresos · '+new Date().toLocaleTimeString('es-PE');
+      // Sincronizar lo nuevo a Sheets también
+      syncAllTxToSheets(true);
+    }
+
   } catch(err){
-    if(statusEl) statusEl.textContent = '⚠ Error: ' + err.message;
+    if(statusEl) statusEl.textContent = '⚠ Error: '+err.message;
     console.error('Notion poll error:', err);
   }
+}
+
+// Convierte resultados de Notion API al formato CSV que espera _procesarCsvNotionTexto
+function _notionResultsToCSV(results){
+  if(!results||!results.length) return '';
+  // Encabezado exacto que usa el importador
+  const headers = ['Fecha','Cliente','Servicio 1','Servicio 2','Servicio 3','Servicio 4',
+                   'Precio del servicio','Movilidad','Materiales','Otros',
+                   'Distrito','Forma de pago','Observaciones','Contacto'];
+
+  function getProp(props, ...names){
+    for(const name of names){
+      const p = props[name] || props[name.toLowerCase()] || Object.entries(props).find(([k])=>k.toLowerCase()===name.toLowerCase())?.[1];
+      if(!p) continue;
+      if(p.type==='title')       return (p.title||[]).map(t=>t.plain_text).join('').trim();
+      if(p.type==='rich_text')   return (p.rich_text||[]).map(t=>t.plain_text).join('').trim();
+      if(p.type==='date')        return p.date?.start||'';
+      if(p.type==='number')      return p.number!=null ? p.number.toString() : '';
+      if(p.type==='select')      return p.select?.name||'';
+      if(p.type==='multi_select')return (p.multi_select||[]).map(s=>s.name).join(', ');
+      if(p.type==='formula')     return p.formula?.number!=null ? p.formula.number.toString() : (p.formula?.string||'');
+      if(p.type==='phone_number')return p.phone_number||'';
+    }
+    return '';
+  }
+
+  const rows = [headers.join(',')];
+  for(const page of results){
+    const p = page.properties||{};
+    const row = [
+      getProp(p,'Fecha','fecha','Date','date'),
+      getProp(p,'Cliente','cliente','Nombre','nombre'),
+      getProp(p,'Servicio 1','servicio 1','Servicio1'),
+      getProp(p,'Servicio 2','servicio 2','Servicio2'),
+      getProp(p,'Servicio 3','servicio 3','Servicio3'),
+      getProp(p,'Servicio 4','servicio 4','Servicio4'),
+      getProp(p,'Precio del servicio','Precio','precio'),
+      getProp(p,'Movilidad','movilidad'),
+      getProp(p,'Materiales','materiales'),
+      getProp(p,'Otros','otros'),
+      getProp(p,'Distrito','distrito','Ubicacion','ubicacion'),
+      getProp(p,'Forma de pago','forma de pago','Pago'),
+      getProp(p,'Observaciones','observaciones','Nota','nota'),
+      getProp(p,'Contacto','contacto','Telefono','teléfono'),
+    ].map(v => '"' + (v||'').replace(/"/g,'""') + '"');
+    rows.push(row.join(','));
+  }
+  return rows.join('\n');
 }
 
 // ── Ajuste section toggle ─────────────────────────────────────────
@@ -5242,6 +5358,7 @@ function renderAjustes(){
         <button onclick="testSheetsSync()" style="flex:1;background:transparent;border:1px solid #1565C044;color:#1565C0;border-radius:10px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Probar</button>
       </div>
       <button onclick="reloadFromSheets()" style="width:100%;margin-top:8px;background:#F0FDF4;border:1px solid #3A7D4444;color:#3A7D44;border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">☁️ Restaurar datos desde Sheets</button>
+      <button onclick="syncAllTxToSheets(false)" style="width:100%;margin-top:6px;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">⬆ Enviar TODO el historial a Sheets</button>
     `)}
 
     ${sec('notion','🔄','Notion — Sync automático','Polling cada X minutos con la API','#6B46C1',`
@@ -5249,8 +5366,8 @@ function renderAjustes(){
         <strong style="color:#6B46C1">Cómo funciona:</strong> La app consulta tu base de datos de Notion a través del proxy de Google Apps Script y detecta registros nuevos o modificados automáticamente. Necesitás un token de integración de Notion y el ID de tu base de datos.
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
-        <input id="notion-token-inp" type="password" placeholder="secret_xxxx... (Integration token de Notion)" value="${notionToken}" style="background:#F8FAFC;border:1px solid #7C3AED44;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%">
-        <input id="notion-dbid-inp" type="text" placeholder="ID de base de datos (32 caracteres)" value="${notionDbId}" style="background:#F8FAFC;border:1px solid #7C3AED44;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%">
+        <input id="notion-token-inp" type="password" placeholder="secret_xxxx... (Integration token de Notion)" value="${notionToken}" style="background:#F8FAFC;border:1px solid #7C3AED44;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%" oninput="if(this.value.startsWith('secret_'))localStorage.setItem('fnz_notion_token',this.value.trim())">
+        <input id="notion-dbid-inp" type="text" placeholder="ID de base de datos (32 caracteres)" value="${notionDbId}" style="background:#F8FAFC;border:1px solid #7C3AED44;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%" oninput="if(this.value.length>=32)localStorage.setItem('fnz_notion_dbid',this.value.trim().replace(/-/g,''))">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:12px;color:var(--muted)">Sincronizar cada</span>
           <select id="notion-interval-sel" style="flex:1;background:#F8FAFC;border:1px solid #7C3AED44;border-radius:8px;padding:8px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text)">
@@ -8466,41 +8583,45 @@ function loadFromSheets(forzar) {
   const url = localStorage.getItem('fnz_sheets_url') || '';
   if (!url) { render(); return; }
 
-  // Solo cargar si forzar=true O si el localStorage está vacío (caché borrado)
+  // Con forzar=false (arranque): siempre intentar, pero solo mostrar spinner si localStorage vacío
   const hayDatos = (
     (load('fnz_neg_tx', []).length > 0) ||
-    (load('fnz_tx', []).length > 0) ||
-    (load('fnz_agenda', []).length > 0)
+    (load('fnz_tx', []).length > 0)
   );
-  if (!forzar && hayDatos) { render(); return; }
 
-  // Mostrar pantalla de carga
-  document.getElementById('content').innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;padding:20px">
-      <div style="font-size:40px">☁️</div>
-      <div style="font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;color:var(--text)">Restaurando desde Sheets...</div>
-      <div style="font-size:12px;color:var(--muted);text-align:center">Tu caché fue borrado — recuperando datos</div>
-      <div class="pulse" style="width:48px;height:4px;background:var(--gold);border-radius:2px;margin-top:4px"></div>
-    </div>`;
+  // Si no hay datos locales, mostrar pantalla de carga
+  if (!hayDatos || forzar) {
+    document.getElementById('content').innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;padding:20px">
+        <div style="font-size:40px">☁️</div>
+        <div style="font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;color:var(--text)">${forzar?'Cargando desde Sheets...':'Restaurando datos...'}</div>
+        <div style="font-size:12px;color:var(--muted);text-align:center">Sincronizando con tu Google Sheets</div>
+        <div class="pulse" style="width:48px;height:4px;background:var(--gold);border-radius:2px;margin-top:4px"></div>
+      </div>`;
+  }
 
   const fullUrl = url + '?data=' + encodeURIComponent(JSON.stringify({ action: 'load' }));
   fetch(fullUrl, { method: 'GET' })
     .then(r => r.json())
     .then(data => {
-      if (!data.ok) { render(); return; }
+      if (!data || !data.ok) { render(); return; }
+
+      let added = 0;
 
       // Agenda
       if (data.agenda && data.agenda.length) {
         const m = _mergeById(load('fnz_agenda',[]), data.agenda);
         save('fnz_agenda', m); state.agenda = m;
+        added += data.agenda.length;
       }
-      // Movimientos negocio — merge por id Y huella (evita duplicados de Notion)
+
+      // Movimientos negocio — merge por ID Y huella (evita duplicados)
       if (data.movimientos && data.movimientos.length) {
         const local = load('fnz_neg_tx',[]);
         const _normCat = cat => _mapearCategoriaNotion(cat||'').toLowerCase().trim();
         const _h = t => [t.date||'',t.type||'',Math.round((t.amount||0)*100),_normCat(t.category),(t.cliente||'').toLowerCase().trim()].join('|');
-        const idsSeen = new Set(local.map(t=>t.id));
-        const huellasSeen = new Set(local.map(_h));
+        const idsSeen    = new Set(local.map(t=>t.id));
+        const huellasSeen= new Set(local.map(_h));
         const toAdd = (data.movimientos||[]).filter(t => {
           if(!t||!t.id) return false;
           if(idsSeen.has(t.id)) return false;
@@ -8509,10 +8630,27 @@ function loadFromSheets(forzar) {
           idsSeen.add(t.id); huellasSeen.add(h);
           return true;
         });
-        const m = [...local, ...toAdd];
-        save('fnz_neg_tx', m);
-        if (state.modo === 'negocio') state.transactions = m;
+        if(toAdd.length > 0){
+          const m = [...local, ...toAdd].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+          save('fnz_neg_tx', m);
+          if (state.modo === 'negocio') state.transactions = m;
+          added += toAdd.length;
+        }
       }
+
+      // Movimientos personales
+      if (data.movimientosPersonales && data.movimientosPersonales.length) {
+        const local = load('fnz_tx',[]);
+        const idsSeen = new Set(local.map(t=>t.id));
+        const toAdd = data.movimientosPersonales.filter(t=>t&&t.id&&!idsSeen.has(t.id));
+        if(toAdd.length>0){
+          const m=[...local,...toAdd].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+          save('fnz_tx',m);
+          if(state.modo==='personal') state.transactions=m;
+          added+=toAdd.length;
+        }
+      }
+
       // Deudas
       if (data.deudas && data.deudas.length) {
         const m = _mergeById(load('fnz_neg_debts',[]), data.deudas);
@@ -8538,12 +8676,11 @@ function loadFromSheets(forzar) {
       }
 
       save('fnz_last_load', new Date().toISOString());
-      // ★ Recargar state completo desde localStorage para que todo sea consistente
       loadStateForModo(state.modo);
-      toast('✓ Datos restaurados desde Sheets');
+      if(added > 0 || forzar) toast('✓ Sheets: '+added+' registros nuevos cargados');
       render();
     })
-    .catch(() => render()); // Si falla, mostrar lo que hay en localStorage
+    .catch(() => render());
 }
 
 // Merge por id: local tiene prioridad, agrega remote solo si id no existe
