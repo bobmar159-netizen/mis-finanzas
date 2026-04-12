@@ -5135,95 +5135,98 @@ async function notionApiPoll(){
   const token = localStorage.getItem('fnz_notion_token');
   const dbId  = localStorage.getItem('fnz_notion_dbid');
   if(!token||!dbId) return;
+
   const statusEl = document.getElementById('notion-api-status');
   if(statusEl) statusEl.textContent = '↻ Consultando Notion...';
 
+  const sheetsUrl = localStorage.getItem('fnz_sheets_url');
+  if(!sheetsUrl){
+    if(statusEl) statusEl.textContent = '⚠ Necesitás configurar primero la URL de Google Sheets — es el puente a Notion';
+    return;
+  }
+
+  const lastSync = localStorage.getItem('fnz_notion_last_sync') || '2000-01-01T00:00:00.000Z';
+
   try{
-    // Notion API requiere server-side por CORS. Usamos el Apps Script como proxy si está configurado,
-    // si no, intentamos con un proxy CORS público de solo-lectura.
-    const sheetsUrl = localStorage.getItem('fnz_sheets_url');
-    const lastSync  = localStorage.getItem('fnz_notion_last_sync')||'2000-01-01T00:00:00.000Z';
+    // El Apps Script actúa como proxy server-side para la Notion API
+    // (el browser no puede llamar a Notion API directamente por CORS)
+    const url = sheetsUrl
+      + '?action=notionQuery'
+      + '&token=' + encodeURIComponent(token)
+      + '&dbId='  + encodeURIComponent(dbId)
+      + '&since=' + encodeURIComponent(lastSync);
 
-    let csvText = null;
+    const res = await fetch(url, { method: 'GET' });
+    if(!res.ok) throw new Error('Apps Script respondió HTTP ' + res.status);
 
-    if(sheetsUrl){
-      // ── Ruta 1: Apps Script como proxy (recomendado) ──
-      const url = sheetsUrl
-        + '?action=notionQuery'
-        + '&token=' + encodeURIComponent(token)
-        + '&dbId='  + encodeURIComponent(dbId)
-        + '&since=' + encodeURIComponent(lastSync);
-      const res = await fetch(url, {method:'GET'});
-      if(res.ok){
-        const ct = res.headers.get('content-type')||'';
-        if(ct.includes('csv')||ct.includes('text/plain')){
-          csvText = await res.text();
-        } else {
-          const data = await res.json().catch(()=>({}));
-          csvText = data.csv || null;
-          if(!csvText && data.rows === 0){
-            if(statusEl) statusEl.textContent = '✓ Sin cambios · '+new Date().toLocaleTimeString('es-PE');
-            localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
-            return;
-          }
-        }
-      }
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) {
+      // Si devuelve texto plano (no JSON), puede ser error de GAS
+      throw new Error('Respuesta inválida del Apps Script. ¿Está publicado como "Cualquier persona"? Respuesta: ' + text.substring(0,120));
     }
 
-    if(!csvText){
-      // ── Ruta 2: Notion API directamente (necesita CORS proxy) ──
-      // Usamos allorigins.win como proxy transparente
-      const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
-      const proxyUrl  = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(notionUrl);
-      const body = JSON.stringify({
-        filter: {
-          timestamp: 'last_edited_time',
-          last_edited_time: { after: lastSync }
-        },
-        sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }],
-        page_size: 100
-      });
-
-      const res = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + token,
-          'Notion-Version': '2022-06-28',
-          'Content-Type': 'application/json'
-        },
-        body
-      });
-
-      if(!res.ok) throw new Error('Notion API HTTP ' + res.status);
-      const data = await res.json();
-      if(!data.results || data.results.length === 0){
-        if(statusEl) statusEl.textContent = '✓ Sin cambios · '+new Date().toLocaleTimeString('es-PE');
-        localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
-        return;
-      }
-      // Convertir resultados de Notion API al mismo formato CSV que exporta Notion
-      csvText = _notionResultsToCSV(data.results);
+    if(data.error){
+      throw new Error('Error del Apps Script: ' + data.error);
     }
 
-    if(!csvText || csvText.trim().length < 10){
-      if(statusEl) statusEl.textContent = '✓ Sin cambios · '+new Date().toLocaleTimeString('es-PE');
+    // El Apps Script devuelve {ok:true, csv:"...", count:N} o {ok:true, count:0}
+    if(!data.ok){
+      throw new Error('Apps Script reportó error. ¿Tiene el handler notionQuery? Descargá el script actualizado.');
+    }
+
+    if(!data.csv || data.count === 0){
+      if(statusEl) statusEl.textContent = '✓ Sin cambios nuevos · ' + new Date().toLocaleTimeString('es-PE');
       localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
       return;
     }
 
-    // Usar EXACTAMENTE el mismo núcleo que la importación manual
-    const result = _procesarCsvNotionTexto(csvText, 'notion-api-status');
+    // Procesar CSV con el mismo núcleo que la importación manual
+    const result = _procesarCsvNotionTexto(data.csv, 'notion-api-status');
     if(result.ok){
       localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
       if(statusEl) statusEl.textContent =
-        '✓ '+result.txImportadas+' ingresos · '+new Date().toLocaleTimeString('es-PE');
-      // Sincronizar lo nuevo a Sheets también
+        '✓ ' + result.txImportadas + ' ing · ' + result.egresosMov + ' movil · ' + new Date().toLocaleTimeString('es-PE');
       syncAllTxToSheets(true);
+      toast('✨ Notion: ' + result.txImportadas + ' registros actualizados');
     }
 
   } catch(err){
-    if(statusEl) statusEl.textContent = '⚠ Error: '+err.message;
+    if(statusEl) statusEl.textContent = '⚠ ' + err.message;
     console.error('Notion poll error:', err);
+  }
+}
+
+// Probar conexión Notion manualmente con feedback detallado
+async function probarConexionNotion(){
+  const token = localStorage.getItem('fnz_notion_token');
+  const dbId  = localStorage.getItem('fnz_notion_dbid');
+  const sheetsUrl = localStorage.getItem('fnz_sheets_url');
+  const statusEl = document.getElementById('notion-api-status');
+
+  if(!token){ if(statusEl) statusEl.textContent = '⚠ Falta el token de Notion'; return; }
+  if(!dbId){  if(statusEl) statusEl.textContent = '⚠ Falta el ID de la base de datos'; return; }
+  if(!sheetsUrl){ if(statusEl) statusEl.textContent = '⚠ Falta la URL de Google Sheets (necesaria como puente)'; return; }
+
+  if(statusEl) statusEl.textContent = '🔄 Probando conexión...';
+
+  try{
+    const url = sheetsUrl + '?action=notionTest&token=' + encodeURIComponent(token) + '&dbId=' + encodeURIComponent(dbId);
+    const res = await fetch(url, { method: 'GET' });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) {
+      if(statusEl) statusEl.textContent = '⚠ El Apps Script no reconoce la acción notionTest. Descargá el script actualizado.';
+      return;
+    }
+    if(data.ok){
+      if(statusEl) statusEl.textContent = '✅ Conexión OK · ' + (data.dbTitle||'Base de datos encontrada') + ' · ' + (data.count||'?') + ' registros';
+      toast('✅ Notion conectado correctamente');
+    } else {
+      if(statusEl) statusEl.textContent = '⚠ Error Notion: ' + (data.error||'Sin detalles. ¿El token tiene acceso a la base de datos?');
+    }
+  } catch(err){
+    if(statusEl) statusEl.textContent = '⚠ No se pudo conectar con el Apps Script: ' + err.message;
   }
 }
 
@@ -5398,6 +5401,11 @@ function renderAjustes(){
       <div class="btn-row">
         <button onclick="saveNotionConfig()" style="flex:1;background:#7C3AED;color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">${notionPolling?'↻ Actualizar config':'▶ Iniciar sync auto'}</button>
         ${notionPolling?`<button onclick="notionApiSyncStop()" style="flex:1;background:#FEF2F2;border:1px solid #C6282833;color:#C62828;border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">⏸ Pausar</button>`:''}
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button onclick="probarConexionNotion()" style="flex:1;background:#F3F0FF;border:1px solid #7C3AED44;color:#6B46C1;border-radius:10px;padding:9px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer">🔌 Probar conexión</button>
+        <button onclick="notionApiPoll()" style="flex:1;background:#F0FDF4;border:1px solid #3A7D4433;color:#2A7A44;border-radius:10px;padding:9px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer">↻ Sincronizar ahora</button>
+        <button onclick="localStorage.removeItem('fnz_notion_last_sync');toast('Fecha de sync reiniciada — la próxima sync traerá todos los registros')" style="flex:1;background:#FFF8F0;border:1px solid #EF9F2733;color:#854F0B;border-radius:10px;padding:9px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">⏮ Reiniciar fecha</button>
       </div>
       ${notionPolling?`<div style="margin-top:8px;background:#F0FDF4;border:1px solid #3A7D4433;border-radius:8px;padding:8px;font-size:11px;color:#2A7A44;text-align:center;font-weight:600">🟢 Sync activo · cada ${notionInterval} min</div>`:''}
       <div id="notion-api-status" style="margin-top:6px;font-size:11px;color:var(--muted);text-align:center;min-height:14px"></div>
@@ -6951,16 +6959,168 @@ function resetAllData(){
 }
 
 function descargarAppsScript(){
-  // AVISO: este código embebido puede estar desactualizado.
-  // Siempre usa el GAS más reciente desde tu repositorio.
-  const codigo="// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// MIS FINANZAS \u2014 Google Apps Script v6.4\n// Dise\u00f1o estilo Notion \u2014 limpio y moderno\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n// Hojas v\u00e1lidas \u2014 cualquier otra se elimina autom\u00e1ticamente\nvar HOJAS_VALIDAS = ['Construcciones y Visitas', 'Movimientos Negocio', 'Deudas y Movimientos', 'Servicios Fijos', 'Metas de Ahorro', 'Prestamos', 'Notas'];\n\nfunction autorizarCalendar() {\n  try {\n    var cal = CalendarApp.getDefaultCalendar();\n    Logger.log('Calendar autorizado OK: ' + cal.getName());\n    return 'OK: ' + cal.getName();\n  } catch (e) { return 'Error: ' + e.message; }\n}\n\nfunction probarCalendar() {\n  try {\n    var cal = CalendarApp.getDefaultCalendar();\n    var ahora = new Date();\n    var ev = cal.createEvent('TEST Mis Finanzas', ahora, new Date(ahora.getTime() + 3600000));\n    ev.deleteEvent();\n    return 'OK';\n  } catch (e) { return 'Error: ' + e.message; }\n}\n\nfunction inicializarHojas() {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sh1 = getOrCreate(ss, 'Construcciones y Visitas');\n  var sh2 = getOrCreate(ss, 'Movimientos Negocio');\n  var sh3 = getOrCreate(ss, 'Deudas y Movimientos');\n  var sh4 = getOrCreate(ss, 'Notas');\n  initConstrucciones(sh1);\n  initMovNegocio(sh2);\n  initDeudasSheet(sh3);\n  // Init Notas\n  if (sh4.getLastRow() === 0) {\n    sh4.appendRow(['  Fecha','  Tipo','  T\u00edtulo','  Contenido / \u00cdtems','  Recordatorio','  Estado']);\n    aplicarEstiloNotion(sh4, {header:'#1C1C1C'}, 6);\n    sh4.setColumnWidth(1,110);sh4.setColumnWidth(2,130);sh4.setColumnWidth(3,200);\n    sh4.setColumnWidth(4,340);sh4.setColumnWidth(5,150);sh4.setColumnWidth(6,120);\n  }\n  limpiarHojasViejas();\n  Logger.log('Hojas inicializadas correctamente');\n}\n\nfunction limpiarHojasViejas() {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var hojas = ss.getSheets();\n  for (var i = hojas.length - 1; i >= 0; i--) {\n    var nombre = hojas[i].getName();\n    var esValida = false;\n    for (var j = 0; j < HOJAS_VALIDAS.length; j++) {\n      if (nombre === HOJAS_VALIDAS[j]) { esValida = true; break; }\n    }\n    if (!esValida && ss.getSheets().length > 1) {\n      try { ss.deleteSheet(hojas[i]); } catch(e) {}\n    }\n  }\n}\n\n// \u2605 Anti-duplicado via PropertiesService \u2014 ver doGet\n\nfunction doGet(e) {\n  try {\n    var raw = e && e.parameter && e.parameter.data ? e.parameter.data : null;\n    if (!raw) return ContentService.createTextOutput('Mis Finanzas v6.4 activo');\n    var data = JSON.parse(decodeURIComponent(raw));\n    if (data.test) return jsonOk({ ok: true, version: '6.4' });\n\n    // Sin anti-duplicado \u2014 cada request se procesa siempre\n\n    var ss = SpreadsheetApp.getActiveSpreadsheet();\n\n    if      (data.type === 'agenda')            { handleAgenda(ss, data); }\n    else if (data.type === 'agenda_estado')     { handleAgendaEstado(ss, data); }\n    else if (data.type === 'agenda_delete')     { handleAgendaDelete(ss, data); }\n    else if (data.type === 'agenda_conversion') { handleAgendaConversion(ss, data); }\n    else if (data.type === 'tx')                { handleTx(ss, data); }\n    else if (data.type === 'deuda')             { handleDeuda(ss, data); }\n    else if (data.type === 'servicio')          { handleServicio(ss, data); }\n    else if (data.type === 'meta')              { handleMeta(ss, data); }\n    else if (data.type === 'prestamo')          { handlePrestamo(ss, data); }\n    else if (data.type === 'nota')              { handleNota(ss, data); }\n\n    return jsonOk({ ok: true });\n  } catch (err) {\n    Logger.log('Error: ' + err.message);\n    return jsonOk({ ok: false, error: err.message });\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// DISE\u00d1O NOTION \u2014 funciones de estilo\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n// Colores por hoja\nvar TEMAS = {\n  'Construcciones y Visitas': { header: '#1C1C1C', alt: '#FAFAFA', badge_a: '#FFF3E0', badge_b: '#E3F2FD', badge_ok: '#E8F5E9', badge_pen: '#FFF8E1' },\n  'Movimientos Negocio':      { header: '#1C1C1C', alt: '#FAFAFA', badge_ing: '#E8F5E9', badge_egr: '#FCE4EC' },\n  'Deudas y Movimientos':     { header: '#1C1C1C', alt: '#FAFAFA' }\n};\n\nfunction aplicarEstiloNotion(sh, tema, numCols) {\n  // Fila de encabezado\n  var hRange = sh.getRange(1, 1, 1, numCols);\n  hRange.setBackground(tema.header)\n        .setFontColor('#FFFFFF')\n        .setFontWeight('bold')\n        .setFontSize(11)\n        .setFontFamily('Arial')\n        .setHorizontalAlignment('left')\n        .setVerticalAlignment('middle')\n        .setBorder(false, false, false, false, false, false);\n  sh.setRowHeight(1, 36);\n  sh.setFrozenRows(1);\n\n  // Ocultar l\u00edneas de cuadr\u00edcula\n  sh.setHiddenGridlines(true);\n}\n\nfunction aplicarFilaNotion(sh, row, numCols, altBg) {\n  var bg = (row % 2 === 0) ? altBg : '#FFFFFF';\n  sh.getRange(row, 1, 1, numCols)\n    .setBackground(bg)\n    .setFontSize(10)\n    .setFontFamily('Arial')\n    .setVerticalAlignment('middle')\n    .setBorder(false, false, true, false, false, false, '#F0F0F0', SpreadsheetApp.BorderStyle.SOLID);\n  sh.setRowHeight(row, 32);\n}\n\nfunction badgeCell(sh, row, col, texto, bgColor, textColor) {\n  var cell = sh.getRange(row, col);\n  cell.setValue(texto);\n  cell.setBackground(bgColor || '#F5F5F5');\n  cell.setFontColor(textColor || '#333333');\n  cell.setFontWeight('bold');\n  cell.setFontSize(10);\n  cell.setHorizontalAlignment('center');\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// HOJA 1 \u2014 CONSTRUCCIONES Y VISITAS\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction initConstrucciones(sh) {\n  if (sh.getLastRow() > 0) { return; }\n  var headers = ['  Fecha', '  Hora', '  Tipo', '  Cliente', '  Servicio', '  Ubicaci\u00f3n', '  Precio S/.', '  Estado', '  Tel\u00e9fono', '  Notas', 'CalID'];\n  sh.appendRow(headers);\n  aplicarEstiloNotion(sh, TEMAS['Construcciones y Visitas'], 11);\n  // Anchos estilo Notion\n  sh.setColumnWidth(1, 110);  // Fecha\n  sh.setColumnWidth(2, 80);   // Hora\n  sh.setColumnWidth(3, 120);  // Tipo\n  sh.setColumnWidth(4, 160);  // Cliente\n  sh.setColumnWidth(5, 170);  // Servicio\n  sh.setColumnWidth(6, 140);  // Ubicaci\u00f3n\n  sh.setColumnWidth(7, 110);  // Precio\n  sh.setColumnWidth(8, 120);  // Estado\n  sh.setColumnWidth(9, 120);  // Tel\u00e9fono\n  sh.setColumnWidth(10, 200); // Notas\n  sh.setColumnWidth(11, 20);  // CalID oculto\n  sh.hideColumns(11);\n}\n\nfunction handleAgenda(ss, data) {\n  var item = data.item || data.agenda;\n  if (!item) { return; }\n  var sh = getOrCreate(ss, 'Construcciones y Visitas');\n  initConstrucciones(sh);\n\n  var esVisita = item.tipo === 'visita';\n\n  // Buscar fila existente por ID\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === item.id) { foundRow = i; break; }\n  }\n\n  var calId = '-';\n  if (foundRow > 0) {\n    // Edici\u00f3n \u2014 conservar CalID existente\n    calId = sh.getRange(foundRow, 11).getValue() || '-';\n    // Actualizar Calendar si existe\n    try {\n      if (calId && calId !== '-') {\n        var ev = CalendarApp.getEventById(calId);\n        if (ev) {\n          var p2 = item.fecha.split('-'), h2 = (item.hora||'09:00').split(':');\n          var inicio2 = new Date(Number(p2[0]),Number(p2[1])-1,Number(p2[2]),Number(h2[0]),Number(h2[1]||0),0);\n          ev.setTime(inicio2, new Date(inicio2.getTime()+7200000));\n          if (!esVisita && item.servicio) ev.setTitle(item.servicio+' \u2014 '+(item.cliente||'Cliente'));\n          if (item.ubicacion) ev.setLocation(item.ubicacion);\n        }\n      }\n    } catch(e) {}\n  } else {\n    // Nuevo \u2014 crear evento Calendar\n    try { calId = crearEventoCalendar(item) || '-'; } catch(e) {}\n  }\n\n  var valores = [\n    '  ' + fmtDate(item.fecha),\n    '  ' + (item.hora || '-'),\n    esVisita ? 'Visita' : 'Construcci\u00f3n',\n    '  ' + (item.cliente || '-'),\n    '  ' + (esVisita ? '-' : (item.servicio || '-')),\n    '  ' + (item.ubicacion || '-'),\n    esVisita ? '-' : (item.precio ? toNum(item.precio) : '-'),\n    item.estado === 'completado' ? 'Completado' : 'Pendiente',\n    '  ' + (item.telefono || '-'),\n    '  ' + (item.notas || '-'),\n    calId\n  ];\n\n  if (foundRow > 0) {\n    sh.getRange(foundRow, 1, 1, 11).setValues([valores]);\n    aplicarFilaNotion(sh, foundRow, 11, '#FAFAFA');\n    var row = foundRow;\n  } else {\n    sh.appendRow(valores);\n    var row = sh.getLastRow();\n    sh.getRange(row, 1).setNote(item.id || '');\n  }\n\n  if (esVisita) {\n    badgeCell(sh, row, 3, 'Visita', '#E3F2FD', '#1565C0');\n  } else {\n    badgeCell(sh, row, 3, 'Construcci\u00f3n', '#FFF3E0', '#E65100');\n  }\n  var esComp = item.estado === 'completado';\n  badgeCell(sh, row, 8, esComp ? '\u2713 Completado' : '\u25cb Pendiente', esComp ? '#E8F5E9' : '#FFF8E1', esComp ? '#2E7D32' : '#F57F17');\n  if (!esVisita && item.precio) {\n    sh.getRange(row, 7).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#2E7D32');\n  }\n}\n\nfunction handleAgendaEstado(ss, data) {\n  var ae = data.agenda_estado; if (!ae) { return; }\n  var sh = ss.getSheetByName('Construcciones y Visitas'); if (!sh) { return; }\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === ae.id) {\n      var esComp = ae.estado === 'completado';\n      badgeCell(sh, i, 8, esComp ? '\u2713 Completado' : '\u25cb Pendiente', esComp ? '#E8F5E9' : '#FFF8E1', esComp ? '#2E7D32' : '#F57F17');\n      try {\n        var calId = sh.getRange(i, 11).getValue();\n        if (calId && calId !== '-') {\n          var ev = CalendarApp.getEventById(calId);\n          if (ev) {\n            var t = ev.getTitle();\n            if (esComp) { if (t.indexOf('[OK] ') < 0) ev.setTitle('[OK] ' + t); }\n            else { ev.setTitle(t.replace('[OK] ', '')); }\n          }\n        }\n      } catch(e) {}\n      break;\n    }\n  }\n}\n\nfunction handleAgendaDelete(ss, data) {\n  if (!data.id) { return; }\n  var sh = ss.getSheetByName('Construcciones y Visitas'); if (!sh) { return; }\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === data.id) {\n      try {\n        var calId = sh.getRange(i, 11).getValue();\n        if (calId && calId !== '-') { var ev = CalendarApp.getEventById(calId); if (ev) ev.deleteEvent(); }\n      } catch(e) {}\n      badgeCell(sh, i, 8, '\u2717 Eliminado', '#F5F5F5', '#9E9E9E');\n      sh.getRange(i, 1, 1, 11).setBackground('#F9F9F9').setFontColor('#BDBDBD');\n      break;\n    }\n  }\n}\n\nfunction handleAgendaConversion(ss, data) {\n  var item = data.item;\n  if (!item || !data.id) { return; }\n  var sh = ss.getSheetByName('Construcciones y Visitas');\n  if (!sh) { handleAgenda(ss, data); return; } // si no existe la hoja, crear normal\n\n  // Buscar la fila por id (guardado en nota de celda A)\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === data.id) { foundRow = i; break; }\n  }\n\n  var fechaConv = fmtDate(new Date().toISOString().split('T')[0]);\n\n  if (foundRow > 0) {\n    // Actualizar fila existente\n    sh.getRange(foundRow, 1, 1, 10).setValues([[\n      '  ' + fmtDate(item.fecha),\n      '  ' + (item.hora || '-'),\n      'Construcci\u00f3n',\n      '  ' + (item.cliente || '-'),\n      '  ' + (item.servicio || '-'),\n      '  ' + (item.ubicacion || '-'),\n      item.precio ? toNum(item.precio) : '-',\n      '\u25cb Pendiente',\n      '  ' + (item.telefono || '-'),\n      '  Convertido de Visita el ' + fechaConv + (item.fechaVisitaOriginal ? ' (visita: ' + fmtDate(item.fechaVisitaOriginal) + ')' : '')\n    ]]);\n    aplicarFilaNotion(sh, foundRow, 11, '#FAFAFA');\n    badgeCell(sh, foundRow, 3, 'Construcci\u00f3n', '#FFF3E0', '#E65100');\n    badgeCell(sh, foundRow, 8, '\u25cb Pendiente', '#FFF8E1', '#F57F17');\n    if (item.precio) {\n      sh.getRange(foundRow, 7).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#2E7D32');\n    }\n    // Actualizar Calendar si existe\n    try {\n      var calId = sh.getRange(foundRow, 11).getValue();\n      if (calId && calId !== '-') {\n        var ev = CalendarApp.getEventById(calId);\n        if (ev) {\n          var iconoConv = '\ud83d\udd27';\n          var servConv = (item.servicio || '').toLowerCase();\n          if (servConv.indexOf('terma') >= 0 || servConv.indexOf('calef') >= 0)       { iconoConv = '\ud83d\udebf'; }\n          else if (servConv.indexOf('cocina') >= 0 || servConv.indexOf('horno') >= 0) { iconoConv = '\ud83c\udf73'; }\n          else if (servConv.indexOf('parrilla') >= 0)                                 { iconoConv = '\ud83d\udd25'; }\n          else if (servConv.indexOf('punto') >= 0 || servConv.indexOf('conexi') >= 0) { iconoConv = '\u26a1'; }\n          else if (servConv.indexOf('modific') >= 0 || servConv.indexOf('red') >= 0)  { iconoConv = '\ud83d\udd29'; }\n          else if (servConv.indexOf('reparac') >= 0)                                  { iconoConv = '\ud83d\udee0\ufe0f'; }\n          else if (servConv.indexOf('gasfiter') >= 0)                                 { iconoConv = '\ud83d\udca7'; }\n          ev.setTitle(iconoConv + ' ' + (item.servicio || 'Construcci\u00f3n') + ' \u2014 ' + (item.cliente || 'Cliente'));\n          var p2 = item.fecha.split('-'), h2 = (item.hora || '09:00').split(':');\n          var inicio2 = new Date(Number(p2[0]), Number(p2[1])-1, Number(p2[2]), Number(h2[0]), Number(h2[1]||0), 0);\n          ev.setTime(inicio2, new Date(inicio2.getTime() + 7200000));\n          var desc2 = '\ud83d\udc64 ' + (item.cliente||'-') + '\\n' +\n                      iconoConv + ' ' + (item.servicio||'-') + '\\n' +\n                      (item.precio ? '\ud83d\udcb0 S/ ' + toNum(item.precio).toFixed(2) + '\\n' : '') +\n                      (item.ubicacion ? '\ud83d\udccd ' + item.ubicacion + '\\n' : '') +\n                      (item.hora ? '\ud83d\udd50 ' + item.hora + '\\n' : '') +\n                      (item.telefono ? '\ud83d\udcde ' + item.telefono + '\\n' : '') +\n                      '\ud83d\udd04 Convertido de Visita el ' + fechaConv;\n          ev.setDescription(desc2);\n        }\n      }\n    } catch(e) { Logger.log('Cal conversion error: ' + e.message); }\n  } else {\n    // No encontr\u00f3 la fila \u2014 crear como nueva construcci\u00f3n\n    handleAgenda(ss, data);\n  }\n}\n\nfunction crearEventoCalendar(item) {\n  var cal = CalendarApp.getDefaultCalendar();\n  if (!item.fecha) { return null; }\n  var p = item.fecha.split('-'), h = (item.hora || '09:00').split(':');\n  var inicio = new Date(Number(p[0]), Number(p[1])-1, Number(p[2]), Number(h[0]), Number(h[1]||0), 0);\n  var fin = new Date(inicio.getTime() + 7200000);\n  var esVisita = item.tipo === 'visita';\n\n  // \u00cdcono seg\u00fan servicio\n  var iconoServicio = '\ud83d\udd27';\n  var serv = (item.servicio || '').toLowerCase();\n  if (serv.indexOf('terma') >= 0 || serv.indexOf('calef') >= 0)      { iconoServicio = '\ud83d\udebf'; }\n  else if (serv.indexOf('cocina') >= 0 || serv.indexOf('horno') >= 0) { iconoServicio = '\ud83c\udf73'; }\n  else if (serv.indexOf('parrilla') >= 0)                             { iconoServicio = '\ud83d\udd25'; }\n  else if (serv.indexOf('secadora') >= 0)                             { iconoServicio = '\ud83c\udf00'; }\n  else if (serv.indexOf('punto') >= 0 || serv.indexOf('conexi') >= 0) { iconoServicio = '\u26a1'; }\n  else if (serv.indexOf('document') >= 0)                             { iconoServicio = '\ud83d\udccb'; }\n  else if (serv.indexOf('modific') >= 0 || serv.indexOf('red') >= 0)  { iconoServicio = '\ud83d\udd29'; }\n  else if (serv.indexOf('reparac') >= 0)                              { iconoServicio = '\ud83d\udee0\ufe0f'; }\n  else if (serv.indexOf('gasfiter') >= 0 || serv.indexOf('tuber') >= 0){ iconoServicio = '\ud83d\udca7'; }\n  else if (serv.indexOf('instalac') >= 0)                             { iconoServicio = '\ud83d\udd27'; }\n\n  // T\u00edtulo del evento\n  var titulo = esVisita\n    ? '\ud83d\udc41\ufe0f Visita \u2014 ' + (item.cliente || 'Cliente')\n    : iconoServicio + ' ' + (item.servicio || 'Construcci\u00f3n') + ' \u2014 ' + (item.cliente || 'Cliente');\n\n  // Hora formateada\n  var horaStr = item.hora || '09:00';\n  var hNum = Number(h[0]), mNum = Number(h[1] || 0);\n  var ampm = hNum >= 12 ? 'PM' : 'AM';\n  var h12 = hNum > 12 ? hNum - 12 : (hNum === 0 ? 12 : hNum);\n  var horaFmt = h12 + ':' + (mNum < 10 ? '0' : '') + mNum + ' ' + ampm;\n\n  // Descripci\u00f3n con \u00edconos por campo\n  var desc = '';\n  if (item.cliente)   { desc += '\ud83d\udc64 ' + item.cliente + '\\n'; }\n  if (!esVisita && item.servicio) { desc += iconoServicio + ' ' + item.servicio + '\\n'; }\n  if (!esVisita && item.precio)   { desc += '\ud83d\udcb0 S/ ' + toNum(item.precio).toFixed(2) + '\\n'; }\n  if (item.ubicacion) { desc += '\ud83d\udccd ' + item.ubicacion + '\\n'; }\n  if (item.hora)      { desc += '\ud83d\udd50 ' + horaFmt + '\\n'; }\n  if (item.telefono)  { desc += '\ud83d\udcde ' + item.telefono + '\\n'; }\n  if (item.notas)     { desc += '\ud83d\udcdd ' + item.notas + '\\n'; }\n  if (esVisita)       { desc += '\\n\u26a0\ufe0f Visita \u2014 pendiente confirmar trabajo'; }\n\n  var ev = cal.createEvent(titulo, inicio, fin, {\n    description: desc.trim(),\n    location: item.ubicacion || ''\n  });\n  return ev.getId();\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// HOJA 2 \u2014 MOVIMIENTOS NEGOCIO\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction initMovNegocio(sh) {\n  if (sh.getLastRow() > 0) { return; }\n  var headers = ['  Fecha', '  Tipo', '  Categor\u00eda / Servicio', '  Cliente', '  Descripci\u00f3n', '  Monto S/.', '  Ubicaci\u00f3n'];\n  sh.appendRow(headers);\n  aplicarEstiloNotion(sh, TEMAS['Movimientos Negocio'], 7);\n  sh.setColumnWidth(1, 110); sh.setColumnWidth(2, 100);\n  sh.setColumnWidth(3, 180); sh.setColumnWidth(4, 160);\n  sh.setColumnWidth(5, 200); sh.setColumnWidth(6, 120); sh.setColumnWidth(7, 140);\n}\n\nfunction handleTx(ss, data) {\n  var tx = data.tx; if (!tx) { return; }\n  var neg = data.modo === 'negocio';\n  var esIng = tx.type === 'ingreso';\n  var monto = toNum(tx.amount);\n\n  if (neg) {\n    var sh = getOrCreate(ss, 'Movimientos Negocio');\n    initMovNegocio(sh);\n    var row = sh.getLastRow() + 1;\n    sh.appendRow(['  '+fmtDate(tx.date), esIng?'Ingreso':'Egreso', '  '+(tx.category||'-'), '  '+(tx.cliente||'-'), '  '+(tx.description||'-'), monto, '  '+(tx.ubicacion||'-')]);\n    aplicarFilaNotion(sh, row, 7, '#FAFAFA');\n    badgeCell(sh, row, 2, esIng ? '\u2191 Ingreso' : '\u2193 Egreso', esIng ? '#E8F5E9' : '#FCE4EC', esIng ? '#2E7D32' : '#C62828');\n    sh.getRange(row, 6).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor(esIng ? '#2E7D32' : '#C62828');\n  } else {\n    handleMovimientoPersonal(ss, data);\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// HOJA 3 \u2014 DEUDAS Y MOVIMIENTOS\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction initDeudasSheet(sh) {\n  if (sh.getLastRow() > 0) { return; }\n  var headers = ['  Fecha', '  Tipo', '  Descripci\u00f3n / Entidad', '  Monto S/.', '  Cuotas', '  Saldo Pendiente', '  Estado', '  Inter\u00e9s'];\n  sh.appendRow(headers);\n  aplicarEstiloNotion(sh, TEMAS['Deudas y Movimientos'], 8);\n  sh.setColumnWidth(1, 110); sh.setColumnWidth(2, 120);\n  sh.setColumnWidth(3, 200); sh.setColumnWidth(4, 120);\n  sh.setColumnWidth(5, 160); sh.setColumnWidth(6, 140);\n  sh.setColumnWidth(7, 130); sh.setColumnWidth(8, 110);\n}\n\nfunction handleMovimientoPersonal(ss, data) {\n  var tx = data.tx; if (!tx) { return; }\n  var sh = getOrCreate(ss, 'Deudas y Movimientos');\n  initDeudasSheet(sh);\n  var esIng = tx.type === 'ingreso';\n  var row = sh.getLastRow() + 1;\n  sh.appendRow(['  '+fmtDate(tx.date), esIng?'Ingreso':'Egreso', '  '+(tx.description||tx.category||'-'), toNum(tx.amount), '-', '-', '-', '-']);\n  aplicarFilaNotion(sh, row, 8, '#FAFAFA');\n  badgeCell(sh, row, 2, esIng ? '\u2191 Ingreso' : '\u2193 Egreso', esIng ? '#E8F5E9' : '#FCE4EC', esIng ? '#2E7D32' : '#C62828');\n  sh.getRange(row, 4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor(esIng ? '#2E7D32' : '#C62828');\n}\n\nfunction handleDeuda(ss, data) {\n  var d = data.item; if (!d) { return; }\n  var sh = getOrCreate(ss, 'Deudas y Movimientos');\n  initDeudasSheet(sh);\n  var nc = toNum(d.cuotasTotales), np = toNum(d.cuotasPagadas);\n  var total = toNum(d.totalAmount) || (toNum(d.cuotaMonto) * nc);\n  var saldo = toNum(d.cuotaMonto) * (nc - np);\n  var interes = total > (toNum(d.cuotaMonto) * nc) ? total - (toNum(d.cuotaMonto) * nc) : 0;\n  var pct = nc > 0 ? Math.round(np/nc*100) : 0;\n\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i,1).getNote() === (d.id||d.name)) { foundRow = i; break; }\n  }\n  var valores = ['  '+fmtDate(new Date().toISOString().split('T')[0]), 'Deuda', '  '+(d.name||'-'), total, np+'/'+nc+' cuotas \u00b7 S/ '+toNum(d.cuotaMonto).toFixed(2)+' c/u', saldo, pct+'% pagado', interes > 0 ? interes : '-'];\n  if (foundRow > 0) {\n    sh.getRange(foundRow, 1, 1, 8).setValues([valores]);\n    _formatDeudasRow(sh, foundRow);\n  } else {\n    var row = sh.getLastRow() + 1;\n    sh.appendRow(valores);\n    aplicarFilaNotion(sh, row, 8, '#FAFAFA');\n    sh.getRange(row, 1).setNote(d.id||d.name||'');\n    _formatDeudasRow(sh, row);\n  }\n}\n\nfunction _formatDeudasRow(sh, row) {\n  badgeCell(sh, row, 2, '\u26a1 Deuda', '#EDE7F6', '#4527A0');\n  sh.getRange(row, 4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#C62828');\n  sh.getRange(row, 6).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#E65100');\n  if (typeof sh.getRange(row, 8).getValue() === 'number') {\n    sh.getRange(row, 8).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right');\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// OTRAS SECCIONES\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction handleServicio(ss, data) {\n  var s = data.item; if (!s) { return; }\n  var sh = getOrCreate(ss, 'Servicios Fijos');\n  if (sh.getLastRow() === 0) {\n    sh.appendRow(['  Servicio', '  Monto Mensual S/.', '  D\u00eda Vencimiento', '  Estado', '  Actualizado']);\n    aplicarEstiloNotion(sh, { header: '#1C1C1C' }, 5);\n    sh.setColumnWidth(1,160);sh.setColumnWidth(2,150);sh.setColumnWidth(3,150);sh.setColumnWidth(4,120);sh.setColumnWidth(5,130);\n  }\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) { if (sh.getRange(i,1).getValue().toString().trim() === s.name) { foundRow=i; break; } }\n  var vals = ['  '+s.name, toNum(s.monto), 'D\u00eda '+s.venceDia, s.pagado?'Pagado':'No pagado', '  '+fmtDate(new Date().toISOString().split('T')[0])];\n  if (foundRow > 0) { sh.getRange(foundRow,1,1,5).setValues([vals]); }\n  else { sh.appendRow(vals); aplicarFilaNotion(sh, sh.getLastRow(), 5, '#FAFAFA'); }\n  var r = foundRow > 0 ? foundRow : sh.getLastRow();\n  sh.getRange(r,2).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold');\n  badgeCell(sh, r, 4, s.pagado?'\u2713 Pagado':'\u25cb Pendiente', s.pagado?'#E8F5E9':'#FFF8E1', s.pagado?'#2E7D32':'#F57F17');\n}\n\nfunction handleMeta(ss, data) {\n  var m = data.item; if (!m) { return; }\n  var sh = getOrCreate(ss, 'Metas de Ahorro');\n  if (sh.getLastRow() === 0) {\n    sh.appendRow(['  Meta','  Objetivo S/.','  Ahorrado S/.','  Pendiente S/.','  Progreso','  Fecha L\u00edmite']);\n    aplicarEstiloNotion(sh, {header:'#1C1C1C'}, 6);\n    sh.setColumnWidth(1,180);sh.setColumnWidth(2,130);sh.setColumnWidth(3,130);sh.setColumnWidth(4,130);sh.setColumnWidth(5,120);sh.setColumnWidth(6,130);\n  }\n  var obj=toNum(m.objetivo),aho=toNum(m.ahorrado),pct=obj>0?Math.round(aho/obj*100):0;\n  var foundRow=-1;\n  for(var i=2;i<=sh.getLastRow();i++){if(sh.getRange(i,1).getValue().toString().trim()===m.nombre){foundRow=i;break;}}\n  var vals=['  '+(m.nombre||'-'),obj,aho,obj-aho,pct+'%','  '+(m.fechaLimite||'-')];\n  if(foundRow>0){sh.getRange(foundRow,1,1,6).setValues([vals]);}\n  else{sh.appendRow(vals);aplicarFilaNotion(sh,sh.getLastRow(),6,'#FAFAFA');}\n  var r=foundRow>0?foundRow:sh.getLastRow();\n  sh.getRange(r,2).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right');\n  sh.getRange(r,3).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#2E7D32').setFontWeight('bold');\n  sh.getRange(r,4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#E65100');\n  badgeCell(sh,r,5,pct+'% logrado',pct>=100?'#E8F5E9':pct>=50?'#FFF8E1':'#FCE4EC',pct>=100?'#2E7D32':pct>=50?'#F57F17':'#C62828');\n}\n\nfunction handlePrestamo(ss, data) {\n  var p = data.item; if (!p) { return; }\n  var sh = getOrCreate(ss, 'Prestamos');\n  if (sh.getLastRow() === 0) {\n    sh.appendRow(['  Acreedor','  Tipo','  Capital S/.','  Pendiente S/.','  Tasa Mensual','  Inter\u00e9s Mensual S/.','  Fecha Inicio']);\n    aplicarEstiloNotion(sh, {header:'#1C1C1C'}, 7);\n    sh.setColumnWidth(1,160);sh.setColumnWidth(2,100);sh.setColumnWidth(3,130);sh.setColumnWidth(4,140);sh.setColumnWidth(5,120);sh.setColumnWidth(6,160);sh.setColumnWidth(7,130);\n  }\n  var intMes=toNum(p.capitalPendiente)*toNum(p.tasaMensual)/100;\n  var foundRow=-1;\n  for(var i=2;i<=sh.getLastRow();i++){if(sh.getRange(i,1).getValue().toString().trim()===(p.nombre||'')){foundRow=i;break;}}\n  var vals=['  '+(p.nombre||'-'),'  '+(p.tipo||'Persona'),toNum(p.capital),toNum(p.capitalPendiente),toNum(p.tasaMensual)+'%',intMes,'  '+fmtDate(p.fechaInicio)];\n  if(foundRow>0){sh.getRange(foundRow,1,1,7).setValues([vals]);}\n  else{sh.appendRow(vals);aplicarFilaNotion(sh,sh.getLastRow(),7,'#FAFAFA');}\n  var r=foundRow>0?foundRow:sh.getLastRow();\n  sh.getRange(r,3).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#C62828');\n  sh.getRange(r,4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#E65100');\n  sh.getRange(r,6).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right');\n}\n\nfunction handleNota(ss, data) {\n  var n = data.item; if (!n) { return; }\n  var sh = getOrCreate(ss, 'Notas');\n\n  if (sh.getLastRow() === 0) {\n    var headers = ['  Fecha', '  Tipo', '  T\u00edtulo', '  Contenido / \u00cdtems', '  Recordatorio', '  Estado'];\n    sh.appendRow(headers);\n    aplicarEstiloNotion(sh, {header:'#1C1C1C'}, 6);\n    sh.setColumnWidth(1, 110);\n    sh.setColumnWidth(2, 130);\n    sh.setColumnWidth(3, 200);\n    sh.setColumnWidth(4, 340);\n    sh.setColumnWidth(5, 150);\n    sh.setColumnWidth(6, 120);\n  }\n\n  // Contenido formateado\n  var contenido = '';\n  var totalItems = 0, hechos = 0;\n  if (n.tipo === 'lista' || n.tipo === 'recordatorio') {\n    var its = n.items || [];\n    totalItems = its.length;\n    for (var i = 0; i < its.length; i++) {\n      if (its[i].done) hechos++;\n      contenido += (its[i].done ? '\u2611 ' : '\u2610 ') + its[i].texto + '\\n';\n    }\n  } else {\n    contenido = n.texto || '';\n  }\n\n  // Badge tipo\n  var TIPO_LABELS = { lista:'\u2713 Lista', recordatorio:'\u23f0 Recordatorio', foto:'\ud83d\udcf7 Foto', texto:'\ud83d\udcdd Texto' };\n  var TIPO_BG     = { lista:'#FFF8E1', recordatorio:'#FCE4EC', foto:'#E8F5E9', texto:'#E3F2FD' };\n  var TIPO_COLOR  = { lista:'#F57F17', recordatorio:'#C62828', foto:'#2E7D32', texto:'#1565C0' };\n  var tipoLabel = TIPO_LABELS[n.tipo] || n.tipo;\n\n  // Estado para listas\n  var estadoLabel = '-';\n  if (totalItems > 0) {\n    estadoLabel = hechos + '/' + totalItems + ' hechos';\n  } else if (n.tipo === 'recordatorio' && n.recordatorio) {\n    estadoLabel = '\u23f0 ' + n.recordatorio;\n  }\n\n  var row = sh.getLastRow() + 1;\n  sh.appendRow([\n    '  ' + fmtDate(n.creado || new Date().toISOString()),\n    tipoLabel,\n    '  ' + (n.titulo || '-'),\n    '  ' + contenido.trim(),\n    '  ' + (n.recordatorio || '-'),\n    estadoLabel\n  ]);\n\n  aplicarFilaNotion(sh, row, 6, '#FAFAFA');\n  sh.getRange(row, 4).setWrap(true).setVerticalAlignment('top');\n  sh.setRowHeight(row, Math.max(32, Math.min(120, 20 + (contenido.split('\\n').length * 18))));\n\n  // Badge tipo con color\n  badgeCell(sh, row, 2, tipoLabel,\n    TIPO_BG[n.tipo] || '#F5F5F5',\n    TIPO_COLOR[n.tipo] || '#333333');\n\n  // Estado con color si es lista completa\n  if (totalItems > 0 && hechos === totalItems) {\n    sh.getRange(row, 6).setFontColor('#2E7D32').setFontWeight('bold');\n  } else if (totalItems > 0) {\n    sh.getRange(row, 6).setFontColor('#F57F17');\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// UTILIDADES\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction getOrCreate(ss, name) {\n  var sh = ss.getSheetByName(name);\n  if (!sh) { sh = ss.insertSheet(name); }\n  return sh;\n}\n\nfunction fmtDate(dateStr) {\n  if (!dateStr) { return '-'; }\n  try {\n    var d = new Date(dateStr.length === 10 ? dateStr + 'T12:00:00' : dateStr);\n    return Utilities.formatDate(d, 'America/Lima', 'dd/MM/yyyy');\n  } catch(e) { return dateStr; }\n}\n\nfunction toNum(v) { var n=Number(v); return isNaN(n)?0:n; }\n\nfunction jsonOk(obj) {\n  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);\n}\n";
-  const blob=new Blob([codigo],{type:'text/plain'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;a.download='MisFinanzas_v6.gs';a.click();
-  URL.revokeObjectURL(url);
-  toast('Script v6.4 descargado ✓ — Pega en Apps Script y publica Nueva versión');
+  // Genera el archivo .gs con todo el código incluyendo el handler de Notion
+  const notionHandlers = `
+// ══════════════════════════════════════════════════════════════════
+// NOTION SYNC — handlers para consultar la API de Notion
+// Agregar estos handlers al doGet() principal de tu script
+// ══════════════════════════════════════════════════════════════════
+
+// IMPORTANTE: Añadir estas líneas dentro del doGet(), antes del return final:
+//
+//   if (e.parameter.action === 'notionQuery') { return handleNotionQuery(e); }
+//   if (e.parameter.action === 'notionTest')  { return handleNotionTest(e); }
+//
+// Y agregar las funciones de abajo al final de tu .gs
+
+function handleNotionQuery(e) {
+  var token = e.parameter.token;
+  var dbId  = e.parameter.dbId;
+  var since = e.parameter.since || '2000-01-01T00:00:00.000Z';
+  if (!token || !dbId) return jsonOk({ ok: false, error: 'Faltan token o dbId' });
+  try {
+    var body = JSON.stringify({
+      filter: { timestamp: 'last_edited_time', last_edited_time: { after: since } },
+      sorts:  [{ timestamp: 'last_edited_time', direction: 'descending' }],
+      page_size: 100
+    });
+    var resp = UrlFetchApp.fetch('https://api.notion.com/v1/databases/' + dbId + '/query', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json'
+      },
+      payload: body,
+      muteHttpExceptions: true
+    });
+    var code = resp.getResponseCode();
+    if (code !== 200) {
+      return jsonOk({ ok: false, error: 'Notion API error ' + code + ': ' + resp.getContentText().substring(0, 300) });
+    }
+    var data = JSON.parse(resp.getContentText());
+    if (!data.results || data.results.length === 0) {
+      return jsonOk({ ok: true, count: 0, csv: '' });
+    }
+    var csv = _notionResultsToCSV(data.results);
+    return jsonOk({ ok: true, count: data.results.length, csv: csv });
+  } catch(err) {
+    return jsonOk({ ok: false, error: err.message });
+  }
 }
+
+function handleNotionTest(e) {
+  var token = e.parameter.token;
+  var dbId  = e.parameter.dbId;
+  if (!token || !dbId) return jsonOk({ ok: false, error: 'Faltan token o dbId' });
+  try {
+    var resp = UrlFetchApp.fetch('https://api.notion.com/v1/databases/' + dbId, {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + token, 'Notion-Version': '2022-06-28' },
+      muteHttpExceptions: true
+    });
+    var code = resp.getResponseCode();
+    if (code !== 200) {
+      return jsonOk({ ok: false, error: 'Notion API ' + code + ': ' + resp.getContentText().substring(0, 300) });
+    }
+    var data = JSON.parse(resp.getContentText());
+    var title = '';
+    if (data.title && data.title.length > 0) title = data.title[0].plain_text || '';
+    // Count total records
+    var cr = UrlFetchApp.fetch('https://api.notion.com/v1/databases/' + dbId + '/query', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+      payload: JSON.stringify({ page_size: 1 }),
+      muteHttpExceptions: true
+    });
+    var cd = JSON.parse(cr.getContentText());
+    return jsonOk({ ok: true, dbTitle: title || 'Base de datos Notion', count: cd.results ? cd.results.length : 0 });
+  } catch(err) {
+    return jsonOk({ ok: false, error: err.message });
+  }
+}
+
+function _notionResultsToCSV(results) {
+  var headers = ['Fecha','Cliente','Servicio 1','Servicio 2','Servicio 3','Servicio 4',
+                 'Precio del servicio','Movilidad','Materiales','Otros',
+                 'Distrito','Forma de pago','Observaciones','Contacto'];
+
+  function getProp(props, names) {
+    for (var ni = 0; ni < names.length; ni++) {
+      var p = props[names[ni]];
+      if (!p) {
+        var keys = Object.keys(props);
+        for (var ki = 0; ki < keys.length; ki++) {
+          if (keys[ki].toLowerCase() === names[ni].toLowerCase()) { p = props[keys[ki]]; break; }
+        }
+      }
+      if (!p) continue;
+      if (p.type === 'title')        return (p.title||[]).map(function(t){return t.plain_text;}).join('').trim();
+      if (p.type === 'rich_text')    return (p.rich_text||[]).map(function(t){return t.plain_text;}).join('').trim();
+      if (p.type === 'date')         return p.date ? (p.date.start || '') : '';
+      if (p.type === 'number')       return p.number != null ? String(p.number) : '';
+      if (p.type === 'select')       return p.select ? (p.select.name || '') : '';
+      if (p.type === 'multi_select') return (p.multi_select||[]).map(function(s){return s.name;}).join(', ');
+      if (p.type === 'formula')      return p.formula ? (p.formula.number != null ? String(p.formula.number) : (p.formula.string||'')) : '';
+      if (p.type === 'phone_number') return p.phone_number || '';
+    }
+    return '';
+  }
+
+  var rows = [headers.join(',')];
+  for (var i = 0; i < results.length; i++) {
+    var p = results[i].properties || {};
+    var row = [
+      getProp(p,['Fecha','fecha','Date','date']),
+      getProp(p,['Cliente','cliente','Nombre','nombre']),
+      getProp(p,['Servicio 1','servicio 1','Servicio1']),
+      getProp(p,['Servicio 2','servicio 2','Servicio2']),
+      getProp(p,['Servicio 3','servicio 3','Servicio3']),
+      getProp(p,['Servicio 4','servicio 4','Servicio4']),
+      getProp(p,['Precio del servicio','Precio','precio']),
+      getProp(p,['Movilidad','movilidad']),
+      getProp(p,['Materiales','materiales']),
+      getProp(p,['Otros','otros']),
+      getProp(p,['Distrito','distrito','Ubicacion','ubicacion']),
+      getProp(p,['Forma de pago','forma de pago','Pago']),
+      getProp(p,['Observaciones','observaciones','Nota','nota']),
+      getProp(p,['Contacto','contacto','Telefono'])
+    ].map(function(v){ return '"' + String(v||'').replace(/"/g,'""') + '"'; });
+    rows.push(row.join(','));
+  }
+  return rows.join('\\n');
+}
+`;
+
+  const blob = new Blob([notionHandlers], {type:'text/plain'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'NotionHandlers_MisFinanzas.gs'; a.click();
+  URL.revokeObjectURL(url);
+
+  toast('✓ Descargado NotionHandlers_MisFinanzas.gs — Abrí tu Apps Script, pegá este código al final y republicá');
+
+  // Show instruction modal
+  document.getElementById('modal-content').innerHTML = `
+    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:14px">📋 Pasos para activar Notion Sync</div>
+    <div style="font-size:13px;color:var(--text);line-height:1.8">
+      <b>1.</b> Abrí tu Google Sheets → Extensiones → Apps Script<br>
+      <b>2.</b> Buscá la función <code style="background:#F1F5F9;padding:2px 6px;border-radius:4px">doGet(e)</code><br>
+      <b>3.</b> Dentro del doGet, antes del <code>return jsonOk({ok:true})</code> final, agregá:<br>
+      <div style="background:#F1F5F9;border-radius:8px;padding:10px;margin:8px 0;font-family:monospace;font-size:11px;color:#0C447C">
+        if (e.parameter.action === 'notionQuery') return handleNotionQuery(e);<br>
+        if (e.parameter.action === 'notionTest')  return handleNotionTest(e);
+      </div>
+      <b>4.</b> Pegá todo el contenido del archivo <code>.gs</code> descargado al final del script<br>
+      <b>5.</b> Implementar → <b>Administrar implementaciones</b> → editar la existente → <b>Nueva versión</b><br>
+      <b>6.</b> Volvé a la app → Ajustes → Notion → tocá <b>Probar conexión</b>
+    </div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn-ghost" onclick="closeModal()">Entendido</button>
+    </div>`;
+  showModal();
+}
+
 
 // ══════════════════════════════════════════════════════════════
 // PREMIUM NOTES v5.0 — renderNotas, cards, editor por bloques
