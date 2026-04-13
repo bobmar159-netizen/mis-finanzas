@@ -3151,7 +3151,7 @@ function enviarTodoASheets() {
 // NÚCLEO de importación Notion — usado por manual Y automático
 // statusElId: id del elemento donde mostrar el estado (puede ser null)
 // ══════════════════════════════════════════════════════════════════
-function _procesarCsvNotionTexto(csv, statusElId) {
+function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
   const status = statusElId ? document.getElementById(statusElId) : null;
   try {
       const rows = _parseCsv(csv);
@@ -3188,6 +3188,7 @@ function _procesarCsvNotionTexto(csv, statusElId) {
       const iPrecio   = col(['precio del servicio','precio serv','precio s','precio']);
       const iGanancia = col(['ganancia']); // ignorado — es columna calculada
       const iObs      = col(['observaciones','observ','nota','comment','descripcion']);
+      const iNotionId = col(['notionid']); // La columna oculta generada por nuestro proxy
 
       let txImportadas = 0;
       let egresosMov = 0;
@@ -3202,9 +3203,13 @@ function _procesarCsvNotionTexto(csv, statusElId) {
         const fechaRaw = iDate >= 0 ? r[iDate]?.trim() : '';
         const fecha = _parseFechaNotion(fechaRaw) || todayStr();
 
-        // Cliente
+        // Cliente (si está en blanco le ponemos 'Desconocido' para no perder gastos)
         const cliente = iCliente >= 0 ? r[iCliente]?.trim().replace(/^\s+/,'') : '';
-        if (!cliente) continue; // saltar filas sin cliente
+        const clienteFinal = cliente || '(Sin cliente)';
+
+        // Notion ID original
+        const rawNotionId = iNotionId >= 0 ? r[iNotionId]?.trim() : '';
+        const nId = rawNotionId || ('not_' + fecha + '_r' + i);
 
         // Servicio — tomar el primer servicio reconocido (no concatenar)
         const svcs = [iSvc1,iSvc2,iSvc3,iSvc4]
@@ -3238,13 +3243,13 @@ function _procesarCsvNotionTexto(csv, statusElId) {
         if (precio > 0) {
           // Descripción limpia: servicio real, cliente separado, obs solo si aporta info nueva
           const descBase = servicio; // nombre del servicio (ya mapeado)
-          const clienteLimpio = cliente.split('@')[0].trim(); // quitar emails si vienen
+          const clienteLimpio = clienteFinal.split('@')[0].trim(); // quitar emails si vienen
           // Solo agregar obs si tiene contenido distinto al servicio y al cliente
           const obsFiltrado = obs && obs.toLowerCase() !== servicio.toLowerCase() && obs.toLowerCase() !== clienteLimpio.toLowerCase() ? obs : '';
-          const descripcion = descBase + (clienteLimpio ? ' — ' + clienteLimpio : '') + (obsFiltrado ? ' · ' + obsFiltrado : '');
+          const descripcion = descBase + (clienteLimpio && clienteLimpio !== '(Sin cliente)' ? ' — ' + clienteLimpio : '') + (obsFiltrado ? ' · ' + obsFiltrado : '');
 
           nuevasTx.push({
-            id: 'not_' + fecha + '_ing_r' + i,
+            id: nId + '-ing',
             type: 'ingreso',
             amount: precio,
             category: servicio,
@@ -3258,6 +3263,7 @@ function _procesarCsvNotionTexto(csv, statusElId) {
             negocio: true,
             moneda: 'PEN',
             _importadoDeNotion: true,
+            _notionRowId: rawNotionId
           });
           txImportadas++;
         }
@@ -3266,16 +3272,17 @@ function _procesarCsvNotionTexto(csv, statusElId) {
         const movil = _parseMonto(iMovil >= 0 ? r[iMovil] : '');
         if (movil > 0) {
           nuevasTx.push({
-            id: 'not_' + fecha + '_mov_r' + i,
+            id: nId + '-mov',
             type: 'egreso',
             amount: movil,
             category: 'Movilidad',
             catId: 'cne5',
-            description: 'Movilidad — ' + (cliente || fecha),
+            description: 'Movilidad — ' + (clienteFinal !== '(Sin cliente)' ? clienteFinal : fecha),
             date: fecha,
             negocio: true,
             moneda: 'PEN',
             _importadoDeNotion: true,
+            _notionRowId: rawNotionId
           });
           egresosMov++;
         }
@@ -3284,16 +3291,17 @@ function _procesarCsvNotionTexto(csv, statusElId) {
         const mat = _parseMonto(iMaterial >= 0 ? r[iMaterial] : '');
         if (mat > 0) {
           nuevasTx.push({
-            id: 'not_' + fecha + '_mat_r' + i,
+            id: nId + '-mat',
             type: 'egreso',
             amount: mat,
             category: 'Materiales',
             catId: 'cne1',
-            description: 'Materiales — ' + (cliente || fecha),
+            description: 'Materiales — ' + (clienteFinal !== '(Sin cliente)' ? clienteFinal : fecha),
             date: fecha,
             negocio: true,
             moneda: 'PEN',
             _importadoDeNotion: true,
+            _notionRowId: rawNotionId
           });
           egresosMat++;
         }
@@ -3302,16 +3310,17 @@ function _procesarCsvNotionTexto(csv, statusElId) {
         const otros = _parseMonto(iOtros >= 0 ? r[iOtros] : '');
         if (otros > 0) {
           nuevasTx.push({
-            id: 'not_' + fecha + '_otr_r' + i,
+            id: nId + '-otr',
             type: 'egreso',
             amount: otros,
             category: 'Otro gasto negocio',
             catId: 'cne6',
-            description: 'Otros gastos — ' + (cliente || fecha),
+            description: 'Otros gastos — ' + (clienteFinal !== '(Sin cliente)' ? clienteFinal : fecha),
             date: fecha,
             negocio: true,
             moneda: 'PEN',
             _importadoDeNotion: true,
+            _notionRowId: rawNotionId
           });
         }
       }
@@ -3321,32 +3330,32 @@ function _procesarCsvNotionTexto(csv, statusElId) {
         return;
       }
 
-      // ── Importar: FUSIONAR — conserva TODO lo existente, solo agrega nuevos ──
+      // ── Importar: FUSIONAR O ESPEJO ──
       const existing = load('fnz_neg_tx', []);
+      let merged = [];
 
-      // Deduplicar contra TODOS los existentes (manuales + notion previos)
-      const _normCat = cat => _mapearCategoriaNotion(cat||'').toLowerCase().trim();
-      const _huella = t => [
-        t.date||'', t.type||'',
-        Math.round((t.amount||0)*100),
-        _normCat(t.category),
-        (t.cliente||'').toLowerCase().trim()
-      ].join('|');
-
-      const huellasExistentes = new Set(existing.map(_huella));
-      const sinDuplicar = [];
-      const vistasEnCSV = new Set();
-      for (const t of nuevasTx) {
-        const h = _huella(t);
-        if (huellasExistentes.has(h)) continue; // ya existe (manual o notion previo)
-        if (vistasEnCSV.has(h)) continue;        // duplicado dentro del mismo lote
-        vistasEnCSV.add(h);
-        huellasExistentes.add(h);
-        sinDuplicar.push(t);
+      if (isFullSync) {
+        // MODO ESPEJO: Preservar solo los registros manuales. TODO lo de Notion se borra y se reemplaza entero
+        const manuales = existing.filter(t => !t._importadoDeNotion);
+        // Validar duplicados dentro del lote de importación (por si acaso Notion manda el mismo ID dos veces)
+        const idsExistentes = new Set(manuales.map(t => t.id)); // manuales
+        const sinDuplicar = [];
+        for (const t of nuevasTx) {
+          if (idsExistentes.has(t.id)) continue; 
+          idsExistentes.add(t.id);
+          sinDuplicar.push(t);
+        }
+        merged = [...manuales, ...sinDuplicar];
+      } else {
+        // MODO INCREMENTAL: Preservar todos, solo agregar/actualizar los que entran
+        // (Sobrescribe si hay IDs idénticos, por si cambió el monto, sino agrega)
+        const map = new Map(existing.map(t => [t.id, t]));
+        for (const t of nuevasTx) {
+          map.set(t.id, t);
+        }
+        merged = Array.from(map.values());
       }
 
-      // ★ Resultado final: TODOS los existentes + genuinamente nuevos de Notion
-      const merged = [...existing, ...sinDuplicar];
       save('fnz_neg_tx', merged);
       if (state.modo === 'negocio') state.transactions = merged;
 
@@ -5197,10 +5206,11 @@ async function notionApiTest(){
     console.log('[Notion] Propiedades encontradas:', propNames);
 
     const csvText = _notionResultsToCSV(allResults);
-    const result = _procesarCsvNotionTexto(csvText, 'notion-api-status');
+    // IMPORTANTE: isFullSync = true para limpiar los viejos
+    const result = _procesarCsvNotionTexto(csvText, 'notion-api-status', true);
     if(result && result.ok){
       localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
-      const msg = '✓ ' + allResults.length + ' registros de Notion · ' + new Date().toLocaleTimeString('es-PE');
+      const msg = '✓ ' + allResults.length + ' registros procesados de Notion · ' + new Date().toLocaleTimeString('es-PE');
       if(statusEl) statusEl.textContent = msg;
       toast(msg, 'success');
     }
@@ -5364,10 +5374,10 @@ async function notionApiPoll(){
 // Convierte resultados de Notion API al formato CSV que espera _procesarCsvNotionTexto
 function _notionResultsToCSV(results){
   if(!results||!results.length) return '';
-  // Encabezado exacto que usa el importador
+  // Encabezado exacto que usa el importador + NotionId para espejo
   const headers = ['Fecha','Cliente','Servicio 1','Servicio 2','Servicio 3','Servicio 4',
                    'Precio del servicio','Movilidad','Materiales','Otros',
-                   'Distrito','Forma de pago','Observaciones','Contacto'];
+                   'Distrito','Forma de pago','Observaciones','Contacto','NotionId'];
 
   function getProp(props, ...names){
     for(const name of names){
@@ -5424,6 +5434,7 @@ function _notionResultsToCSV(results){
       getProp(p,'Forma de pago','forma de pago','Pago','pago','Payment','payment','Método de pago'),
       getProp(p,'Observaciones','observaciones','Nota','nota','Notas','notas','Notes','notes','Descripcion','Descripción','descripcion'),
       getProp(p,'Contacto','contacto','Telefono','Teléfono','telefono','tel','Tel','Phone','phone'),
+      page.id
     ].map(v => '"' + (v||'').replace(/"/g,'""') + '"');
     rows.push(row.join(','));
   }
@@ -7044,6 +7055,9 @@ function exportData(){
     catsIn: state.catsIn,
     catsEx: state.catsEx,
   };
+  
+  let numTx = state.transactions ? state.transactions.length : 0;
+  
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -7057,18 +7071,22 @@ function exportData(){
   const now=new Date().toLocaleString('es-PE');
   localStorage.setItem('fnz_last_backup',now);
   render();
-  toast('✓ Archivo guardado en Descargas');
+  toast(`⬇ Exportado exitosamente: ${numTx} movimientos descargados`, 'success');
 }
 
 function importData(event){
   const file=event.target.files[0];
   if(!file)return;
   const reader=new FileReader();
+  toast('⏳ Importando copia de seguridad...');
   reader.onload=function(e){
     try{
       const data=JSON.parse(e.target.result);
       if(!data.transactions&&!data.debts)return toast('Archivo no válido','error');
-      if(!confirm(`¿Importar datos del ${data.exportDate||'archivo'}?\n\nEsto reemplazará tus datos actuales.`))return;
+      
+      const numTx = data.transactions ? data.transactions.length : 0;
+      if(!confirm(`¿Importar datos del ${data.exportDate||'archivo'}?\n\nEsto reemplazará tus datos actuales y restaurará ${numTx} movimientos.`))return;
+      
       if(data.transactions) state.transactions=data.transactions;
       if(data.debts) state.debts=data.debts;
       if(data.servicios) state.servicios=data.servicios;
@@ -7076,7 +7094,7 @@ function importData(event){
       if(data.catsEx) state.catsEx=data.catsEx;
       saveAll();
       render();
-      toast('✓ Datos importados correctamente');
+      toast(`⬆ Importación completada: ${numTx} movimientos restaurados`, 'success');
     }catch{toast('Error al leer el archivo','error');}
   };
   reader.readAsText(file);
