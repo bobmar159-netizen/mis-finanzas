@@ -3321,12 +3321,10 @@ function _procesarCsvNotionTexto(csv, statusElId) {
         return;
       }
 
-      // ── Importar: REEMPLAZA todos los de Notion, conserva los manuales ──
+      // ── Importar: FUSIONAR — conserva TODO lo existente, solo agrega nuevos ──
       const existing = load('fnz_neg_tx', []);
-      // Separar: registros creados manualmente vs importados de Notion
-      const manuales = existing.filter(t => !t._importadoDeNotion);
 
-      // Verificar duplicados solo contra los manuales (para no pisar trabajo manual)
+      // Deduplicar contra TODOS los existentes (manuales + notion previos)
       const _normCat = cat => _mapearCategoriaNotion(cat||'').toLowerCase().trim();
       const _huella = t => [
         t.date||'', t.type||'',
@@ -3335,19 +3333,20 @@ function _procesarCsvNotionTexto(csv, statusElId) {
         (t.cliente||'').toLowerCase().trim()
       ].join('|');
 
-      const huellasManuales = new Set(manuales.map(_huella));
+      const huellasExistentes = new Set(existing.map(_huella));
       const sinDuplicar = [];
       const vistasEnCSV = new Set();
       for (const t of nuevasTx) {
         const h = _huella(t);
-        if (huellasManuales.has(h)) continue; // ya existe como manual
-        if (vistasEnCSV.has(h)) continue;     // duplicado dentro del mismo CSV
+        if (huellasExistentes.has(h)) continue; // ya existe (manual o notion previo)
+        if (vistasEnCSV.has(h)) continue;        // duplicado dentro del mismo lote
         vistasEnCSV.add(h);
+        huellasExistentes.add(h);
         sinDuplicar.push(t);
       }
 
-      // ★ Resultado final: manuales + nueva importación limpia
-      const merged = [...manuales, ...sinDuplicar];
+      // ★ Resultado final: TODOS los existentes + genuinamente nuevos de Notion
+      const merged = [...existing, ...sinDuplicar];
       save('fnz_neg_tx', merged);
       if (state.modo === 'negocio') state.transactions = merged;
 
