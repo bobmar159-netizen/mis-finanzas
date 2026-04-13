@@ -5155,6 +5155,126 @@ function _programarRecordatorio(textoHora,titulo){
   const diff=objetivo-ahora;if(diff>0&&diff<86400000)setTimeout(()=>{toast(`⏰ Recordatorio: ${titulo}`,'success');if('vibrate'in navigator)navigator.vibrate([200,100,200]);},diff);
 }
 
+// ── Auto-descubrimiento y Push a Notion ─────────────────────────────
+async function _fetchNotionSchema(token, dbId) {
+  const cached = sessionStorage.getItem('fnz_notion_schema');
+  if (cached) return JSON.parse(cached);
+
+  const notionUrl = 'https://api.notion.com/v1/databases/' + dbId;
+  const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
+  
+  const res = await fetch(proxyUrl, {
+    method: 'GET',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Notion-Version': '2022-06-28'
+    }
+  });
+  if (!res.ok) throw new Error('No se pudo leer el esquema de la base de datos');
+  const db = await res.json();
+  sessionStorage.setItem('fnz_notion_schema', JSON.stringify(db.properties));
+  return db.properties;
+}
+
+async function _pushToNotion(item, cobrado) {
+  const token = localStorage.getItem('fnz_notion_token');
+  const dbId  = localStorage.getItem('fnz_notion_dbid');
+  if (!token || !dbId) throw new Error('Notion no configurado');
+
+  const props = await _fetchNotionSchema(token, dbId);
+  const payload = {
+    parent: { database_id: dbId },
+    properties: {}
+  };
+
+  // Helper para encontrar el nombre exacto de la columna en Notion basado en nombres probables
+  const findCol = (...names) => {
+    for (const n of names) {
+      const match = Object.keys(props).find(k => k.toLowerCase() === n.toLowerCase());
+      if (match) return { name: match, type: props[match].type };
+    }
+    return null;
+  };
+
+  const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
+  if (pTitle) {
+    payload.properties[pTitle] = { title: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
+  }
+
+  const pDate = findCol('fecha', 'date', 'día', 'dia');
+  if (pDate && pDate.type === 'date') {
+    payload.properties[pDate.name] = { date: { start: item.fecha } };
+  }
+
+  const pPrecio = findCol('precio del servicio', 'precio', 'monto', 'importe', 'total', 'amount');
+  if (pPrecio && pPrecio.type === 'number') {
+    payload.properties[pPrecio.name] = { number: parseFloat(cobrado?.ingreso) || parseFloat(cobrado) || 0 };
+  }
+  
+  // Agregar Egresos
+  if (cobrado?.movilidad) {
+    const pMovilidad = findCol('movilidad', 'pasajes', 'gasolina', 'combustible', 'transporte');
+    if (pMovilidad && pMovilidad.type === 'number') {
+      payload.properties[pMovilidad.name] = { number: parseFloat(cobrado.movilidad) };
+    }
+  }
+  if (cobrado?.materiales) {
+    const pMateriales = findCol('materiales', 'material', 'insumos', 'compras');
+    if (pMateriales && pMateriales.type === 'number') {
+      payload.properties[pMateriales.name] = { number: parseFloat(cobrado.materiales) };
+    }
+  }
+
+  const pServicio = findCol('servicio 1', 'servicio', 'tipo', 'categoría', 'categoria', 'category');
+  if (pServicio && item.servicio) {
+    if (pServicio.type === 'select') payload.properties[pServicio.name] = { select: { name: item.servicio } };
+    else if (pServicio.type === 'rich_text') payload.properties[pServicio.name] = { rich_text: [{ text: { content: item.servicio } }] };
+  }
+
+  const pDistrito = findCol('distrito', 'ubicacion', 'ubicación', 'zona');
+  if (pDistrito && item.ubicacion) {
+    if (pDistrito.type === 'select') payload.properties[pDistrito.name] = { select: { name: item.ubicacion } };
+    else if (pDistrito.type === 'rich_text') payload.properties[pDistrito.name] = { rich_text: [{ text: { content: item.ubicacion } }] };
+  }
+
+  const pContacto = findCol('contacto', 'telefono', 'teléfono', 'tel', 'phone');
+  if (pContacto && item.telefono) {
+    if (pContacto.type === 'phone_number') payload.properties[pContacto.name] = { phone_number: item.telefono };
+    else if (pContacto.type === 'rich_text') payload.properties[pContacto.name] = { rich_text: [{ text: { content: item.telefono } }] };
+  }
+
+  const pNotas = findCol('observaciones', 'nota', 'notas', 'descripcion', 'descripción');
+  const precioBase = typeof cobrado === 'object' ? cobrado.ingreso : cobrado;
+  let extras = [];
+  if (item.precio && item.precio !== precioBase) extras.push(`(Acordado: ${item.precio})`);
+  if (cobrado?.otros) extras.push(`(Otros Gastos: ${cobrado.otros})`);
+  
+  const notasFinal = [...extras, item.notas].filter(Boolean).join(' · ');
+  if (pNotas && pNotas.type === 'rich_text' && notasFinal) {
+    payload.properties[pNotas.name] = { rich_text: [{ text: { content: notasFinal } }] };
+  }
+
+  const notionUrl = 'https://api.notion.com/v1/pages';
+  const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
+  
+  const res = await fetch(proxyUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text().catch(()=>'');
+    throw new Error('HTTP ' + res.status + ' - ' + errorText);
+  }
+
+  return await res.json(); // Retorna la página creada, donde podremos extraer el id
+}
+
 // ── Notion API Polling ──────────────────────────────────────────────
 let _notionPollTimer = null;
 
@@ -6582,13 +6702,32 @@ function abrirModalCobro(id){
       <div style="font-weight:600">${item.cliente||'Cliente'}</div>
       <div style="color:#6C3483;margin-top:2px">${item.servicio||''} · Precio acordado: <strong>${fmt(precio)}</strong></div>
     </div>
-    <div class="field"><label class="field-label">¿Cuánto cobró? (S/)</label>
-      <input id="cobro-monto" type="number" inputmode="decimal" placeholder="0.00" value="${precio}" style="font-size:16px;font-weight:600">
+    
+    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:12px;margin-bottom:16px;">
+      <div class="field" style="margin-bottom:12px"><label class="field-label" style="color:#27500A;font-weight:700">¿Cuánto cobró del servicio? (Ingreso S/)</label>
+        <div style="display:flex;gap:8px">
+          <input id="cobro-monto" type="number" inputmode="decimal" placeholder="0.00" value="${precio}" style="font-size:16px;font-weight:600;flex:2">
+          <button onclick="setCobro(${precio})" style="flex:1;background:#EAF3DE;border:1px solid #63992244;color:#27500A;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">Todo</button>
+          <button onclick="setCobro(0)" style="flex:1;background:#FCEBEB;border:1px solid #E24B4A44;color:#791F1F;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">Nada</button>
+        </div>
+      </div>
+
+      <div style="border-top:1px dashed #CBD5E1;margin:12px 0;"></div>
+      
+      <div style="font-size:12px;color:#64748B;margin-bottom:8px;font-weight:600">GASTOS ASOCIADOS A ESTE TRABAJO (Egresos S/)</div>
+      <div style="display:flex;gap:12px;">
+        <div class="field" style="flex:1"><label class="field-label" style="font-size:11px">Movilidad / Gasolina</label>
+          <input id="cobro-movilidad" type="number" inputmode="decimal" placeholder="0.00" value="" style="font-size:14px">
+        </div>
+        <div class="field" style="flex:1"><label class="field-label" style="font-size:11px">Materiales</label>
+          <input id="cobro-materiales" type="number" inputmode="decimal" placeholder="0.00" value="" style="font-size:14px">
+        </div>
+      </div>
+      <div class="field" style="margin-top:8px"><label class="field-label" style="font-size:11px">Otros Gastos (Peajes, almuerzo temporal, etc)</label>
+        <input id="cobro-otros" type="number" inputmode="decimal" placeholder="0.00" value="" style="font-size:14px">
+      </div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button onclick="setCobro(${precio})" style="flex:1;background:#EAF3DE;border:1px solid #63992244;color:#27500A;border-radius:8px;padding:8px;font-size:12px;font-weight:600;cursor:pointer">Cobro completo (${fmt(precio)})</button>
-      <button onclick="setCobro(0)" style="flex:1;background:#FCEBEB;border:1px solid #E24B4A44;color:#791F1F;border-radius:8px;padding:8px;font-size:12px;font-weight:600;cursor:pointer">Sin cobro</button>
-    </div>
+
     <div class="btn-row">
       <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
       <button class="btn-gold" onclick="guardarFinalizacion('${id}')">Guardar</button>
@@ -6598,10 +6737,17 @@ function abrirModalCobro(id){
 
 function setCobro(v){ document.getElementById('cobro-monto').value=v; }
 
-function guardarFinalizacion(id){
+async function guardarFinalizacion(id){
   const item=(state.agenda||[]).find(x=>x.id===id);
   if(!item) return;
   const cobrado=parseFloat(document.getElementById('cobro-monto').value)||0;
+  const movilidadEl=document.getElementById('cobro-movilidad');
+  const materialesEl=document.getElementById('cobro-materiales');
+  const otrosEl=document.getElementById('cobro-otros');
+  const movilidad=movilidadEl ? parseFloat(movilidadEl.value)||0 : 0;
+  const materiales=materialesEl ? parseFloat(materialesEl.value)||0 : 0;
+  const otros=otrosEl ? parseFloat(otrosEl.value)||0 : 0;
+
   const precio=parseFloat(item.precio)||0;
   const pendiente=parseFloat((precio-cobrado).toFixed(2));
 
@@ -6613,14 +6759,46 @@ function guardarFinalizacion(id){
   else if(cobrado>0)  item.estadoPago='parcial';
   else                item.estadoPago='sin_cobro';
 
-  // Registrar ingreso si cobró algo
-  if(cobrado>0){
-    const tx={id:Date.now()+'_ag',type:'ingreso',amount:cobrado,
-      category:item.servicio||'Servicio Gas',date:item.fecha,
-      description:(item.servicio||'Servicio')+' — '+(item.cliente||''),
-      cliente:item.cliente||'',ubicacion:item.ubicacion||'',negocio:true};
-    state.transactions.unshift(tx);
-    syncToSheets(tx);
+  const agDesc = (item.servicio||'Servicio')+' — '+(item.cliente||'');
+  const baseTx={category:item.servicio||'Servicio Gas',date:item.fecha,
+    description:agDesc,cliente:item.cliente||'',ubicacion:item.ubicacion||'',negocio:true};
+
+  // Guardar Venta y Gastos Asociados
+  if(cobrado>0 || movilidad>0 || materiales>0 || otros>0){
+    const notionToken = localStorage.getItem('fnz_notion_token');
+    const dbid = localStorage.getItem('fnz_notion_dbid');
+    const cobroObj = {ingreso: cobrado, movilidad, materiales, otros};
+    
+    if (notionToken && dbid) {
+      toast('⏳ Guardando datos oficiales en Notion...', 'info');
+      try {
+        const notionRes = await _pushToNotion(item, cobroObj);
+        const notionId = notionRes.id;
+        
+        // Inyectamos las transacciones locales pegadas al ID de Notion
+        if(cobrado>0) state.transactions.unshift({id: notionId+'-ing', type:'ingreso', amount:cobrado, ...baseTx, _importadoDeNotion:true, _notionRowId:notionId});
+        if(movilidad>0) state.transactions.unshift({id: notionId+'-mov', type:'egreso', amount:movilidad, ...baseTx, category:'Movilidad', description:'Movilidad · '+agDesc, _importadoDeNotion:true, _notionRowId:notionId});
+        if(materiales>0) state.transactions.unshift({id: notionId+'-mat', type:'egreso', amount:materiales, ...baseTx, category:'Materiales', description:'Materiales · '+agDesc, _importadoDeNotion:true, _notionRowId:notionId});
+        if(otros>0) state.transactions.unshift({id: notionId+'-otr', type:'egreso', amount:otros, ...baseTx, category:'Mantenimiento o Rep', description:'Otros Gastos · '+agDesc, _importadoDeNotion:true, _notionRowId:notionId});
+      } catch (err) {
+        console.error('Error push Notion:', err);
+        toast('⚠ Error vinculando a Notion. Solo guardado localmente.', 'error');
+        // Fallback local
+        const lId = Date.now()+'_ag';
+        if(cobrado>0) state.transactions.unshift({id: lId, type:'ingreso', amount:cobrado, ...baseTx});
+        if(movilidad>0) state.transactions.unshift({id: lId+'_m', type:'egreso', amount:movilidad, ...baseTx, category:'Movilidad', description:'Movilidad · '+agDesc});
+        if(materiales>0) state.transactions.unshift({id: lId+'_t', type:'egreso', amount:materiales, ...baseTx, category:'Materiales', description:'Materiales · '+agDesc});
+        if(otros>0) state.transactions.unshift({id: lId+'_o', type:'egreso', amount:otros, ...baseTx, category:'Mantenimiento o Rep', description:'Otros Gastos · '+agDesc});
+        syncToSheets({id:lId, type:'ingreso', amount:cobrado, ...baseTx}); // Sheets legacy solo soporta 1 a la vez bien
+      }
+    } else {
+      const lId = Date.now()+'_ag';
+      if(cobrado>0) state.transactions.unshift({id: lId, type:'ingreso', amount:cobrado, ...baseTx});
+      if(movilidad>0) state.transactions.unshift({id: lId+'_m', type:'egreso', amount:movilidad, ...baseTx, category:'Movilidad', description:'Movilidad · '+agDesc});
+      if(materiales>0) state.transactions.unshift({id: lId+'_t', type:'egreso', amount:materiales, ...baseTx, category:'Materiales', description:'Materiales · '+agDesc});
+      if(otros>0) state.transactions.unshift({id: lId+'_o', type:'egreso', amount:otros, ...baseTx, category:'Mantenimiento o Rep', description:'Otros Gastos · '+agDesc});
+      syncToSheets({id:lId, type:'ingreso', amount:cobrado, ...baseTx});
+    }
   }
 
   // Si cobro parcial → crear deuda automáticamente
