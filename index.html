@@ -5269,9 +5269,18 @@ async function _pushToNotion(item, cobrado) {
   const precioBase = typeof cobrado === 'object' ? cobrado.ingreso : cobrado;
   let extras = [];
   if (item.precio && item.precio !== precioBase) extras.push(`(Acordado: ${item.precio})`);
-  if (cobrado?.otros) extras.push(`(Otros Gastos: ${cobrado.otros})`);
   
-  const notasFinal = [...extras, item.notas].filter(Boolean).join(' · ');
+  // Si "Otros" no tiene una columna propia, lo metemos en las notas (fallback seguro)
+  const pOtros = findCol('otros', 'otros gastos', 'gastos extra');
+  if (cobrado?.otros && (!pOtros || pOtros.type !== 'number')) {
+    extras.push(`(Otros Gastos: ${cobrado.otros})`);
+  } else if (cobrado?.otros && pOtros && pOtros.type === 'number') {
+    payload.properties[pOtros.name] = { number: parseFloat(cobrado.otros) };
+  }
+  
+  const textObs = (cobrado?.observaciones || item.notas || '');
+  const notasFinal = [...extras, textObs].filter(Boolean).join(' · ');
+
   if (pNotas && pNotas.type === 'rich_text' && notasFinal) {
     payload.properties[pNotas.name] = { rich_text: [{ text: { content: notasFinal } }] };
   }
@@ -5349,7 +5358,7 @@ async function _updateNotionPage(pageId, updatedTx) {
     else {
       // Otros egresos
       const pOtros = findCol('otros', 'otros gastos', 'gastos extra');
-      if (pOstros && pOstros.type === 'number') payload.properties[pOstros.name] = { number: parseFloat(updatedTx.amount) || 0 };
+      if (pOtros && pOtros.type === 'number') payload.properties[pOtros.name] = { number: parseFloat(updatedTx.amount) || 0 };
     }
   }
 
@@ -6829,6 +6838,9 @@ function abrirModalCobro(id){
       <div class="field" style="margin-top:8px"><label class="field-label" style="font-size:11px">Otros Gastos (Peajes, almuerzo temporal, etc)</label>
         <input id="cobro-otros" type="number" inputmode="decimal" placeholder="0.00" value="" style="font-size:14px">
       </div>
+      <div class="field" style="margin-top:8px"><label class="field-label" style="font-size:11px">Observaciones / Notas del Trabajo</label>
+        <textarea id="cobro-notas" placeholder="Ej: Se cambió válvula de gas adicional..." style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:8px;font-size:13px;width:100%;min-height:60px;font-family:inherit"></textarea>
+      </div>
     </div>
 
     <div class="btn-row">
@@ -6850,6 +6862,7 @@ async function guardarFinalizacion(id){
   const movilidad=movilidadEl ? parseFloat(movilidadEl.value)||0 : 0;
   const materiales=materialesEl ? parseFloat(materialesEl.value)||0 : 0;
   const otros=otrosEl ? parseFloat(otrosEl.value)||0 : 0;
+  const notas=document.getElementById('cobro-notas').value.trim();
 
   const precio=parseFloat(item.precio)||0;
   const pendiente=parseFloat((precio-cobrado).toFixed(2));
@@ -6862,6 +6875,8 @@ async function guardarFinalizacion(id){
   else if(cobrado>0)  item.estadoPago='parcial';
   else                item.estadoPago='sin_cobro';
 
+  if (notas) item.notas = (item.notas ? item.notas + ' · ' : '') + notas;
+
   const agDesc = (item.servicio||'Servicio')+' — '+(item.cliente||'');
   const baseTx={category:item.servicio||'Servicio Gas',date:item.fecha,
     description:agDesc,cliente:item.cliente||'',ubicacion:item.ubicacion||'',negocio:true};
@@ -6870,7 +6885,7 @@ async function guardarFinalizacion(id){
   if(cobrado>0 || movilidad>0 || materiales>0 || otros>0){
     const notionToken = localStorage.getItem('fnz_notion_token');
     const dbid = localStorage.getItem('fnz_notion_dbid');
-    const cobroObj = {ingreso: cobrado, movilidad, materiales, otros};
+    const cobroObj = {ingreso: cobrado, movilidad, materiales, otros, observaciones: notas};
     
     if (notionToken && dbid) {
       toast('⏳ Guardando datos oficiales en Notion...', 'info');
