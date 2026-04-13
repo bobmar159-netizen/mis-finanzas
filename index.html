@@ -3725,7 +3725,7 @@ function setTxType(type){
   document.getElementById('tx-cat-wrap').innerHTML=`<label class="field-label">Categoría</label>${catSelectHtml('tx-cat',type,null,null)}`;
 }
 
-function saveTx(editId){
+async function saveTx(editId){
   const amount=parseFloat(document.getElementById('tx-amount').value);
   const date=document.getElementById('tx-date').value;
   if(!amount||!date)return toast('Completa monto y fecha','error');
@@ -3760,6 +3760,22 @@ function saveTx(editId){
     moneda: window._txMoneda || original?.moneda || 'PEN',
   };
 
+  // ✅ Bidireccional: Sync a Notion si fue importado de Notion
+  if (original && original._importadoDeNotion && original._notionRowId) {
+    toast('⏳ Guardando edición oficial en Notion...', 'info');
+    try {
+      // Remover sufijos -ing, -mov, -mat para obtener el pageId puro
+      let pureId = original._notionRowId;
+      if (pureId.includes('-')) pureId = pureId.split('-')[0];
+      await _updateNotionPage(pureId, item);
+      toast('✓ Cambio registrado en Notion', 'success');
+    } catch (err) {
+      console.error('Error Notion PATCH', err);
+      // Fallback local y advertencia
+      toast('⚠ Error en Notion (¿sin internet?). El cambio se guardó solo de forma local.', 'error');
+    }
+  }
+
   if(editId) {
     state.transactions = state.transactions.map(t => t.id === editId ? item : t);
   } else {
@@ -3768,7 +3784,7 @@ function saveTx(editId){
   saveAll();
   syncToSheets(item);
   closeModal(); render();
-  toast(editId ? 'Movimiento actualizado ✓' : 'Movimiento guardado ✓');
+  if(!original || (!original._importadoDeNotion)) toast(editId ? 'Movimiento actualizado ✓' : 'Movimiento guardado ✓');
 }
 
 function deleteTx(id){
@@ -5201,6 +5217,12 @@ async function _pushToNotion(item, cobrado) {
     payload.properties[pTitle] = { title: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
   }
 
+  const pCliente = findCol('cliente', 'nombre', 'name', 'client');
+  if (pCliente && pCliente.type !== 'title') {
+    if (pCliente.type === 'rich_text') payload.properties[pCliente.name] = { rich_text: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
+    else if (pCliente.type === 'select') payload.properties[pCliente.name] = { select: { name: item.cliente || '(Sin cliente)' } };
+  }
+
   const pDate = findCol('fecha', 'date', 'día', 'dia');
   if (pDate && pDate.type === 'date') {
     payload.properties[pDate.name] = { date: { start: item.fecha } };
@@ -5273,6 +5295,87 @@ async function _pushToNotion(item, cobrado) {
   }
 
   return await res.json(); // Retorna la página creada, donde podremos extraer el id
+}
+
+async function _updateNotionPage(pageId, updatedTx) {
+  const token = localStorage.getItem('fnz_notion_token');
+  const dbId  = localStorage.getItem('fnz_notion_dbid');
+  if (!token || !dbId) throw new Error('Notion no configurado');
+
+  const props = await _fetchNotionSchema(token, dbId);
+  const payload = { properties: {} };
+
+  const findCol = (...names) => {
+    for (const n of names) {
+      const match = Object.keys(props).find(k => k.toLowerCase() === n.toLowerCase());
+      if (match) return { name: match, type: props[match].type };
+    }
+    return null;
+  };
+
+  // Update Cliente
+  const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
+  if (pTitle && updatedTx.cliente) {
+    payload.properties[pTitle] = { title: [{ text: { content: updatedTx.cliente } }] };
+  }
+  const pCliente = findCol('cliente', 'nombre', 'name', 'client');
+  if (pCliente && pCliente.type !== 'title' && updatedTx.cliente) {
+    if (pCliente.type === 'rich_text') payload.properties[pCliente.name] = { rich_text: [{ text: { content: updatedTx.cliente } }] };
+    else if (pCliente.type === 'select') payload.properties[pCliente.name] = { select: { name: updatedTx.cliente } };
+  }
+
+  // Update Fecha
+  const pDate = findCol('fecha', 'date', 'día', 'dia');
+  if (pDate && pDate.type === 'date' && updatedTx.date) {
+    payload.properties[pDate.name] = { date: { start: updatedTx.date } };
+  }
+
+  // Descubrir en qué columna meter el monto dependiendo de la categoría (Ingreso vs Egreso específico)
+  const catL = (updatedTx.category || '').toLowerCase();
+  
+  if (updatedTx.type === 'ingreso') {
+    const pPrecio = findCol('precio del servicio', 'precio', 'monto', 'importe', 'total', 'amount');
+    if (pPrecio && pPrecio.type === 'number') payload.properties[pPrecio.name] = { number: parseFloat(updatedTx.amount) || 0 };
+  } else {
+    // Es un Egreso
+    if (catL.includes('movilidad') || catL.includes('pasaje') || catL.includes('gasolina')) {
+      const pMovilidad = findCol('movilidad', 'pasajes', 'gasolina', 'combustible', 'transporte');
+      if (pMovilidad && pMovilidad.type === 'number') payload.properties[pMovilidad.name] = { number: parseFloat(updatedTx.amount) || 0 };
+    } 
+    else if (catL.includes('material')) {
+      const pMateriales = findCol('materiales', 'material', 'insumos', 'compras');
+      if (pMateriales && pMateriales.type === 'number') payload.properties[pMateriales.name] = { number: parseFloat(updatedTx.amount) || 0 };
+    }
+    else {
+      // Otros egresos
+      const pOtros = findCol('otros', 'otros gastos', 'gastos extra');
+      if (pOstros && pOstros.type === 'number') payload.properties[pOstros.name] = { number: parseFloat(updatedTx.amount) || 0 };
+    }
+  }
+
+  // Update Descripción (Notas)
+  const pNotas = findCol('observaciones', 'nota', 'notas', 'descripcion', 'descripción');
+  if (pNotas && pNotas.type === 'rich_text' && updatedTx.description) {
+    payload.properties[pNotas.name] = { rich_text: [{ text: { content: updatedTx.description } }] };
+  }
+
+  const notionUrl = 'https://api.notion.com/v1/pages/' + pageId;
+  const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
+  
+  const res = await fetch(proxyUrl, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text().catch(()=>'');
+    throw new Error('HTTP ' + res.status + ' - ' + errorText);
+  }
 }
 
 // ── Notion API Polling ──────────────────────────────────────────────
