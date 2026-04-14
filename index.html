@@ -5343,9 +5343,12 @@ async function _pushToNotion(item, cobrado) {
     else if (col.type === 'url')     payload.properties[col.name] = { url: String(value) };
   };
 
-  // ── CLIENTE (título de la página) ──
+  // ── CLIENTE (título de la página) + columna rich_text si existe por separado ──
   const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
   if (pTitle) payload.properties[pTitle] = { title: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
+  // Si hay una columna 'Cliente' de tipo rich_text separada, también la llenamos
+  const pCliente = findCol('cliente','name','nombre');
+  if (pCliente && pCliente.type !== 'title') setProp(pCliente, item.cliente || '(Sin cliente)');
 
   // ── FECHA ──
   setProp(findCol('fecha','date','día','dia'), item.fecha);
@@ -5533,9 +5536,11 @@ async function _updateNotionPageFull(pageId, item, cobroObj) {
     else if (col.type === 'multi_select') payload.properties[col.name] = { multi_select: [{ name: String(value) }] };
   };
 
-  // ── Cliente (título) ──
+  // ── Cliente (título) + columna rich_text separada si existe ──
   const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
   if (pTitle && item.cliente) payload.properties[pTitle] = { title: [{ text: { content: item.cliente } }] };
+  const pCliente2 = findCol('cliente','name','nombre');
+  if (pCliente2 && pCliente2.type !== 'title') setProp(pCliente2, item.cliente || '');
 
   // ── Fecha ──
   setProp(findCol('fecha','date','día','dia'), item.fecha);
@@ -5578,6 +5583,86 @@ async function _updateNotionPageFull(pageId, item, cobroObj) {
   const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/pages/' + pageId);
   const res = await fetch(proxyUrl, {
     method: 'PATCH',
+    headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) { const e = await res.text().catch(()=>''); throw new Error('HTTP '+res.status+' - '+e.slice(0,120)); }
+  return await res.json();
+}
+
+// ── POST para Control de Clientes Potenciales (Visitas) ──
+async function _pushToNotionClientes(item) {
+  const token = localStorage.getItem('fnz_notion_token');
+  const dbId = localStorage.getItem('fnz_notion_dbid_clientes');
+  if (!token || !dbId) throw new Error('Notion DB Clientes no configurada');
+
+  const props = await _fetchNotionSchema(token, dbId);
+  const payload = { parent: { database_id: dbId }, properties: {} };
+
+  const findCol = (...names) => {
+    for (const n of names) {
+      const match = Object.keys(props).find(k => k.toLowerCase() === n.toLowerCase());
+      if (match) return { name: match, type: props[match].type };
+    }
+    return null;
+  };
+
+  const setProp = (col, value) => {
+    if (!col || value === null || value === undefined || value === '') return;
+    if (col.type === 'title')        payload.properties[col.name] = { title: [{ text: { content: String(value) } }] };
+    else if (col.type === 'rich_text') payload.properties[col.name] = { rich_text: [{ text: { content: String(value) } }] };
+    else if (col.type === 'number')  payload.properties[col.name] = { number: parseFloat(value) || 0 };
+    else if (col.type === 'select')  payload.properties[col.name] = { select: { name: String(value) } };
+    else if (col.type === 'date')    payload.properties[col.name] = { date: { start: String(value) } };
+    else if (col.type === 'phone_number') payload.properties[col.name] = { phone_number: String(value) };
+    else if (col.type === 'multi_select') payload.properties[col.name] = { multi_select: [{ name: String(value) }] };
+  };
+
+  // Title: Cliente
+  const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
+  if (pTitle) payload.properties[pTitle] = { title: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
+  
+  const pCliente = findCol('cliente','name','nombre');
+  if (pCliente && pCliente.type !== 'title') setProp(pCliente, item.cliente || '(Sin cliente)');
+
+  // Date: Fecha de contacto (uso item.fecha)
+  setProp(findCol('fecha de contacto','fecha','contacto'), item.fecha);
+
+  // Phone: Whatsapp
+  const pTel = findCol('whatsapp','telefono','teléfono','celular');
+  if (pTel && pTel.type === 'phone_number') payload.properties[pTel.name] = { phone_number: item.telefono || '' };
+  else setProp(pTel, item.telefono);
+
+  // Select: Prioridad
+  setProp(findCol('prioridad'), item.prioridad || 'media');
+
+  // Select: Estado
+  setProp(findCol('estado'), item.estado || 'en proceso');
+
+  // Select: Servicio solicitado
+  setProp(findCol('servicio solicitado','servicio'), item.servicio || item.servicio1 || '');
+
+  // Select/RichText: Acciones 1-4
+  setProp(findCol('primera acción','1a accion','1ra accion','accion 1'), item.accion1 || item.notas || '');
+  setProp(findCol('segunda acción','2a accion','2da accion','accion 2'), item.accion2 || '');
+  setProp(findCol('tercera acción','3a accion','3ra accion','accion 3'), item.accion3 || '');
+  setProp(findCol('cuarta acción','4a accion','4ta accion','accion 4'), item.accion4 || '');
+
+  // Date: Fecha de visita
+  setProp(findCol('fecha de visita','visita'), item.fechaVisita || item.fecha);
+
+  // Date: Fecha de construccion
+  if(item.fechaConstruccion) setProp(findCol('fecha de construcción','construccion','fecha construccion'), item.fechaConstruccion);
+
+  // Text: Ubicacion
+  setProp(findCol('ubicacion','ubicación','distrito'), item.ubicacion || '');
+
+  // Text: Notas
+  setProp(findCol('notas','nota','observaciones'), item.notas || '');
+
+  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/pages');
+  const res = await fetch(proxyUrl, {
+    method: 'POST',
     headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
@@ -6235,17 +6320,28 @@ function renderAjustes(){
           value="${notionToken}"
           style="background:#F8FAFC;border:1px solid #7C3AED44;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%"
           oninput="const v=this.value.trim();if(v.startsWith('secret_')||v.startsWith('ntn_'))localStorage.setItem('fnz_notion_token',v)">
+          
+        <div style="font-size:10px;font-weight:700;color:#4338CA;text-transform:uppercase;letter-spacing:.06em;margin-top:4px">📋 DB 1 — Reporte Diario (Trabajos)</div>
         <input id="notion-dbid-inp" type="text"
-          placeholder="ID de base de datos (32 caracteres hex)"
+          placeholder="ID base datos Reporte Diario (32 hex)"
           value="${notionDbId}"
           style="background:#F8FAFC;border:1px solid #7C3AED44;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%"
           oninput="if(this.value.length>=32)localStorage.setItem('fnz_notion_dbid',this.value.trim().replace(/-/g,''))">
+
+        <div style="font-size:10px;font-weight:700;color:#0891B2;text-transform:uppercase;letter-spacing:.06em;margin-top:4px">👥 DB 2 — Clientes Potenciales (Visitas)</div>
+        <input id="notion-dbid-clientes-inp" type="text"
+          placeholder="ID base datos Clientes Potenciales (32 hex)"
+          value="${localStorage.getItem('fnz_notion_dbid_clientes')||''}"
+          style="background:#F0F9FF;border:1px solid #0891B244;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%"
+          oninput="if(this.value.length>=32)localStorage.setItem('fnz_notion_dbid_clientes',this.value.trim().replace(/-/g,''))">
+
         <button onclick="saveNotionConfig()"
-          style="background:linear-gradient(135deg,#6B46C1,#7C3AED);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">
+          style="background:linear-gradient(135deg,#6B46C1,#7C3AED);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;margin-top:4px">
           💾 Guardar credenciales
         </button>
         <div style="font-size:11px;text-align:center;font-weight:600;color:${notionToken&&notionDbId?'#27500A':'#888'}">
-          ${notionToken&&notionDbId?'✅ Notion conectado':'⚠ Sin credenciales configuradas'}
+          ${notionToken&&notionDbId?'✅ Notion DB1 conectado':'⚠ Sin credenciales DB1'}
+          ${localStorage.getItem('fnz_notion_dbid_clientes') ? ' · 👥 DB2 OK' : ''}
         </div>
       </div>
 
@@ -7195,15 +7291,30 @@ function saveAgendaItem(editId, tipo){
 
   // ── Push a Notion al crear/editar (garantiza que el cliente llegue) ──
   const nToken = localStorage.getItem('fnz_notion_token');
-  const nDbid  = localStorage.getItem('fnz_notion_dbid');
-  if(nToken && nDbid){
-    _pushToNotion(item, 0).then(res => {
-      if(res && res.id && !item._notionRowId){
-        item._notionRowId = res.id;
-        state.agenda = state.agenda.map(x=>x.id===item.id ? item : x);
-        save('fnz_agenda', state.agenda);
+  if (nToken) {
+    if (tipo === 'visita') {
+      const nDbidClientes = localStorage.getItem('fnz_notion_dbid_clientes');
+      if (nDbidClientes) {
+        _pushToNotionClientes(item).then(res => {
+          if (res && res.id && !item._notionRowId) {
+            item._notionRowId = res.id;
+            state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
+            save('fnz_agenda', state.agenda);
+          }
+        }).catch(err => console.warn('Notion Clientes (no crítico):', err.message));
       }
-    }).catch(err => console.warn('Notion (no crítico):', err.message));
+    } else {
+      const nDbid = localStorage.getItem('fnz_notion_dbid');
+      if (nDbid) {
+        _pushToNotion(item, 0).then(res => {
+          if (res && res.id && !item._notionRowId) {
+            item._notionRowId = res.id;
+            state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
+            save('fnz_agenda', state.agenda);
+          }
+        }).catch(err => console.warn('Notion Trabajos (no crítico):', err.message));
+      }
+    }
   }
 
   closeModal(); render();
