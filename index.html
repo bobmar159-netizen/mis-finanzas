@@ -7019,22 +7019,7 @@ function openAddAgenda(tipo, editId, preData){
     </div>
     ${isVisita?`
     <div style="background:#F0F9FF;border:1px solid #1565C022;border-radius:12px;padding:12px;margin-bottom:8px">
-      <div style="font-size:11px;font-weight:700;color:#1565C0;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">👥 Gestión Comercial</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div class="field" style="margin-bottom:0"><label class="field-label">Prioridad</label>
-          <select id="ag-prioridad" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
-            <option value="alta" ${item&&item.prioridad==='alta'?'selected':''}>🔴 Alta</option>
-            <option value="media" ${(!item||item.prioridad==='media')?'selected':''}>🟡 Media</option>
-            <option value="baja" ${item&&item.prioridad==='baja'?'selected':''}>⚪ Baja</option>
-          </select>
-        </div>
-        <div class="field" style="margin-bottom:0"><label class="field-label">Servicio Solicitado</label>
-          <select id="ag-servicio-visita" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
-            <option value="">Seleccionar...</option>
-            ${serviciosOpts}
-          </select>
-        </div>
-      </div>
+      <div style="font-size:11px;font-weight:700;color:#1565C0;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">👥 Acciones Comerciales</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${['1','2','3','4'].map(i=>`
           <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">${i}ª Acción</label>
@@ -7045,13 +7030,8 @@ function openAddAgenda(tipo, editId, preData){
           </div>
         `).join('')}
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-        <div class="field" style="margin-bottom:0"><label class="field-label">Fecha de Visita</label>
-          <input id="ag-fecha-visita" type="date" value="${item?item.fechaVisita||'':''}">
-        </div>
-        <div class="field" style="margin-bottom:0"><label class="field-label">F. Construcción</label>
-          <input id="ag-fecha-construccion" type="date" value="${item?item.fechaConstruccion||'':''}">
-        </div>
+      <div class="field" style="margin-bottom:0;margin-top:8px"><label class="field-label">Fecha de Visita</label>
+        <input id="ag-fecha-visita" type="date" value="${item?item.fechaVisita||'':''}">
       </div>
     </div>` : ''}
     ${!isVisita?`
@@ -11556,19 +11536,23 @@ function startListeningHandlers(rec) {
 
     rec.onresult = (e) => {
     let sessionInterim = '';
+    let sessionFinals  = '';
+    let lastTr = '';
 
-    // Iterar solo sobre los resultados nuevos/modificados de este evento
-    for(let i = e.resultIndex; i < e.results.length; i++){
+    // Reconstruir SIEMPRE desde 0 para evitar errores críticos de Android Chrome
+    for(let i = 0; i < e.results.length; i++){
+      let tr = e.results[i][0].transcript.trim();
       if(e.results[i].isFinal) {
-        // En Android, a veces el mismo index se recibe multiples veces como final, chequeo simple:
-        const t = e.results[i][0].transcript;
-        if (!_micSessionFinals.endsWith(t + ' ') && !_micSessionFinals.endsWith(t)) {
-          _micSessionFinals += t + ' ';
+        if(tr && tr !== lastTr) { // Evita que Chrome agregue el mismo sub-segmento varias veces
+          sessionFinals += tr + ' ';
+          lastTr = tr;
         }
       } else {
-        sessionInterim += e.results[i][0].transcript;
+        sessionInterim += tr + ' ';
       }
     }
+
+    _micSessionFinals = sessionFinals.trim();
 
     const base = _micSessionBase.trim();
     const finals = _micSessionFinals.trim();
@@ -13488,9 +13472,37 @@ function _agendaMicGuardarDirecto(){
   };
 
   if(!state.agenda) state.agenda=[];
-  state.agenda.push(item);
+  state.agenda.unshift(item);
   save('fnz_agenda', state.agenda);
   syncAgendaToSheets(item);
+
+  // ── Push a Notion para Guardado Directo desde Micrófono ──
+  const nToken = localStorage.getItem('fnz_notion_token');
+  if (nToken) {
+    if (d.tipo === 'visita') {
+      const nDbidClientes = localStorage.getItem('fnz_notion_dbid_clientes');
+      if (nDbidClientes) {
+        _pushToNotionClientes(item).then(res => {
+          if (res && res.id && !item._notionRowId) {
+            item._notionRowId = res.id;
+            state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
+            save('fnz_agenda', state.agenda);
+          }
+        }).catch(err => console.warn('Notion Clientes (no crítico):', err.message));
+      }
+    } else {
+      const nDbid = localStorage.getItem('fnz_notion_dbid');
+      if (nDbid) {
+        _pushToNotion(item, 0).then(res => {
+          if (res && res.id && !item._notionRowId) {
+            item._notionRowId = res.id;
+            state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
+            save('fnz_agenda', state.agenda);
+          }
+        }).catch(err => console.warn('Notion Trabajos (no crítico):', err.message));
+      }
+    }
+  }
 
   document.getElementById('micModal').style.display='none';
   switchPage('agenda');
@@ -13643,28 +13655,36 @@ function _rellenarFormularioAgenda(p){
 
 // ── Eliminar repeticiones de texto por reinicios del mic ──
 function _deduplicarTranscript(text){
-  if(!text || text.length < 20) return text;
-  const words = text.trim().split(/\s+/);
-  if(words.length < 6) return text;
+  if(!text) return '';
+  let words = text.trim().split(/\s+/);
+  if(words.length < 2) return text;
 
-  // Buscar la secuencia más larga repetida (hasta 3 repeticiones)
-  const half = Math.floor(words.length / 2);
-  for(let len = half; len >= 4; len--){
-    const head = words.slice(0, len).join(' ').toLowerCase();
-    const full = words.join(' ').toLowerCase();
-    const firstIdx = full.indexOf(head);
-    const secondIdx = full.indexOf(head, firstIdx + head.length);
-    if(secondIdx >= 0){
-      // Hay repetición — tomar desde la última ocurrencia completa
-      const thirdIdx = full.indexOf(head, secondIdx + head.length);
-      const lastIdx = thirdIdx >= 0 ? thirdIdx : secondIdx;
-      const afterLast = text.substring(lastIdx + head.length).trim();
-      const result = (head + (afterLast ? ' ' + afterLast : '')).trim();
-      // Capitalizar
-      return result.charAt(0).toUpperCase() + result.slice(1);
+  // En Android Chrome (continuous=true), a veces el texto se repite.
+  // Colapsar repeticiones contiguas exactas de n-gramos (hasta 20 palabras de largo).
+  const maxN = Math.min(20, Math.floor(words.length / 2));
+  for (let n = 1; n <= maxN; n++) {
+    let i = 0;
+    while (i <= words.length - 2*n) {
+      // Comparar sin importar mayúsculas
+      let chunk1 = words.slice(i, i+n).join(' ').toLowerCase();
+      let chunk2 = words.slice(i+n, i+2*n).join(' ').toLowerCase();
+      if (chunk1 === chunk2) {
+        words.splice(i, n); // Eliminar la primera instancia de la repetición
+        // No incrementamos "i" para que un triple repetido (A A A) también se colapse
+      } else {
+        i++;
+      }
     }
   }
-  return text;
+
+  // Límite duro de palabras para evitar que la cadena enorme rompa el JSON en Gemini
+  if(words.length > 150) {
+    words = words.slice(0, 150);
+  }
+
+  const result = words.join(' ');
+  if (!result) return '';
+  return result.charAt(0).toUpperCase() + result.slice(1);
 }
 
 function processVoiceResult(text) {
