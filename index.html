@@ -2946,8 +2946,41 @@ function appendWithoutOverlap(existing, newText) {
 
 function syncAgendaToSheets(item){
   const url=localStorage.getItem('fnz_sheets_url')||'';
-  if(!url) return; // sin Sheets → silencio
-  _sendToSheets(url,{type:'agenda',item,modo:state.modo,timestamp:item.id+'_'+Date.now()});
+  if(!url) return;
+  // Enriquecer el item con todos los campos que el GAS necesita
+  const payload = {
+    type:'agenda',
+    modo: state.modo,
+    timestamp: item.id+'_'+Date.now(),
+    item: {
+      id:          item.id,
+      tipo:        item.tipo,
+      fecha:       item.fecha,
+      hora:        item.hora,
+      cliente:     item.cliente,
+      telefono:    item.telefono,
+      servicio:    item.servicio,
+      servicio1:   item.servicio1 || item.servicio,
+      servicio2:   item.servicio2,
+      servicio3:   item.servicio3,
+      servicio4:   item.servicio4,
+      ubicacion:   item.ubicacion,
+      precio:      item.precio,
+      estado:      item.estado,
+      estadoPago:  item.estadoPago,
+      montoPagado: item.montoPagado,
+      formaPago:   item.formaPago,
+      movilidad:   item.movilidad,
+      materiales:  item.materiales,
+      otros:       item.otros,
+      meta:        item.meta,
+      notas:       item.notas,
+      observaciones: item.observaciones,
+      fechaReprogramado:    item.fechaReprogramado,
+      motivoReprogramacion: item.motivoReprogramacion,
+    }
+  };
+  _sendToSheets(url, payload);
 }
 
 function syncSeccionToSheets(type,item){
@@ -5226,21 +5259,40 @@ function _programarRecordatorio(textoHora,titulo){
 
 // ── Auto-descubrimiento y Push a Notion ─────────────────────────────
 async function _fetchNotionSchema(token, dbId) {
-  const cached = sessionStorage.getItem('fnz_notion_schema');
-  if (cached) return JSON.parse(cached);
+  // Validar caché — si está corrupto o vacío lo descartamos
+  try {
+    const cached = sessionStorage.getItem('fnz_notion_schema');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      // Verificar que tiene al menos una propiedad de tipo 'title'
+      const hasTitle = Object.values(parsed).some(v => v && v.type === 'title');
+      if (hasTitle) return parsed;
+      // Caché inválido → descartar
+      sessionStorage.removeItem('fnz_notion_schema');
+    }
+  } catch(e) {
+    sessionStorage.removeItem('fnz_notion_schema');
+  }
 
   const notionUrl = 'https://api.notion.com/v1/databases/' + dbId;
   const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
-  
+
   const res = await fetch(proxyUrl, {
     method: 'GET',
     headers: {
       'Authorization': 'Bearer ' + token,
-      'Notion-Version': '2022-06-28'
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json'
     }
   });
-  if (!res.ok) throw new Error('No se pudo leer el esquema de la base de datos');
+  if (!res.ok) {
+    const errText = await res.text().catch(()=>'');
+    throw new Error('Schema Notion HTTP ' + res.status + ' — ' + errText.slice(0,120));
+  }
   const db = await res.json();
+  if (!db.properties || !Object.keys(db.properties).length) {
+    throw new Error('La base de datos de Notion no tiene propiedades visibles. Verificá los permisos de la integración.');
+  }
   sessionStorage.setItem('fnz_notion_schema', JSON.stringify(db.properties));
   return db.properties;
 }
