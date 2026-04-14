@@ -5493,6 +5493,98 @@ async function _deleteNotionPage(pageId) {
   } catch(e) { console.warn('[Notion] No se pudo archivar página:', pageId, e.message); }
 }
 
+// ── PATCH completo al finalizar un trabajo (actualiza todos los campos del cobro) ──
+async function _updateNotionPageFull(pageId, item, cobroObj) {
+  const token = localStorage.getItem('fnz_notion_token');
+  const dbId  = localStorage.getItem('fnz_notion_dbid');
+  if (!token || !dbId || !pageId) throw new Error('Notion no configurado');
+
+  const ingreso    = cobroObj.ingreso    || 0;
+  const movilidad  = cobroObj.movilidad  || 0;
+  const materiales = cobroObj.materiales || 0;
+  const otros      = cobroObj.otros      || 0;
+  const meta       = cobroObj.meta       || 0;
+  const formaPago  = cobroObj.formaPago  || '';
+  const observaciones = cobroObj.observaciones || '';
+  const svc1 = cobroObj.svc1 || item.servicio1 || item.servicio || '';
+  const svc2 = cobroObj.svc2 || '';
+  const svc3 = cobroObj.svc3 || '';
+  const svc4 = cobroObj.svc4 || '';
+
+  const props = await _fetchNotionSchema(token, dbId);
+  const payload = { properties: {} };
+
+  const findCol = (...names) => {
+    for (const n of names) {
+      const match = Object.keys(props).find(k => k.toLowerCase() === n.toLowerCase());
+      if (match) return { name: match, type: props[match].type };
+    }
+    return null;
+  };
+
+  const setProp = (col, value) => {
+    if (!col || value === null || value === undefined || value === '') return;
+    if (col.type === 'title')        payload.properties[col.name] = { title: [{ text: { content: String(value) } }] };
+    else if (col.type === 'rich_text') payload.properties[col.name] = { rich_text: [{ text: { content: String(value) } }] };
+    else if (col.type === 'number')  payload.properties[col.name] = { number: parseFloat(value) || 0 };
+    else if (col.type === 'select')  payload.properties[col.name] = { select: { name: String(value) } };
+    else if (col.type === 'date')    payload.properties[col.name] = { date: { start: String(value) } };
+    else if (col.type === 'phone_number') payload.properties[col.name] = { phone_number: String(value) };
+    else if (col.type === 'multi_select') payload.properties[col.name] = { multi_select: [{ name: String(value) }] };
+  };
+
+  // ── Cliente (título) ──
+  const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
+  if (pTitle && item.cliente) payload.properties[pTitle] = { title: [{ text: { content: item.cliente } }] };
+
+  // ── Fecha ──
+  setProp(findCol('fecha','date','día','dia'), item.fecha);
+
+  // ── Contacto ──
+  if (item.telefono) {
+    const pCon = findCol('contacto','telefono','teléfono','tel','phone');
+    if (pCon?.type === 'phone_number') payload.properties[pCon.name] = { phone_number: item.telefono };
+    else setProp(pCon, item.telefono);
+  }
+
+  // ── Servicios 1-4 ──
+  const svcCols = [
+    findCol('servicio 1','servicio1','servicio','tipo','categoria','category'),
+    findCol('servicio 2','servicio2'),
+    findCol('servicio 3','servicio3'),
+    findCol('servicio 4','servicio4')
+  ];
+  [svc1,svc2,svc3,svc4].forEach((s,i) => { if(s) setProp(svcCols[i], s); });
+
+  // ── Distrito ──
+  if (item.ubicacion) setProp(findCol('distrito','ubicacion','ubicación','zona'), item.ubicacion);
+
+  // ── Forma de pago ──
+  if (formaPago) setProp(findCol('forma de pago','forma','pago','payment','método de pago'), formaPago);
+
+  // ── Precio del servicio ──
+  setProp(findCol('precio del servicio','precio','monto','importe','total','amount'), ingreso);
+
+  // ── Gastos ──
+  if (movilidad  > 0) setProp(findCol('movilidad','pasajes','gasolina','combustible','transporte'), movilidad);
+  if (materiales > 0) setProp(findCol('materiales','material','insumos','compras'), materiales);
+  if (otros      > 0) setProp(findCol('otros','otros gastos','gastos extra','extra'), otros);
+  if (meta       > 0) setProp(findCol('meta','objetivo','goal','target'), meta);
+
+  // ── Observaciones ──
+  const notasFinal = [observaciones, item.notas||''].filter(Boolean).join(' · ');
+  if (notasFinal) setProp(findCol('observaciones','nota','notas','descripcion','descripción','notes'), notasFinal);
+
+  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/pages/' + pageId);
+  const res = await fetch(proxyUrl, {
+    method: 'PATCH',
+    headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) { const e = await res.text().catch(()=>''); throw new Error('HTTP '+res.status+' - '+e.slice(0,120)); }
+  return await res.json();
+}
+
 // ── Notion API Polling ──────────────────────────────────────────────
 let _notionPollTimer = null;
 
@@ -7501,8 +7593,19 @@ async function guardarFinalizacion(id){
     if(notionToken && dbid){
       toast('⏳ Enviando a Notion...','info');
       try{
-        const notionRes = await _pushToNotion(item, cobroObj);
-        const notionId  = notionRes.id;
+        let notionId;
+        // ── Si ya existe la página en Notion → PATCH (no crear duplicado) ──
+        if(item._notionRowId){
+          await _updateNotionPageFull(item._notionRowId, item, cobroObj);
+          notionId = item._notionRowId;
+        } else {
+          const notionRes = await _pushToNotion(item, cobroObj);
+          notionId = notionRes.id;
+          // Guardar el ID para futuros updates
+          item._notionRowId = notionId;
+          state.agenda = state.agenda.map(x => x.id===item.id ? item : x);
+          save('fnz_agenda', state.agenda);
+        }
         if(cobrado>0)    state.transactions.unshift({id:notionId+'-ing',type:'ingreso',amount:cobrado,...baseTx,_importadoDeNotion:true,_notionRowId:notionId});
         if(movilidad>0)  state.transactions.unshift({id:notionId+'-mov',type:'egreso',amount:movilidad,...baseTx,category:'Movilidad',description:'Movilidad · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
         if(materiales>0) state.transactions.unshift({id:notionId+'-mat',type:'egreso',amount:materiales,...baseTx,category:'Materiales',description:'Materiales · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
@@ -7528,11 +7631,24 @@ async function guardarFinalizacion(id){
   }
 
   save('fnz_agenda',state.agenda); saveAll();
+  // ── Sheets: enviar item COMPLETO con datos del cobro para actualizar la fila ──
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(url){
-    const payload={type:'agenda_estado',agenda_estado:{id:item.id,estado:'se_finalizo',
-      estadoPago:item.estadoPago,montoPagado:cobrado,montoPendienteCobro:item.montoPendienteCobro,tipo:item.tipo}};
-    _sendToSheets(url,payload);
+    // Enriquecer el item con todos los campos del cobro antes de enviar
+    const itemParaSheets = {
+      ...item,
+      ingreso:    cobrado,
+      movilidad,
+      materiales,
+      otros,
+      meta,
+      formaPago,
+      observaciones: notas || item.notas || '',
+      servicio1: svc1, servicio2: svc2, servicio3: svc3, servicio4: svc4,
+      montoPagado: cobrado,
+      estadoPago: item.estadoPago,
+    };
+    _sendToSheets(url, { type:'agenda', modo: state.modo, timestamp: item.id+'_fin_'+Date.now(), item: itemParaSheets });
   }
   closeModal(); render();
   if(item.estadoPago==='completo') toast('✓ Trabajo finalizado · '+fmt(cobrado)+' cobrado');
