@@ -6991,6 +6991,9 @@ function openAddAgenda(tipo, editId, preData){
     return `<option value="${s}" ${isSelected?'selected':''}>${s}</option>`;
   }).join('');
   const estadosOpts = Object.entries(AGENDA_ESTADOS).map(([k,v])=>`<option value="${k}" ${item&&item.estado===k?'selected':k==='agendado'&&!item?'selected':''}>${v.label}</option>`).join('');
+  const visitasEstados = ['agendado','en proceso','interesado','convertido','no interesado'];
+  const visitasEstadosOpts = visitasEstados.map(e=>`<option value="${e}" ${item&&item.estado===e?'selected':e==='en proceso'&&!item?'selected':''}>${e.charAt(0).toUpperCase()+e.slice(1)}</option>`).join('');
+  const visitasAcciones = ['se agendó const...', 'se envió mensaje', 'se llamó', 'se envió precio', 'se agendó visita', 'se hizo visita', 'se construyó', 'se desanimó'];
 
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:${colorTitle}">${isEdit?'Editar':(isVisita?'Nueva':'Nuevo')} ${isVisita?'Visita':'Trabajo'}</div>
@@ -7014,6 +7017,43 @@ function openAddAgenda(tipo, editId, preData){
         </div>
       </div>
     </div>
+    ${isVisita?`
+    <div style="background:#F0F9FF;border:1px solid #1565C022;border-radius:12px;padding:12px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:700;color:#1565C0;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">👥 Gestión Comercial</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="field" style="margin-bottom:0"><label class="field-label">Prioridad</label>
+          <select id="ag-prioridad" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
+            <option value="alta" ${item&&item.prioridad==='alta'?'selected':''}>🔴 Alta</option>
+            <option value="media" ${(!item||item.prioridad==='media')?'selected':''}>🟡 Media</option>
+            <option value="baja" ${item&&item.prioridad==='baja'?'selected':''}>⚪ Baja</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0"><label class="field-label">Servicio Solicitado</label>
+          <select id="ag-servicio-visita" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
+            <option value="">Seleccionar...</option>
+            ${serviciosOpts}
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${['1','2','3','4'].map(i=>`
+          <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">${i}ª Acción</label>
+            <select id="ag-accion${i}" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%">
+              <option value="">— Ninguna —</option>
+              ${visitasAcciones.map(a=>`<option value="${a}" ${item&&item[`accion${i}`]===a?'selected':''}>${a}</option>`).join('')}
+            </select>
+          </div>
+        `).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <div class="field" style="margin-bottom:0"><label class="field-label">Fecha de Visita</label>
+          <input id="ag-fecha-visita" type="date" value="${item?item.fechaVisita||'':''}">
+        </div>
+        <div class="field" style="margin-bottom:0"><label class="field-label">F. Construcción</label>
+          <input id="ag-fecha-construccion" type="date" value="${item?item.fechaConstruccion||'':''}">
+        </div>
+      </div>
+    </div>` : ''}
     ${!isVisita?`
     <div style="background:#F8F0FF;border:1px solid #9B59B622;border-radius:12px;padding:12px;margin-bottom:8px">
       <div style="font-size:11px;font-weight:700;color:#6C3483;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🔧 Servicios</div>
@@ -7071,7 +7111,7 @@ function openAddAgenda(tipo, editId, preData){
     </div>
     <div class="field"><label class="field-label">Estado</label>
       <select id="ag-estado" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-        ${estadosOpts}
+        ${isVisita ? visitasEstadosOpts : estadosOpts}
       </select>
     </div>
     <div class="btn-row">
@@ -7245,7 +7285,10 @@ function saveAgendaItem(editId, tipo){
   const cliente   = (clienteEl?.value||'').trim();
   const fecha     = fechaEl?.value||'';
   const hora      = getAgHora();
-  const servicio  = servicioEl?.value||'';
+  
+  const vServ     = document.getElementById('ag-servicio-visita');
+  const servicio  = tipo==='visita' ? (vServ?.value||'') : (servicioEl?.value||'');
+  
   const servicio2 = servicio2El?.value||'';
   const servicio3 = servicio3El?.value||'';
   const servicio4 = servicio4El?.value||'';
@@ -7253,7 +7296,16 @@ function saveAgendaItem(editId, tipo){
   const ubicacion = (ubicEl?.value||'').trim();
   const telefono  = (telEl?.value||'').trim();
   const notas     = (notasEl?.value||'').trim();
-  const estado    = estadoEl?.value||'pendiente';
+  const estado    = estadoEl?.value||(tipo==='visita'?'en proceso':'pendiente');
+
+  // Valores exclusivos de visita
+  const prioridad = document.getElementById('ag-prioridad')?.value || 'media';
+  const accion1 = document.getElementById('ag-accion1')?.value || '';
+  const accion2 = document.getElementById('ag-accion2')?.value || '';
+  const accion3 = document.getElementById('ag-accion3')?.value || '';
+  const accion4 = document.getElementById('ag-accion4')?.value || '';
+  const fechaVisita = document.getElementById('ag-fecha-visita')?.value || '';
+  const fechaConstruccion = document.getElementById('ag-fecha-construccion')?.value || '';
 
   if(!cliente || !fecha){
     if(clienteEl) clienteEl.style.borderColor = !cliente ? '#E05252' : 'var(--border)';
@@ -7279,6 +7331,8 @@ function saveAgendaItem(editId, tipo){
     servicio, servicio1: servicio,
     servicio2, servicio3, servicio4,
     precio, ubicacion, telefono, notas, estado,
+    // Add visita fields
+    prioridad, accion1, accion2, accion3, accion4, fechaVisita, fechaConstruccion
   };
 
   if(editId){
@@ -11500,22 +11554,29 @@ function startListeningHandlers(rec) {
   // _micSessionFinals = finales confirmados de esta sesión.
   // micFullTranscript = base + sessionFinals (lo que se muestra y procesa).
 
-  rec.onresult = (e) => {
+    rec.onresult = (e) => {
     let sessionInterim = '';
-    let sessionFinals  = '';
 
-    // Reconstruir SIEMPRE desde 0 para evitar errores de duplicación del API de Android Chrome
-    for(let i = 0; i < e.results.length; i++){
-      if(e.results[i].isFinal) sessionFinals += e.results[i][0].transcript + ' ';
-      else                     sessionInterim += e.results[i][0].transcript;
+    // Iterar solo sobre los resultados nuevos/modificados de este evento
+    for(let i = e.resultIndex; i < e.results.length; i++){
+      if(e.results[i].isFinal) {
+        // En Android, a veces el mismo index se recibe multiples veces como final, chequeo simple:
+        const t = e.results[i][0].transcript;
+        if (!_micSessionFinals.endsWith(t + ' ') && !_micSessionFinals.endsWith(t)) {
+          _micSessionFinals += t + ' ';
+        }
+      } else {
+        sessionInterim += e.results[i][0].transcript;
+      }
     }
 
-    _micSessionFinals = sessionFinals.trim();
-
-    // Texto completo = base + finales actuales + interim actual
     const base = _micSessionBase.trim();
     const finals = _micSessionFinals.trim();
-    micFullTranscript = (base + (base && finals ? ' ' : '') + finals).trim();
+    // Prevenir duplicación en el display visual
+    let combinedFinal = (base + (base && finals ? ' ' : '') + finals).trim();
+    combinedFinal = _deduplicarTranscript(combinedFinal); 
+    micFullTranscript = combinedFinal;
+
     const interimClean = sessionInterim.trim();
     const display = (micFullTranscript + (micFullTranscript && interimClean ? ' ' : '') + interimClean).trim();
 
@@ -13454,38 +13515,20 @@ async function rellenarAgendaConGemini(text, tipoDetectado, localData){
 Hoy es ${hoy} (${diaSemana}). Mañana es ${mananaStr}.
 Tipo de evento: ${tipoDetectado}.
 
-El usuario dijo (por voz, puede estar desordenado): "${text}"
+El usuario dijo: "${text}"
 
-El parser local ya extrajo esto (puede tener errores, validá y corregí):
-${JSON.stringify(localData, null, 0)}
+Tu tarea es extraer los datos EXACTOS de lo que dictó el usuario, IGNORANDO palabras duplicadas, tartamudeos o frases repetidas (el micrófono de Android falla y a veces escribe lo mismo 2 o 3 veces seguidas).
 
 REGLAS CRÍTICAS:
 1. fecha: Calculá desde HOY (${hoy}). "este domingo/lunes/..." = próximo día desde hoy. "mañana" = ${mananaStr}.
-2. hora: Convertí a "HH:MM" en 24h.
-   - "nueve de la mañana" = "09:00"
-   - "ocho de la mañana" = "08:00"
-   - "tres de la tarde" = "15:00"
-   - "mediodía" = "12:00"
-   - Si no hay hora: null
-3. precio: Convertí números en palabras a número.
-   - "cuatrocientos soles" = 400
-   - "trescientos" = 300
-   - "doscientos cincuenta" = 250
-   - "un millón" = 1000000
-   - Si no hay precio: null
-4. cliente: Conservar el tratamiento abreviado + nombre propio.
-   - "la señora Karen" → "Sra. Karen"
-   - "el señor Julio" → "Sr. Julio"
-   - "don Pedro" → "Sr. Pedro"
-   - Si no hay tratamiento, solo el nombre propio.
-5. servicio (solo si tipo=trabajo): Elegí el más apropiado de: ${serviciosOk}
-   - "punto adicional" → "Punto Adicional"
-   - "construccion" → analizar contexto: si habla de nueva conexión → "Instalación Nueva", si es punto → "Punto Adicional", si es modificar → "Modificación Red"
-   - Si no se puede determinar con certeza → "Otro Servicio""
-6. ubicacion: Solo el distrito de Lima. Si dice "comas" → "Comas", "san juan de miraflores" → "San Juan de Miraflores"
-7. Si el campo ya está correcto en el parse local, confirmalo tal cual.
+2. hora: Convertí a "HH:MM" en formato 24h.
+3. precio: Convertí números hablados a dígitos (ej. "quinientos" -> 500). Si no dice precio, null.
+4. cliente: Extrae el nombre de la persona. Mantené el trato si lo dice ("el señor leonidas" -> "Sr. Leonidas"). NUNCA uses días de la semana como si fueran nombres de clientes (ignora "jueves", "lunes", etc. en el nombre). Si no detectas un nombre humano, null.
+5. servicio (solo si tipo=trabajo): Elegí el más lógico de esta lista exacta: ${serviciosOk}. Si detectas "punto adicional", usa "Punto Adicional". Si detectas "construccion", evalúa el contexto (ej. "Instalación Nueva" o "Punto Adicional" o "Modificación Red"). Si no hay certeza, null.
+6. ubicacion: Solo el distrito o lugar exacto en Lima ("en san juan de miraflores" -> "San Juan de Miraflores").
+7. notas: Cualquier otra observación importante.
 
-Respondé SOLO con JSON válido, sin explicaciones:
+Respondé SOLO con JSON válido, exacto, sin código markdown ni comentarios:
 {"fecha":"YYYY-MM-DD","hora":"HH:MM o null","cliente":"nombre o null","servicio":"${tipoDetectado==='trabajo'?serviciosOk:'null'} o null","precio":numero_o_null,"ubicacion":"distrito o null","notas":"texto extra o null"}`;
 
   try{
@@ -13494,19 +13537,16 @@ Respondé SOLO con JSON válido, sin explicaciones:
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         contents:[{role:'user',parts:[{text:prompt}]}],
-        generationConfig:{temperature:0.05, maxOutputTokens:350}
+        generationConfig:{temperature:0.05, maxOutputTokens:400}
       })
     });
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
 
-    // ── Parser robusto: tolera JSON parcial o con texto extra ──
     let parsed = null;
-    try{
-      parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
-    } catch(e1){
-      // Intentar extraer solo el objeto JSON del texto
+    try{ parsed = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+    catch(e1){
       const jsonMatch = raw.match(/\{[^]*\}/);
       if(jsonMatch) try{ parsed = JSON.parse(jsonMatch[0]); }catch(e2){}
     }
@@ -13514,21 +13554,18 @@ Respondé SOLO con JSON válido, sin explicaciones:
 
     parsed.tipo = tipoDetectado;
 
-    // ★ Merge: Gemini gana SOLO si aporta dato que el local no tenía
-    //    Si Gemini da null pero local tenía dato → conservar el local
+    // ★ Gemini tiene la última palabra absoluta, reemplazamos el parser local que falla a menudo.
     Object.keys(parsed).forEach(k => {
       const geminiVal = parsed[k];
-      const localVal  = _agendaMicData[k];
-      // Gemini gana si tiene valor Y (local no tenía O campo es cliente/hora/precio)
-      const camposCriticos = ['cliente','hora','precio','servicio','ubicacion'];
       if(geminiVal !== null && geminiVal !== undefined && geminiVal !== ''){
-        if(!localVal || camposCriticos.includes(k)){
-          _agendaMicData[k] = geminiVal;
-        }
+        _agendaMicData[k] = geminiVal;
+      } else if (['cliente','hora','precio','servicio','ubicacion'].includes(k)) {
+        // En caso de que Gemini devuelva null, limpiamos los falsos positivos del local (ej. señor jueves)
+        // Solo la fecha permitimos que el local la sobreviva por si a Gemini se le escapó.
+        if (k !== 'fecha') _agendaMicData[k] = null;
       }
     });
 
-    // ── Normalizar cliente: convertir forma larga a abreviada ──
     if(_agendaMicData.cliente){
       _agendaMicData.cliente = _agendaMicData.cliente
         .replace(/^señora\s+/i,'Sra. ')
@@ -13537,10 +13574,8 @@ Respondé SOLO con JSON válido, sin explicaciones:
         .replace(/^don\s+/i,'Sr. ')
         .replace(/^(el|la)\s+/i,'')
         .trim();
-      if(!_agendaMicData.cliente) _agendaMicData.cliente = null;
     }
 
-    // ── Refrescar panel si sigue visible ──
     const panelPresente = document.getElementById('ag-mic-campos');
     if(panelPresente){
       _mostrarResumenAgendaEnMic(_agendaMicData, text, tipoDetectado);
@@ -13548,17 +13583,16 @@ Respondé SOLO con JSON válido, sin explicaciones:
       _rellenarFormularioAgenda(parsed);
     }
 
-    // ── Status OK ──
     const st = document.getElementById('ag-mic-status');
     if(st){
-      const faltantes = ['cliente','fecha','servicio'].filter(k=>!_agendaMicData[k]);
+      const faltantes = ['cliente','fecha','servicio'].filter(k=>!_agendaMicData[k] && (tipoDetectado==='trabajo' && k==='servicio' || k!=='servicio'));
       st.style.animation='none';
       if(faltantes.length===0){
         st.style.background='#F0FDF4'; st.style.color='#166534';
-        st.innerHTML='<span>✓</span> Completado por IA';
+        st.innerHTML='<span>✓</span> Datos verificados por IA';
       } else {
         st.style.background='#FEF9EC'; st.style.color='#92400E';
-        st.innerHTML='⚠ Faltan: '+faltantes.join(', ')+' — completá en el formulario';
+        st.innerHTML='⚠ Faltan: '+faltantes.join(', ')+' — completá después';
       }
       setTimeout(()=>{ if(st) st.style.animation=''; }, 4000);
     }
@@ -13569,11 +13603,10 @@ Respondé SOLO con JSON válido, sin explicaciones:
       st.style.animation='none';
       st.style.background='#F5F5F5';
       st.style.color='#64748B';
-      // Mostrar qué detectó el parser local
       const localCliente = _agendaMicData.cliente;
       st.textContent = localCliente
-        ? '✓ Parser local: cliente = '+localCliente
-        : '⚠ Sin Gemini — completá el cliente manualmente';
+        ? '✓ Parser local (Gemini falló): cliente = '+localCliente
+        : '⚠ Sin Gemini — completá manualmente';
     }
   }
 }
