@@ -6671,22 +6671,18 @@ function renderAgenda(){
     const cardId = 'agcard_'+item.id;
     const estaActivo = ['agendado','pendiente','reprogramo'].includes(_migEst(item.estado));
 
-    // Icono y color según tipo
     const icono = isVisita ? '👁' : '🔧';
     const iconBg = isVisita ? '#EFF6FF' : '#F3F0FF';
 
-    // Fecha formateada
     const [y,m,d] = (item.fecha||'').split('-');
     const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
     const fechaLbl = y ? `${parseInt(d)} ${meses[parseInt(m)-1]}` : '—';
     const horaLbl = item.hora ? horaTo12(item.hora) : '';
 
-    // Precio
     const precioBadge = !isVisita && item.precio
       ? `<span class="ag-card-pill" style="background:#F3F0FF;color:#534AB7">S/ ${fmt(item.precio).replace('S/ ','')}</span>`
       : '';
 
-    // Detalle expandido
     const ubicHtml = ubic.link
       ? `<a href="${ubic.link}" target="_blank" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;background:#EEF4FF;border:1px solid #2E86AB33;border-radius:8px;padding:6px 11px;font-size:12px;color:#1565C0;text-decoration:none;font-weight:600">${ubic.display} ↗</a>`
       : `<div style="font-size:12px;color:var(--muted)">${ubic.display}</div>`;
@@ -6703,13 +6699,11 @@ function renderAgenda(){
     const notasHtml = item.notas
       ? `<div style="background:#FFFBEB;border:1px solid #EF9F2733;border-radius:8px;padding:8px 11px;font-size:12px;color:#633806">📝 ${item.notas}</div>` : '';
 
-    // Pago badge si finalizó
     const pagoBadge = item.estadoPago
       ? `<span class="ag-card-pill" style="background:${(AGENDA_PAGO[item.estadoPago]||{}).bg||'#F5F5F5'};color:${(AGENDA_PAGO[item.estadoPago]||{}).color||'#333'}">${(AGENDA_PAGO[item.estadoPago]||{}).label||''}</span>` : '';
     const montoP = item.montoPendienteCobro>0
       ? `<span class="ag-card-pill" style="background:#FAEEDA;color:#633806">Pendiente: S/ ${item.montoPendienteCobro.toFixed(2)}</span>` : '';
 
-    // Botones de acción según estado
     const accionesHtml = estaActivo ? `
       <div class="ag-card-actions">
         <button class="ag-act-btn" style="background:#EEEDFE;border-color:#AFA9EC;color:#3C3489"
@@ -6723,7 +6717,6 @@ function renderAgenda(){
               onclick="event.stopPropagation();convertirVisitaAConstruccion('${item.id}')">🔨 Convertir a Construcción</button>`}
       </div>` : '';
 
-    // Botones secundarios (editar / whatsapp / eliminar)
     const secundariosHtml = `
       <div style="display:flex;gap:6px;margin-top:4px">
         <button onclick="event.stopPropagation();editAgendaItem('${item.id}')"
@@ -6736,7 +6729,6 @@ function renderAgenda(){
 
     return `
     <div class="ag-card" id="${cardId}">
-      <!-- CABECERA — siempre visible, tap para expandir -->
       <div class="ag-card-head" onclick="toggleAgendaCard('${cardId}')">
         <div class="ag-card-icon" style="background:${iconBg}">${icono}</div>
         <div class="ag-card-body">
@@ -6803,6 +6795,105 @@ function renderAgenda(){
 
 // ── Formulario agregar/editar ──
 function openAddAgenda(tipo, editId, preData){
+  const isEdit = !!editId;
+  const item = isEdit ? (state.agenda||[]).find(x=>x.id===editId) : null;
+  const isVisita = (item?item.tipo:tipo) === 'visita';
+  const colorTitle = isVisita ? '#1565C0' : '#6C3483';
+  const pre = preData || {};
+  const serviciosOpts = AGENDA_SERVICIOS.map(s=>{
+    const isSelected = (item&&item.servicio===s) || (!item&&pre.servicio&&s===pre.servicio);
+    return `<option value="${s}" ${isSelected?'selected':''}>${s}</option>`;
+  }).join('');
+  const estadosOpts = Object.entries(AGENDA_ESTADOS).map(([k,v])=>`<option value="${k}" ${item&&item.estado===k?'selected':k==='agendado'&&!item?'selected':''}>${v.label}</option>`).join('');
+
+  document.getElementById('modal-content').innerHTML=`
+    <div class="modal-title" style="color:${colorTitle}">${isEdit?'Editar':(isVisita?'Nueva':'Nuevo')} ${isVisita?'Visita':'Trabajo'}</div>
+    <div class="field"><label class="field-label">Cliente</label>
+      <input id="ag-cliente" type="text" placeholder="Nombre del cliente" value="${item?item.cliente||'':pre.cliente||''}">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="field"><label class="field-label">Fecha</label>
+        <input id="ag-fecha" type="date" value="${item?item.fecha:pre.fecha||getAgendaHoy()}">
+      </div>
+      <div class="field"><label class="field-label">Hora</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="ag-hora-txt" type="text" inputmode="numeric" placeholder="Ej: 9:00 o 3:30"
+            value="${item&&item.hora?horaTo12(item.hora).replace(' AM','').replace(' PM',''):(pre.hora?horaTo12(pre.hora).replace(' AM','').replace(' PM',''):'')}"
+            style="flex:1;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px"
+            oninput="formatHoraInput(this)">
+          <div style="display:flex;gap:4px;flex-shrink:0">
+            <button type="button" id="ag-ampm-am" onclick="setAgAmpm('AM')" style="padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s">AM</button>
+            <button type="button" id="ag-ampm-pm" onclick="setAgAmpm('PM')" style="padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s">PM</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${!isVisita?`
+    <div style="background:#F8F0FF;border:1px solid #9B59B622;border-radius:12px;padding:12px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:700;color:#6C3483;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🔧 Servicios</div>
+      <div class="field" style="margin-bottom:8px"><label class="field-label">Servicio 1 <span style="color:#E74C3C">*</span></label>
+        <select id="ag-servicio" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+          <option value="">Seleccionar servicio...</option>
+          ${serviciosOpts}
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">Servicio 2 (opcional)</label>
+          <select id="ag-servicio2" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
+            <option value="">—</option>
+            ${AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${item&&item.servicio2===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">Servicio 3 (opcional)</label>
+          <select id="ag-servicio3" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
+            <option value="">—</option>
+            ${AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${item&&item.servicio3===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0;margin-top:8px"><label class="field-label" style="font-size:10px">Servicio 4 (opcional)</label>
+        <select id="ag-servicio4" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
+          <option value="">—</option>
+          ${AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${item&&item.servicio4===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="field"><label class="field-label">Precio acordado (S/)</label>
+      <input id="ag-precio" type="number" inputmode="decimal" placeholder="0.00" value="${item?item.precio||'':pre.precio||''}">
+    </div>`:''}
+    <div class="field"><label class="field-label">Ubicación / Distrito</label>
+      <div class="ubic-wrap" style="position:relative">
+        <div style="position:relative">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none">📍</span>
+          <input id="ag-ubicacion" type="text" placeholder="Escribí el distrito o dirección..."
+            value="${item?item.ubicacion||'':pre.ubicacion||''}"
+            autocomplete="off"
+            style="font-size:13px;padding-left:34px"
+            oninput="distritoComboShow('ag-ubicacion','ag-ubic-dropdown')"
+            onfocus="distritoComboShow('ag-ubicacion','ag-ubic-dropdown')"
+            onblur="setTimeout(()=>{const d=document.getElementById('ag-ubic-dropdown');if(d)d.style.display='none';},200)"
+            onkeydown="distritoComboKey(event,'ag-ubicacion','ag-ubic-dropdown')">
+        </div>
+        <div id="ag-ubic-dropdown" class="ubic-dropdown" style="display:none;position:absolute;z-index:999;width:100%;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #C7D5E8;border-radius:10px;box-shadow:0 8px 24px #0002;top:calc(100% + 4px);left:0"></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">También podés pegar un enlace de Google Maps.</div>
+    </div>
+    <div class="field"><label class="field-label">Teléfono (opcional)</label>
+      <input id="ag-telefono" type="tel" inputmode="tel" placeholder="Ej: 987654321" value="${item?item.telefono||'':pre.telefono||''}">
+    </div>
+    <div class="field"><label class="field-label">Notas (opcional)</label>
+      <input id="ag-notas" type="text" placeholder="Ej: Traer válvula de 3/4, dar presupuesto primero" value="${item?item.notas||'':pre.notas||''}">
+    </div>
+    <div class="field"><label class="field-label">Estado</label>
+      <select id="ag-estado" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+        ${estadosOpts}
+      </select>
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button style="flex:2;background:linear-gradient(135deg,${colorTitle},${isVisita?'#2E86AB':'#9B59B6'});color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="saveAgendaItem('${isEdit?editId:''}','${isVisita?'visita':'trabajo'}')">Guardar</button>
+    </div>`;
+
   const isEdit = !!editId;
   const item = isEdit ? (state.agenda||[]).find(x=>x.id===editId) : null;
   const isVisita = (item?item.tipo:tipo) === 'visita';
@@ -7032,26 +7123,31 @@ function selectAgUbic(val){
 }
 
 function saveAgendaItem(editId, tipo){
-  const clienteEl  = document.getElementById('ag-cliente');
-  const fechaEl    = document.getElementById('ag-fecha');
-  const servicioEl = document.getElementById('ag-servicio');
-  const precioEl   = document.getElementById('ag-precio');
-  const ubicEl     = document.getElementById('ag-ubicacion');
-  const telEl      = document.getElementById('ag-telefono');
-  const notasEl    = document.getElementById('ag-notas');
-  const estadoEl   = document.getElementById('ag-estado');
+  const clienteEl   = document.getElementById('ag-cliente');
+  const fechaEl     = document.getElementById('ag-fecha');
+  const servicioEl  = document.getElementById('ag-servicio');
+  const servicio2El = document.getElementById('ag-servicio2');
+  const servicio3El = document.getElementById('ag-servicio3');
+  const servicio4El = document.getElementById('ag-servicio4');
+  const precioEl    = document.getElementById('ag-precio');
+  const ubicEl      = document.getElementById('ag-ubicacion');
+  const telEl       = document.getElementById('ag-telefono');
+  const notasEl     = document.getElementById('ag-notas');
+  const estadoEl    = document.getElementById('ag-estado');
 
-  const cliente   = clienteEl?.value.trim()||'';
+  const cliente   = (clienteEl?.value||'').trim();
   const fecha     = fechaEl?.value||'';
   const hora      = getAgHora();
   const servicio  = servicioEl?.value||'';
+  const servicio2 = servicio2El?.value||'';
+  const servicio3 = servicio3El?.value||'';
+  const servicio4 = servicio4El?.value||'';
   const precio    = parseFloat(precioEl?.value)||0;
-  const ubicacion = ubicEl?.value.trim()||'';
-  const telefono  = telEl?.value.trim()||'';
-  const notas     = notasEl?.value.trim()||'';
+  const ubicacion = (ubicEl?.value||'').trim();
+  const telefono  = (telEl?.value||'').trim();
+  const notas     = (notasEl?.value||'').trim();
   const estado    = estadoEl?.value||'pendiente';
 
-  // ── Solo cliente y fecha son obligatorios ──
   if(!cliente || !fecha){
     if(clienteEl) clienteEl.style.borderColor = !cliente ? '#E05252' : 'var(--border)';
     if(fechaEl)   fechaEl.style.borderColor   = !fecha   ? '#E05252' : 'var(--border)';
@@ -7059,32 +7155,52 @@ function saveAgendaItem(editId, tipo){
     return;
   }
 
-  // ── Marcar en rojo campos opcionales vacíos pero GUARDAR igual ──
   const markRed = (el) => { if(el) el.style.borderColor = '#E05252'; };
   const markOk  = (el) => { if(el) el.style.borderColor = 'var(--border)'; };
   !ubicacion && tipo!=='visita' ? markRed(ubicEl) : markOk(ubicEl);
   !telefono ? markRed(telEl) : markOk(telEl);
   tipo==='trabajo' && !servicio ? markRed(servicioEl) : markOk(servicioEl);
 
-  // ── Guardar siempre ──
   if(!state.agenda) state.agenda=[];
-  const item = { id:editId||Date.now()+'', tipo, cliente, fecha, hora, servicio, precio, ubicacion, telefono, notas, estado };
+
+  // Preservar campos que no están en el form (montoPagado, _notionRowId, etc.)
+  const existente = editId ? (state.agenda.find(x=>x.id===editId)||{}) : {};
+  const item = {
+    ...existente,
+    id: editId || Date.now()+'',
+    tipo, cliente, fecha, hora,
+    servicio, servicio1: servicio,
+    servicio2, servicio3, servicio4,
+    precio, ubicacion, telefono, notas, estado,
+  };
+
   if(editId){
-    state.agenda=state.agenda.map(x=>x.id===editId?item:x);
-    syncAgendaToSheets(item); // sync edición también
+    state.agenda = state.agenda.map(x=>x.id===editId ? item : x);
   } else {
     state.agenda.unshift(item);
-    syncAgendaToSheets(item);
   }
   save('fnz_agenda', state.agenda);
-  closeModal(); render();
+  syncAgendaToSheets(item);
 
+  // ── Push a Notion al crear/editar (garantiza que el cliente llegue) ──
+  const nToken = localStorage.getItem('fnz_notion_token');
+  const nDbid  = localStorage.getItem('fnz_notion_dbid');
+  if(nToken && nDbid){
+    _pushToNotion(item, 0).then(res => {
+      if(res && res.id && !item._notionRowId){
+        item._notionRowId = res.id;
+        state.agenda = state.agenda.map(x=>x.id===item.id ? item : x);
+        save('fnz_agenda', state.agenda);
+      }
+    }).catch(err => console.warn('Notion (no crítico):', err.message));
+  }
+
+  closeModal(); render();
   const faltantes=[];
   if(!ubicacion) faltantes.push('ubicación');
   if(!telefono)  faltantes.push('teléfono');
   if(tipo==='trabajo'&&!servicio) faltantes.push('servicio');
-  const msg = (tipo==='visita'?'Visita':'Trabajo')+' guardado ✓'+(faltantes.length?' · Falta: '+faltantes.join(', '):'');
-  toast(msg);
+  toast((tipo==='visita'?'Visita':'Trabajo')+' guardado ✓'+(faltantes.length?' · Falta: '+faltantes.join(', '):''));
 }
 
 
