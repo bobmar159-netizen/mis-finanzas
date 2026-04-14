@@ -5444,6 +5444,243 @@ async function _deleteNotionPage(pageId) {
 // ── Notion API Polling ──────────────────────────────────────────────
 let _notionPollTimer = null;
 
+// ══════════════════════════════════════════════════════════════════════
+// 📥 CARGA MANUAL DESDE NOTION CON DEDUPLICACIÓN
+// ══════════════════════════════════════════════════════════════════════
+async function notionCargarManual() {
+  const token = localStorage.getItem('fnz_notion_token');
+  const dbId  = localStorage.getItem('fnz_notion_dbid');
+  if (!token || !dbId) { toast('Configurá primero las credenciales de Notion', 'error'); return; }
+
+  const statusEl = document.getElementById('notion-load-status');
+  if (statusEl) statusEl.textContent = '⏳ Consultando Notion...';
+
+  try {
+    // ── 1. Traer TODOS los registros de Notion (con paginación) ──
+    const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
+    const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
+    let allResults = [], cursor = undefined, page = 0;
+
+    do {
+      page++;
+      const bodyObj = { page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) };
+      const res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyObj)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + (await res.text().catch(()=>'')).slice(0,120));
+      const data = await res.json();
+      if (data.results) allResults = allResults.concat(data.results);
+      cursor = data.has_more ? data.next_cursor : undefined;
+      if (statusEl) statusEl.textContent = '⏳ Cargando... ' + allResults.length + ' registros';
+    } while (cursor);
+
+    if (!allResults.length) {
+      if (statusEl) statusEl.textContent = '⚠ La base de datos está vacía';
+      toast('Notion no tiene registros', 'error'); return;
+    }
+
+    // ── 2. Motor de deduplicación ──
+    const txExistentes = state.transactions || [];
+
+    // Índice de IDs de Notion ya en la app
+    const notionIdsEnApp = new Set(
+      txExistentes
+        .filter(t => t._notionRowId)
+        .map(t => {
+          // Normalizar: quitar sufijos -ing, -mov, -mat, -otr
+          const id = t._notionRowId;
+          return id.includes('-') ? id.split('-').slice(0,-1).join('-') : id;
+        })
+    );
+
+    const yaExisten   = [];  // Tienen el mismo PageId → no importar
+    const posibleDup  = [];  // Misma fecha+cliente+monto ±5% → advertir
+    const soloNuevos  = [];  // No coincide nada → importar normalmente
+
+    for (const page of allResults) {
+      const pageId = page.id;
+      const props  = page.properties || {};
+
+      // Helper de lectura rápida
+      const getPropVal = (...names) => {
+        for (const n of names) {
+          const p = Object.entries(props).find(([k]) => k.toLowerCase() === n.toLowerCase())?.[1];
+          if (!p) continue;
+          if (p.type==='title')      return (p.title||[]).map(t=>t.plain_text).join('').trim();
+          if (p.type==='rich_text')  return (p.rich_text||[]).map(t=>t.plain_text).join('').trim();
+          if (p.type==='date')       return p.date?.start||'';
+          if (p.type==='number')     return p.number!=null ? p.number : null;
+          if (p.type==='select')     return p.select?.name||'';
+          if (p.type==='phone_number') return p.phone_number||'';
+        }
+        return '';
+      };
+
+      const titleEntry = Object.entries(props).find(([,v]) => v.type==='title');
+      const cliente = titleEntry ? (titleEntry[1].title||[]).map(t=>t.plain_text).join('').trim()
+                                 : getPropVal('cliente','nombre','name');
+      const fecha   = getPropVal('fecha','date') || page.created_time?.split('T')[0] || '';
+      const precio  = parseFloat(getPropVal('precio del servicio','precio','monto','total')) || 0;
+
+      // Capa 1: Notion Page ID exacto
+      const pureId = pageId.replace(/-/g,'');
+      if (notionIdsEnApp.has(pureId) || notionIdsEnApp.has(pageId)) {
+        yaExisten.push({ pageId, cliente, fecha, precio });
+        continue;
+      }
+
+      // Capa 2: fecha + cliente + monto ±5%
+      const dupPorDatos = txExistentes.find(t => {
+        const mismaFecha   = t.date === fecha;
+        const mismoCliente = (t.cliente||'').toLowerCase() === (cliente||'').toLowerCase();
+        const montoRef     = parseFloat(t.amount) || 0;
+        const montoMatch   = precio > 0 && montoRef > 0
+                           && Math.abs(montoRef - precio) / Math.max(montoRef, precio) < 0.05;
+        return mismaFecha && mismoCliente && montoMatch;
+      });
+
+      if (dupPorDatos) {
+        posibleDup.push({ pageId, cliente, fecha, precio, txLocal: dupPorDatos });
+      } else {
+        soloNuevos.push(page);
+      }
+    }
+
+    if (statusEl) statusEl.textContent = '';
+
+    // ── 3. Mostrar modal de preview ──
+    const total = allResults.length;
+    document.getElementById('modal-content').innerHTML = `
+      <div class="modal-title" style="color:#6B46C1">📥 Preview — Cargar desde Notion</div>
+
+      <!-- RESUMEN -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+        <div style="background:#F0FDF4;border:1px solid #4CAF8533;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:800;color:#27500A">${soloNuevos.length}</div>
+          <div style="font-size:10px;font-weight:700;color:#27500A;text-transform:uppercase">Nuevos</div>
+        </div>
+        <div style="background:#FFFBEB;border:1px solid #EF9F2733;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:800;color:#633806">${posibleDup.length}</div>
+          <div style="font-size:10px;font-weight:700;color:#633806;text-transform:uppercase">Posibles Dup.</div>
+        </div>
+        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:800;color:#64748B">${yaExisten.length}</div>
+          <div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase">Ya en App</div>
+        </div>
+      </div>
+
+      <!-- DETALLE NUEVOS -->
+      ${soloNuevos.length > 0 ? `
+        <div style="background:#F0FDF4;border:1px solid #4CAF8522;border-radius:10px;padding:10px;margin-bottom:10px;max-height:140px;overflow-y:auto">
+          <div style="font-size:11px;font-weight:700;color:#27500A;margin-bottom:6px">✅ Se importarán (${soloNuevos.length})</div>
+          ${soloNuevos.slice(0,10).map(p => {
+            const ps = p.properties||{};
+            const tEnt = Object.entries(ps).find(([,v])=>v.type==='title');
+            const cl = tEnt ? (tEnt[1].title||[]).map(t=>t.plain_text).join('') : '—';
+            const fe = Object.entries(ps).find(([k])=>k.toLowerCase()==='fecha')?.[1]?.date?.start || p.created_time?.split('T')[0] || '—';
+            return `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid #E2E8F0">${cl} · ${fe}</div>`;
+          }).join('')}
+          ${soloNuevos.length>10?`<div style="font-size:11px;color:var(--muted);margin-top:4px">... y ${soloNuevos.length-10} más</div>`:''}
+        </div>` : ''}
+
+      <!-- DETALLE POSIBLES DUP -->
+      ${posibleDup.length > 0 ? `
+        <div style="background:#FFFBEB;border:1px solid #EF9F2733;border-radius:10px;padding:10px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:700;color:#633806;margin-bottom:6px">⚠ Posibles duplicados — misma fecha, cliente y monto (±5%)</div>
+          ${posibleDup.slice(0,5).map(d => `
+            <div style="font-size:12px;padding:4px 0;border-bottom:1px solid #EF9F2722">
+              ${d.cliente} · ${d.fecha} · S/${d.precio}
+            </div>`).join('')}
+          ${posibleDup.length>5?`<div style="font-size:11px;color:var(--muted);margin-top:4px">... y ${posibleDup.length-5} más</div>`:''}
+          <div style="margin-top:8px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#633806;cursor:pointer">
+              <input type="checkbox" id="incluir-posibles-dup" style="width:16px;height:16px">
+              Importar también los posibles duplicados
+            </label>
+          </div>
+        </div>` : ''}
+
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;text-align:center">
+        Total en Notion: <strong>${total}</strong> · Ya en app: <strong>${yaExisten.length}</strong> (no se tocarán)
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+        <button style="flex:2;background:linear-gradient(135deg,#5B21B6,#7C3AED);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer"
+          onclick="notionConfirmarCarga(${JSON.stringify(soloNuevos.map(p=>p.id))}, ${JSON.stringify(posibleDup.map(d=>d.pageId))}, ${JSON.stringify(allResults.map(p=>p.id))})">
+          ✓ Importar ${soloNuevos.length} nuevos
+        </button>
+      </div>`;
+    showModal();
+
+  } catch(err) {
+    if (statusEl) statusEl.textContent = '⚠ ' + err.message;
+    toast('Error al conectar con Notion: ' + err.message.slice(0,80), 'error');
+    console.error('[Notion] Error carga manual:', err);
+  }
+}
+
+async function notionConfirmarCarga(soloNuevosIds, posibleDupIds, allIds) {
+  const incluirDup = document.getElementById('incluir-posibles-dup')?.checked || false;
+  closeModal();
+
+  const token = localStorage.getItem('fnz_notion_token');
+  const dbId  = localStorage.getItem('fnz_notion_dbid');
+  if (!token || !dbId) return;
+
+  const statusEl = document.getElementById('notion-load-status');
+  if (statusEl) statusEl.textContent = '⏳ Importando...';
+  toast('⏳ Importando desde Notion...', 'info');
+
+  try {
+    // Re-fetch solo los que necesitamos para no guardar referencias obsoletas
+    const idsAImportar = new Set([
+      ...soloNuevosIds,
+      ...(incluirDup ? posibleDupIds : [])
+    ]);
+    if (idsAImportar.size === 0) {
+      toast('No hay registros nuevos para importar', 'info');
+      if (statusEl) statusEl.textContent = '✓ Nada que importar';
+      return;
+    }
+
+    // Traer de nuevo los registros seleccionados
+    const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
+    const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
+    let allResults = [], cursor = undefined;
+    do {
+      const bodyObj = { page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) };
+      const res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyObj)
+      });
+      const data = await res.json();
+      if (data.results) allResults = allResults.concat(data.results.filter(p => idsAImportar.has(p.id)));
+      cursor = data.has_more ? data.next_cursor : undefined;
+    } while (cursor);
+
+    if (!allResults.length) {
+      toast('No se encontraron registros para importar', 'error'); return;
+    }
+
+    const csvText = _notionResultsToCSV(allResults);
+    const result  = _procesarCsvNotionTexto(csvText, 'notion-load-status', false);
+
+    if (result && result.ok) {
+      localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
+      const msg = '✅ ' + (result.txImportadas||0) + ' registros importados desde Notion';
+      if (statusEl) statusEl.textContent = msg;
+      toast(msg, 'success');
+    }
+  } catch(err) {
+    if (statusEl) statusEl.textContent = '⚠ Error: ' + err.message;
+    toast('Error importando: ' + err.message.slice(0,80), 'error');
+  }
+}
+
 // ★ Forzar importación completa desde Notion (ignora filtro de fecha)
 async function notionApiTest(){
   const token = localStorage.getItem('fnz_notion_token');
@@ -5830,44 +6067,65 @@ function renderAjustes(){
       <button onclick="syncAllTxToSheets(false)" style="width:100%;margin-top:6px;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">⬆ Enviar TODO el historial a Sheets</button>
     `)}
 
-    ${sec('notion','🔄','Notion — Sync automático','Polling cada X minutos con la API','#6B46C1',`
-      <div style="background:#F3F0FF;border:1px solid #7C3AED22;border-radius:10px;padding:10px;font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">
-        <strong style="color:#6B46C1">Cómo funciona:</strong> La app consulta tu base de datos de Notion a través del proxy de Google Apps Script y detecta registros nuevos o modificados automáticamente. Necesitás un token de integración de Notion y el ID de tu base de datos.
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
-        <input id="notion-token-inp" type="password" placeholder="ntn_xxxx... o secret_xxxx... (Integration token de Notion)" value="${notionToken}" style="background:#F8FAFC;border:1px solid #7C3AED44;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%" oninput="const v=this.value.trim();if(v.startsWith('secret_')||v.startsWith('ntn_'))localStorage.setItem('fnz_notion_token',v)">
-        <input id="notion-dbid-inp" type="text" placeholder="ID de base de datos (32 caracteres)" value="${notionDbId}" style="background:#F8FAFC;border:1px solid #7C3AED44;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%" oninput="if(this.value.length>=32)localStorage.setItem('fnz_notion_dbid',this.value.trim().replace(/-/g,''))">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:12px;color:var(--muted)">Sincronizar cada</span>
-          <select id="notion-interval-sel" style="flex:1;background:#F8FAFC;border:1px solid #7C3AED44;border-radius:8px;padding:8px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text)">
-            <option value="5" ${notionInterval==='5'?'selected':''}>5 minutos</option>
-            <option value="15" ${notionInterval==='15'?'selected':''}>15 minutos</option>
-            <option value="30" ${notionInterval==='30'?'selected':''}>30 minutos</option>
-            <option value="60" ${notionInterval==='60'?'selected':''}>1 hora</option>
-          </select>
+    ${sec('notion','🔥','Notion','App → Notion (fuente de verdad)','#6B46C1',`
+
+      <!-- FLUJO VISUAL -->
+      <div style="background:linear-gradient(135deg,#F3F0FF,#EDE9FE);border:1px solid #7C3AED22;border-radius:12px;padding:12px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;margin-bottom:6px">
+          <div style="background:#6B46C1;color:#fff;padding:4px 12px;border-radius:20px;font-weight:700;font-size:11px">APP</div>
+          <div style="color:#6B46C1;font-size:16px;font-weight:700">→</div>
+          <div style="background:#fff;border:2px solid #6B46C1;color:#6B46C1;padding:4px 12px;border-radius:20px;font-weight:700;font-size:11px">NOTION</div>
+          <div style="color:#6B46C1;font-size:16px;font-weight:700">→</div>
+          <div style="background:#fff;border:2px solid #1565C0;color:#1565C0;padding:4px 12px;border-radius:20px;font-weight:700;font-size:11px">SHEETS</div>
+        </div>
+        <div style="font-size:11px;color:#6B46C1;text-align:center;font-weight:500">
+          Lo que registrás en la app cae automáticamente en Notion y Sheets.
         </div>
       </div>
-      <div class="btn-row">
-        <button onclick="saveNotionConfig()" style="flex:1;background:#7C3AED;color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">${notionPolling?'↻ Actualizar config':'▶ Iniciar sync auto'}</button>
-        ${notionPolling?`<button onclick="notionApiSyncStop()" style="flex:1;background:#FEF2F2;border:1px solid #C6282833;color:#C62828;border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">⏸ Pausar</button>`:''}
+
+      <!-- CREDENCIALES -->
+      <div style="font-size:10px;font-weight:700;color:#6B46C1;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">🔑 Credenciales</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+        <input id="notion-token-inp" type="password"
+          placeholder="ntn_xxxx... o secret_xxxx... (Integration token)"
+          value="${notionToken}"
+          style="background:#F8FAFC;border:1px solid #7C3AED44;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%"
+          oninput="const v=this.value.trim();if(v.startsWith('secret_')||v.startsWith('ntn_'))localStorage.setItem('fnz_notion_token',v)">
+        <input id="notion-dbid-inp" type="text"
+          placeholder="ID de base de datos (32 caracteres hex)"
+          value="${notionDbId}"
+          style="background:#F8FAFC;border:1px solid #7C3AED44;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%"
+          oninput="if(this.value.length>=32)localStorage.setItem('fnz_notion_dbid',this.value.trim().replace(/-/g,''))">
+        <button onclick="saveNotionConfig()"
+          style="background:linear-gradient(135deg,#6B46C1,#7C3AED);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">
+          💾 Guardar credenciales
+        </button>
+        <div style="font-size:11px;text-align:center;font-weight:600;color:${notionToken&&notionDbId?'#27500A':'#888'}">
+          ${notionToken&&notionDbId?'✅ Notion conectado':'⚠ Sin credenciales configuradas'}
+        </div>
       </div>
-      <button onclick="notionApiTest()" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#5B21B6,#7C3AED);color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-        ⚡ Importar TODO desde Notion ahora
-      </button>
-      ${notionPolling?`<div style="margin-top:8px;background:#F0FDF4;border:1px solid #3A7D4433;border-radius:8px;padding:8px;font-size:11px;color:#2A7A44;text-align:center;font-weight:600">🟢 Sync activo · cada ${notionInterval} min</div>`:''}
-      <div id="notion-api-status" style="margin-top:6px;font-size:12px;color:#6B46C1;text-align:center;min-height:16px;font-weight:500"></div>
-      <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">O importar CSV manualmente</div>
+
+      <!-- CARGA MANUAL CON DEDUP -->
+      <div style="border-top:1px solid #7C3AED22;padding-top:12px;margin-top:4px">
+        <div style="font-size:10px;font-weight:700;color:#6B46C1;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📥 Carga manual desde Notion</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.6">
+          Trae registros de Notion a la app. Detecta duplicados automáticamente y muestra un preview antes de importar.
+        </div>
+        <button onclick="notionCargarManual()"
+          style="width:100%;background:linear-gradient(135deg,#5B21B6,#7C3AED);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+          📥 Cargar desde Notion
+        </button>
+        <div id="notion-load-status" style="margin-top:8px;font-size:12px;color:#6B46C1;text-align:center;min-height:16px;font-weight:500"></div>
+      </div>
+
+      <!-- CSV ALTERNATIVA -->
+      <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:12px">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📂 Alternativa: CSV exportado de Notion</div>
         <label style="display:block;width:100%;background:#F3F0FF;border:1px dashed #7C3AED44;border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;text-align:center;color:#6B46C1">
-          📂 Seleccionar CSV de Notion
+          📂 Seleccionar archivo CSV
           <input type="file" accept=".csv" onchange="importarNotion(this)" style="display:none">
         </label>
         <div id="notion-import-status" style="margin-top:6px;font-size:11px;color:var(--muted);text-align:center;min-height:14px"></div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
-        <button onclick="sincronizarNotionASheets()" style="width:100%;background:#F3F0FF;border:1px solid #7C3AED44;color:#7C3AED;border-radius:10px;padding:10px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer">☁️ Enviar importados a Sheets</button>
-        <button onclick="limpiarDuplicadosNotion()" style="width:100%;background:#FEF2F2;border:1px solid #C6282822;color:#C62828;border-radius:10px;padding:10px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer">🧹 Limpiar duplicados</button>
-        <div id="notion-sync-status" style="font-size:11px;color:var(--muted);text-align:center;min-height:14px"></div>
       </div>
     `)}
 
@@ -5929,14 +6187,16 @@ function renderAjustes(){
 }
 
 function saveNotionConfig(){
-  const token=document.getElementById('notion-token-inp')?.value.trim();
-  const dbId=document.getElementById('notion-dbid-inp')?.value.trim();
-  const interval=document.getElementById('notion-interval-sel')?.value||'15';
+  const token    = document.getElementById('notion-token-inp')?.value.trim();
+  const dbId     = document.getElementById('notion-dbid-inp')?.value.trim();
   if(!token||!dbId){toast('Completá el token y el ID de base de datos','error');return;}
-  localStorage.setItem('fnz_notion_token',token);
-  localStorage.setItem('fnz_notion_dbid',dbId);
-  localStorage.setItem('fnz_notion_interval',interval);
-  notionApiSyncStart();
+  localStorage.setItem('fnz_notion_token', token);
+  localStorage.setItem('fnz_notion_dbid',  dbId);
+  // Limpiar el caché de esquema por si cambio la DB
+  sessionStorage.removeItem('fnz_notion_schema');
+  localStorage.removeItem('fnz_notion_polling');
+  toast('✓ Credenciales de Notion guardadas ✓', 'success');
+  render();
 }
 
 
@@ -6258,10 +6518,15 @@ const AGENDA_PAGO = {
 };
 
 const AGENDA_SERVICIOS = [
-  'Punto Adicional','Modificación Red','Instalación Nueva','Conversión Artefacto',
-  'Conexión Artefacto','Reparación Tubería','Gasfitería','Documentación',
-  'Cocina / Cocinilla','Horno a Gas','Terma','Secadora a Gas','Calefón','Parrilla a Gas',
-  'Otro Servicio'
+  'Instalación Nueva',
+  'Punto Adicional',
+  'Modificación de Red',
+  'Reparación de Tubería',
+  'Conversión de Artefacto',
+  'Conexión de Artefacto',
+  'Documentación',
+  'Gasfitería',
+  'Otros',
 ];
 
 function getAgendaHoy(){
@@ -9437,25 +9702,9 @@ loadFromSheets(false);
 // ── Auto-arranque Notion Sync ──────────────────────────────────────
 // Si el usuario configuró sus credenciales, el polling arranca SOLO
 // sin necesidad de tocar ningún botón.
-(function autoStartNotionSync() {
-  const token    = localStorage.getItem('fnz_notion_token');
-  const dbId     = localStorage.getItem('fnz_notion_dbid');
-  const wasActive = localStorage.getItem('fnz_notion_polling') === '1';
-  if (!token || !dbId) return; // Sin credenciales → nada que hacer
-
-  // Esperar 3s para que cargue el estado de la app antes de sincronizar
-  setTimeout(() => {
-    if (!_notionPollTimer) {
-      notionApiSyncStart(); // Arranca polling automáticamente
-      if (wasActive) {
-        console.log('[Notion] Auto-sync reanudado al abrir la app');
-      } else {
-        console.log('[Notion] Auto-sync iniciado por primera vez');
-        localStorage.setItem('fnz_notion_polling', '1');
-      }
-    }
-  }, 3000);
-})();
+// Auto-polling deshabilitado intencionalmente.
+// La app es la fuente de datos (App → Notion).
+// Usa el botón en Ajustes para cargar manualmente desde Notion cuando lo necesités.
 
 // ── FAB arrastrable — mantener presionado 400ms ──
 (function(){
