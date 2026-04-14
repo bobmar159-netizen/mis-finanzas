@@ -917,14 +917,60 @@ function getBulletIcon(nota, idx, done){
 // ─────────────────────────────────────────────
 
 const DISTRITOS_LIMA = [
-  'Ancón','Ate','Ate Vitarte','Barranco','Breña','Carabayllo','Chaclacayo','Chorrillos',
-  'Cieneguilla','Comas','El Agustino','Independencia','Jesús María','La Molina','La Victoria',
-  'Lince','Los Olivos','Lurigancho','Lurín','Magdalena del Mar','Miraflores','Pachacámac',
-  'Pucusana','Pueblo Libre','Puente Piedra','Punta Hermosa','Punta Negra','Rímac',
-  'San Bartolo','San Borja','San Isidro','San Juan de Lurigancho','San Juan de Miraflores',
-  'San Luis','San Martín de Porres','San Miguel','Santa Anita','Santa María del Mar',
-  'Santa Rosa','Santiago de Surco','Surquillo','Villa El Salvador','Villa María del Triunfo',
-  'Callao','Bellavista','Carmen de La Legua','La Perla','La Punta','Mi Perú','Ventanilla'
+  // ── Lima Provincia (43 distritos) ──
+  'Ancón',
+  'Ate','Ate Vitarte',
+  'Barranco',
+  'Breña',
+  'Carabayllo',
+  'Cercado de Lima','Centro de Lima',
+  'Chaclacayo',
+  'Chorrillos',
+  'Cieneguilla',
+  'Comas',
+  'El Agustino',
+  'Independencia',
+  'Jesús María',
+  'La Molina',
+  'La Victoria',
+  'Lima',
+  'Lince',
+  'Los Olivos',
+  'Lurigancho','Lurigancho-Chosica','Chosica',
+  'Lurín',
+  'Magdalena del Mar',
+  'Magdalena Vieja',
+  'Miraflores',
+  'Pachacámac',
+  'Pucusana',
+  'Pueblo Libre',
+  'Puente Piedra',
+  'Punta Hermosa',
+  'Punta Negra',
+  'Rímac',
+  'San Bartolo',
+  'San Borja',
+  'San Isidro',
+  'San Juan de Lurigancho',
+  'San Juan de Miraflores',
+  'San Luis',
+  'San Martín de Porres',
+  'San Miguel',
+  'Santa Anita',
+  'Santa María del Mar',
+  'Santa Rosa',
+  'Santiago de Surco','Surco',
+  'Surquillo',
+  'Villa El Salvador',
+  'Villa María del Triunfo',
+  // ── Callao Provincia (7 distritos) ──
+  'Callao',
+  'Bellavista',
+  'Carmen de La Legua','Carmen de La Legua-Reynoso',
+  'La Perla',
+  'La Punta',
+  'Mi Perú',
+  'Ventanilla',
 ];
 const MONTHS_FULL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const MONTHS_SHORT=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -3793,7 +3839,14 @@ function deleteTx(id){
   state.transactions=state.transactions.filter(t=>t.id!==id);
   saveAll();
   if(tx&&tx.negocio) syncSeccionToSheets('tx_delete',{id});
-  render();toast('Eliminado');
+  // Archivar en Notion si tiene ID de Notion
+  if(tx&&tx._notionRowId){
+    let pId = tx._notionRowId;
+    // Quitar sufijos -ing, -mov, -mat, -otr para obtener el pageId puro
+    if(pId.includes('-')) pId = pId.split('-').slice(0,-1).join('-');
+    _deleteNotionPage(pId).then(()=>toast('Eliminado · Archivado en Notion ✓')).catch(()=>toast('Eliminado'));
+  } else { toast('Eliminado'); }
+  render();
 }
 
 // ─────────────────────────────────────────────
@@ -5197,6 +5250,19 @@ async function _pushToNotion(item, cobrado) {
   const dbId  = localStorage.getItem('fnz_notion_dbid');
   if (!token || !dbId) throw new Error('Notion no configurado');
 
+  // Extraer campos extendidos de cobrado
+  const ingreso    = typeof cobrado === 'object' ? (cobrado.ingreso    || 0) : (cobrado || 0);
+  const movilidad  = typeof cobrado === 'object' ? (cobrado.movilidad  || 0) : 0;
+  const materiales = typeof cobrado === 'object' ? (cobrado.materiales || 0) : 0;
+  const otros      = typeof cobrado === 'object' ? (cobrado.otros      || 0) : 0;
+  const meta       = typeof cobrado === 'object' ? (cobrado.meta       || 0) : 0;
+  const formaPago  = typeof cobrado === 'object' ? (cobrado.formaPago  || '') : '';
+  const observaciones = typeof cobrado === 'object' ? (cobrado.observaciones || '') : '';
+  const svc1 = typeof cobrado === 'object' ? (cobrado.svc1 || item.servicio || '') : (item.servicio || '');
+  const svc2 = typeof cobrado === 'object' ? (cobrado.svc2 || '') : '';
+  const svc3 = typeof cobrado === 'object' ? (cobrado.svc3 || '') : '';
+  const svc4 = typeof cobrado === 'object' ? (cobrado.svc4 || '') : '';
+
   const props = await _fetchNotionSchema(token, dbId);
   const payload = {
     parent: { database_id: dbId },
@@ -5212,78 +5278,68 @@ async function _pushToNotion(item, cobrado) {
     return null;
   };
 
+  // ── Helper para set de propiedades según tipo de columna Notion ──
+  const setProp = (col, value) => {
+    if (!col || value === null || value === undefined || value === '') return;
+    if (col.type === 'title')        payload.properties[col.name] = { title: [{ text: { content: String(value) } }] };
+    else if (col.type === 'rich_text') payload.properties[col.name] = { rich_text: [{ text: { content: String(value) } }] };
+    else if (col.type === 'number')  payload.properties[col.name] = { number: parseFloat(value) || 0 };
+    else if (col.type === 'select')  payload.properties[col.name] = { select: { name: String(value) } };
+    else if (col.type === 'date')    payload.properties[col.name] = { date: { start: String(value) } };
+    else if (col.type === 'phone_number') payload.properties[col.name] = { phone_number: String(value) };
+    else if (col.type === 'multi_select') payload.properties[col.name] = { multi_select: [{ name: String(value) }] };
+    else if (col.type === 'url')     payload.properties[col.name] = { url: String(value) };
+  };
+
+  // ── CLIENTE (título de la página) ──
   const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
-  if (pTitle) {
-    payload.properties[pTitle] = { title: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
+  if (pTitle) payload.properties[pTitle] = { title: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
+
+  // ── FECHA ──
+  setProp(findCol('fecha','date','día','dia'), item.fecha);
+
+  // ── CONTACTO / TELÉFONO ──
+  if (item.telefono) {
+    const pCon = findCol('contacto','telefono','teléfono','tel','phone');
+    if (pCon?.type === 'phone_number') payload.properties[pCon.name] = { phone_number: item.telefono };
+    else setProp(pCon, item.telefono);
   }
 
-  const pCliente = findCol('cliente', 'nombre', 'name', 'client');
-  if (pCliente && pCliente.type !== 'title') {
-    if (pCliente.type === 'rich_text') payload.properties[pCliente.name] = { rich_text: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
-    else if (pCliente.type === 'select') payload.properties[pCliente.name] = { select: { name: item.cliente || '(Sin cliente)' } };
-  }
+  // ── SERVICIOS 1-4 ──
+  const svcCols = [
+    findCol('servicio 1','servicio1','servicio','tipo','categoria','category'),
+    findCol('servicio 2','servicio2'),
+    findCol('servicio 3','servicio3'),
+    findCol('servicio 4','servicio4')
+  ];
+  [svc1,svc2,svc3,svc4].forEach((s,i) => { if(s) setProp(svcCols[i], s); });
 
-  const pDate = findCol('fecha', 'date', 'día', 'dia');
-  if (pDate && pDate.type === 'date') {
-    payload.properties[pDate.name] = { date: { start: item.fecha } };
-  }
+  // ── DISTRITO ──
+  if (item.ubicacion) setProp(findCol('distrito','ubicacion','ubicación','zona'), item.ubicacion);
 
-  const pPrecio = findCol('precio del servicio', 'precio', 'monto', 'importe', 'total', 'amount');
-  if (pPrecio && pPrecio.type === 'number') {
-    payload.properties[pPrecio.name] = { number: parseFloat(cobrado?.ingreso) || parseFloat(cobrado) || 0 };
-  }
-  
-  // Agregar Egresos
-  if (cobrado?.movilidad) {
-    const pMovilidad = findCol('movilidad', 'pasajes', 'gasolina', 'combustible', 'transporte');
-    if (pMovilidad && pMovilidad.type === 'number') {
-      payload.properties[pMovilidad.name] = { number: parseFloat(cobrado.movilidad) };
-    }
-  }
-  if (cobrado?.materiales) {
-    const pMateriales = findCol('materiales', 'material', 'insumos', 'compras');
-    if (pMateriales && pMateriales.type === 'number') {
-      payload.properties[pMateriales.name] = { number: parseFloat(cobrado.materiales) };
-    }
-  }
+  // ── FORMA DE PAGO ──
+  if (formaPago) setProp(findCol('forma de pago','forma','pago','payment','método de pago'), formaPago);
 
-  const pServicio = findCol('servicio 1', 'servicio', 'tipo', 'categoría', 'categoria', 'category');
-  if (pServicio && item.servicio) {
-    if (pServicio.type === 'select') payload.properties[pServicio.name] = { select: { name: item.servicio } };
-    else if (pServicio.type === 'rich_text') payload.properties[pServicio.name] = { rich_text: [{ text: { content: item.servicio } }] };
-  }
+  // ── MOVILIDAD ──
+  if (movilidad > 0) setProp(findCol('movilidad','pasajes','gasolina','combustible','transporte'), movilidad);
 
-  const pDistrito = findCol('distrito', 'ubicacion', 'ubicación', 'zona');
-  if (pDistrito && item.ubicacion) {
-    if (pDistrito.type === 'select') payload.properties[pDistrito.name] = { select: { name: item.ubicacion } };
-    else if (pDistrito.type === 'rich_text') payload.properties[pDistrito.name] = { rich_text: [{ text: { content: item.ubicacion } }] };
-  }
+  // ── MATERIALES ──
+  if (materiales > 0) setProp(findCol('materiales','material','insumos','compras'), materiales);
 
-  const pContacto = findCol('contacto', 'telefono', 'teléfono', 'tel', 'phone');
-  if (pContacto && item.telefono) {
-    if (pContacto.type === 'phone_number') payload.properties[pContacto.name] = { phone_number: item.telefono };
-    else if (pContacto.type === 'rich_text') payload.properties[pContacto.name] = { rich_text: [{ text: { content: item.telefono } }] };
-  }
+  // ── OTROS ──
+  if (otros > 0) setProp(findCol('otros','otros gastos','gastos extra','extra'), otros);
 
-  const pNotas = findCol('observaciones', 'nota', 'notas', 'descripcion', 'descripción');
-  const precioBase = typeof cobrado === 'object' ? cobrado.ingreso : cobrado;
-  let extras = [];
-  if (item.precio && item.precio !== precioBase) extras.push(`(Acordado: ${item.precio})`);
-  
-  // Si "Otros" no tiene una columna propia, lo metemos en las notas (fallback seguro)
-  const pOtros = findCol('otros', 'otros gastos', 'gastos extra');
-  if (cobrado?.otros && (!pOtros || pOtros.type !== 'number')) {
-    extras.push(`(Otros Gastos: ${cobrado.otros})`);
-  } else if (cobrado?.otros && pOtros && pOtros.type === 'number') {
-    payload.properties[pOtros.name] = { number: parseFloat(cobrado.otros) };
-  }
-  
-  const textObs = (cobrado?.observaciones || item.notas || '');
-  const notasFinal = [...extras, textObs].filter(Boolean).join(' · ');
+  // ── META ──
+  if (meta > 0) setProp(findCol('meta','objetivo','goal','target'), meta);
 
-  if (pNotas && pNotas.type === 'rich_text' && notasFinal) {
-    payload.properties[pNotas.name] = { rich_text: [{ text: { content: notasFinal } }] };
-  }
+  // ── PRECIO DEL SERVICIO ──
+  setProp(findCol('precio del servicio','precio','monto','importe','total','amount'), ingreso);
+
+  // ── OBSERVACIONES ──
+  const extrasObs = [];
+  if (item.precio && item.precio !== ingreso) extrasObs.push(`(Precio acordado: S/${item.precio})`);
+  const notasFinal = [observaciones, ...extrasObs, item.notas||''].filter(Boolean).join(' · ');
+  if (notasFinal) setProp(findCol('observaciones','nota','notas','descripcion','descripción','notes'), notasFinal);
 
   const notionUrl = 'https://api.notion.com/v1/pages';
   const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
@@ -5322,69 +5378,67 @@ async function _updateNotionPage(pageId, updatedTx) {
     return null;
   };
 
-  // Update Cliente
+  const setProp = (col, value) => {
+    if (!col || value === null || value === undefined || value === '') return;
+    if (col.type === 'title')        payload.properties[col.name] = { title: [{ text: { content: String(value) } }] };
+    else if (col.type === 'rich_text') payload.properties[col.name] = { rich_text: [{ text: { content: String(value) } }] };
+    else if (col.type === 'number')  payload.properties[col.name] = { number: parseFloat(value) || 0 };
+    else if (col.type === 'select')  payload.properties[col.name] = { select: { name: String(value) } };
+    else if (col.type === 'date')    payload.properties[col.name] = { date: { start: String(value) } };
+    else if (col.type === 'phone_number') payload.properties[col.name] = { phone_number: String(value) };
+  };
+
+  // Título (cliente)
   const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
-  if (pTitle && updatedTx.cliente) {
-    payload.properties[pTitle] = { title: [{ text: { content: updatedTx.cliente } }] };
-  }
-  const pCliente = findCol('cliente', 'nombre', 'name', 'client');
-  if (pCliente && pCliente.type !== 'title' && updatedTx.cliente) {
-    if (pCliente.type === 'rich_text') payload.properties[pCliente.name] = { rich_text: [{ text: { content: updatedTx.cliente } }] };
-    else if (pCliente.type === 'select') payload.properties[pCliente.name] = { select: { name: updatedTx.cliente } };
-  }
+  if (pTitle && updatedTx.cliente) payload.properties[pTitle] = { title: [{ text: { content: updatedTx.cliente } }] };
 
-  // Update Fecha
-  const pDate = findCol('fecha', 'date', 'día', 'dia');
-  if (pDate && pDate.type === 'date' && updatedTx.date) {
-    payload.properties[pDate.name] = { date: { start: updatedTx.date } };
-  }
+  setProp(findCol('fecha','date','día','dia'), updatedTx.date);
 
-  // Descubrir en qué columna meter el monto dependiendo de la categoría (Ingreso vs Egreso específico)
+  // Monto según categoría
   const catL = (updatedTx.category || '').toLowerCase();
-  
   if (updatedTx.type === 'ingreso') {
-    const pPrecio = findCol('precio del servicio', 'precio', 'monto', 'importe', 'total', 'amount');
-    if (pPrecio && pPrecio.type === 'number') payload.properties[pPrecio.name] = { number: parseFloat(updatedTx.amount) || 0 };
+    setProp(findCol('precio del servicio','precio','monto','importe','total','amount'), parseFloat(updatedTx.amount)||0);
+    // Servicios del item de agenda si están adjuntos
+    if (updatedTx.servicio1) setProp(findCol('servicio 1','servicio1','servicio','tipo','categoria','category'), updatedTx.servicio1);
+    if (updatedTx.servicio2) setProp(findCol('servicio 2','servicio2'), updatedTx.servicio2);
+    if (updatedTx.servicio3) setProp(findCol('servicio 3','servicio3'), updatedTx.servicio3);
+    if (updatedTx.servicio4) setProp(findCol('servicio 4','servicio4'), updatedTx.servicio4);
+    if (updatedTx.formaPago) setProp(findCol('forma de pago','forma','pago','payment'), updatedTx.formaPago);
   } else {
-    // Es un Egreso
-    if (catL.includes('movilidad') || catL.includes('pasaje') || catL.includes('gasolina')) {
-      const pMovilidad = findCol('movilidad', 'pasajes', 'gasolina', 'combustible', 'transporte');
-      if (pMovilidad && pMovilidad.type === 'number') payload.properties[pMovilidad.name] = { number: parseFloat(updatedTx.amount) || 0 };
-    } 
-    else if (catL.includes('material')) {
-      const pMateriales = findCol('materiales', 'material', 'insumos', 'compras');
-      if (pMateriales && pMateriales.type === 'number') payload.properties[pMateriales.name] = { number: parseFloat(updatedTx.amount) || 0 };
-    }
-    else {
-      // Otros egresos
-      const pOtros = findCol('otros', 'otros gastos', 'gastos extra');
-      if (pOtros && pOtros.type === 'number') payload.properties[pOtros.name] = { number: parseFloat(updatedTx.amount) || 0 };
-    }
+    if (catL.includes('movilidad')||catL.includes('pasaje')||catL.includes('gasolina'))
+      setProp(findCol('movilidad','pasajes','gasolina','combustible','transporte'), parseFloat(updatedTx.amount)||0);
+    else if (catL.includes('material'))
+      setProp(findCol('materiales','material','insumos','compras'), parseFloat(updatedTx.amount)||0);
+    else
+      setProp(findCol('otros','otros gastos','gastos extra'), parseFloat(updatedTx.amount)||0);
   }
 
-  // Update Descripción (Notas)
-  const pNotas = findCol('observaciones', 'nota', 'notas', 'descripcion', 'descripción');
-  if (pNotas && pNotas.type === 'rich_text' && updatedTx.description) {
-    payload.properties[pNotas.name] = { rich_text: [{ text: { content: updatedTx.description } }] };
-  }
+  if (updatedTx.ubicacion) setProp(findCol('distrito','ubicacion','ubicación','zona'), updatedTx.ubicacion);
+  if (updatedTx.telefono)  setProp(findCol('contacto','telefono','teléfono','tel','phone'), updatedTx.telefono);
+  if (updatedTx.description) setProp(findCol('observaciones','nota','notas','descripcion','descripción'), updatedTx.description);
 
   const notionUrl = 'https://api.notion.com/v1/pages/' + pageId;
   const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
-  
   const res = await fetch(proxyUrl, {
     method: 'PATCH',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Notion-Version': '2022-06-28',
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
+  if (!res.ok) { const e = await res.text().catch(()=>''); throw new Error('HTTP '+res.status+' - '+e); }
+}
 
-  if (!res.ok) {
-    const errorText = await res.text().catch(()=>'');
-    throw new Error('HTTP ' + res.status + ' - ' + errorText);
-  }
+// ── Archivar página en Notion (equivale a "eliminar" en la app) ──
+async function _deleteNotionPage(pageId) {
+  const token = localStorage.getItem('fnz_notion_token');
+  if (!token || !pageId) return;
+  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/pages/' + pageId);
+  try {
+    await fetch(proxyUrl, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archived: true })
+    });
+  } catch(e) { console.warn('[Notion] No se pudo archivar página:', pageId, e.message); }
 }
 
 // ── Notion API Polling ──────────────────────────────────────────────
@@ -6378,6 +6432,7 @@ function renderAgenda(){
           </div>
           ${!isVisita && item.servicio ? `<div class="ag-card-servicio">🔵 ${item.servicio}</div>` : ''}
           ${item.ubicacion ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">📍 ${item.ubicacion}</div>` : ''}
+          ${item.fechaReprogramado ? `<div style="font-size:11px;color:#3C3489;margin-top:3px;font-weight:600">↻ Reprogramado: ${item.fechaReprogramado}${item.motivoReprogramacion?' · '+item.motivoReprogramacion:''}</div>` : ''}
         </div>
         <div class="ag-card-chevron">▾</div>
       </div>
@@ -6475,14 +6530,22 @@ function openAddAgenda(tipo, editId, preData){
     <div class="field"><label class="field-label">Precio acordado (S/)</label>
       <input id="ag-precio" type="number" inputmode="decimal" placeholder="0.00" value="${item?item.precio||'':pre.precio||''}">
     </div>`:''}
-    <div class="field"><label class="field-label">Ubicación / Dirección</label>
-      <div class="ubic-wrap">
-        <input id="ag-ubicacion" type="text" placeholder="Dirección, distrito o pega link de Google Maps"
-          value="${item?item.ubicacion||'':pre.ubicacion||''}" oninput="filterAgUbic(this.value)" autocomplete="off"
-          style="font-size:13px">
-        <div id="ag-ubic-dropdown" class="ubic-dropdown" style="display:none"></div>
+    <div class="field"><label class="field-label">Ubicación / Distrito</label>
+      <div class="ubic-wrap" style="position:relative">
+        <div style="position:relative">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none">📍</span>
+          <input id="ag-ubicacion" type="text" placeholder="Escribí el distrito o dirección..."
+            value="${item?item.ubicacion||'':pre.ubicacion||''}"
+            autocomplete="off"
+            style="font-size:13px;padding-left:34px"
+            oninput="distritoComboShow('ag-ubicacion','ag-ubic-dropdown')"
+            onfocus="distritoComboShow('ag-ubicacion','ag-ubic-dropdown')"
+            onblur="setTimeout(()=>{const d=document.getElementById('ag-ubic-dropdown');if(d)d.style.display='none';},200)"
+            onkeydown="distritoComboKey(event,'ag-ubicacion','ag-ubic-dropdown')">
+        </div>
+        <div id="ag-ubic-dropdown" class="ubic-dropdown" style="display:none;position:absolute;z-index:999;width:100%;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #C7D5E8;border-radius:10px;box-shadow:0 8px 24px #0002;top:calc(100% + 4px);left:0"></div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px">Podés pegar un enlace de Google Maps o WhatsApp — se abrirá directamente en Maps.</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">También podés pegar un enlace de Google Maps.</div>
     </div>
     <div class="field"><label class="field-label">Teléfono (opcional)</label>
       <input id="ag-telefono" type="tel" inputmode="tel" placeholder="Ej: 987654321" value="${item?item.telefono||'':pre.telefono||''}">
@@ -6556,22 +6619,99 @@ function horaTo12(hora24){
   return h+':'+(mm||'00')+' '+period;
 }
 
+// ══════════════════════════════════════════════════════════════════
+// DISTRITO COMBOBOX — reutilizable en agenda y modal de cobro
+// InputId: id del <input>, DropId: id del contenedor del dropdown
+// ══════════════════════════════════════════════════════════════════
+function distritoComboShow(inputId, dropId) {
+  const inp = document.getElementById(inputId);
+  const dd  = document.getElementById(dropId);
+  if (!inp || !dd) return;
+
+  const val = inp.value.trim().toLowerCase();
+  // Si es URL → no mostrar distritos
+  if (val.includes('http') || val.includes('maps') || val.includes('goo.gl')) {
+    dd.style.display = 'none'; return;
+  }
+
+  const distOrdenados = [...DISTRITOS_LIMA].sort((a, b) => a.localeCompare(b, 'es'));
+  const matches = val
+    ? distOrdenados.filter(d => d.toLowerCase().includes(val))
+    : distOrdenados;
+
+  if (!matches.length) { dd.style.display = 'none'; return; }
+
+  dd.innerHTML = matches.map((d, i) => {
+    // Resaltar la parte que coincide
+    let display = d;
+    if (val) {
+      const idx = d.toLowerCase().indexOf(val);
+      if (idx >= 0) {
+        display = d.slice(0, idx)
+          + '<span style="background:#FFF3CD;border-radius:3px;font-weight:700">'
+          + d.slice(idx, idx + val.length)
+          + '</span>'
+          + d.slice(idx + val.length);
+      }
+    }
+    return `<div class="ubic-opt" 
+      data-dist="${d}" 
+      data-idx="${i}"
+      onmousedown="event.preventDefault();distritoComboSelect('${inputId}','${dropId}','${d.replace(/'/g,"\\'")}')"
+      style="padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid #F1F5F9;display:flex;align-items:center;gap:8px"
+    >📍 ${display}</div>`;
+  }).join('');
+
+  dd.style.display = 'block';
+  // Reset selected index
+  dd._selIdx = -1;
+}
+
+function distritoComboSelect(inputId, dropId, val) {
+  const inp = document.getElementById(inputId);
+  if (inp) inp.value = val;
+  const dd = document.getElementById(dropId);
+  if (dd) dd.style.display = 'none';
+  inp?.focus();
+}
+
+function distritoComboKey(e, inputId, dropId) {
+  const dd = document.getElementById(dropId);
+  if (!dd || dd.style.display === 'none') return;
+  const opts = dd.querySelectorAll('.ubic-opt');
+  let idx = dd._selIdx ?? -1;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    idx = Math.min(idx + 1, opts.length - 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    idx = Math.max(idx - 1, 0);
+  } else if (e.key === 'Enter' && idx >= 0) {
+    e.preventDefault();
+    const d = opts[idx]?.dataset?.dist || '';
+    if (d) distritoComboSelect(inputId, dropId, d);
+    return;
+  } else if (e.key === 'Escape') {
+    dd.style.display = 'none'; return;
+  } else {
+    return;
+  }
+  dd._selIdx = idx;
+  opts.forEach((o, i) => {
+    o.style.background = i === idx ? '#EFF6FF' : '';
+    o.style.color      = i === idx ? '#1565C0' : '';
+    o.style.fontWeight = i === idx ? '700' : '';
+    if (i === idx) o.scrollIntoView({ block: 'nearest' });
+  });
+}
+
+// Compatibilidad con el sistema existente de agenda
 function filterAgUbic(val){
-  const dd=document.getElementById('ag-ubic-dropdown');
-  if(!dd) return;
-  if(!val||val.length<1){ dd.style.display='none'; return; }
-  // Si parece URL, no mostrar distritos
-  if(val.includes('http')||val.includes('maps')||val.includes('goo.gl')){ dd.style.display='none'; return; }
-  const matches=DISTRITOS_LIMA.filter(d=>d.toLowerCase().startsWith(val.toLowerCase())).slice(0,8);
-  if(!matches.length){ dd.style.display='none'; return; }
-  dd.innerHTML=matches.map(d=>`<div class="ubic-opt" onclick="selectAgUbic('${d}')">${d}</div>`).join('');
-  dd.style.display='block';
+  distritoComboShow('ag-ubicacion','ag-ubic-dropdown');
 }
 function selectAgUbic(val){
-  const inp=document.getElementById('ag-ubicacion');
-  if(inp) inp.value=val;
-  const dd=document.getElementById('ag-ubic-dropdown');
-  if(dd) dd.style.display='none';
+  distritoComboSelect('ag-ubicacion','ag-ubic-dropdown', val);
 }
 
 function saveAgendaItem(editId, tipo){
@@ -6792,12 +6932,54 @@ function deleteAgendaItem(id){
 function cambiarEstadoAgenda(id, estado){
   const item=(state.agenda||[]).find(x=>x.id===id);
   if(!item) return;
+
+  if(estado==='reprogramo'){
+    // Mini-modal para capturar la fecha de reprogramación
+    document.getElementById('modal-content').innerHTML=`
+      <div class="modal-title" style="color:#3C3489">↻ Reprogramar visita</div>
+      <div style="background:#EEEDFE;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#3C3489">
+        <strong>${item.cliente||'Cliente'}</strong> · Fecha original: ${item.fecha||'—'}
+      </div>
+      <div class="field">
+        <label class="field-label">📅 Nueva fecha de reprogramación</label>
+        <input id="reprog-fecha" type="date" value="" style="background:#F8FAFC;border:1px solid #7F77DD44;border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+      </div>
+      <div class="field">
+        <label class="field-label">📝 Motivo (opcional)</label>
+        <input id="reprog-motivo" type="text" placeholder="Ej: Cliente no estaba, reagendó para..." style="font-size:13px">
+      </div>
+      <div class="btn-row">
+        <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+        <button style="flex:2;background:linear-gradient(135deg,#3C3489,#7F77DD);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="confirmarReprogramacion('${id}')">✓ Confirmar</button>
+      </div>`;
+    showModal();
+    return;
+  }
+
+  _aplicarEstadoAgenda(id, estado);
+}
+
+function confirmarReprogramacion(id){
+  const item=(state.agenda||[]).find(x=>x.id===id);
+  if(!item) return;
+  const newFecha = document.getElementById('reprog-fecha')?.value||'';
+  const motivo   = document.getElementById('reprog-motivo')?.value.trim()||'';
+  if(!newFecha){ toast('Seleccioná la nueva fecha','error'); return; }
+  item.fechaReprogramado = newFecha;
+  item.motivoReprogramacion = motivo;
+  closeModal();
+  _aplicarEstadoAgenda(id,'reprogramo');
+  toast('↻ Reprogramado para '+newFecha);
+}
+
+function _aplicarEstadoAgenda(id, estado){
+  const item=(state.agenda||[]).find(x=>x.id===id);
+  if(!item) return;
   item.estado=estado;
   save('fnz_agenda',state.agenda);
-  // FIX: usar _sendToSheets en lugar de new Image() — más confiable
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(url){
-    const payload={ type:'agenda_estado', agenda_estado:{ id:item.id, estado, estadoPago:item.estadoPago||'-', montoPagado:item.montoPagado||0, montoPendienteCobro:item.montoPendienteCobro||0, tipo:item.tipo } };
+    const payload={ type:'agenda_estado', agenda_estado:{ id:item.id, estado, estadoPago:item.estadoPago||'-', montoPagado:item.montoPagado||0, montoPendienteCobro:item.montoPendienteCobro||0, tipo:item.tipo, fechaReprogramado:item.fechaReprogramado||'' } };
     _sendToSheets(url, payload);
   }
   render();
@@ -6808,44 +6990,108 @@ function abrirModalCobro(id){
   const item=(state.agenda||[]).find(x=>x.id===id);
   if(!item) return;
   const precio=item.precio||0;
-  document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title" style="color:#27500A">Finalizar trabajo</div>
-    <div style="background:#F3F0FF;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px">
-      <div style="font-weight:600">${item.cliente||'Cliente'}</div>
-      <div style="color:#6C3483;margin-top:2px">${item.servicio||''} · Precio acordado: <strong>${fmt(precio)}</strong></div>
-    </div>
-    
-    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:12px;margin-bottom:16px;">
-      <div class="field" style="margin-bottom:12px"><label class="field-label" style="color:#27500A;font-weight:700">¿Cuánto cobró del servicio? (Ingreso S/)</label>
-        <div style="display:flex;gap:8px">
-          <input id="cobro-monto" type="number" inputmode="decimal" placeholder="0.00" value="${precio}" style="font-size:16px;font-weight:600;flex:2">
-          <button onclick="setCobro(${precio})" style="flex:1;background:#EAF3DE;border:1px solid #63992244;color:#27500A;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">Todo</button>
-          <button onclick="setCobro(0)" style="flex:1;background:#FCEBEB;border:1px solid #E24B4A44;color:#791F1F;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">Nada</button>
-        </div>
-      </div>
+  const svcOpts = (presel='') => '<option value="">-- ninguno --</option>' +
+    AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${s===presel?'selected':''}>${s}</option>`).join('');
 
-      <div style="border-top:1px dashed #CBD5E1;margin:12px 0;"></div>
-      
-      <div style="font-size:12px;color:#64748B;margin-bottom:8px;font-weight:600">GASTOS ASOCIADOS A ESTE TRABAJO (Egresos S/)</div>
-      <div style="display:flex;gap:12px;">
-        <div class="field" style="flex:1"><label class="field-label" style="font-size:11px">Movilidad / Gasolina</label>
-          <input id="cobro-movilidad" type="number" inputmode="decimal" placeholder="0.00" value="" style="font-size:14px">
-        </div>
-        <div class="field" style="flex:1"><label class="field-label" style="font-size:11px">Materiales</label>
-          <input id="cobro-materiales" type="number" inputmode="decimal" placeholder="0.00" value="" style="font-size:14px">
+  document.getElementById('modal-content').innerHTML=`
+    <div class="modal-title" style="color:#27500A">✓ Finalizar trabajo</div>
+    <div style="background:linear-gradient(135deg,#F3F0FF,#E8E5FE);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px">
+      <div style="font-weight:700;color:#3C3489">${item.cliente||'Cliente'}</div>
+      <div style="color:#6C3483;margin-top:2px;font-size:12px">${item.servicio||'Sin servicio'} · Precio acordado: <strong>${fmt(precio)}</strong></div>
+    </div>
+
+    <!-- INGRESO -->
+    <div style="background:#F0FDF4;border:1px solid #4CAF8533;border-radius:12px;padding:12px;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#27500A;margin-bottom:10px">💰 Ingreso del servicio</div>
+      <div class="field" style="margin-bottom:10px">
+        <label class="field-label" style="color:#27500A;font-weight:700">¿Cuánto cobró? (S/)</label>
+        <div style="display:flex;gap:8px">
+          <input id="cobro-monto" type="number" inputmode="decimal" placeholder="0.00" value="${precio}" style="font-size:18px;font-weight:700;flex:2;color:#27500A">
+          <button onclick="setCobro(${precio})" style="flex:1;background:#EAF3DE;border:1px solid #63992244;color:#27500A;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">Todo</button>
+          <button onclick="setCobro(0)" style="flex:1;background:#FCEBEB;border:1px solid #E24B4A44;color:#791F1F;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">Nada</button>
         </div>
       </div>
-      <div class="field" style="margin-top:8px"><label class="field-label" style="font-size:11px">Otros Gastos (Peajes, almuerzo temporal, etc)</label>
-        <input id="cobro-otros" type="number" inputmode="decimal" placeholder="0.00" value="" style="font-size:14px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#334155;margin-bottom:6px">🔧 Servicios realizados</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:20px;height:20px;border-radius:6px;background:#3C3489;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div>
+          <select id="cobro-svc1" style="flex:1;background:#fff;border:1px solid #C7B9F8;border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">${svcOpts(item.servicio||'')}</select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:20px;height:20px;border-radius:6px;background:#94A3B8;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div>
+          <select id="cobro-svc2" style="flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">${svcOpts()}</select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:20px;height:20px;border-radius:6px;background:#94A3B8;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div>
+          <select id="cobro-svc3" style="flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">${svcOpts()}</select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:20px;height:20px;border-radius:6px;background:#94A3B8;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">4</div>
+          <select id="cobro-svc4" style="flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">${svcOpts()}</select>
+        </div>
       </div>
-      <div class="field" style="margin-top:8px"><label class="field-label" style="font-size:11px">Observaciones / Notas del Trabajo</label>
-        <textarea id="cobro-notas" placeholder="Ej: Se cambió válvula de gas adicional..." style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:8px;font-size:13px;width:100%;min-height:60px;font-family:inherit"></textarea>
+    </div>
+
+    <!-- EGRESOS -->
+    <div style="background:#FEF2F2;border:1px solid #E0525233;border-radius:12px;padding:12px;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#791F1F;margin-bottom:10px">📦 Egresos del trabajo</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="field"><label class="field-label" style="font-size:11px">🚗 Movilidad/Gasolina</label>
+          <input id="cobro-movilidad" type="number" inputmode="decimal" placeholder="0.00" style="font-size:14px">
+        </div>
+        <div class="field"><label class="field-label" style="font-size:11px">🛒 Materiales</label>
+          <input id="cobro-materiales" type="number" inputmode="decimal" placeholder="0.00" style="font-size:14px">
+        </div>
+      </div>
+      <div class="field" style="margin-top:8px"><label class="field-label" style="font-size:11px">📦 Otros gastos (peajes, almuerzo, etc.)</label>
+        <input id="cobro-otros" type="number" inputmode="decimal" placeholder="0.00" style="font-size:14px">
+      </div>
+    </div>
+
+    <!-- DATOS EXTRA → NOTION -->
+    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:12px;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748B;margin-bottom:10px">📋 Datos adicionales → Notion</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="field"><label class="field-label" style="font-size:11px">💳 Forma de pago</label>
+          <select id="cobro-forma-pago" style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:9px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
+            <option value="Efectivo">💵 Efectivo</option>
+            <option value="Yape">💜 Yape</option>
+            <option value="Plin">💙 Plin</option>
+            <option value="Transferencia">🏦 Transferencia</option>
+            <option value="A cuenta">📆 A cuenta</option>
+          </select>
+        </div>
+        <div class="field"><label class="field-label" style="font-size:11px">🎯 Meta (S/)</label>
+          <input id="cobro-meta" type="number" inputmode="decimal" placeholder="0.00" style="font-size:14px">
+        </div>
+      </div>
+      <!-- Distrito editable con combobox inteligente -->
+      <div class="field" style="margin-bottom:8px">
+        <label class="field-label" style="font-size:11px">📍 Distrito</label>
+        <div style="position:relative">
+          <input id="cobro-distrito"
+            type="text"
+            placeholder="Escribí el distrito..."
+            value="${item.ubicacion||''}"
+            autocomplete="off"
+            style="font-size:13px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:9px 10px;width:100%"
+            oninput="distritoComboShow('cobro-distrito','cobro-dist-dd')"
+            onfocus="distritoComboShow('cobro-distrito','cobro-dist-dd')"
+            onblur="setTimeout(()=>{const d=document.getElementById('cobro-dist-dd');if(d)d.style.display='none';},200)"
+            onkeydown="distritoComboKey(event,'cobro-distrito','cobro-dist-dd')">
+          <div id="cobro-dist-dd" style="display:none;position:absolute;z-index:999;width:100%;max-height:200px;overflow-y:auto;background:#fff;border:1px solid #C7D5E8;border-radius:10px;box-shadow:0 8px 24px #0002;top:calc(100% + 4px);left:0"></div>
+        </div>
+      </div>
+      <div class="field"><label class="field-label" style="font-size:11px">📝 Observaciones</label>
+        <textarea id="cobro-notas" placeholder="Ej: Se cambió válvula adicional..." style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:9px;font-size:13px;width:100%;min-height:52px;font-family:inherit;resize:vertical"></textarea>
       </div>
     </div>
 
     <div class="btn-row">
       <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn-gold" onclick="guardarFinalizacion('${id}')">Guardar</button>
+      <button style="flex:2;background:linear-gradient(135deg,#27500A,#4CAF50);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="guardarFinalizacion('${id}')">
+        ✓ Guardar &amp; Enviar a Notion
+      </button>
     </div>`;
   showModal();
 }
@@ -6855,94 +7101,98 @@ function setCobro(v){ document.getElementById('cobro-monto').value=v; }
 async function guardarFinalizacion(id){
   const item=(state.agenda||[]).find(x=>x.id===id);
   if(!item) return;
-  const cobrado=parseFloat(document.getElementById('cobro-monto').value)||0;
-  const movilidadEl=document.getElementById('cobro-movilidad');
-  const materialesEl=document.getElementById('cobro-materiales');
-  const otrosEl=document.getElementById('cobro-otros');
-  const movilidad=movilidadEl ? parseFloat(movilidadEl.value)||0 : 0;
-  const materiales=materialesEl ? parseFloat(materialesEl.value)||0 : 0;
-  const otros=otrosEl ? parseFloat(otrosEl.value)||0 : 0;
-  const notas=document.getElementById('cobro-notas').value.trim();
+  const cobrado    = parseFloat(document.getElementById('cobro-monto')?.value)||0;
+  const movilidad  = parseFloat(document.getElementById('cobro-movilidad')?.value)||0;
+  const materiales = parseFloat(document.getElementById('cobro-materiales')?.value)||0;
+  const otros      = parseFloat(document.getElementById('cobro-otros')?.value)||0;
+  const meta       = parseFloat(document.getElementById('cobro-meta')?.value)||0;
+  const notas      = document.getElementById('cobro-notas')?.value.trim()||'';
+  const formaPago  = document.getElementById('cobro-forma-pago')?.value||'Efectivo';
+  const distrito   = document.getElementById('cobro-distrito')?.value.trim()||item.ubicacion||'';
+  const svc1 = document.getElementById('cobro-svc1')?.value||item.servicio||'';
+  const svc2 = document.getElementById('cobro-svc2')?.value||'';
+  const svc3 = document.getElementById('cobro-svc3')?.value||'';
+  const svc4 = document.getElementById('cobro-svc4')?.value||'';
 
-  const precio=parseFloat(item.precio)||0;
-  const pendiente=parseFloat((precio-cobrado).toFixed(2));
+  const precio   = parseFloat(item.precio)||0;
+  const pendiente= parseFloat((precio-cobrado).toFixed(2));
 
-  item.estado='se_finalizo';
-  item.montoPagado=cobrado;
-  item.montoPendienteCobro=Math.max(pendiente,0);
+  item.estado    = 'se_finalizo';
+  item.montoPagado = cobrado;
+  item.montoPendienteCobro = Math.max(pendiente,0);
 
   if(cobrado>=precio) item.estadoPago='completo';
   else if(cobrado>0)  item.estadoPago='parcial';
   else                item.estadoPago='sin_cobro';
 
-  if (notas) item.notas = (item.notas ? item.notas + ' · ' : '') + notas;
+  if(notas) item.notas = (item.notas ? item.notas+' · ' : '')+notas;
 
-  const agDesc = (item.servicio||'Servicio')+' — '+(item.cliente||'');
-  const baseTx={category:item.servicio||'Servicio Gas',date:item.fecha,
-    description:agDesc,cliente:item.cliente||'',ubicacion:item.ubicacion||'',negocio:true};
+  // Guardar servicios en el item de agenda
+  item.servicio1 = svc1; item.servicio2 = svc2;
+  item.servicio3 = svc3; item.servicio4 = svc4;
+  item.formaPago = formaPago;
+  if(distrito) item.ubicacion = distrito; // actualizar si el usuario cambió el distrito
 
-  // Guardar Venta y Gastos Asociados
-  if(cobrado>0 || movilidad>0 || materiales>0 || otros>0){
+  const agDesc = (svc1||item.servicio||'Servicio')+' — '+(item.cliente||'');
+  const baseTx = {category:svc1||item.servicio||'Servicio Gas', date:item.fecha,
+    description:agDesc, cliente:item.cliente||'', ubicacion:item.ubicacion||'', negocio:true};
+
+  if(cobrado>0||movilidad>0||materiales>0||otros>0){
     const notionToken = localStorage.getItem('fnz_notion_token');
-    const dbid = localStorage.getItem('fnz_notion_dbid');
-    const cobroObj = {ingreso: cobrado, movilidad, materiales, otros, observaciones: notas};
-    
-    if (notionToken && dbid) {
-      toast('⏳ Guardando datos oficiales en Notion...', 'info');
-      try {
+    const dbid        = localStorage.getItem('fnz_notion_dbid');
+    // Objeto completo con todos los campos de Notion
+    const cobroObj = {
+      ingreso:cobrado, movilidad, materiales, otros, observaciones:notas,
+      formaPago, meta, svc1, svc2, svc3, svc4
+    };
+
+    if(notionToken && dbid){
+      toast('⏳ Enviando a Notion...','info');
+      try{
         const notionRes = await _pushToNotion(item, cobroObj);
-        const notionId = notionRes.id;
-        
-        // Inyectamos las transacciones locales pegadas al ID de Notion
-        if(cobrado>0) state.transactions.unshift({id: notionId+'-ing', type:'ingreso', amount:cobrado, ...baseTx, _importadoDeNotion:true, _notionRowId:notionId});
-        if(movilidad>0) state.transactions.unshift({id: notionId+'-mov', type:'egreso', amount:movilidad, ...baseTx, category:'Movilidad', description:'Movilidad · '+agDesc, _importadoDeNotion:true, _notionRowId:notionId});
-        if(materiales>0) state.transactions.unshift({id: notionId+'-mat', type:'egreso', amount:materiales, ...baseTx, category:'Materiales', description:'Materiales · '+agDesc, _importadoDeNotion:true, _notionRowId:notionId});
-        if(otros>0) state.transactions.unshift({id: notionId+'-otr', type:'egreso', amount:otros, ...baseTx, category:'Mantenimiento o Rep', description:'Otros Gastos · '+agDesc, _importadoDeNotion:true, _notionRowId:notionId});
-      } catch (err) {
-        console.error('Error push Notion:', err);
-        toast('⚠ Error vinculando a Notion. Solo guardado localmente.', 'error');
-        // Fallback local
-        const lId = Date.now()+'_ag';
-        if(cobrado>0) state.transactions.unshift({id: lId, type:'ingreso', amount:cobrado, ...baseTx});
-        if(movilidad>0) state.transactions.unshift({id: lId+'_m', type:'egreso', amount:movilidad, ...baseTx, category:'Movilidad', description:'Movilidad · '+agDesc});
-        if(materiales>0) state.transactions.unshift({id: lId+'_t', type:'egreso', amount:materiales, ...baseTx, category:'Materiales', description:'Materiales · '+agDesc});
-        if(otros>0) state.transactions.unshift({id: lId+'_o', type:'egreso', amount:otros, ...baseTx, category:'Mantenimiento o Rep', description:'Otros Gastos · '+agDesc});
-        syncToSheets({id:lId, type:'ingreso', amount:cobrado, ...baseTx}); // Sheets legacy solo soporta 1 a la vez bien
+        const notionId  = notionRes.id;
+        if(cobrado>0)    state.transactions.unshift({id:notionId+'-ing',type:'ingreso',amount:cobrado,...baseTx,_importadoDeNotion:true,_notionRowId:notionId});
+        if(movilidad>0)  state.transactions.unshift({id:notionId+'-mov',type:'egreso',amount:movilidad,...baseTx,category:'Movilidad',description:'Movilidad · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
+        if(materiales>0) state.transactions.unshift({id:notionId+'-mat',type:'egreso',amount:materiales,...baseTx,category:'Materiales',description:'Materiales · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
+        if(otros>0)      state.transactions.unshift({id:notionId+'-otr',type:'egreso',amount:otros,...baseTx,category:'Mantenimiento o Rep',description:'Otros Gastos · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
+        toast('✓ Registrado en Notion ✓','success');
+      } catch(err){
+        console.error('Error push Notion:',err);
+        toast('⚠ Error en Notion — guardado solo localmente','error');
+        _guardarFinalizacionLocal(Date.now()+'_ag', cobrado, movilidad, materiales, otros, baseTx, agDesc);
       }
     } else {
-      const lId = Date.now()+'_ag';
-      if(cobrado>0) state.transactions.unshift({id: lId, type:'ingreso', amount:cobrado, ...baseTx});
-      if(movilidad>0) state.transactions.unshift({id: lId+'_m', type:'egreso', amount:movilidad, ...baseTx, category:'Movilidad', description:'Movilidad · '+agDesc});
-      if(materiales>0) state.transactions.unshift({id: lId+'_t', type:'egreso', amount:materiales, ...baseTx, category:'Materiales', description:'Materiales · '+agDesc});
-      if(otros>0) state.transactions.unshift({id: lId+'_o', type:'egreso', amount:otros, ...baseTx, category:'Mantenimiento o Rep', description:'Otros Gastos · '+agDesc});
-      syncToSheets({id:lId, type:'ingreso', amount:cobrado, ...baseTx});
+      _guardarFinalizacionLocal(Date.now()+'_ag', cobrado, movilidad, materiales, otros, baseTx, agDesc);
     }
   }
 
-  // Si cobro parcial → crear deuda automáticamente
-  if(item.estadoPago==='parcial' && pendiente>0){
+  if(item.estadoPago==='parcial'&&pendiente>0){
     const deudaAuto={id:Date.now()+'_dag',name:'Saldo pendiente — '+(item.cliente||''),
-      totalAmount:pendiente,cuotaMonto:pendiente,cuotasTotales:1,cuotasPagadas:0,
-      categoria:'Servicio',color:'#9B59B6'};
+      totalAmount:pendiente,cuotaMonto:pendiente,cuotasTotales:1,cuotasPagadas:0,categoria:'Servicio',color:'#9B59B6'};
     if(!state.debts) state.debts=[];
     state.debts.push(deudaAuto);
     syncSeccionToSheets('deuda',deudaAuto);
     toast('⚠ Cobro parcial · Deuda de '+fmt(pendiente)+' creada automáticamente','info');
   }
 
-  save('fnz_agenda',state.agenda);
-  saveAll();
-
-  // Sync estado a Sheets
+  save('fnz_agenda',state.agenda); saveAll();
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(url){
     const payload={type:'agenda_estado',agenda_estado:{id:item.id,estado:'se_finalizo',
       estadoPago:item.estadoPago,montoPagado:cobrado,montoPendienteCobro:item.montoPendienteCobro,tipo:item.tipo}};
     _sendToSheets(url,payload);
   }
-  closeModal();render();
+  closeModal(); render();
   if(item.estadoPago==='completo') toast('✓ Trabajo finalizado · '+fmt(cobrado)+' cobrado');
   else if(item.estadoPago==='sin_cobro') toast('Trabajo finalizado · Sin cobro registrado');
+}
+
+function _guardarFinalizacionLocal(lId, cobrado, movilidad, materiales, otros, baseTx, agDesc){
+  if(cobrado>0)    state.transactions.unshift({id:lId,       type:'ingreso',amount:cobrado,...baseTx});
+  if(movilidad>0)  state.transactions.unshift({id:lId+'_m',  type:'egreso', amount:movilidad,...baseTx,category:'Movilidad',description:'Movilidad · '+agDesc});
+  if(materiales>0) state.transactions.unshift({id:lId+'_t',  type:'egreso', amount:materiales,...baseTx,category:'Materiales',description:'Materiales · '+agDesc});
+  if(otros>0)      state.transactions.unshift({id:lId+'_o',  type:'egreso', amount:otros,...baseTx,category:'Mantenimiento o Rep',description:'Otros Gastos · '+agDesc});
+  syncToSheets({id:lId,type:'ingreso',amount:cobrado,...baseTx});
 }
 
 function registrarIngresoAgenda(id){
