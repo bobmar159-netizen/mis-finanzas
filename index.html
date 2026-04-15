@@ -6444,14 +6444,24 @@ function renderAjustes(){
 }
 
 function saveNotionConfig(){
-  const token    = document.getElementById('notion-token-inp')?.value.trim();
-  const dbId     = document.getElementById('notion-dbid-inp')?.value.trim();
-  if(!token||!dbId){toast('Completá el token y el ID de base de datos','error');return;}
+  const token     = document.getElementById('notion-token-inp')?.value.trim();
+  const dbId      = document.getElementById('notion-dbid-inp')?.value.trim();
+  const dbIdCli   = document.getElementById('notion-dbid-clientes-inp')?.value.trim();
+
+  if(!token || !dbId){
+    toast('Completá al menos el Token y el ID de Reporte Diario (DB1)','error');
+    return;
+  }
+
   localStorage.setItem('fnz_notion_token', token);
   localStorage.setItem('fnz_notion_dbid',  dbId);
+  if(dbIdCli) localStorage.setItem('fnz_notion_dbid_clientes', dbIdCli.replace(/-/g,''));
+  else localStorage.removeItem('fnz_notion_dbid_clientes');
+
   // Limpiar el caché de esquema por si cambio la DB
   sessionStorage.removeItem('fnz_notion_schema');
   localStorage.removeItem('fnz_notion_polling');
+
   toast('✓ Credenciales de Notion guardadas ✓', 'success');
   render();
 }
