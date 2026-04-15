@@ -5652,7 +5652,9 @@ async function _pushToNotionClientes(item) {
   setProp(findCol('fecha de visita','visita'), item.fechaVisita || item.fecha);
 
   // Date: Fecha de construccion
-  if(item.fechaConstruccion) setProp(findCol('fecha de construcción','construccion','fecha construccion'), item.fechaConstruccion);
+  // Si es un trabajo, usamos la fecha principal como fecha de construcción si no hay una específica
+  const fConst = item.fechaConstruccion || (item.tipo === 'trabajo' ? item.fecha : '');
+  if(fConst) setProp(findCol('fecha de construcción','construccion','fecha construccion'), fConst);
 
   // Text: Ubicacion
   setProp(findCol('ubicacion','ubicación','distrito'), item.ubicacion || '');
@@ -5685,28 +5687,35 @@ async function notionCargarManual() {
   if (statusEl) statusEl.textContent = '⏳ Consultando Notion...';
 
   try {
-    // ── 1. Traer TODOS los registros de Notion (con paginación) ──
-    const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
-    const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
-    let allResults = [], cursor = undefined, page = 0;
+    // ── 1. Traer registros de Notion (Finanzas + Clientes) ──
+    const dbIdFinanzas = localStorage.getItem('fnz_notion_dbid');
+    const dbIdClientes = localStorage.getItem('fnz_notion_dbid_clientes');
+    const dbs = [dbIdFinanzas, dbIdClientes].filter(Boolean);
+    
+    let allResults = [];
+    for (const dbId of dbs) {
+      const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
+      const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
+      let cursor = undefined, page = 0;
 
-    do {
-      page++;
-      const bodyObj = { page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) };
-      const res = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyObj)
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + (await res.text().catch(()=>'')).slice(0,120));
-      const data = await res.json();
-      if (data.results) allResults = allResults.concat(data.results);
-      cursor = data.has_more ? data.next_cursor : undefined;
-      if (statusEl) statusEl.textContent = '⏳ Cargando... ' + allResults.length + ' registros';
-    } while (cursor);
+      do {
+        page++;
+        const bodyObj = { page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) };
+        const res = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyObj)
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status + ' en DB ' + dbId);
+        const data = await res.json();
+        if (data.results) allResults = allResults.concat(data.results);
+        cursor = data.has_more ? data.next_cursor : undefined;
+        if (statusEl) statusEl.textContent = '⏳ Cargando... ' + allResults.length + ' registros';
+      } while (cursor);
+    }
 
     if (!allResults.length) {
-      if (statusEl) statusEl.textContent = '⚠ La base de datos está vacía';
+      if (statusEl) statusEl.textContent = '⚠ Bases de datos vacías';
       toast('Notion no tiene registros', 'error'); return;
     }
 
@@ -5856,8 +5865,11 @@ async function notionConfirmarCarga(soloNuevosIds, posibleDupIds, allIds) {
   closeModal();
 
   const token = localStorage.getItem('fnz_notion_token');
-  const dbId  = localStorage.getItem('fnz_notion_dbid');
-  if (!token || !dbId) return;
+  const dbIdFinanzas = localStorage.getItem('fnz_notion_dbid');
+  const dbIdClientes = localStorage.getItem('fnz_notion_dbid_clientes');
+  const dbs = [dbIdFinanzas, dbIdClientes].filter(Boolean);
+
+  if (!token || dbs.length === 0) return;
 
   const statusEl = document.getElementById('notion-load-status');
   if (statusEl) statusEl.textContent = '⏳ Importando...';
@@ -5875,21 +5887,26 @@ async function notionConfirmarCarga(soloNuevosIds, posibleDupIds, allIds) {
       return;
     }
 
-    // Traer de nuevo los registros seleccionados
-    const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
-    const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
-    let allResults = [], cursor = undefined;
-    do {
-      const bodyObj = { page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) };
-      const res = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyObj)
-      });
-      const data = await res.json();
-      if (data.results) allResults = allResults.concat(data.results.filter(p => idsAImportar.has(p.id)));
-      cursor = data.has_more ? data.next_cursor : undefined;
-    } while (cursor);
+    // 1. Traer registros seleccionados de todas las bases de datos configuradas
+    for (const dbId of dbs) {
+      const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
+      const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
+      let cursor = undefined;
+      do {
+        const bodyObj = { page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) };
+        const res = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyObj)
+        });
+        const data = await res.json();
+        // Filtrar solo los IDs que el usuario aceptó importar
+        if (data.results) {
+          allResults = allResults.concat(data.results.filter(p => idsAImportar.has(p.id)));
+        }
+        cursor = data.has_more ? data.next_cursor : undefined;
+      } while (cursor);
+    }
 
     if (!allResults.length) {
       toast('No se encontraron registros para importar', 'error'); return;
@@ -7326,8 +7343,11 @@ function saveAgendaItem(editId, tipo){
   // ── Push a Notion al crear/editar (garantiza que el cliente llegue) ──
   const nToken = localStorage.getItem('fnz_notion_token');
   if (nToken) {
-    if (tipo === 'visita') {
-      const nDbidClientes = localStorage.getItem('fnz_notion_dbid_clientes');
+    const nDbidClientes = localStorage.getItem('fnz_notion_dbid_clientes');
+    const nDbidFinanzas = localStorage.getItem('fnz_notion_dbid');
+
+    // 1. Siempre empujar a CLIENTES si es visita O si es TRABAJO (para la vista de construcción)
+    if (tipo === 'visita' || tipo === 'trabajo') {
       if (nDbidClientes) {
         _pushToNotionClientes(item).then(res => {
           if (res && res.id && !item._notionRowId) {
@@ -7337,17 +7357,11 @@ function saveAgendaItem(editId, tipo){
           }
         }).catch(err => console.warn('Notion Clientes (no crítico):', err.message));
       }
-    } else {
-      const nDbid = localStorage.getItem('fnz_notion_dbid');
-      if (nDbid) {
-        _pushToNotion(item, 0).then(res => {
-          if (res && res.id && !item._notionRowId) {
-            item._notionRowId = res.id;
-            state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
-            save('fnz_agenda', state.agenda);
-          }
-        }).catch(err => console.warn('Notion Trabajos (no crítico):', err.message));
-      }
+    }
+
+    // 2. Empujar a FINANZAS solo si es TRABAJO
+    if (tipo === 'trabajo' && nDbidFinanzas) {
+      _pushToNotion(item, 0).catch(err => console.warn('Notion Finanzas (no crítico):', err.message));
     }
   }
 
@@ -13479,28 +13493,23 @@ function _agendaMicGuardarDirecto(){
   // ── Push a Notion para Guardado Directo desde Micrófono ──
   const nToken = localStorage.getItem('fnz_notion_token');
   if (nToken) {
-    if (d.tipo === 'visita') {
-      const nDbidClientes = localStorage.getItem('fnz_notion_dbid_clientes');
-      if (nDbidClientes) {
-        _pushToNotionClientes(item).then(res => {
-          if (res && res.id && !item._notionRowId) {
-            item._notionRowId = res.id;
-            state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
-            save('fnz_agenda', state.agenda);
-          }
-        }).catch(err => console.warn('Notion Clientes (no crítico):', err.message));
-      }
-    } else {
-      const nDbid = localStorage.getItem('fnz_notion_dbid');
-      if (nDbid) {
-        _pushToNotion(item, 0).then(res => {
-          if (res && res.id && !item._notionRowId) {
-            item._notionRowId = res.id;
-            state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
-            save('fnz_agenda', state.agenda);
-          }
-        }).catch(err => console.warn('Notion Trabajos (no crítico):', err.message));
-      }
+    const nDbidClientes = localStorage.getItem('fnz_notion_dbid_clientes');
+    const nDbidFinanzas = localStorage.getItem('fnz_notion_dbid');
+
+    // Sincronización comercial (Visita o Trabajo)
+    if ((d.tipo === 'visita' || d.tipo === 'trabajo') && nDbidClientes) {
+      _pushToNotionClientes(item).then(res => {
+        if (res && res.id && !item._notionRowId) {
+          item._notionRowId = res.id;
+          state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
+          save('fnz_agenda', state.agenda);
+        }
+      }).catch(err => console.warn('Notion Clientes Mic (no crítico):', err.message));
+    }
+
+    // Sincronización financiera (Solo Trabajo)
+    if (d.tipo === 'trabajo' && nDbidFinanzas) {
+      _pushToNotion(item, 0).catch(err => console.warn('Notion Finanzas Mic (no crítico):', err.message));
     }
   }
 
@@ -13529,19 +13538,19 @@ Tipo de evento: ${tipoDetectado}.
 
 El usuario dijo: "${text}"
 
-Tu tarea es extraer los datos EXACTOS de lo que dictó el usuario, IGNORANDO palabras duplicadas, tartamudeos o frases repetidas (el micrófono de Android falla y a veces escribe lo mismo 2 o 3 veces seguidas).
+Tu tarea es extraer los datos EXACTOS de lo que dictó el usuario, IGNORANDO palabras duplicadas o repetidas (errores de micrófono).
 
 REGLAS CRÍTICAS:
 1. fecha: Calculá desde HOY (${hoy}). "este domingo/lunes/..." = próximo día desde hoy. "mañana" = ${mananaStr}.
-2. hora: Convertí a "HH:MM" en formato 24h.
+2. hora: Convertí a "HH:MM" en formato 24h. Si no dice, null.
 3. precio: Convertí números hablados a dígitos (ej. "quinientos" -> 500). Si no dice precio, null.
-4. cliente: Extrae el nombre de la persona. Mantené el trato si lo dice ("el señor leonidas" -> "Sr. Leonidas"). NUNCA uses días de la semana como si fueran nombres de clientes (ignora "jueves", "lunes", etc. en el nombre). Si no detectas un nombre humano, null.
-5. servicio (solo si tipo=trabajo): Elegí el más lógico de esta lista exacta: ${serviciosOk}. Si detectas "punto adicional", usa "Punto Adicional". Si detectas "construccion", evalúa el contexto (ej. "Instalación Nueva" o "Punto Adicional" o "Modificación Red"). Si no hay certeza, null.
-6. ubicacion: Solo el distrito o lugar exacto en Lima ("en san juan de miraflores" -> "San Juan de Miraflores").
-7. notas: Cualquier otra observación importante.
+4. cliente: Extrae el nombre de la persona. Mantené el trato ("el señor leonidas" -> "Sr. Leonidas"). NUNCA uses días de la semana como si fueran nombres. Si no hay humano, null.
+5. servicio (solo si tipo=trabajo): Elegí el más lógico de esta lista exacta: ${serviciosOk}. Si detectas "punto adicional", usa "Punto Adicional". Si detectas "construccion", evalúalo (ej. "Instalación Nueva", "Punto Adicional" o "Modificación Red"). Si no hay certeza, null.
+6. ubicacion: Solo el distrito o lugar exacto en Lima ("en san juan de miraflores" -> "San Juan de Miraflores"). Si no dice, null.
+7. notas: Cualquier otra observación importante. Si no hay, null.
 
-Respondé SOLO con JSON válido, exacto, sin código markdown ni comentarios:
-{"fecha":"YYYY-MM-DD","hora":"HH:MM o null","cliente":"nombre o null","servicio":"${tipoDetectado==='trabajo'?serviciosOk:'null'} o null","precio":numero_o_null,"ubicacion":"distrito o null","notas":"texto extra o null"}`;
+Responde obligatoriamente siguiendo esta estructura JSON (asegúrate de que sea JSON válido):
+{"fecha": "YYYY-MM-DD", "hora": "HH:MM", "cliente": "nombre", "servicio": "servicio", "precio": 123, "ubicacion": "lugar", "notas": "texto"}`;
 
   try{
     const res = await fetch(GEMINI_URL(geminiKey),{
@@ -13549,7 +13558,7 @@ Respondé SOLO con JSON válido, exacto, sin código markdown ni comentarios:
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         contents:[{role:'user',parts:[{text:prompt}]}],
-        generationConfig:{temperature:0.05, maxOutputTokens:400}
+        generationConfig:{temperature:0.05, maxOutputTokens:400, responseMimeType: "application/json"}
       })
     });
     if(!res.ok) throw new Error('HTTP '+res.status);
@@ -13557,7 +13566,7 @@ Respondé SOLO con JSON válido, exacto, sin código markdown ni comentarios:
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
 
     let parsed = null;
-    try{ parsed = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+    try{ parsed = JSON.parse(raw); }
     catch(e1){
       const jsonMatch = raw.match(/\{[^]*\}/);
       if(jsonMatch) try{ parsed = JSON.parse(jsonMatch[0]); }catch(e2){}
