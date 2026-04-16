@@ -5682,10 +5682,13 @@ async function _pushToNotionClientes(item) {
   if(fConst) setProp(findCol('fecha de construcción','construccion','fecha construccion'), isoWithTime(fConst));
 
   // Text: Ubicacion
-  setProp(findCol('ubicacion','ubicación','distrito'), item.ubicacion || '');
+  setProp(findCol('ubicacion','ubicación','distrito','zona','lugar'), item.ubicacion || '');
+
+  // Text: Hora
+  setProp(findCol('hora','horario','tiempo','time'), item.hora || '');
 
   // Text: Notas
-  setProp(findCol('notas','nota','observaciones'), item.notas || '');
+  setProp(findCol('notas','nota','observaciones','descripción'), item.notas || '');
 
   const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/pages');
   const res = await fetch(proxyUrl, {
@@ -7055,42 +7058,41 @@ function openAddAgenda(tipo, editId, preData){
   const visitasAcciones = ['se agendó const...', 'se envió mensaje', 'se llamó', 'se envió precio', 'se agendó visita', 'se hizo visita', 'se construyó', 'se desanimó'];
 
   document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title" style="color:${colorTitle}">${isEdit?'Editar':(isVisita?'Nueva':'Nuevo')} ${isVisita?'Visita':'Trabajo'}</div>
+    <div class="modal-title" style="color:${colorTitle};font-family:'Playfair Display',serif">${isEdit?'Editar':(isVisita?'Nueva':'Nuevo')} ${isVisita?'Visita':'Construcción'}</div>
     <div class="field"><label class="field-label">Cliente</label>
-      <input id="ag-cliente" type="text" placeholder="Nombre del cliente" value="${item?item.cliente||'':pre.cliente||''}">
+      <input id="ag-cliente" type="text" placeholder="Nombre del cliente" value="${item?item.cliente||'':pre.cliente||''}" 
+        style="font-family:'DM Sans',sans-serif;font-weight:600;padding:14px;background:#F1F5F9;border-color:transparent">
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div class="field"><label class="field-label">Fecha</label>
-        <input id="ag-fecha" type="date" value="${item?item.fecha:pre.fecha||getAgendaHoy()}">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div class="field" style="margin-bottom:0"><label class="field-label">Fecha Programada</label>
+        <input id="ag-fecha" type="date" value="${item?item.fecha:pre.fecha||getAgendaHoy()}"
+          style="padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px">
       </div>
-      <div class="field"><label class="field-label">Hora</label>
+      <div class="field" style="margin-bottom:0"><label class="field-label">Hora</label>
         <div style="display:flex;gap:6px;align-items:center">
-          <input id="ag-hora-txt" type="text" inputmode="numeric" placeholder="Ej: 9:00 o 3:30"
+          <input id="ag-hora-txt" type="text" inputmode="numeric" placeholder="Ej: 9:00"
             value="${item&&item.hora?horaTo12(item.hora).replace(' AM','').replace(' PM',''):(pre.hora?horaTo12(pre.hora).replace(' AM','').replace(' PM',''):'')}"
-            style="flex:1;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px"
+            style="flex:1;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px"
             oninput="formatHoraInput(this)">
           <div style="display:flex;gap:4px;flex-shrink:0">
-            <button type="button" id="ag-ampm-am" onclick="setAgAmpm('AM')" style="padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s">AM</button>
-            <button type="button" id="ag-ampm-pm" onclick="setAgAmpm('PM')" style="padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s">PM</button>
+            <button type="button" id="ag-ampm-am" onclick="setAgAmpm('AM')" style="padding:10px;border-radius:8px;border:1px solid #E2E8F0;font-size:11px;font-weight:700;cursor:pointer">AM</button>
+            <button type="button" id="ag-ampm-pm" onclick="setAgAmpm('PM')" style="padding:10px;border-radius:8px;border:1px solid #E2E8F0;font-size:11px;font-weight:700;cursor:pointer">PM</button>
           </div>
         </div>
       </div>
     </div>
     ${isVisita?`
-    <div style="background:#F0F9FF;border:1px solid #1565C022;border-radius:12px;padding:12px;margin-bottom:8px">
-      <div style="font-size:11px;font-weight:700;color:#1565C0;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">👥 Acciones Comerciales</div>
+    <div style="background:#F0F9FF;border:1px solid #1565C022;border-radius:12px;padding:12px;margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;color:#1565C0;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">👥 Gestión Comercial</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${['1','2','3','4'].map(i=>`
           <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">${i}ª Acción</label>
-            <select id="ag-accion${i}" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%">
-              <option value="">— Ninguna —</option>
+            <select id="ag-accion${i}" style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%">
+              <option value="">—</option>
               ${visitasAcciones.map(a=>`<option value="${a}" ${item&&item[`accion${i}`]===a?'selected':''}>${a}</option>`).join('')}
             </select>
           </div>
         `).join('')}
-      </div>
-      <div class="field" style="margin-bottom:0;margin-top:8px"><label class="field-label">Fecha de Visita</label>
-        <input id="ag-fecha-visita" type="date" value="${item?item.fechaVisita||'':''}">
       </div>
     </div>` : ''}
     ${!isVisita?`
@@ -7572,21 +7574,28 @@ function cambiarEstadoAgenda(id, estado){
   if(estado==='reprogramo'){
     // Mini-modal para capturar la fecha de reprogramación
     document.getElementById('modal-content').innerHTML=`
-      <div class="modal-title" style="color:#3C3489">↻ Reprogramar visita</div>
-      <div style="background:#EEEDFE;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#3C3489">
-        <strong>${item.cliente||'Cliente'}</strong> · Fecha original: ${item.fecha||'—'}
+      <div class="modal-title" style="color:#3C3489;font-family:'Playfair Display',serif">↻ Reprogramar Cita</div>
+      <div style="background:#EEEDFE;border-radius:12px;padding:12px;margin-bottom:14px;font-size:13px;color:#3C3489;border:1px solid #7F77DD33">
+        <div style="font-weight:800;font-size:14px;margin-bottom:2px">${item.cliente||'Cliente'}</div>
+        <div style="opacity:0.8;font-size:11px;font-weight:600">Fecha original: ${item.fecha||'—'}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div class="field" style="margin-bottom:0">
+          <label class="field-label" style="font-size:11px">📅 Nueva Fecha</label>
+          <input id="reprog-fecha" type="date" value="${item.fecha||''}" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="field-label" style="font-size:11px">🕒 Nueva Hora</label>
+          <input id="reprog-hora" type="time" value="${item.hora||'09:00'}" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+        </div>
       </div>
       <div class="field">
-        <label class="field-label">📅 Nueva fecha de reprogramación</label>
-        <input id="reprog-fecha" type="date" value="" style="background:#F8FAFC;border:1px solid #7F77DD44;border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-      </div>
-      <div class="field">
-        <label class="field-label">📝 Motivo (opcional)</label>
-        <input id="reprog-motivo" type="text" placeholder="Ej: Cliente no estaba, reagendó para..." style="font-size:13px">
+        <label class="field-label" style="font-size:11px">📝 Motivo del cambio (opcional)</label>
+        <input id="reprog-motivo" type="text" placeholder="Ej: Cliente pidió cambiar hora" style="background:#F1F5F9;border-radius:12px;padding:12px">
       </div>
       <div class="btn-row">
         <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-        <button style="flex:2;background:linear-gradient(135deg,#3C3489,#7F77DD);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="confirmarReprogramacion('${id}')">✓ Confirmar</button>
+        <button style="flex:2;background:linear-gradient(135deg,#3C3489,#7F77DD);color:#fff;border:none;border-radius:12px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="confirmarReprogramacion('${id}')">✓ Guardar Cambios</button>
       </div>`;
     showModal();
     return;
@@ -7598,14 +7607,26 @@ function cambiarEstadoAgenda(id, estado){
 function confirmarReprogramacion(id){
   const item=(state.agenda||[]).find(x=>x.id===id);
   if(!item) return;
-  const newFecha = document.getElementById('reprog-fecha')?.value||'';
-  const motivo   = document.getElementById('reprog-motivo')?.value.trim()||'';
-  if(!newFecha){ toast('Seleccioná la nueva fecha','error'); return; }
-  item.fechaReprogramado = newFecha;
+  const nFecha = document.getElementById('reprog-fecha')?.value||'';
+  const nHora  = document.getElementById('reprog-hora')?.value||'';
+  const motivo = document.getElementById('reprog-motivo')?.value.trim()||'';
+  if(!nFecha){ toast('Seleccioná la nueva fecha','error'); return; }
+  
+  item.fecha = nFecha;
+  item.hora  = nHora;
+  item.estado = 'reprogramo';
   item.motivoReprogramacion = motivo;
+  
+  save('fnz_agenda',state.agenda);
   closeModal();
-  _aplicarEstadoAgenda(id,'reprogramo');
-  toast('↻ Reprogramado para '+newFecha);
+  render();
+  
+  const url=localStorage.getItem('fnz_sheets_url')||'';
+  if(url){
+    // Re-enviamos el item completo porque cambió la fecha/hora
+    _sendToSheets(url, { type:'agenda', item, modo: state.modo });
+  }
+  toast('↻ Reprogramado para '+nFecha);
 }
 
 function _aplicarEstadoAgenda(id, estado){
@@ -7833,6 +7854,11 @@ async function guardarFinalizacion(id){
       estadoPago: item.estadoPago,
     };
     _sendToSheets(url, { type:'agenda', modo: state.modo, timestamp: item.id+'_fin_'+Date.now(), item: itemParaSheets });
+    
+    // TAMBIÉN: Enviar a handleTrabajo para el histórico financiero en Sheets
+    setTimeout(() => {
+      _sendToSheets(url, { type:'tx', tx: { ...baseTx, id: item.id+'_fin', amount: cobrado, type: 'ingreso' }, modo: 'negocio' });
+    }, 500);
   }
   closeModal(); render();
   if(item.estadoPago==='completo') toast('✓ Trabajo finalizado · '+fmt(cobrado)+' cobrado');
