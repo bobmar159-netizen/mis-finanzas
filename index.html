@@ -5648,8 +5648,8 @@ async function _pushToNotionClientes(item) {
   const pCliente = findCol('cliente','name','nombre');
   if (pCliente && pCliente.type !== 'title') setProp(pCliente, item.cliente || '(Sin cliente)');
 
-  // Date: Fecha de contacto (uso item.fecha)
-  setProp(findCol('fecha de contacto','fecha','contacto'), item.fecha);
+  // Date: Fecha de visita (Consolidamos aquí)
+  setProp(findCol('fecha de visita','visita','fecha'), item.fecha);
 
   // Phone: Whatsapp
   const pTel = findCol('whatsapp','telefono','teléfono','celular');
@@ -5681,8 +5681,8 @@ async function _pushToNotionClientes(item) {
   const fConst = item.fechaConstruccion || (item.tipo === 'trabajo' ? item.fecha : '');
   if(fConst) setProp(findCol('fecha de construcción','construccion','fecha construccion'), isoWithTime(fConst));
 
-  // Text: Ubicacion
-  setProp(findCol('ubicacion','ubicación','distrito','zona','lugar'), item.ubicacion || '');
+  // Text: Ubicacion (Columna exacta en Notion: Ubicaciones)
+  setProp(findCol('ubicaciones','ubicacion','ubicación','distrito','zona','lugar'), item.ubicacion || '');
 
   // Text: Hora
   setProp(findCol('hora','horario','tiempo','time'), item.hora || '');
@@ -7068,7 +7068,7 @@ function openAddAgenda(tipo, editId, preData){
         <input id="ag-fecha" type="date" value="${item?item.fecha:pre.fecha||getAgendaHoy()}"
           style="padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px">
       </div>
-      <div class="field" style="margin-bottom:0"><label class="field-label">Hora</label>
+      <div class="field" style="margin-bottom:0"><label class="field-label">Hora (12h)</label>
         <div style="display:flex;gap:6px;align-items:center">
           <input id="ag-hora-txt" type="text" inputmode="numeric" placeholder="Ej: 9:00"
             value="${item&&item.hora?horaTo12(item.hora).replace(' AM','').replace(' PM',''):(pre.hora?horaTo12(pre.hora).replace(' AM','').replace(' PM',''):'')}"
