@@ -2621,8 +2621,14 @@ function renderGraficos(){
       ${state.debts.length===0?`<div style="text-align:center;color:var(--dim);padding:16px 0;font-size:13px">Sin deudas registradas</div>`
       :state.debts.map(d=>{const pct=Math.round((d.cuotasPagadas/d.cuotasTotales)*100);return `
         <div style="margin-bottom:12px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-            <span style="font-size:13px;color:var(--text)">${d.name}</span><span style="font-size:11px;color:${d.color}">${pct}%</span>
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;align-items:center">
+            <span style="font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px">
+              ${d.name} 
+              <span style="font-size:9px;padding:2px 6px;border-radius:6px;background:${d.tipo==='Banco'?'#F0F9FF':'#F5F3FF'};color:${d.tipo==='Banco'?'#1E40AF':'#5B21B6'};border:1px solid ${d.tipo==='Banco'?'#1E40AF22':'#7C3AED22'}">
+                ${d.tipo==='Banco'?'🏦':'👤'} ${d.tipo||'Personal'}
+              </span>
+            </span>
+            <span style="font-size:11px;font-weight:700;color:${d.color}">${pct}%</span>
           </div>
           <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${d.color}"></div></div>
           <div style="display:flex;justify-content:space-between;margin-top:4px">
@@ -3899,7 +3905,13 @@ function openDebtModal(debt, preData){
     <div class="field"><label class="field-label">Cuota mensual (S/)</label><input id="d-cuota" type="number" inputmode="decimal" placeholder="0.00" value="${d.cuotaMonto||''}"></div>
     <div class="field"><label class="field-label">Número de cuotas totales</label><input id="d-ntotal" type="number" inputmode="numeric" placeholder="Ej: 12, 24, 36" value="${d.cuotasTotales||''}"></div>
     <div class="field"><label class="field-label">Cuotas ya pagadas</label><input id="d-npag" type="number" inputmode="numeric" placeholder="0" value="${d.cuotasPagadas||0}"></div>
-    <div class="field"><label class="field-label">Categoría</label><select id="d-cat">${DEBT_CATS.map(c=>`<option ${c===d.categoria?'selected':''}>${c}</option>`).join('')}</select></div>
+    <div class="field">
+      <label class="field-label">Tipo de Préstamo</label>
+      <select id="d-tipo">
+        <option value="Banco" ${d.tipo==='Banco'?'selected':''}>🏦 Banco</option>
+        <option value="Personal" ${d.tipo==='Personal'?'selected':''}>👤 Personal</option>
+      </select>
+    </div>
     <div class="field"><label class="field-label">Color</label><div style="display:flex;gap:8px;flex-wrap:wrap">${DEBT_COLORS.map(c=>`<div onclick="selectDebtColor(this,'${c}')" style="width:28px;height:28px;border-radius:50%;background:${c};cursor:pointer;border:2px solid ${c===d.color?'#fff':'transparent'}" data-dcolor="${c}"></div>`).join('')}</div></div>
     <div class="btn-row" style="margin-top:6px">
       <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
@@ -3920,7 +3932,17 @@ function saveDebt(editId){
   if(!name) return toast('Escribe el nombre de la deuda','error');
   if(!cuotaMonto) return toast('Escribe la cuota mensual','error');
   if(!cuotasTotales) return toast('Escribe el número de cuotas','error');
-  const item={id:editId||Date.now()+'',name,totalAmount,cuotaMonto,cuotasTotales,cuotasPagadas,categoria:document.getElementById('d-cat').value,color:window._debtColor||DEBT_COLORS[0]};
+  const item={
+    id:editId||Date.now()+'',
+    name,
+    totalAmount,
+    cuotaMonto,
+    cuotasTotales,
+    cuotasPagadas,
+    tipo:document.getElementById('d-tipo').value,
+    categoria:'Deuda',
+    color:window._debtColor||DEBT_COLORS[0]
+  };
   if(editId)state.debts=state.debts.map(d=>d.id===editId?item:d);
   else state.debts.push(item);
   saveAll();
@@ -5350,8 +5372,9 @@ async function _pushToNotion(item, cobrado) {
   const pCliente = findCol('cliente','name','nombre');
   if (pCliente && pCliente.type !== 'title') setProp(pCliente, item.cliente || '(Sin cliente)');
 
-  // ── FECHA ──
-  setProp(findCol('fecha','date','día','dia'), item.fecha);
+  // ── FECHA + HORA ──
+  const fullIso = (item.fecha||todayStr()) + (item.hora ? 'T'+item.hora+':00' : 'T09:00:00') + '-05:00';
+  setProp(findCol('fecha','date','día','dia'), fullIso);
 
   // ── CONTACTO / TELÉFONO ──
   if (item.telefono) {
@@ -5648,13 +5671,15 @@ async function _pushToNotionClientes(item) {
   setProp(findCol('tercera acción','3a accion','3ra accion','accion 3'), item.accion3 || '');
   setProp(findCol('cuarta acción','4a accion','4ta accion','accion 4'), item.accion4 || '');
 
+  // Helpers para ISO con Hora
+  const isoWithTime = (d) => { if(!d) return ''; return d + (item.hora ? 'T'+item.hora+':00' : 'T09:00:00') + '-05:00'; };
+
   // Date: Fecha de visita
-  setProp(findCol('fecha de visita','visita'), item.fechaVisita || item.fecha);
+  setProp(findCol('fecha de visita','visita'), isoWithTime(item.fechaVisita || item.fecha));
 
   // Date: Fecha de construccion
-  // Si es un trabajo, usamos la fecha principal como fecha de construcción si no hay una específica
   const fConst = item.fechaConstruccion || (item.tipo === 'trabajo' ? item.fecha : '');
-  if(fConst) setProp(findCol('fecha de construcción','construccion','fecha construccion'), fConst);
+  if(fConst) setProp(findCol('fecha de construcción','construccion','fecha construccion'), isoWithTime(fConst));
 
   // Text: Ubicacion
   setProp(findCol('ubicacion','ubicación','distrito'), item.ubicacion || '');
@@ -6300,8 +6325,15 @@ function renderAjustes(){
       <button onclick="descargarAppsScript()" style="width:100%;margin-top:10px;background:#F0FDF4;border:1px solid #4CAF8544;color:var(--green);border-radius:10px;padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">⬇ Descargar código Apps Script</button>
     `)}
 
-    ${sec('sheets','📊','Google Sheets','Sincronización automática','#1565C0',`
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">${sheetsUrl?'✓ URL configurada':'Sin configurar — datos solo en este dispositivo'}</div>
+    ${sec('sheets','📊','Google Sheets','Sincronización v9.0 SAAS','#1565C0',`
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">${sheetsUrl?'✓ Conectado a Sheets':'Sin configurar — datos solo locales'}</div>
+      <div style="background:#F0F9FF;border:1px solid #1E40AF22;border-radius:10px;padding:10px;margin-bottom:12px;font-size:11px;color:#1E40AF">
+        <strong>Estructura activa:</strong><br>
+        • Reporte Diario (Finanzas)<br>
+        • Agenda (Visitas/Construcciones)<br>
+        • Mov. Negocio & Personal<br>
+        • Dashboard Semanal activo
+      </div>
       <div style="display:flex;gap:8px;margin-bottom:8px">
         <input id="sheets-url-input" type="url" placeholder="https://script.google.com/macros/s/.../exec" value="${sheetsUrl}" style="flex:1;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px">
       </div>
@@ -6310,7 +6342,7 @@ function renderAjustes(){
         <button onclick="testSheetsSync()" style="flex:1;background:transparent;border:1px solid #1565C044;color:#1565C0;border-radius:10px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Probar</button>
       </div>
       <button onclick="reloadFromSheets()" style="width:100%;margin-top:8px;background:#F0FDF4;border:1px solid #3A7D4444;color:#3A7D44;border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">☁️ Restaurar datos desde Sheets</button>
-      <button onclick="syncAllTxToSheets(false)" style="width:100%;margin-top:6px;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">⬆ Enviar TODO el historial a Sheets</button>
+      <button onclick="syncAllTxToSheets(false)" style="width:100%;margin-top:6px;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">⬆ Enviar TODO a Sheets</button>
     `)}
 
     ${sec('notion','🔥','Notion','App → Notion (fuente de verdad)','#6B46C1',`
@@ -7354,24 +7386,15 @@ function saveAgendaItem(editId, tipo){
   const nToken = localStorage.getItem('fnz_notion_token');
   if (nToken) {
     const nDbidClientes = localStorage.getItem('fnz_notion_dbid_clientes');
-    const nDbidFinanzas = localStorage.getItem('fnz_notion_dbid');
-
-    // 1. Siempre empujar a CLIENTES si es visita O si es TRABAJO (para la vista de construcción)
-    if (tipo === 'visita' || tipo === 'trabajo') {
-      if (nDbidClientes) {
-        _pushToNotionClientes(item).then(res => {
-          if (res && res.id && !item._notionRowId) {
-            item._notionRowId = res.id;
-            state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
-            save('fnz_agenda', state.agenda);
-          }
-        }).catch(err => console.warn('Notion Clientes (no crítico):', err.message));
-      }
-    }
-
-    // 2. Empujar a FINANZAS solo si es TRABAJO
-    if (tipo === 'trabajo' && nDbidFinanzas) {
-      _pushToNotion(item, 0).catch(err => console.warn('Notion Finanzas (no crítico):', err.message));
+    // 1. Siempre empujar a CLIENTES (DB2)
+    if (nDbidClientes) {
+      _pushToNotionClientes(item).then(res => {
+        if (res && res.id && !item._notionRowId) {
+          item._notionRowId = res.id;
+          state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
+          save('fnz_agenda', state.agenda);
+        }
+      }).catch(err => console.warn('Notion Clientes (no crítico):', err.message));
     }
   }
 
@@ -7762,19 +7785,11 @@ async function guardarFinalizacion(id){
     if(notionToken && dbid){
       toast('⏳ Enviando a Notion...','info');
       try{
-        let notionId;
-        // ── Si ya existe la página en Notion → PATCH (no crear duplicado) ──
-        if(item._notionRowId){
-          await _updateNotionPageFull(item._notionRowId, item, cobroObj);
-          notionId = item._notionRowId;
-        } else {
-          const notionRes = await _pushToNotion(item, cobroObj);
-          notionId = notionRes.id;
-          // Guardar el ID para futuros updates
-          item._notionRowId = notionId;
-          state.agenda = state.agenda.map(x => x.id===item.id ? item : x);
-          save('fnz_agenda', state.agenda);
-        }
+        // ── Al finalizar, SIEMPRE creamos un registro NUEVO en Finanzas (Historico) ──
+        const notionRes = await _pushToNotion(item, cobroObj);
+        const notionId = notionRes.id;
+        // No sobreescribimos item._notionRowId para no romper el vínculo con el registro comercial original
+        // pero podemos guardar la relación si fuera necesario.
         if(cobrado>0)    state.transactions.unshift({id:notionId+'-ing',type:'ingreso',amount:cobrado,...baseTx,_importadoDeNotion:true,_notionRowId:notionId});
         if(movilidad>0)  state.transactions.unshift({id:notionId+'-mov',type:'egreso',amount:movilidad,...baseTx,category:'Movilidad',description:'Movilidad · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
         if(materiales>0) state.transactions.unshift({id:notionId+'-mat',type:'egreso',amount:materiales,...baseTx,category:'Materiales',description:'Materiales · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
