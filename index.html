@@ -7055,7 +7055,7 @@ function openAddAgenda(tipo, editId, preData){
   const estadosOpts = Object.entries(AGENDA_ESTADOS).map(([k,v])=>`<option value="${k}" ${item&&item.estado===k?'selected':k==='agendado'&&!item?'selected':''}>${v.label}</option>`).join('');
   const visitasEstados = ['agendado','en proceso','interesado','convertido','no interesado'];
   const visitasEstadosOpts = visitasEstados.map(e=>`<option value="${e}" ${item&&item.estado===e?'selected':e==='en proceso'&&!item?'selected':''}>${e.charAt(0).toUpperCase()+e.slice(1)}</option>`).join('');
-  const visitasAcciones = ['se agendó const...', 'se envió mensaje', 'se llamó', 'se envió precio', 'se agendó visita', 'se hizo visita', 'se construyó', 'se desanimó'];
+  const visitasAcciones = ['se agendó construcción', 'se envió mensaje', 'se llamó', 'se envió precio', 'se agendó visita', 'se hizo visita', 'se construyó', 'se desanimó'];
 
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:${colorTitle};font-family:'Playfair Display',serif">${isEdit?'Editar':(isVisita?'Nueva':'Nuevo')} ${isVisita?'Visita':'Construcción'}</div>
@@ -7089,7 +7089,16 @@ function openAddAgenda(tipo, editId, preData){
           <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">${i}ª Acción</label>
             <select id="ag-accion${i}" style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%">
               <option value="">—</option>
-              ${visitasAcciones.map(a=>`<option value="${a}" ${(item&&item[`accion${i}`]===a) || (!item && i==='1' && a==='se agendó visita')?'selected':''}>${a}</option>`).join('')}
+              ${visitasAcciones.map(a=>`
+                <option value="${a}" ${
+                  (item && item[`accion${i}`]===a) || 
+                  (!item && (
+                    (i==='1' && ((isVisita && a==='se agendó visita') || (!isVisita && a==='se agendó visita'))) ||
+                    (i==='2' && (!isVisita && a==='se agendó construcción'))
+                  ))
+                  ?'selected':''
+                }>${a}</option>
+              `).join('')}
             </select>
           </div>
         `).join('')}
