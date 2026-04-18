@@ -5639,6 +5639,7 @@ async function _pushToNotionClientes(item) {
     else if (col.type === 'date')    payload.properties[col.name] = { date: { start: String(value) } };
     else if (col.type === 'phone_number') payload.properties[col.name] = { phone_number: String(value) };
     else if (col.type === 'multi_select') payload.properties[col.name] = { multi_select: [{ name: String(value) }] };
+    else if (col.type === 'url')     payload.properties[col.name] = { url: String(value) };
   };
 
   // Title: Cliente
