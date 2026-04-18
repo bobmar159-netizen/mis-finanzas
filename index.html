@@ -6956,16 +6956,16 @@ function renderAgenda(){
       ? `<span class="ag-card-pill" style="background:#FAEEDA;color:#633806">Pendiente: S/ ${item.montoPendienteCobro.toFixed(2)}</span>` : '';
 
     const accionesHtml = estaActivo ? `
-      <div class="ag-card-actions" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button class="ag-act-btn" style="background:#EEEDFE;border:1px solid #AFA9EC;color:#3C3489;padding:10px;font-size:11px;font-weight:700;border-radius:10px;cursor:pointer"
-          onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','reprogramo')">🔄 Se reprogramó</button>
-        <button class="ag-act-btn" style="background:#F1EFE8;border:1px solid #B4B2A9;color:#444441;padding:10px;font-size:11px;font-weight:700;border-radius:10px;cursor:pointer"
-          onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','se_desanimo')">✗ Se desanimó</button>
+      <div class="ag-card-actions" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 4px">
+        <button class="ag-act-btn" style="background:#EEEDFE;border:1px solid #AFA9EC;color:#3C3489;padding:10px;font-size:11px;font-weight:700;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px"
+          onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','reprogramo')">🔄 Reprogramar</button>
+        <button class="ag-act-btn" style="background:#F1EFE8;border:1px solid #B4B2A9;color:#444441;padding:10px;font-size:11px;font-weight:700;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px"
+          onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','se_desanimo')">✗ Desanimó</button>
         ${!isVisita
           ? `<button class="ag-act-btn" style="background:#EAF3DE;border:1px solid #97C459;color:#27500A;grid-column: span 2;padding:12px;font-size:12px;font-weight:800;border-radius:10px;cursor:pointer"
-              onclick="event.stopPropagation();abrirModalCobro('${item.id}')">✓ Se finalizó / Cobrar</button>`
+              onclick="event.stopPropagation();abrirModalCobro('${item.id}')">✓ Finalizar y Cobrar</button>`
           : `<button class="ag-act-btn" style="background:#FFF3E0;border:1px solid #FFCC80;color:#BF360C;grid-column: span 2;padding:12px;font-size:12px;font-weight:800;border-radius:10px;cursor:pointer"
-              onclick="event.stopPropagation();convertirVisitaATrabajo('${item.id}')">🔨 Agendó construcción</button>`}
+              onclick="event.stopPropagation();convertirVisitaATrabajo('${item.id}')">🔨 Agendó Construcción</button>`}
       </div>` : '';
 
     const secundariosHtml = `
@@ -6992,11 +6992,9 @@ function renderAgenda(){
           </div>
           ${!isVisita && item.servicio ? `<div class="ag-card-servicio">🔵 ${item.servicio}</div>` : ''}
           ${item.ubicacion ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">📍 ${item.ubicacion}</div>` : ''}
-          ${item.fechaReprogramado ? `<div style="font-size:11px;color:#3C3489;margin-top:3px;font-weight:600">↻ Reprogramado: ${item.fechaReprogramado}${item.motivoReprogramacion?' · '+item.motivoReprogramacion:''}</div>` : ''}
         </div>
-        <div class="ag-card-chevron">▾</div>
+        ${accionesHtml}
       </div>
-
       <!-- DETALLE — se despliega al tap -->
       <div class="ag-card-expand">
         <div class="ag-card-detail">
@@ -7004,7 +7002,6 @@ function renderAgenda(){
           ${precioHtml}
           ${telHtml}
           ${notasHtml}
-          ${accionesHtml}
           ${secundariosHtml}
         </div>
       </div>
