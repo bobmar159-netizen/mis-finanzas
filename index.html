@@ -6979,8 +6979,8 @@ function renderAgenda(){
       </div>`;
 
     return `
-    <div class="ag-card" id="${cardId}">
-      <div class="ag-card-head" onclick="toggleAgendaCard('${cardId}')">
+    <div class="ag-card" id="${cardId}" style="padding-bottom:12px">
+      <div class="ag-card-head" onclick="toggleAgendaCard('${cardId}')" style="border-bottom:none">
         <div class="ag-card-icon" style="background:${iconBg}">${icono}</div>
         <div class="ag-card-body">
           <div class="ag-card-nombre">${item.cliente||'Sin cliente'}</div>
@@ -6993,11 +6993,17 @@ function renderAgenda(){
           ${!isVisita && item.servicio ? `<div class="ag-card-servicio">🔵 ${item.servicio}</div>` : ''}
           ${item.ubicacion ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">📍 ${item.ubicacion}</div>` : ''}
         </div>
+        <div class="ag-card-chevron">▾</div>
+      </div>
+
+      <!-- BOTONES SIEMPRE VISIBLES -->
+      <div style="padding: 0 12px">
         ${accionesHtml}
       </div>
+
       <!-- DETALLE — se despliega al tap -->
       <div class="ag-card-expand">
-        <div class="ag-card-detail">
+        <div class="ag-card-detail" style="border-top:1px solid #F1F5F9;margin-top:10px;padding-top:10px">
           ${ubicHtml}
           ${precioHtml}
           ${telHtml}
