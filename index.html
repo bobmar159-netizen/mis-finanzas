@@ -6958,14 +6958,14 @@ function renderAgenda(){
     const accionesHtml = estaActivo ? `
       <div class="ag-card-actions">
         <button class="ag-act-btn" style="background:#EEEDFE;border-color:#AFA9EC;color:#3C3489"
-          onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','reprogramo')">↻ Reprogramó</button>
+          onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','reprogramo')">↻ Se reprogramó</button>
         <button class="ag-act-btn" style="background:#F1EFE8;border-color:#B4B2A9;color:#444441"
           onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','se_desanimo')">✗ Se desanimó</button>
         ${!isVisita
           ? `<button class="ag-act-btn" style="background:#EAF3DE;border-color:#97C459;color:#27500A"
               onclick="event.stopPropagation();abrirModalCobro('${item.id}')">✓ Se finalizó</button>`
           : `<button class="ag-act-btn" style="background:#FFF3E0;border-color:#FFCC80;color:#BF360C"
-              onclick="event.stopPropagation();convertirVisitaAConstruccion('${item.id}')">🔨 Convertir a Construcción</button>`}
+              onclick="event.stopPropagation();convertirVisitaATrabajo('${item.id}')">🔨 Agendó construcción</button>`}
       </div>` : '';
 
     const secundariosHtml = `
@@ -7446,93 +7446,33 @@ function abrirWhatsAppAgenda(id) {
   window.open(url, '_blank');
 }
 
-function convertirVisitaAConstruccion(id){
-  const visita=(state.agenda||[]).find(x=>x.id===id);
+function convertirVisitaATrabajo(id){
+  const visita = (state.agenda||[]).find(x=>x.id===id);
   if(!visita) return;
-  const hoy=todayStr();
-  document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title" style="color:#BF360C">🔨 Convertir a Construcción</div>
-    <div style="background:#FFF3E0;border:1px solid #E6510033;border-radius:10px;padding:10px 14px;font-size:12px;color:#BF360C;margin-bottom:14px">
-      <strong>Visita original:</strong> ${visita.cliente} · ${visita.fecha}${visita.ubicacion?' · '+visita.ubicacion:''}
-    </div>
-    <div class="field"><label class="field-label">Servicio / Trabajo a realizar</label>
-      <select id="cv-servicio" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-        <option value="">Seleccionar servicio...</option>
-        ${(state.serviciosNeg||[
-          {label:'Instalación Terma'},{label:'Instalación Cocina'},{label:'Instalación Calefón'},
-          {label:'Modificación Red'},{label:'Punto Adicional'},{label:'Conexión Artefacto'},
-          {label:'Reparación'},{label:'Conversión Artefacto'},{label:'Instalación Horno'},
-          {label:'Instalación Secadora'},{label:'Construcción Parrilla'},{label:'Gasfitería General'},
-          {label:'Documentación Técnica'}
-        ]).map(s=>`<option value="${s.label}">${s.label}</option>`).join('')}
-      </select>
-    </div>
-    <div class="field"><label class="field-label">Precio acordado (S/.)</label>
-      <input id="cv-precio" type="number" min="0" placeholder="0.00" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-    </div>
-    <div class="field"><label class="field-label">Nueva fecha</label>
-      <input id="cv-fecha" type="date" value="${visita.fecha||hoy}" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-    </div>
-    <div class="field"><label class="field-label">Hora</label>
-      <input id="cv-hora" type="time" value="${visita.hora||'09:00'}" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-    </div>
-    <div class="field"><label class="field-label">Notas adicionales</label>
-      <input id="cv-notas" type="text" placeholder="Observaciones del cliente, materiales, etc." value="${visita.notas||''}" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-    </div>
-    <div class="btn-row">
-      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button onclick="guardarConversion('${id}')" style="flex:2;background:linear-gradient(135deg,#E65100,#FF7043);color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">🔨 Confirmar conversión</button>
-    </div>`;
-  showModal();
+  
+  // Pre-cargar datos de la visita para el nuevo formulario de trabajo
+  const preData = {
+    cliente: visita.cliente || '',
+    ubicacion: visita.ubicacion || '',
+    telefono: visita.telefono || '',
+    notas: visita.notas ? 'Viene de Visita: ' + visita.notas : 'Viene de Visita',
+    // No ponemos fecha para que el calendario se abra y el usuario elija la fecha de construcción
+    fecha: '', 
+    hora: visita.hora || '09:00'
+  };
+
+  // Abrimos el formulario de TRABAJO con los datos pre-llenados
+  // No enviamos editId para que se cree uno nuevo, o si prefieres, podemos 
+  // marcar la visita como 'convertida' después de guardar.
+  openAddAgenda('trabajo', null, preData);
+  
+  // Opcional: Podríamos marcar la visita como finalizada/convertida en Notion/Sheets
+  // Pero lo ideal es que el usuario guarde el nuevo trabajo primero.
 }
 
 function guardarConversion(id){
-  const visita=(state.agenda||[]).find(x=>x.id===id);
-  if(!visita) return;
-
-  const servicio=document.getElementById('cv-servicio').value;
-  const precio=parseFloat(document.getElementById('cv-precio').value)||0;
-  const fecha=document.getElementById('cv-fecha').value;
-  const hora=document.getElementById('cv-hora').value;
-  const notas=document.getElementById('cv-notas').value.trim();
-
-  if(!servicio){ toast('Selecciona el servicio','error'); return; }
-  if(!fecha){ toast('Selecciona la fecha','error'); return; }
-
-  // Historial de conversión
-  const fechaConversion=new Date().toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});
-  const historial=`Convertido de Visita el ${fechaConversion}${visita.fecha?' (visita original: '+visita.fecha+')':''}`;
-
-  // Actualizar el item existente
-  const itemActualizado={
-    ...visita,
-    tipo:'trabajo',
-    servicio,
-    precio,
-    fecha,
-    hora,
-    notas: notas ? notas+' · '+historial : historial,
-    estado:'pendiente',
-    convertidoDeVisita: true,
-    fechaVisitaOriginal: visita.fecha,
-    fechaConversion: todayStr()
-  };
-
-  state.agenda=state.agenda.map(x=>x.id===id?itemActualizado:x);
-  save('fnz_agenda',state.agenda);
-
-  // Sync a Sheets — usa _sendToSheets para badge de feedback
-  _sendToSheets(localStorage.getItem('fnz_sheets_url')||'', {
-    type:'agenda_conversion',
-    id,
-    item:itemActualizado,
-    modo:state.modo,
-    timestamp:id+'_conv_'+Date.now()
-  });
-
-  closeModal();
-  render();
-  toast('✓ Visita convertida a Construcción');
+  // Esta función es obsoleta si usamos el flujo de openAddAgenda
+  // La mantengo vacía o la elimino para evitar confusión
 }
 
 function deleteAgendaItem(id){
