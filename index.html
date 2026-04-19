@@ -7522,6 +7522,26 @@ function deleteAgendaItem(id){
   toast('Eliminado' + (txAsociadas.length||deudasAsociadas.length ? ' · Movimientos e ingresos relacionados también eliminados' : ''));
 }
 
+// ── Función para expandir/colapsar tarjetas de Agenda ──
+function toggleAgendaCard(cardId) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  
+  const expand = card.querySelector('.ag-card-expand');
+  const chevron = card.querySelector('.ag-card-chevron');
+  const isOpening = !card.classList.contains('open');
+  
+  if (isOpening) {
+    card.classList.add('open');
+    if(expand) expand.style.maxHeight = '600px';
+    if(chevron) chevron.style.transform = 'rotate(180deg)';
+  } else {
+    card.classList.remove('open');
+    if(expand) expand.style.maxHeight = '0px';
+    if(chevron) chevron.style.transform = 'rotate(0deg)';
+  }
+}
+
 function cambiarEstadoAgenda(id, estado){
   const item=(state.agenda||[]).find(x=>x.id===id);
   if(!item) return;
