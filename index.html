@@ -7399,19 +7399,20 @@ function saveAgendaItem(editId, tipo){
   save('fnz_agenda', state.agenda);
   syncAgendaToSheets(item);
 
-  // ── Push a Notion al crear/editar (garantiza que el cliente llegue) ──
+  // ── Push a Notion al crear/editar (Evita duplicados usando _notionRowId) ──
   const nToken = localStorage.getItem('fnz_notion_token');
   if (nToken) {
     const nDbidClientes = localStorage.getItem('fnz_notion_dbid_clientes');
-    // 1. Siempre empujar a CLIENTES (DB2)
     if (nDbidClientes) {
+      // Si ya tiene _notionRowId, Notion debe ACTUALIZAR (usando la lógica interna de push)
       _pushToNotionClientes(item).then(res => {
+        // Si es nuevo, guardamos el ID que Notion nos devuelve para futuras ediciones
         if (res && res.id && !item._notionRowId) {
           item._notionRowId = res.id;
           state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
           save('fnz_agenda', state.agenda);
         }
-      }).catch(err => console.warn('Notion Clientes (no crítico):', err.message));
+      }).catch(err => console.warn('Notion Sincronización:', err.message));
     }
   }
 
