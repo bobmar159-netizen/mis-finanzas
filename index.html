@@ -6955,7 +6955,7 @@ function renderAgenda(){
     const montoP = item.montoPendienteCobro>0
       ? `<span class="ag-card-pill" style="background:#FAEEDA;color:#633806">Pendiente: S/ ${item.montoPendienteCobro.toFixed(2)}</span>` : '';
 
-    const accionesHtml = estaActivo ? `
+    const accionesHtml = `
       <div class="ag-card-actions" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 4px">
         <button class="ag-act-btn" style="background:#EEEDFE;border:1px solid #AFA9EC;color:#3C3489;padding:10px;font-size:11px;font-weight:700;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px"
           onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','reprogramo')">🔄 Reprogramar</button>
@@ -6966,7 +6966,7 @@ function renderAgenda(){
               onclick="event.stopPropagation();abrirModalCobro('${item.id}')">✓ Finalizar y Cobrar</button>`
           : `<button class="ag-act-btn" style="background:#FFF3E0;border:1px solid #FFCC80;color:#BF360C;grid-column: span 2;padding:12px;font-size:12px;font-weight:800;border-radius:10px;cursor:pointer"
               onclick="event.stopPropagation();convertirVisitaATrabajo('${item.id}')">🔨 Agendó Construcción</button>`}
-      </div>` : '';
+      </div>`;
 
     const secundariosHtml = `
       <div style="display:flex;gap:6px;margin-top:4px">
