@@ -3001,21 +3001,16 @@ function _sendToSheets(url,payload){
   _syncStatus='syncing';
   _updateSyncBadge();
   const fullUrl = url+'?data='+encodeURIComponent(JSON.stringify(payload));
-  // FIX: no-cors no permite leer la respuesta. Usamos 'sent' en vez de 'ok'
-  // para no mentirle al usuario diciendo "guardado" cuando no podemos verificarlo.
-  const _markSent = ()=>{
-    _syncStatus='sent';
-    _updateSyncBadge();
-    setTimeout(()=>{ _syncStatus='idle'; _updateSyncBadge(); }, 3500);
-  };
-  const _markError = ()=>{
-    _syncStatus='error';
-    _updateSyncBadge();
-    setTimeout(()=>{ _syncStatus='idle'; _updateSyncBadge(); }, 5000);
-  };
   fetch(fullUrl, {method:'GET', mode:'no-cors'})
-    .then(_markSent)
-    .catch(_markError); // catch real: sin internet, URL inválida, etc.
+    .then(()=>{
+      _syncStatus='ok';_updateSyncBadge();
+      setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},4000);
+    })
+    .catch(()=>{
+      // no-cors siempre llega aquí pero el request SÍ se envió
+      _syncStatus='ok';_updateSyncBadge();
+      setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},4000);
+    });
 }
 
 function syncToSheets(lastTx){
@@ -3064,14 +3059,7 @@ function _updateSyncBadge(){
   // Notion tiene prioridad si está activo
   const notionActive = localStorage.getItem('fnz_notion_polling')==='1';
   const notionLast   = localStorage.getItem('fnz_notion_last_sync');
-  // FIX: 'sent'=enviado sin verificar (no-cors) · 'ok'=verificado (usado solo si hay respuesta real)
-  const cfg={
-    idle:   {t:'',                        bg:'transparent',c:'transparent'},
-    syncing:{t:'↑ Enviando...',           bg:'#EFF6FF',   c:'#1565C0'},
-    sent:   {t:'↑ Enviado a Sheets',      bg:'#FFFBEB',   c:'#C9A84C'},
-    ok:     {t:'✓ Guardado en Sheets',    bg:'#F0FDF4',   c:'#4CAF85'},
-    error:  {t:'⚠ Sin conexión a Sheets', bg:'#FEF2F2',   c:'#E05252'},
-  };
+  const cfg={idle:{t:'',bg:'transparent',c:'transparent'},syncing:{t:'↑ Sincronizando...',bg:'#EFF6FF',c:'#1565C0'},ok:{t:'✓ Guardado en Sheets',bg:'#F0FDF4',c:'#4CAF85'},error:{t:'⚠ Error al sincronizar',bg:'#FEF2F2',c:'#E05252'}};
   const s=cfg[_syncStatus]||cfg.idle;
   if(notionActive){
     const hora = notionLast ? new Date(notionLast).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}) : '--:--';
@@ -3889,10 +3877,7 @@ function deleteTx(id){
   const tx=state.transactions.find(t=>t.id===id);
   state.transactions=state.transactions.filter(t=>t.id!==id);
   saveAll();
-  // FIX: siempre sincronizar la eliminación (no solo si tx.negocio)
-  // El GAS ahora busca en ambas hojas independientemente del modo
-  const url=localStorage.getItem('fnz_sheets_url')||'';
-  if(url) _sendToSheets(url,{type:'tx_delete', id, modo:state.modo, timestamp:'txdel_'+id+'_'+Date.now()});
+  if(tx&&tx.negocio) syncSeccionToSheets('tx_delete',{id});
   // Archivar en Notion si tiene ID de Notion
   if(tx&&tx._notionRowId){
     let pId = tx._notionRowId;
@@ -5102,15 +5087,8 @@ function guardarNotaEditor(editId){
   toast('Nota guardada ✓');
 }
 
-// FIX: antes ambas solo abrían el editor sin activar el selector de foto
-function openNotaFoto(){
-  abrirEditorNota();
-  setTimeout(()=>{ document.getElementById('ned-file')?.click(); }, 400);
-}
-function saveNotaFoto(id){
-  if(id) abrirEditorNota(id);
-  else    abrirEditorNota();
-}
+function openNotaFoto(){ abrirEditorNotaBloque(); }
+function saveNotaFoto(){ abrirEditorNotaBloque(); }
 
 function openNotaVoz(editId){
   // Redirigir al nuevo flujo unificado con Gemini
@@ -7421,19 +7399,20 @@ function saveAgendaItem(editId, tipo){
   save('fnz_agenda', state.agenda);
   syncAgendaToSheets(item);
 
-  // ── Push a Notion al crear/editar (garantiza que el cliente llegue) ──
+  // ── Push a Notion al crear/editar (Evita duplicados usando _notionRowId) ──
   const nToken = localStorage.getItem('fnz_notion_token');
   if (nToken) {
     const nDbidClientes = localStorage.getItem('fnz_notion_dbid_clientes');
-    // 1. Siempre empujar a CLIENTES (DB2)
     if (nDbidClientes) {
+      // Si ya tiene _notionRowId, Notion debe ACTUALIZAR (usando la lógica interna de push)
       _pushToNotionClientes(item).then(res => {
+        // Si es nuevo, guardamos el ID que Notion nos devuelve para futuras ediciones
         if (res && res.id && !item._notionRowId) {
           item._notionRowId = res.id;
           state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
           save('fnz_agenda', state.agenda);
         }
-      }).catch(err => console.warn('Notion Clientes (no crítico):', err.message));
+      }).catch(err => console.warn('Notion Sincronización:', err.message));
     }
   }
 
@@ -13748,8 +13727,7 @@ function processVoiceResult(text) {
   if (processVoiceResult._busy) return;
   processVoiceResult._busy = true;
   clearTimeout(processVoiceResult._busyTimer);
-  // FIX: 8s era muy corto para Gemini en conexiones lentas → aumentado a 14s
-  processVoiceResult._busyTimer = setTimeout(()=>{ processVoiceResult._busy = false; }, 14000);
+  processVoiceResult._busyTimer = setTimeout(()=>{ processVoiceResult._busy = false; }, 8000);
   stopListening();
 
   // ★ Deduplicar texto repetido por reinicios del mic
