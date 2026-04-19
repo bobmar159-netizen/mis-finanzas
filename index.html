@@ -16489,6 +16489,41 @@ async function exportarNotaA4WhatsApp(notaId){
     toast('Error al generar imagen: '+err.message,'error');
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// 🔄 SINCRONIZACIÓN MAESTRA (FIX DUPLICADOS)
+// ═══════════════════════════════════════════════════════════════════
+function syncAgendaToSheets(item){
+  const url = localStorage.getItem('fnz_sheets_url');
+  if(!url) return;
+  const nToken = localStorage.getItem('fnz_notion_token') || '';
+  const nDbId  = localStorage.getItem('fnz_notion_dbid_clientes') || '';
+  
+  // Limpieza preventiva de fechas
+  if (item.fechaVisita && item.fechaVisita.includes('42026')) item.fechaVisita = item.fechaVisita.replace('42026', '2026');
+  
+  const payload = { 
+    agenda: item,
+    notion_token: nToken,
+    notion_dbid_clientes: nDbId
+  };
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  })
+  .then(res => res.json())
+  .then(res => {
+    if (res && res.notionId) {
+      // ÉXITO: La App ahora conoce el ID de Notion
+      item._notionRowId = res.notionId;
+      saveAll();
+      console.log('✅ Sincronización OK - Notion ID vinculado:', res.notionId);
+    }
+  })
+  .catch(e => console.warn('Sync Error:', e.message));
+}
 </script>
 </body>
 </html>
