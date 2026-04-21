@@ -7135,6 +7135,14 @@ function openAddAgenda(tipo, editId, preData){
     ${isVisita?`
     <div style="background:#F0F9FF;border:1px solid #1565C022;border-radius:12px;padding:12px;margin-bottom:12px">
       <div style="font-size:10px;font-weight:800;color:#1565C0;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">👥 Gestión Comercial</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">Fecha Visita</label>
+          <input type="date" id="ag-fecha-visita" value="${item?item.fechaVisita||'':pre.fechaVisita||''}" style="padding:10px;background:#fff;border:1px solid #E2E8F0;border-radius:10px;width:100%;font-size:12px">
+        </div>
+        <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">Fecha Construcción</label>
+          <input type="date" id="ag-fecha-construccion" value="${item?item.fechaConstruccion||'':pre.fechaConstruccion||''}" style="padding:10px;background:#fff;border:1px solid #E2E8F0;border-radius:10px;width:100%;font-size:12px">
+        </div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${['1','2','3','4'].map(i=>`
           <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">${i}ª Acción</label>
@@ -7142,7 +7150,7 @@ function openAddAgenda(tipo, editId, preData){
               <option value="">—</option>
               ${visitasAcciones.map(a=>`
                 <option value="${a}" ${
-                  (item && item[`accion${i}`]===a) || 
+                  (item && item[\`accion\${i}\`]===a) || 
                   (!item && (
                     (i==='1' && ((isVisita && a==='se agendó visita') || (!isVisita && a==='se agendó visita'))) ||
                     (i==='2' && (!isVisita && a==='se agendó construcción'))
@@ -7502,24 +7510,11 @@ function convertirVisitaATrabajo(id){
   const visita = (state.agenda||[]).find(x=>x.id===id);
   if(!visita) return;
   
-  // Pre-cargar datos de la visita para el nuevo formulario de trabajo
-  const preData = {
-    cliente: visita.cliente || '',
-    ubicacion: visita.ubicacion || '',
-    telefono: visita.telefono || '',
-    notas: visita.notas ? 'Viene de Visita: ' + visita.notas : 'Viene de Visita',
-    // No ponemos fecha para que el calendario se abra y el usuario elija la fecha de construcción
-    fecha: '', 
-    hora: visita.hora || '09:00'
-  };
-
-  // Abrimos el formulario de TRABAJO con los datos pre-llenados
-  // No enviamos editId para que se cree uno nuevo, o si prefieres, podemos 
-  // marcar la visita como 'convertida' después de guardar.
-  openAddAgenda('trabajo', null, preData);
+  visita.accion1 = 'se agendó visita';
+  visita.accion2 = 'se agendó construcción';
+  state.agenda = state.agenda.map(x => x.id === id ? visita : x);
   
-  // Opcional: Podríamos marcar la visita como finalizada/convertida en Notion/Sheets
-  // Pero lo ideal es que el usuario guarde el nuevo trabajo primero.
+  openAddAgenda('visita', id);
 }
 
 function guardarConversion(id){
