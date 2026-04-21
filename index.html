@@ -7642,12 +7642,23 @@ function confirmarReprogramacion(id){
   save('fnz_agenda',state.agenda);
   closeModal();
   render();
-  
+
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(url){
-    // Re-enviamos el item completo porque cambió la fecha/hora
     _sendToSheets(url, { type:'agenda', item, modo: state.modo });
   }
+
+  // ── Actualizar Notion al reprogramar ──
+  if(localStorage.getItem('fnz_notion_token') && localStorage.getItem('fnz_notion_dbid_clientes')){
+    _pushToNotionClientes(item).then(res=>{
+      if(res && res.id){
+        state.agenda = state.agenda.map(x => x.id===item.id ? {...x, _notionRowId: res.id} : x);
+        save('fnz_agenda', state.agenda);
+        console.log('Notion reprogramado:', res.id);
+      }
+    }).catch(e=>console.warn('Notion reprogramar:', e.message));
+  }
+
   toast('↻ Reprogramado para '+nFecha);
 }
 
@@ -7661,6 +7672,18 @@ function _aplicarEstadoAgenda(id, estado){
     const payload={ type:'agenda_estado', agenda_estado:{ id:item.id, estado, estadoPago:item.estadoPago||'-', montoPagado:item.montoPagado||0, montoPendienteCobro:item.montoPendienteCobro||0, tipo:item.tipo, fechaReprogramado:item.fechaReprogramado||'' } };
     _sendToSheets(url, payload);
   }
+
+  // ── Actualizar estado en Notion ──
+  if(localStorage.getItem('fnz_notion_token') && localStorage.getItem('fnz_notion_dbid_clientes')){
+    _pushToNotionClientes(item).then(res=>{
+      if(res && res.id){
+        state.agenda = state.agenda.map(x => x.id===item.id ? {...x, _notionRowId: res.id} : x);
+        save('fnz_agenda', state.agenda);
+        console.log('Notion estado actualizado:', estado, res.id);
+      }
+    }).catch(e=>console.warn('Notion estado:', e.message));
+  }
+
   render();
   toast('Estado: '+(AGENDA_ESTADOS[estado]?.label||estado));
 }
