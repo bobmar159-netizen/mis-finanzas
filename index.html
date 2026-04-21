@@ -7115,7 +7115,7 @@ function openAddAgenda(tipo, editId, preData){
         style="font-family:'DM Sans',sans-serif;font-weight:600;padding:14px;background:#F1F5F9;border-color:transparent">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-      <div class="field" style="margin-bottom:0"><label class="field-label">Fecha Programada</label>
+      <div class="field" style="margin-bottom:0"><label class="field-label">${isVisita ? 'Fecha de Visita' : 'Fecha de Construcción'}</label>
         <input id="ag-fecha" type="date" value="${item?item.fecha:pre.fecha||getAgendaHoy()}"
           style="padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px">
       </div>
@@ -7135,14 +7135,6 @@ function openAddAgenda(tipo, editId, preData){
     ${isVisita?`
     <div style="background:#F0F9FF;border:1px solid #1565C022;border-radius:12px;padding:12px;margin-bottom:12px">
       <div style="font-size:10px;font-weight:800;color:#1565C0;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">👥 Gestión Comercial</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">Fecha Visita</label>
-          <input type="date" id="ag-fecha-visita" value="${item?item.fechaVisita||'':pre.fechaVisita||''}" style="padding:10px;background:#fff;border:1px solid #E2E8F0;border-radius:10px;width:100%;font-size:12px">
-        </div>
-        <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">Fecha Construcción</label>
-          <input type="date" id="ag-fecha-construccion" value="${item?item.fechaConstruccion||'':pre.fechaConstruccion||''}" style="padding:10px;background:#fff;border:1px solid #E2E8F0;border-radius:10px;width:100%;font-size:12px">
-        </div>
-      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${['1','2','3','4'].map(i=>`
           <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">${i}ª Acción</label>
@@ -7431,21 +7423,42 @@ function saveAgendaItem(editId, tipo){
 
   if(!state.agenda) state.agenda=[];
 
+  let isConversion = false;
+  let finalId = editId || Date.now()+'';
+  if(!editId && window._conversionVisita) {
+    isConversion = true;
+    finalId = window._conversionVisita.id;
+  }
+
   // Preservar campos que no están en el form (montoPagado, _notionRowId, etc.)
-  const existente = editId ? (state.agenda.find(x=>x.id===editId)||{}) : {};
+  const existente = (editId || isConversion) ? (state.agenda.find(x=>x.id===finalId)||{}) : {};
   const item = {
     ...existente,
-    id: editId || Date.now()+'',
+    id: finalId,
     tipo, cliente, fecha, hora,
     servicio, servicio1: servicio,
     servicio2, servicio3, servicio4,
     precio, ubicacion, telefono, notas, estado,
     // Add visita fields
-    prioridad, accion1, accion2, accion3, accion4, fechaVisita, fechaConstruccion
+    prioridad: prioridad || existente.prioridad || 'media',
+    accion1: accion1 || existente.accion1 || '',
+    accion2: accion2 || existente.accion2 || '',
+    accion3: accion3 || existente.accion3 || '',
+    accion4: accion4 || existente.accion4 || '',
+    fechaVisita: fechaVisita || existente.fechaVisita || (tipo === 'visita' ? fecha : ''),
+    fechaConstruccion: fechaConstruccion || existente.fechaConstruccion || ''
   };
 
-  if(editId){
-    state.agenda = state.agenda.map(x=>x.id===editId ? item : x);
+  if(isConversion) {
+    item.accion1 = 'se agendó visita';
+    item.accion2 = 'se agendó construcción';
+    item.fechaConstruccion = fecha; // El nuevo Trabajo guarda su fecha principal como fecha de construcción
+    item._notionRowId = window._conversionVisita._notionRowId;
+    window._conversionVisita = null; // Reset
+  }
+
+  if(editId || isConversion){
+    state.agenda = state.agenda.map(x=>x.id===finalId ? item : x);
   } else {
     state.agenda.unshift(item);
   }
@@ -7510,11 +7523,23 @@ function convertirVisitaATrabajo(id){
   const visita = (state.agenda||[]).find(x=>x.id===id);
   if(!visita) return;
   
-  visita.accion1 = 'se agendó visita';
-  visita.accion2 = 'se agendó construcción';
-  state.agenda = state.agenda.map(x => x.id === id ? visita : x);
-  
-  openAddAgenda('visita', id);
+  // Pre-cargar datos de la visita para el nuevo formulario de trabajo
+  const preData = {
+    cliente: visita.cliente || '',
+    ubicacion: visita.ubicacion || '',
+    telefono: visita.telefono || '',
+    notas: visita.notas ? 'Viene de Visita: ' + visita.notas : 'Viene de Visita',
+    fecha: '', 
+    hora: visita.hora || '09:00'
+  };
+
+  // Guardamos el contexto de conversión globalmente
+  window._conversionVisita = {
+    id: visita.id,
+    _notionRowId: visita._notionRowId
+  };
+
+  openAddAgenda('trabajo', null, preData);
 }
 
 function guardarConversion(id){
