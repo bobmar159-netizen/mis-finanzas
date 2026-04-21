@@ -7150,7 +7150,7 @@ function openAddAgenda(tipo, editId, preData){
               <option value="">—</option>
               ${visitasAcciones.map(a=>`
                 <option value="${a}" ${
-                  (item && item[\`accion\${i}\`]===a) || 
+                  (item && item['accion'+i]===a) || 
                   (!item && (
                     (i==='1' && ((isVisita && a==='se agendó visita') || (!isVisita && a==='se agendó visita'))) ||
                     (i==='2' && (!isVisita && a==='se agendó construcción'))
