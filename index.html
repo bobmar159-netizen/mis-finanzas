@@ -2968,11 +2968,12 @@ function syncAgendaToSheets(item){
     notion_dbid_clientes: localStorage.getItem('fnz_notion_dbid_clientes') || ''
   });
 
-  // GET con ?data= es el método más confiable con Apps Script + no-cors
-  // (POST con no-cors puede enviar body vacío por el manejo de CORS en GAS)
-  const fullUrl = url + '?data=' + encodeURIComponent(payload);
-  fetch(fullUrl, { method: 'GET', mode: 'no-cors' })
-    .catch(e => console.warn('syncAgendaToSheets error:', e.message));
+  fetch(url, {
+    method:   'POST',
+    mode:     'no-cors',
+    redirect: 'follow',
+    body:     payload
+  }).catch(e => console.warn('syncAgendaToSheets error:', e.message));
 }
 
 
