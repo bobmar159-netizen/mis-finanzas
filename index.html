@@ -5682,6 +5682,9 @@ async function _pushToNotionClientes(item) {
   const fConst = item.fechaConstruccion || (item.tipo === 'trabajo' ? item.fecha : '');
   if(fConst) setProp(findCol('fecha de construcción','construccion','fecha construccion'), isoWithTime(fConst));
 
+  // Number: Precio
+  setProp(findCol('precio s/.','precio','monto','total'), item.precio);
+
   // Text: Ubicacion (Mapeo exacto según imagen: ubicación - letra minúscula)
   setProp(findCol('ubicación','ubicacion','ubicaciones','distrito','zona','lugar'), item.ubicacion || '');
 
@@ -7656,6 +7659,8 @@ function confirmarReprogramacion(id){
   
   item.fecha = nFecha;
   item.hora  = nHora;
+  if(item.tipo === 'visita') item.fechaVisita = nFecha;
+  if(item.tipo === 'trabajo') item.fechaConstruccion = nFecha;
   item.estado = 'reprogramo';
   item.motivoReprogramacion = motivo;
   
