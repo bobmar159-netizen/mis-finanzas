@@ -7643,10 +7643,7 @@ function confirmarReprogramacion(id){
   closeModal();
   render();
 
-  const url=localStorage.getItem('fnz_sheets_url')||'';
-  if(url){
-    _sendToSheets(url, { type:'agenda', item, modo: state.modo });
-  }
+  syncAgendaToSheets(item);
 
   // ── Actualizar Notion al reprogramar ──
   if(localStorage.getItem('fnz_notion_token') && localStorage.getItem('fnz_notion_dbid_clientes')){
