@@ -2958,16 +2958,23 @@ function syncAgendaToSheets(item){
   if(item.fechaVisita)       item.fechaVisita       = item.fechaVisita.replace(/(\d{4,5})/, y => parseInt(y)>3000?'2026':y);
   if(item.fechaConstruccion) item.fechaConstruccion = item.fechaConstruccion.replace(/(\d{4,5})/, y => parseInt(y)>3000?'2026':y);
 
-  // El backend espera la clave 'agenda' (no 'item') para routePayload
-  const payload = {
-    type:   'agenda',
-    agenda: item,          // ← clave correcta para handleAgenda
-    modo:   state.modo,
+  // Asegurarse de que fechaVisita nunca esté vacío si hay fecha principal
+  if(!item.fechaVisita && item.fecha) item.fechaVisita = item.fecha;
+
+  const payload = JSON.stringify({
+    type:                 'agenda',
+    agenda:               item,
     notion_token:         localStorage.getItem('fnz_notion_token')          || '',
     notion_dbid_clientes: localStorage.getItem('fnz_notion_dbid_clientes') || ''
-  };
-  _sendToSheets(url, payload);
+  });
+
+  // GET con ?data= es el método más confiable con Apps Script + no-cors
+  // (POST con no-cors puede enviar body vacío por el manejo de CORS en GAS)
+  const fullUrl = url + '?data=' + encodeURIComponent(payload);
+  fetch(fullUrl, { method: 'GET', mode: 'no-cors' })
+    .catch(e => console.warn('syncAgendaToSheets error:', e.message));
 }
+
 
 function syncSeccionToSheets(type,item){
   const url=localStorage.getItem('fnz_sheets_url')||'';
