@@ -2953,38 +2953,18 @@ function appendWithoutOverlap(existing, newText) {
 function syncAgendaToSheets(item){
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(!url) return;
-  // Enriquecer el item con todos los campos que el GAS necesita
+
+  // Corrección preventiva de fechas corruptas
+  if(item.fechaVisita)       item.fechaVisita       = item.fechaVisita.replace(/(\d{4,5})/, y => parseInt(y)>3000?'2026':y);
+  if(item.fechaConstruccion) item.fechaConstruccion = item.fechaConstruccion.replace(/(\d{4,5})/, y => parseInt(y)>3000?'2026':y);
+
+  // El backend espera la clave 'agenda' (no 'item') para routePayload
   const payload = {
-    type:'agenda',
-    modo: state.modo,
-    timestamp: item.id+'_'+Date.now(),
-    item: {
-      id:          item.id,
-      tipo:        item.tipo,
-      fecha:       item.fecha,
-      hora:        item.hora,
-      cliente:     item.cliente,
-      telefono:    item.telefono,
-      servicio:    item.servicio,
-      servicio1:   item.servicio1 || item.servicio,
-      servicio2:   item.servicio2,
-      servicio3:   item.servicio3,
-      servicio4:   item.servicio4,
-      ubicacion:   item.ubicacion,
-      precio:      item.precio,
-      estado:      item.estado,
-      estadoPago:  item.estadoPago,
-      montoPagado: item.montoPagado,
-      formaPago:   item.formaPago,
-      movilidad:   item.movilidad,
-      materiales:  item.materiales,
-      otros:       item.otros,
-      meta:        item.meta,
-      notas:       item.notas,
-      observaciones: item.observaciones,
-      fechaReprogramado:    item.fechaReprogramado,
-      motivoReprogramacion: item.motivoReprogramacion,
-    }
+    type:   'agenda',
+    agenda: item,          // ← clave correcta para handleAgenda
+    modo:   state.modo,
+    notion_token:         localStorage.getItem('fnz_notion_token')          || '',
+    notion_dbid_clientes: localStorage.getItem('fnz_notion_dbid_clientes') || ''
   };
   _sendToSheets(url, payload);
 }
@@ -16611,31 +16591,7 @@ async function exportarNotaA4WhatsApp(notaId){
 // ═══════════════════════════════════════════════════════════════════
 // 🔄 SINCRONIZACIÓN MAESTRA (FIX DUPLICADOS)
 // ═══════════════════════════════════════════════════════════════════
-function syncAgendaToSheets(item) {
-  var url = localStorage.getItem('fnz_sheets_url');
-  if (!url) return;
-
-  // Corrección preventiva de fechas corruptas
-  if (item.fechaVisita)       item.fechaVisita       = item.fechaVisita.replace(/(\d{4,5})/, function(y){ return parseInt(y)>3000?'2026':y; });
-  if (item.fechaConstruccion) item.fechaConstruccion = item.fechaConstruccion.replace(/(\d{4,5})/, function(y){ return parseInt(y)>3000?'2026':y; });
-
-  var payload = JSON.stringify({
-    type:                  'agenda',          // necesario para routePayload
-    agenda:                item,
-    notion_token:          localStorage.getItem('fnz_notion_token')          || '',
-    notion_dbid_clientes:  localStorage.getItem('fnz_notion_dbid_clientes') || ''
-  });
-
-  // Google Apps Script siempre redirige el POST a una URL diferente.
-  // mode:'no-cors' garantiza que el request llega (aunque no podamos leer la respuesta).
-  // La columna S de Sheets actúa como ancla permanente del notionId en el servidor.
-  fetch(url, {
-    method:      'POST',
-    mode:        'no-cors',
-    redirect:    'follow',
-    body:        payload
-  }).catch(function(e){ console.warn('syncAgendaToSheets error:', e.message); });
-}
+// syncAgendaToSheets definida en línea 2953
 
 </script>
 </body>
