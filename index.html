@@ -7405,7 +7405,7 @@ function saveAgendaItem(editId, tipo){
   const accion2 = document.getElementById('ag-accion2')?.value || '';
   const accion3 = document.getElementById('ag-accion3')?.value || '';
   const accion4 = document.getElementById('ag-accion4')?.value || '';
-  const fechaVisita = document.getElementById('ag-fecha-visita')?.value || '';
+  const fechaVisita = document.getElementById('ag-fecha-visita')?.value || fecha || '';
   const fechaConstruccion = document.getElementById('ag-fecha-construccion')?.value || '';
 
   if(!cliente || !fecha){
