@@ -7444,22 +7444,23 @@ function saveAgendaItem(editId, tipo){
   save('fnz_agenda', state.agenda);
   syncAgendaToSheets(item);
 
-  // ── Push a Notion al crear/editar (Evita duplicados usando _notionRowId) ──
+  // ── Push a Notion al crear/editar ────────────────────────────────────────
   const nToken = localStorage.getItem('fnz_notion_token');
-  if (nToken) {
-    const nDbidClientes = localStorage.getItem('fnz_notion_dbid_clientes');
-    if (nDbidClientes) {
-      // Si ya tiene _notionRowId, Notion debe ACTUALIZAR (usando la lógica interna de push)
-      _pushToNotionClientes(item).then(res => {
-        // Si es nuevo, guardamos el ID que Notion nos devuelve para futuras ediciones
-        if (res && res.id && !item._notionRowId) {
-          item._notionRowId = res.id;
-          state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
-          save('fnz_agenda', state.agenda);
-        }
-      }).catch(err => console.warn('Notion Sincronización:', err.message));
-    }
+  if (nToken && localStorage.getItem('fnz_notion_dbid_clientes')) {
+    _pushToNotionClientes(item).then(res => {
+      // SIEMPRE guardar el ID que Notion devuelve (sea POST o PATCH)
+      if (res && res.id) {
+        // Actualizar el item en state.agenda con el notionRowId
+        state.agenda = state.agenda.map(x => {
+          if (x.id === item.id) return { ...x, _notionRowId: res.id };
+          return x;
+        });
+        save('fnz_agenda', state.agenda);
+        console.log('Notion ID guardado:', res.id, '| acción:', res.object === 'page' ? (item._notionRowId ? 'PATCH' : 'POST') : '?');
+      }
+    }).catch(err => console.warn('Notion error:', err.message));
   }
+
 
   closeModal(); render();
   const faltantes=[];
