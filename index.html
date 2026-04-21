@@ -5691,19 +5691,45 @@ async function _pushToNotionClientes(item) {
   // Text: Notas
   setProp(findCol('notas','nota','observaciones','descripción'), item.notas || '');
 
-  // ── UPSERT: PATCH si ya existe el page_id, POST si es nuevo ──────────────
-  const existingPageId = (item._notionRowId || '').replace(/[^a-zA-Z0-9-]/g,'').trim();
-  const isUpdate = existingPageId.length >= 10;
+  // ── UPSERT: buscar página existente si no tenemos el ID local ────────────
+  let existingPageId = (item._notionRowId || '').replace(/[^a-zA-Z0-9-]/g,'').trim();
 
+  // Si no hay ID local (ej: se editó desde otro dispositivo), buscar en Notion por nombre
+  if (existingPageId.length < 10 && (item.cliente || '').trim()) {
+    try {
+      const searchProxy = 'https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/search');
+      const sr = await fetch(searchProxy, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: item.cliente.trim(), filter: { value: 'page', property: 'object' } })
+      });
+      if (sr.ok) {
+        const sd = await sr.json();
+        const cleanDbId = dbId.replace(/-/g,'');
+        for (const pg of (sd.results || [])) {
+          const pgDbId = (pg.parent && pg.parent.database_id ? pg.parent.database_id : '').replace(/-/g,'');
+          if (pgDbId === cleanDbId) { existingPageId = pg.id; break; }
+        }
+        if (existingPageId.length >= 10) {
+          item._notionRowId = existingPageId;
+          // Persistir en state para futuros usos en este dispositivo
+          if (window.state && window.state.agenda) {
+            state.agenda = state.agenda.map(x => x.id === item.id ? {...x, _notionRowId: existingPageId} : x);
+            if (typeof save === 'function') save('fnz_agenda', state.agenda);
+          }
+          console.log('Notion: página encontrada por nombre → PATCH', existingPageId);
+        }
+      }
+    } catch(e) { console.warn('Notion search:', e.message); }
+  }
+
+  const isUpdate = existingPageId.length >= 10;
   let apiUrl, method;
   if (isUpdate) {
-    // PATCH: actualizar página existente
-    apiUrl  = 'https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/pages/' + existingPageId);
-    method  = 'PATCH';
-    // En PATCH no se envía parent
+    apiUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/pages/' + existingPageId);
+    method = 'PATCH';
     delete payload.parent;
   } else {
-    // POST: crear página nueva
     apiUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/pages');
     method = 'POST';
   }
@@ -5718,6 +5744,7 @@ async function _pushToNotionClientes(item) {
   if (!res.ok) { const e = await res.text().catch(()=>''); throw new Error('HTTP '+res.status+' - '+e.slice(0,200)); }
   return await res.json();
 }
+
 
 // ── Notion API Polling ──────────────────────────────────────────────
 let _notionPollTimer = null;
