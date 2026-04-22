@@ -5683,7 +5683,7 @@ async function _pushToNotionClientes(item) {
   if(fConst) setProp(findCol('fecha de construcción','construccion','fecha construccion'), isoWithTime(fConst));
 
   // Number: Precio
-  setProp(findCol('precio s/.','precio','monto','total'), item.precio);
+  setProp(findCol('precio del servicio', '# precio del servicio', 'precio s/.','precio','monto','total'), item.precio);
 
   // Text: Ubicacion (Mapeo exacto según imagen: ubicación - letra minúscula)
   setProp(findCol('ubicación','ubicacion','ubicaciones','distrito','zona','lugar'), item.ubicacion || '');
@@ -7448,8 +7448,8 @@ function saveAgendaItem(editId, tipo){
     accion2: accion2 || existente.accion2 || '',
     accion3: accion3 || existente.accion3 || '',
     accion4: accion4 || existente.accion4 || '',
-    fechaVisita: fechaVisita || existente.fechaVisita || (tipo === 'visita' ? fecha : ''),
-    fechaConstruccion: fechaConstruccion || existente.fechaConstruccion || ''
+    fechaVisita: (tipo === 'visita') ? fecha : (existente.fechaVisita || ''),
+    fechaConstruccion: (tipo === 'trabajo' && !isConversion) ? fecha : (existente.fechaConstruccion || '')
   };
 
   if(isConversion) {
