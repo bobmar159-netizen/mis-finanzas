@@ -7954,6 +7954,14 @@ async function guardarFinalizacion(id){
 
     // 2) Actualizar estado en Clientes Potenciales ─────────────────────────
     syncAgendaToSheets({ ...item, estado: 'se_finalizo', montoPagado: cobrado, estadoPago: item.estadoPago });
+
+    // 3) Enviar los movimientos (ingresos y egresos) al histórico de Sheets ──
+    setTimeout(() => {
+      if(cobrado > 0)    _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_ing', amount: cobrado, type: 'ingreso' }, modo: 'negocio' });
+      if(movilidad > 0)  _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_mov', amount: movilidad, type: 'egreso', category: 'Movilidad', description: 'Movilidad · '+agDesc }, modo: 'negocio' });
+      if(materiales > 0) _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_mat', amount: materiales, type: 'egreso', category: 'Materiales', description: 'Materiales · '+agDesc }, modo: 'negocio' });
+      if(otros > 0)      _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_otr', amount: otros, type: 'egreso', category: 'Mantenimiento o Rep', description: 'Otros Gastos · '+agDesc }, modo: 'negocio' });
+    }, 500);
   }
   closeModal(); render();
   if(item.estadoPago==='completo') toast('✓ Trabajo finalizado · '+fmt(cobrado)+' cobrado');
