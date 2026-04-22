@@ -5289,19 +5289,20 @@ function _programarRecordatorio(textoHora,titulo){
 
 // ── Auto-descubrimiento y Push a Notion ─────────────────────────────
 async function _fetchNotionSchema(token, dbId) {
-  // Validar caché — si está corrupto o vacío lo descartamos
+  // Caché por dbId — cada base de datos tiene su propio schema
+  const cacheKey = 'fnz_notion_schema_' + (dbId || '').slice(-8);
   try {
-    const cached = sessionStorage.getItem('fnz_notion_schema');
+    const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached);
       // Verificar que tiene al menos una propiedad de tipo 'title'
       const hasTitle = Object.values(parsed).some(v => v && v.type === 'title');
       if (hasTitle) return parsed;
       // Caché inválido → descartar
-      sessionStorage.removeItem('fnz_notion_schema');
+      sessionStorage.removeItem(cacheKey);
     }
   } catch(e) {
-    sessionStorage.removeItem('fnz_notion_schema');
+    sessionStorage.removeItem(cacheKey);
   }
 
   const notionUrl = 'https://api.notion.com/v1/databases/' + dbId;
@@ -5323,7 +5324,7 @@ async function _fetchNotionSchema(token, dbId) {
   if (!db.properties || !Object.keys(db.properties).length) {
     throw new Error('La base de datos de Notion no tiene propiedades visibles. Verificá los permisos de la integración.');
   }
-  sessionStorage.setItem('fnz_notion_schema', JSON.stringify(db.properties));
+  sessionStorage.setItem(cacheKey, JSON.stringify(db.properties));
   return db.properties;
 }
 
