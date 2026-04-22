@@ -7879,36 +7879,43 @@ async function guardarFinalizacion(id){
   const baseTx = {category:svc1||item.servicio||'Servicio Gas', date:item.fecha,
     description:agDesc, cliente:item.cliente||'', ubicacion:item.ubicacion||'', negocio:true};
 
-  if(cobrado>0||movilidad>0||materiales>0||otros>0){
-    const notionToken = localStorage.getItem('fnz_notion_token');
-    const dbid        = localStorage.getItem('fnz_notion_dbid');
-    // Objeto completo con todos los campos de Notion
-    const cobroObj = {
-      ingreso:cobrado, movilidad, materiales, otros, observaciones:notas,
-      formaPago, meta, svc1, svc2, svc3, svc4
-    };
+  const notionToken = localStorage.getItem('fnz_notion_token');
+  const dbidReporte = localStorage.getItem('fnz_notion_dbid');           // Reporte Diario
+  const dbidClientes= localStorage.getItem('fnz_notion_dbid_clientes'); // Clientes Potenciales
 
-    if(notionToken && dbid){
-      toast('⏳ Enviando a Notion...','info');
-      try{
-        // ── Al finalizar, SIEMPRE creamos un registro NUEVO en Finanzas (Historico) ──
-        const notionRes = await _pushToNotion(item, cobroObj);
-        const notionId = notionRes.id;
-        // No sobreescribimos item._notionRowId para no romper el vínculo con el registro comercial original
-        // pero podemos guardar la relación si fuera necesario.
-        if(cobrado>0)    state.transactions.unshift({id:notionId+'-ing',type:'ingreso',amount:cobrado,...baseTx,_importadoDeNotion:true,_notionRowId:notionId});
-        if(movilidad>0)  state.transactions.unshift({id:notionId+'-mov',type:'egreso',amount:movilidad,...baseTx,category:'Movilidad',description:'Movilidad · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
-        if(materiales>0) state.transactions.unshift({id:notionId+'-mat',type:'egreso',amount:materiales,...baseTx,category:'Materiales',description:'Materiales · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
-        if(otros>0)      state.transactions.unshift({id:notionId+'-otr',type:'egreso',amount:otros,...baseTx,category:'Mantenimiento o Rep',description:'Otros Gastos · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
-        toast('✓ Registrado en Notion ✓','success');
-      } catch(err){
-        console.error('Error push Notion:',err);
-        toast('⚠ Error en Notion — guardado solo localmente','error');
-        _guardarFinalizacionLocal(Date.now()+'_ag', cobrado, movilidad, materiales, otros, baseTx, agDesc);
-      }
-    } else {
+  const cobroObj = {
+    ingreso: cobrado, movilidad, materiales, otros, observaciones: notas,
+    formaPago, meta, svc1, svc2, svc3, svc4
+  };
+
+  // ── 1. Reporte Diario (SIEMPRE, aunque sea sin cobro) ─────────────────────
+  if(notionToken && dbidReporte){
+    toast('⏳ Enviando a Notion Reporte Diario...','info');
+    try{
+      const notionRes = await _pushToNotion(item, cobroObj);
+      const notionId  = notionRes.id;
+      if(cobrado>0)    state.transactions.unshift({id:notionId+'-ing',type:'ingreso',amount:cobrado,...baseTx,_importadoDeNotion:true,_notionRowId:notionId});
+      if(movilidad>0)  state.transactions.unshift({id:notionId+'-mov',type:'egreso',amount:movilidad,...baseTx,category:'Movilidad',description:'Movilidad · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
+      if(materiales>0) state.transactions.unshift({id:notionId+'-mat',type:'egreso',amount:materiales,...baseTx,category:'Materiales',description:'Materiales · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
+      if(otros>0)      state.transactions.unshift({id:notionId+'-otr',type:'egreso',amount:otros,...baseTx,category:'Mantenimiento o Rep',description:'Otros Gastos · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
+      toast('✓ Registrado en Reporte Diario','success');
+    } catch(err){
+      console.error('Error Notion Reporte Diario:',err);
+      toast('⚠ Error Reporte Diario — guardado localmente','error');
       _guardarFinalizacionLocal(Date.now()+'_ag', cobrado, movilidad, materiales, otros, baseTx, agDesc);
     }
+  } else {
+    _guardarFinalizacionLocal(Date.now()+'_ag', cobrado, movilidad, materiales, otros, baseTx, agDesc);
+  }
+
+  // ── 2. Actualizar Clientes Potenciales en Notion → estado se_finalizo ──────
+  if(notionToken && dbidClientes && item._notionRowId){
+    _pushToNotionClientes({
+      ...item,
+      estado:     'se_finalizo',
+      estadoPago: item.estadoPago,
+      montoPagado: cobrado
+    }).catch(e=>console.warn('Clientes Potenciales Notion (no crítico):', e.message));
   }
 
   if(item.estadoPago==='parcial'&&pendiente>0){
