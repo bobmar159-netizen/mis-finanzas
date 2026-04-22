@@ -7921,29 +7921,31 @@ async function guardarFinalizacion(id){
   }
 
   save('fnz_agenda',state.agenda); saveAll();
-  // ── Sheets: enviar item COMPLETO con datos del cobro para actualizar la fila ──
-  const url=localStorage.getItem('fnz_sheets_url')||'';
-  if(url){
-    // Enriquecer el item con todos los campos del cobro antes de enviar
-    const itemParaSheets = {
-      ...item,
-      ingreso:    cobrado,
+  // ── Sheets: 1) Escribir en Reporte Diario (tipo 'trabajo') ──────────────
+  const urlSh = localStorage.getItem('fnz_sheets_url')||'';
+  if(urlSh){
+    const itemTrabajo = {
+      id:           item.id,
+      fecha:        item.fecha,
+      cliente:      item.cliente,
+      telefono:     item.telefono,
+      servicio1:    svc1 || item.servicio || item.servicio1,
+      servicio2:    svc2 || item.servicio2,
+      servicio3:    svc3 || item.servicio3,
+      servicio4:    svc4 || item.servicio4,
+      ubicacion:    distrito || item.ubicacion,
+      formaPago,
+      ingreso:      cobrado,
       movilidad,
       materiales,
       otros,
       meta,
-      formaPago,
       observaciones: notas || item.notas || '',
-      servicio1: svc1, servicio2: svc2, servicio3: svc3, servicio4: svc4,
-      montoPagado: cobrado,
-      estadoPago: item.estadoPago,
     };
-    _sendToSheets(url, { type:'agenda', modo: state.modo, timestamp: item.id+'_fin_'+Date.now(), item: itemParaSheets });
-    
-    // TAMBIÉN: Enviar a handleTrabajo para el histórico financiero en Sheets
-    setTimeout(() => {
-      _sendToSheets(url, { type:'tx', tx: { ...baseTx, id: item.id+'_fin', amount: cobrado, type: 'ingreso' }, modo: 'negocio' });
-    }, 500);
+    _sendToSheets(urlSh, { type:'trabajo', item: itemTrabajo, modo: state.modo });
+
+    // 2) Actualizar estado en Clientes Potenciales ─────────────────────────
+    syncAgendaToSheets({ ...item, estado: 'se_finalizo', montoPagado: cobrado, estadoPago: item.estadoPago });
   }
   closeModal(); render();
   if(item.estadoPago==='completo') toast('✓ Trabajo finalizado · '+fmt(cobrado)+' cobrado');
