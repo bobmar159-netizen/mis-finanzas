@@ -2953,38 +2953,46 @@ function appendWithoutOverlap(existing, newText) {
 function syncAgendaToSheets(item){
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(!url) return;
-  // Enriquecer el item con todos los campos que el GAS necesita
   const payload = {
-    type:'agenda',
-    modo: state.modo,
-    timestamp: item.id+'_'+Date.now(),
-    item: {
-      id:          item.id,
-      tipo:        item.tipo,
-      fecha:       item.fecha,
-      hora:        item.hora,
-      cliente:     item.cliente,
-      telefono:    item.telefono,
-      servicio:    item.servicio,
-      servicio1:   item.servicio1 || item.servicio,
-      servicio2:   item.servicio2,
-      servicio3:   item.servicio3,
-      servicio4:   item.servicio4,
-      ubicacion:   item.ubicacion,
-      precio:      item.precio,
-      estado:      item.estado,
-      estadoPago:  item.estadoPago,
-      montoPagado: item.montoPagado,
-      formaPago:   item.formaPago,
-      movilidad:   item.movilidad,
-      materiales:  item.materiales,
-      otros:       item.otros,
-      meta:        item.meta,
-      notas:       item.notas,
-      observaciones: item.observaciones,
+    type: 'agenda',
+    agenda: {
+      id:                   item.id,
+      tipo:                 item.tipo,
+      fecha:                item.fecha,
+      hora:                 item.hora,
+      cliente:              item.cliente,
+      telefono:             item.telefono,
+      whatsapp:             item.whatsapp || item.telefono,
+      servicio:             item.servicio || item.servicio1,
+      servicio1:            item.servicio1 || item.servicio,
+      servicio2:            item.servicio2,
+      servicio3:            item.servicio3,
+      servicio4:            item.servicio4,
+      ubicacion:            item.ubicacion,
+      precio:               item.precio,
+      estado:               item.estado,
+      estadoPago:           item.estadoPago,
+      montoPagado:          item.montoPagado,
+      formaPago:            item.formaPago,
+      movilidad:            item.movilidad,
+      materiales:           item.materiales,
+      otros:                item.otros,
+      meta:                 item.meta,
+      notas:                item.notas,
+      observaciones:        item.observaciones,
+      prioridad:            item.prioridad,
+      accion1:              item.accion1,
+      accion2:              item.accion2,
+      accion3:              item.accion3,
+      accion4:              item.accion4,
+      fechaVisita:          item.fechaVisita,
+      fechaConstruccion:    item.fechaConstruccion,
       fechaReprogramado:    item.fechaReprogramado,
       motivoReprogramacion: item.motivoReprogramacion,
-    }
+      _notionRowId:         item._notionRowId
+    },
+    notion_token:         localStorage.getItem('fnz_notion_token') || '',
+    notion_dbid_clientes: localStorage.getItem('fnz_notion_dbid_clientes') || ''
   };
   _sendToSheets(url, payload);
 }
@@ -5682,8 +5690,11 @@ async function _pushToNotionClientes(item) {
   const fConst = item.fechaConstruccion || (item.tipo === 'trabajo' ? item.fecha : '');
   if(fConst) setProp(findCol('fecha de construcción','construccion','fecha construccion'), isoWithTime(fConst));
 
-  // Number: Precio
-  setProp(findCol('precio del servicio', '# precio del servicio', 'precio s/.','precio','monto','total'), item.precio);
+  // Number: Precio — busca la columna exacta de Notion "# Precio del servicio"
+  const pPrecio = findCol('# precio del servicio', 'precio del servicio', 'precio s/.', 'precio', 'monto', 'total');
+  if (pPrecio && item.precio) {
+    payload.properties[pPrecio.name] = { number: parseFloat(item.precio) || 0 };
+  }
 
   // Text: Ubicacion (Mapeo exacto según imagen: ubicación - letra minúscula)
   setProp(findCol('ubicación','ubicacion','ubicaciones','distrito','zona','lugar'), item.ubicacion || '');
