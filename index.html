@@ -5628,6 +5628,9 @@ async function _pushToNotionClientes(item) {
   if (!token || !dbId) throw new Error('Notion DB Clientes no configurada');
 
   const props = await _fetchNotionSchema(token, dbId);
+  // ★ DEBUG PRECIO: ver nombres EXACTOS de columnas Notion (buscar '# Precio' o 'Precio')
+  const schemaKeys = Object.keys(props);
+  console.warn('★ NOTION COLUMNAS:', schemaKeys.join(' | '));
   const payload = { parent: { database_id: dbId }, properties: {} };
 
   const findCol = (...names) => {
@@ -5690,10 +5693,24 @@ async function _pushToNotionClientes(item) {
   const fConst = item.fechaConstruccion || (item.tipo === 'trabajo' ? item.fecha : '');
   if(fConst) setProp(findCol('fecha de construcción','construccion','fecha construccion'), isoWithTime(fConst));
 
-  // Number: Precio — busca la columna exacta de Notion "# Precio del servicio"
-  const pPrecio = findCol('# precio del servicio', 'precio del servicio', 'precio s/.', 'precio', 'monto', 'total');
-  if (pPrecio && item.precio) {
-    payload.properties[pPrecio.name] = { number: parseFloat(item.precio) || 0 };
+  // Number: Precio — intento directo con nombres posibles del schema
+  if (item.precio) {
+    const precioVal = parseFloat(item.precio) || 0;
+    // Buscar dinámicamente por findCol
+    const pPrecio = findCol('# precio del servicio', 'precio del servicio', 'precio', 'monto', 'total', 'price');
+    if (pPrecio) {
+      payload.properties[pPrecio.name] = { number: precioVal };
+      console.log('Precio mapeado a columna:', pPrecio.name, '=', precioVal);
+    } else {
+      // Fallback: buscar manualmente cualquier columna con 'precio' en el nombre
+      const precioKey = schemaKeys.find(k => k.toLowerCase().includes('precio'));
+      if (precioKey) {
+        payload.properties[precioKey] = { number: precioVal };
+        console.log('Precio fallback a columna:', precioKey, '=', precioVal);
+      } else {
+        console.warn('★ Columna Precio NO encontrada en schema Notion');
+      }
+    }
   }
 
   // Text: Ubicacion (Mapeo exacto según imagen: ubicación - letra minúscula)
@@ -7679,10 +7696,7 @@ function confirmarReprogramacion(id){
   closeModal();
   render();
 
-  const url=localStorage.getItem('fnz_sheets_url')||'';
-  if(url){
-    _sendToSheets(url, { type:'agenda', item, modo: state.modo });
-  }
+  syncAgendaToSheets(item);
 
   // ── Actualizar Notion al reprogramar ──
   if(localStorage.getItem('fnz_notion_token') && localStorage.getItem('fnz_notion_dbid_clientes')){
