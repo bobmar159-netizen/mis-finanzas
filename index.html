@@ -5884,6 +5884,7 @@ async function notionCargarManual() {
       }
     }
 
+    window._notionCache = allResults;
     if (statusEl) statusEl.textContent = '';
 
     // ── 3. Mostrar modal de preview ──
@@ -5985,30 +5986,15 @@ async function notionConfirmarCarga(soloNuevosIds, posibleDupIds, allIds) {
       return;
     }
 
-    // 1. Traer registros seleccionados de todas las bases de datos configuradas
-    for (const dbId of dbs) {
-      const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
-      const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
-      let cursor = undefined;
-      do {
-        const bodyObj = { page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) };
-        const res = await fetch(proxyUrl, {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
-          body: JSON.stringify(bodyObj)
-        });
-        const data = await res.json();
-        // Filtrar solo los IDs que el usuario aceptó importar
-        if (data.results) {
-          allResults = allResults.concat(data.results.filter(p => idsAImportar.has(p.id)));
-        }
-        cursor = data.has_more ? data.next_cursor : undefined;
-      } while (cursor);
+    // Usar la caché de la vista previa para no descargar todo de nuevo (Evita el error y la demora)
+    const itemsToImport = (window._notionCache || []).filter(p => idsAImportar.has(p.id));
+
+    if (!itemsToImport.length) {
+      toast('No se encontraron registros en caché para importar', 'error'); return;
     }
 
-    if (!allResults.length) {
-      toast('No se encontraron registros para importar', 'error'); return;
-    }
+    // Convert to mock allResults format
+    const allResults = itemsToImport;
 
     const csvText = _notionResultsToCSV(allResults);
     const result  = _procesarCsvNotionTexto(csvText, 'notion-load-status', false);
