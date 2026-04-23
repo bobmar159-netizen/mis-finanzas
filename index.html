@@ -8,12 +8,13 @@
 <meta name="theme-color" content="#F9F7F3">
 <title>Mis Finanzas</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js">
+</script>
 <style>
 :root {
-  --gold:#3A7D44;--gold2:#52A85A;--red:#E05252;--green:#4CAF85;--blue:#2E86AB;
-  --bg:#F2F7F2;--card:#FFFFFF;--border:#D4E8D4;--text:#1A2E1A;--muted:#7BAE7F;--dim:#A8C9AB;
-  --ing-color:#52A85A;--ing-bg:#EAF3DE;--ing-text:#3B6D11;
+  --gold:#475569;--gold2:#64748B;--red:#E05252;--green:#4CAF85;--blue:#2E86AB;
+  --bg:#F9FAFB;--card:#FFFFFF;--border:#D4E8D4;--text:#1A2E1A;--muted:#7BAE7F;--dim:#A8C9AB;
+  --ing-color:#64748B;--ing-bg:#EAF3DE;--ing-text:#3B6D11;
 }
 
 /* ── 6 TEMAS — variables CSS completas ── */
@@ -133,7 +134,7 @@ body{font-family:'Inter', system-ui, sans-serif;color:var(--text)}
 .mv-cli{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mv-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
 .mv-amt{font-size:16px;font-weight:700}
-.mv-amt-ing{color:var(--ing-color,#52A85A)}
+.mv-amt-ing{color:var(--ing-color,#64748B)}
 .mv-amt-egr{color:#C62828}
 .mv-chevron{font-size:10px;color:var(--muted);transition:transform .2s}
 .mv-card.open .mv-chevron{transform:rotate(180deg)}
@@ -181,7 +182,7 @@ body{font-family:'Inter', system-ui, sans-serif;color:var(--text)}
 .field{margin-bottom:16px}
 .field-label{font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;display:block}
 .field input,.field select,.field textarea{background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:14px 16px;color:var(--text);font-family:'Inter', system-ui, sans-serif;font-size:15px;width:100%;transition:border-color .2s}
-.field input:focus,.field select:focus{outline:none;border-color:#3A7D4466}
+.field input:focus,.field select:focus{outline:none;border-color:#47556966}
 .field select option{background:#FFFFFF}
 .type-toggle{display:flex;gap:8px}
 .type-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Inter', system-ui, sans-serif;font-weight:600;font-size:13px;cursor:pointer;transition:all .2s}
@@ -431,7 +432,7 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 #ned-editor mark { background: #FFF9C4; padding: 0 2px; border-radius: 3px; }
 /* checklist */
 #ned-editor .ned-row { display: flex; align-items: flex-start; gap: 8px; min-height: 32px; padding: 1px 0; }
-#ned-editor .ned-row input[type=checkbox] { margin-top: 7px; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; accent-color: #3A7D44; }
+#ned-editor .ned-row input[type=checkbox] { margin-top: 7px; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; accent-color: #475569; }
 #ned-editor .ned-row .ned-txt { flex: 1; outline: none; min-height: 22px; line-height: 32px; padding: 0; border: none; font-size: 15px; font-family: inherit; background: transparent; color: inherit; width: 100%; }
 #ned-editor .ned-row.ned-done .ned-txt { text-decoration: line-through; opacity: .5; }
 /* photo strip */
@@ -1269,6 +1270,7 @@ let state = {
   chartBar:     null,
   chartPie:     null,
   moneda:       load('fnz_moneda','PEN'),
+  monedaSymbol: load('fnz_moneda_symbol','S/'),
   tipoCambio:   load('fnz_tipo_cambio', 3.75),
 };
 // Cargar datos del modo guardado
@@ -1280,7 +1282,7 @@ setTimeout(checkReminders, 1500);
 // ─────────────────────────────────────────────
 // UTILS
 // ─────────────────────────────────────────────
-const fmt=n=>'S/ '+Math.abs(Number(n)).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt=n=>(state.monedaSymbol||'S/')+' '+Math.abs(Number(n)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtSign=n=>(n>=0?'+':'-')+fmt(n);
 const todayStr=()=>new Date().toISOString().split('T')[0];
 const monthName=()=>MONTHS_FULL[state.filterMonth]+' '+state.filterYear;
@@ -1601,7 +1603,7 @@ function renderMovimientos(){
     if(c.includes('instalac')) return {icon:'🏗️',color:'#01579B'};
     if(c.includes('conversion')||c.includes('conversión')) return {icon:'🔄',color:'#0288D1'};
     if(c.includes('document')) return {icon:'📄',color:'#37474F'};
-    return {icon:t.type==='ingreso'?'⬆':'⬇', color:t.type==='ingreso'?'#3A7D44':'#C62828'};
+    return {icon:t.type==='ingreso'?'⬆':'⬇', color:t.type==='ingreso'?'#475569':'#C62828'};
   };
 
   // ── Fecha legible ──
@@ -1641,7 +1643,7 @@ function renderMovimientos(){
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <div onclick="window._movFiltro='ingresos';render()" style="flex:1;background:${window._movFiltro==='ingresos'?'var(--ing-bg,#EAF3DE)':'#EAF3DE'};border:1px solid ${window._movFiltro==='ingresos'?'var(--gold)':'#4CAF8533'};border-radius:10px;padding:12px;cursor:pointer;transition:all .2s">
         <div style="font-size:10px;color:#27500A88;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ingresos</div>
-        <div style="color:#3A7D44;font-weight:700;font-size:15px">+${fmt(inc)}</div>
+        <div style="color:#475569;font-weight:700;font-size:15px">+${fmt(inc)}</div>
       </div>
       <div onclick="window._movFiltro='egresos';render()" style="flex:1;background:${window._movFiltro==='egresos'?'#FFCDD2':'#FFEBEE'};border:1px solid ${window._movFiltro==='egresos'?'#C62828':'#E0525233'};border-radius:10px;padding:12px;cursor:pointer;transition:all .2s">
         <div style="font-size:10px;color:#C6282888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Egresos</div>
@@ -3123,7 +3125,7 @@ function guardarNombreUsuario(){
 // SISTEMA DE TEMAS — 6 diseños
 // ══════════════════════════════════════════════════
 const TEMAS_APP = [
-  { id:'esmeralda', nombre:'Esmeralda', emoji:'🌿', desc:'Verde sage · Actual',      bg:'#F2F7F2', accent:'#3A7D44' },
+  { id:'esmeralda', nombre:'Premium', emoji:'✨', desc:'Minimalista · Actual', bg:'#F9FAFB', accent:'#475569' },
   { id:'oceano',    nombre:'Océano',    emoji:'🌊', desc:'Azul profundo',            bg:'#F0F4FF', accent:'#1565C0' },
   { id:'ambar',     nombre:'Ámbar',     emoji:'🔥', desc:'Borde lateral dorado',     bg:'#FFF8F0', accent:'#854F0B' },
   { id:'noche',     nombre:'Noche',     emoji:'🌙', desc:'Modo oscuro completo',     bg:'#0F0F1A', accent:'#9F5AE5' },
@@ -6361,27 +6363,27 @@ function renderAjustes(){
     <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Toca para expandir cada sección</div>
     <!-- Mockup Items -->
     <div class="card" style="margin-bottom:12px;padding:0;overflow:hidden;border:1px solid var(--border);border-radius:12px;box-shadow:none;background:#FFFFFF">
-      <div style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer;border-bottom:1px solid var(--border)">
+      <div onclick="toast('Perfil: Próximamente')" style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer;border-bottom:1px solid var(--border)">
         <div style="width:36px;height:36px;border-radius:10px;background:#F9FAFB;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text);flex-shrink:0"><i data-lucide="user" style="width:20px;height:20px"></i></div>
         <div style="flex:1;font-size:15px;font-weight:500;color:var(--text);font-family:'Inter', system-ui, sans-serif">Perfil</div>
         <span style="font-size:20px;color:var(--dim)">›</span>
       </div>
-      <div style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer;border-bottom:1px solid var(--border)">
+      <div onclick="toast('Notificaciones: Próximamente')" style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer;border-bottom:1px solid var(--border)">
         <div style="width:36px;height:36px;border-radius:10px;background:#F9FAFB;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text);flex-shrink:0"><i data-lucide="bell" style="width:20px;height:20px"></i></div>
         <div style="flex:1;font-size:15px;font-weight:500;color:var(--text);font-family:'Inter', system-ui, sans-serif">Notificaciones</div>
         <span style="font-size:20px;color:var(--dim)">›</span>
       </div>
-      <div style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer;border-bottom:1px solid var(--border)">
+      <div onclick="toast('Seguridad: Próximamente')" style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer;border-bottom:1px solid var(--border)">
         <div style="width:36px;height:36px;border-radius:10px;background:#F9FAFB;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text);flex-shrink:0"><i data-lucide="shield" style="width:20px;height:20px"></i></div>
         <div style="flex:1;font-size:15px;font-weight:500;color:var(--text);font-family:'Inter', system-ui, sans-serif">Seguridad</div>
         <span style="font-size:20px;color:var(--dim)">›</span>
       </div>
-      <div style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer;border-bottom:1px solid var(--border)">
+      <div onclick="openMonedaModal()" style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer;border-bottom:1px solid var(--border)">
         <div style="width:36px;height:36px;border-radius:10px;background:#F9FAFB;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text);flex-shrink:0"><i data-lucide="globe" style="width:20px;height:20px"></i></div>
         <div style="flex:1;font-size:15px;font-weight:500;color:var(--text);font-family:'Inter', system-ui, sans-serif">Moneda</div>
         <span style="font-size:20px;color:var(--dim)">›</span>
       </div>
-      <div style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer">
+      <div onclick="toast('Ayuda: Próximamente')" style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer">
         <div style="width:36px;height:36px;border-radius:10px;background:#F9FAFB;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text);flex-shrink:0"><i data-lucide="help-circle" style="width:20px;height:20px"></i></div>
         <div style="flex:1;font-size:15px;font-weight:500;color:var(--text);font-family:'Inter', system-ui, sans-serif">Ayuda</div>
         <span style="font-size:20px;color:var(--dim)">›</span>
@@ -6443,7 +6445,7 @@ function renderAjustes(){
         <button onclick="saveSheetsUrl()" style="flex:2;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'Inter', system-ui, sans-serif;font-size:13px;cursor:pointer">💾 Guardar URL</button>
         <button onclick="testSheetsSync()" style="flex:1;background:transparent;border:1px solid #1565C044;color:#1565C0;border-radius:10px;padding:11px;font-family:'Inter', system-ui, sans-serif;font-size:13px;cursor:pointer">Probar</button>
       </div>
-      <button onclick="reloadFromSheets()" style="width:100%;margin-top:8px;background:#F0FDF4;border:1px solid #3A7D4444;color:#3A7D44;border-radius:10px;padding:11px;font-weight:600;font-family:'Inter', system-ui, sans-serif;font-size:13px;cursor:pointer">☁️ Restaurar datos desde Sheets</button>
+      <button onclick="reloadFromSheets()" style="width:100%;margin-top:8px;background:#F0FDF4;border:1px solid #47556944;color:#475569;border-radius:10px;padding:11px;font-weight:600;font-family:'Inter', system-ui, sans-serif;font-size:13px;cursor:pointer">☁️ Restaurar datos desde Sheets</button>
       <button onclick="syncAllTxToSheets(false)" style="width:100%;margin-top:6px;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'Inter', system-ui, sans-serif;font-size:13px;cursor:pointer">⬆ Enviar TODO a Sheets</button>
     `)}
 
@@ -11880,7 +11882,7 @@ function stopListening() {
   const micTxt  = document.getElementById('micBtnTxt');
   const micHint = document.getElementById('micHint');
   const micFab  = document.getElementById('micFab');
-  if(micBtn)  micBtn.style.background = 'linear-gradient(135deg,#3A7D44,#52A85A)';
+  if(micBtn)  micBtn.style.background = 'linear-gradient(135deg,#475569,#64748B)';
   if(micIcon) micIcon.textContent = '🎙';
   if(micTxt)  micTxt.textContent  = 'Escuchar de nuevo';
   if(micFab)  micFab.classList.remove('listening');
@@ -11922,7 +11924,7 @@ function abrirEditorNota(editId){
       <span id="ned-status" style="font-size:11px;color:${nc.footer};flex:1"></span>
       <button onclick="nedAddPhoto()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 6px;opacity:.75" title="Foto">📷</button>
       <button id="ned-rec-btn" onclick="nedEditReminder()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 6px;opacity:${_nedRecordatorio?1:.5}" title="Recordatorio">⏰</button>
-      <button onclick="nedSave(true)" style="background:#3A7D44;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;font-family:'Inter', system-ui, sans-serif;cursor:pointer;flex-shrink:0">Guardar</button>
+      <button onclick="nedSave(true)" style="background:#475569;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;font-family:'Inter', system-ui, sans-serif;cursor:pointer;flex-shrink:0">Guardar</button>
     </div>
 
     <div id="ned-rem" style="display:${_nedRecordatorio?'flex':'none'};align-items:center;gap:8px;padding:7px 20px;background:#FEF2F2;border-bottom:1px solid #FECACA;flex-shrink:0;font-size:12px;color:#DC2626">
@@ -12100,7 +12102,7 @@ function nedAddTable(){
   // Init check visual
   setTimeout(()=>{
     const chk = document.getElementById('nt-total-check');
-    if(chk){ chk.style.background='#3A7D44'; chk.style.borderColor='#3A7D44'; chk.textContent='✓'; chk.style.color='#fff'; }
+    if(chk){ chk.style.background='#475569'; chk.style.borderColor='#475569'; chk.textContent='✓'; chk.style.color='#fff'; }
   }, 30);
 
   const rowsEl = document.getElementById('nt-cols');
@@ -12113,8 +12115,8 @@ function _ntToggleTotal(row){
   _ntHasTotal = !_ntHasTotal;
   const chk = document.getElementById('nt-total-check');
   if(chk){
-    chk.style.background = _ntHasTotal ? '#3A7D44' : '#fff';
-    chk.style.borderColor = _ntHasTotal ? '#3A7D44' : '#CBD5E1';
+    chk.style.background = _ntHasTotal ? '#475569' : '#fff';
+    chk.style.borderColor = _ntHasTotal ? '#475569' : '#CBD5E1';
     chk.textContent = _ntHasTotal ? '✓' : '';
     chk.style.color = '#fff';
   }
@@ -12642,7 +12644,7 @@ function abrirModoLista(tipo, tituloInicial){
         <button id="lista-mic-btn" style="flex:1;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'Inter', system-ui, sans-serif;font-size:14px;cursor:pointer">
           🎙 Dictar
         </button>
-        <button id="lista-guardar-btn" style="flex:1;background:#3A7D44;color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'Inter', system-ui, sans-serif;font-size:14px;cursor:pointer">
+        <button id="lista-guardar-btn" style="flex:1;background:#475569;color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'Inter', system-ui, sans-serif;font-size:14px;cursor:pointer">
           ✓ Guardar
         </button>
       </div>
@@ -12691,7 +12693,7 @@ function renderListaItems(){
   el.innerHTML = listaItems.map((item,i) => {
     if(item.tipo === 'subtotal'){
       return `<div style="border-top:2px dashed #F9A825;margin:8px 0 4px;padding:8px 0;display:flex;justify-content:space-between;font-weight:700;color:#5D4037;font-size:14px">
-        <span>${item.texto}</span><span style="color:#3A7D44">S/ ${item.valor.toFixed(2)}</span>
+        <span>${item.texto}</span><span style="color:#475569">S/ ${item.valor.toFixed(2)}</span>
       </div>`;
     }
     const precioStr = item.precio ? 'S/ '+item.precio.toFixed(2) : '';
@@ -13051,7 +13053,7 @@ Respondé SOLO con JSON válido, sin explicaciones ni markdown:
     window._listaGuardarTimer=setTimeout(()=>guardarListaFinal(),800);
   }
 
-  if(btn){ btn.disabled = false; btn.textContent = '✓ Guardar lista'; btn.style.background='#3A7D44'; }
+  if(btn){ btn.disabled = false; btn.textContent = '✓ Guardar lista'; btn.style.background='#475569'; }
 }
 
 function pararListaMicDefinitivo(){
@@ -14941,1721 +14943,49 @@ function compartirPDF(notaId){
     + '<body><button onclick="window.print()" style="margin-bottom:16px;padding:8px 16px;cursor:pointer">🖨 Imprimir / Guardar PDF</button>'
     + '<h1>' + titulo + '</h1><pre>' + cuerpo.replace(/</g,'&lt;') + '</pre>'
     + '<div class="footer">Creado: ' + fecha + (tags ? ' · Tags: ' + tags : '') + '</div><script>lucide.createIcons();</script>
-</body></html>';
 
-  const win = window.open('','_blank');
-  if(!win){ toast('Permitir ventanas emergentes para imprimir','error'); return; }
-  win.document.write(htmlContent);
-  win.document.close();
-  cerrarModalCompartir();
-}
-
-
-function compartirWhatsApp(notaId){
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota) return;
+<script>
+function openMonedaModal() {
+  const m = state.moneda || 'PEN';
+  const monedas = [
+    { code: 'USD', symbol: '$', name: 'Dólar Estadounidense' },
+    { code: 'EUR', symbol: '€', name: 'Euro' },
+    { code: 'PEN', symbol: 'S/', name: 'Sol Peruano' },
+    { code: 'MXN', symbol: '$', name: 'Peso Mexicano' },
+    { code: 'COP', symbol: '$', name: 'Peso Colombiano' },
+    { code: 'CLP', symbol: '$', name: 'Peso Chileno' },
+    { code: 'ARS', symbol: '$', name: 'Peso Argentino' },
+    { code: 'BRL', symbol: 'R$', name: 'Real Brasileño' },
+    { code: 'GBP', symbol: '£', name: 'Libra Esterlina' },
+  ];
   
-  let texto = `*${nota.titulo || 'Nota'}*\n\n`;
-  
-  if(nota.tipo === 'lista' && nota.items){
-    texto += nota.items.map(i => `${i.done?'✓':'○'} ${i.texto}`).join('\n');
-  } else if(nota.texto){
-    texto += nota.texto.replace(/<[^>]+>/g,'').trim();
-  }
-  
-  if(nota.tags && nota.tags.length){
-    texto += `\n\n${nota.tags.join(' ')}`;
-  }
-  
-  const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
-  window.open(url, '_blank');
-  
-  toast('Abriendo WhatsApp...');
-  cerrarModalCompartir();
-}
-
-function copiarTexto(notaId){
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota) return;
-  
-  let texto = `${nota.titulo || 'Nota'}\n\n`;
-  
-  if(nota.tipo === 'lista' && nota.items){
-    texto += nota.items.map(i => `${i.done?'✓':'○'} ${i.texto}`).join('\n');
-  } else if(nota.texto){
-    texto += nota.texto.replace(/<[^>]+>/g,'').trim();
-  }
-  
-  navigator.clipboard.writeText(texto).then(() => {
-    toast('✓ Copiado al portapapeles');
-    cerrarModalCompartir();
-  }).catch(() => {
-    toast('Error al copiar','error');
-  });
-}
-
-function exportarExcel(notaId){
-  toast('Excel export: próximamente');
-  // Implementación completa requiere librería externa
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 4. 📋 TEMPLATES RÁPIDOS
-// ═══════════════════════════════════════════════════════════════════
-
-const TEMPLATES_NOTAS = [
-  {
-    id: 'reunion',
-    icon: '👥',
-    nombre: 'Reunión cliente',
-    desc: 'Agenda + notas',
-    contenido: {
-      titulo: 'Reunión con ',
-      items: [
-        {texto: 'Fecha y hora', done: false},
-        {texto: 'Asistentes', done: false},
-        {texto: 'Agenda', done: false},
-        {texto: 'Acuerdos', done: false},
-        {texto: 'Próximos pasos', done: false}
-      ],
-      tipo: 'lista'
-    }
-  },
-  {
-    id: 'cotizacion',
-    icon: '💰',
-    nombre: 'Cotización obra',
-    desc: 'Presupuesto',
-    contenido: {
-      titulo: 'Cotización ',
-      tipo: 'editor',
-      texto: 'Cliente:\nObra:\nFecha:\n\nDetalle:\n- Materiales:\n- Mano de obra:\n- Otros:\n\nTotal:'
-    }
-  },
-  {
-    id: 'compras',
-    icon: '🛒',
-    nombre: 'Lista compras',
-    desc: 'Materiales',
-    contenido: {
-      titulo: 'Compras ',
-      items: [
-        {texto: 'Cemento', done: false},
-        {texto: 'Arena', done: false},
-        {texto: 'Fierro', done: false}
-      ],
-      tipo: 'lista'
-    }
-  },
-  {
-    id: 'daily',
-    icon: '✅',
-    nombre: 'Tareas del día',
-    desc: 'Checklist',
-    contenido: {
-      titulo: 'Tareas ' + new Date().toLocaleDateString('es-PE'),
-      items: [
-        {texto: 'Tarea importante', done: false},
-        {texto: 'Llamar a...', done: false},
-        {texto: 'Revisar...', done: false}
-      ],
-      tipo: 'lista'
-    }
-  },
-  {
-    id: 'seguimiento',
-    icon: '📞',
-    nombre: 'Seguimiento',
-    desc: 'Cliente/Obra',
-    contenido: {
-      titulo: 'Seguimiento ',
-      items: [
-        {texto: 'Llamada 1:', done: false},
-        {texto: 'Llamada 2:', done: false},
-        {texto: 'Enviar cotización', done: false},
-        {texto: 'Confirmar fecha', done: false}
-      ],
-      tipo: 'lista'
-    }
-  },
-  {
-    id: 'gastos',
-    icon: '💸',
-    nombre: 'Control gastos',
-    desc: 'Obra/Proyecto',
-    contenido: {
-      titulo: 'Gastos ',
-      tipo: 'editor',
-      texto: 'Proyecto:\nPresupuesto: S/ \n\nGastos:\n1. \n2. \n3. \n\nTotal gastado:\nRestante:'
-    }
-  }
-];
-
-function mostrarTemplates(){
-  const templatesHtml = TEMPLATES_NOTAS.map(t => `
-    <div class="template-card" onclick="crearDesdeTemplate('${t.id}')">
-      <div class="template-icon">${t.icon}</div>
-      <div class="template-name">${t.nombre}</div>
-      <div class="template-desc">${t.desc}</div>
+  const html = `
+    <div class="modal-title" style="font-family:'Inter', system-ui, sans-serif;font-size:20px;font-weight:700;margin-bottom:16px;color:var(--text)">Moneda</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Selecciona la moneda principal de la aplicación.</div>
+    <div style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto;padding-right:4px">
+      ${`${monedas.map(c => `
+        <div onclick="setMoneda('${c.code}', '${c.symbol}')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:${m===c.code?'var(--bg)':'var(--card)'};border:1px solid ${m===c.code?'var(--gold)':'var(--border)'};border-radius:12px;cursor:pointer;transition:all .2s">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:36px;height:36px;border-radius:10px;background:${m===c.code?'var(--gold)':'#F8FAFC'};color:${m===c.code?'#FFF':'var(--text)'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;border:1px solid ${m===c.code?'var(--gold)':'var(--border)'}">${c.symbol}</div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);font-family:'Inter', system-ui, sans-serif">${c.name}</div>
+          </div>
+          ${m===c.code?'<div style="color:var(--gold);font-size:18px;font-weight:700">✓</div>':''}
+        </div>
+      `).join('')}`}
     </div>
-  `).join('');
-  
-  document.getElementById('modal-content').innerHTML = `
-    <div class="modal-title" style="color:var(--gold)">Templates rápidos</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">Elige una plantilla para empezar rápido</div>
-    <div class="templates-grid">
-      ${templatesHtml}
-    </div>
-    <div class="btn-row">
-      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-    </div>`;
-  showModal();
-}
-
-function crearDesdeTemplate(templateId){
-  const template = TEMPLATES_NOTAS.find(t => t.id === templateId);
-  if(!template) return;
-  
-  const nuevaNota = {
-    id: Date.now() + '',
-    ...template.contenido,
-    creado: new Date().toISOString(),
-    modificado: new Date().toISOString(),
-    tags: [],
-    favorita: false
-  };
-  
-  state.notas.push(nuevaNota);
-  saveAll();
-  closeModal();
-  
-  if(nuevaNota.tipo === 'lista'){
-    openEditNotaLista(nuevaNota);
-  } else {
-    abrirEditorNota(nuevaNota.id);
-  }
-  
-  toast(`Template "${template.nombre}" creado ✓`);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 5. ⏰ RECORDATORIOS
-// ═══════════════════════════════════════════════════════════════════
-
-function agregarRecordatorio(notaId){
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota) return;
-  
-  document.getElementById('modal-content').innerHTML = `
-    <div class="modal-title" style="color:#FF9800">⏰ Recordatorio</div>
-    <div class="field">
-      <label class="field-label">Fecha y hora</label>
-      <input type="datetime-local" 
-             class="reminder-input" 
-             id="reminder-datetime"
-             value="${nota.recordatorio || ''}">
-    </div>
-    <div style="font-size:12px;color:var(--muted);margin-top:8px">
-      Recibirás una notificación en este momento
-    </div>
-    <div class="btn-row" style="margin-top:16px">
-      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-      ${nota.recordatorio ? `<button class="btn" onclick="quitarRecordatorio('${notaId}')" style="background:#E05252;color:#FFF">Quitar</button>` : ''}
-      <button class="btn-gold" onclick="guardarRecordatorio('${notaId}')">Guardar</button>
-    </div>`;
-  showModal();
-}
-
-function guardarRecordatorio(notaId){
-  const datetime = document.getElementById('reminder-datetime').value;
-  if(!datetime) return toast('Selecciona fecha y hora','error');
-  
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota) return;
-  
-  nota.recordatorio = datetime;
-  saveAll();
-  
-  // Programar notificación
-  programarNotificacion(nota);
-  
-  closeModal();
-  render();
-  toast('Recordatorio configurado ✓');
-}
-
-function quitarRecordatorio(notaId){
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota) return;
-  
-  delete nota.recordatorio;
-  saveAll();
-  
-  closeModal();
-  render();
-  toast('Recordatorio eliminado');
-}
-
-function programarNotificacion(nota){
-  if(!('Notification' in window)) return;
-  
-  if(Notification.permission === 'granted'){
-    const tiempoRecordatorio = new Date(nota.recordatorio).getTime();
-    const ahora = Date.now();
-    const delay = tiempoRecordatorio - ahora;
-    
-    if(delay > 0){
-      setTimeout(() => {
-        new Notification('📝 Recordatorio', {
-          body: nota.titulo || 'Nota sin título',
-          icon: '/favicon.ico'
-        });
-      }, delay);
-    }
-  } else if(Notification.permission !== 'denied'){
-    Notification.requestPermission();
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 6. 📸 GALERÍA MÚLTIPLE
-// ═══════════════════════════════════════════════════════════════════
-
-function abrirGaleriaFotos(notaId){
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota) return;
-  
-  if(!nota.fotos) nota.fotos = [];
-  
-  const fotosHtml = nota.fotos.map((foto, idx) => `
-    <div class="gallery-item">
-      <img src="${foto}" alt="Foto ${idx+1}">
-      <div class="gallery-delete" onclick="eliminarFoto('${notaId}', ${idx})">✕</div>
-    </div>
-  `).join('');
-  
-  document.getElementById('modal-content').innerHTML = `
-    <div class="modal-title" style="color:var(--text)">📸 Galería de fotos</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">${nota.fotos.length} foto${nota.fotos.length!==1?'s':''}</div>
-    
-    <div class="photo-gallery">
-      ${fotosHtml}
-      <div class="gallery-item gallery-add" onclick="agregarFotoGaleria('${notaId}')">
-        <div>+</div>
-      </div>
-    </div>
-    
-    <div class="btn-row" style="margin-top:16px">
-      <button class="btn-gold" onclick="closeModal()">Listo</button>
-    </div>`;
-  showModal();
-}
-
-function agregarFotoGaleria(notaId){
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.multiple = true;
-  
-  input.onchange = e => {
-    const files = Array.from(e.target.files);
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = evt => {
-        const nota = state.notas.find(n => n.id === notaId);
-        if(!nota) return;
-        
-        if(!nota.fotos) nota.fotos = [];
-        nota.fotos.push(evt.target.result);
-        saveAll();
-        
-        // Re-abrir modal actualizado
-        abrirGaleriaFotos(notaId);
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-  
-  input.click();
-}
-
-function eliminarFoto(notaId, index){
-  if(!confirm('¿Eliminar esta foto?')) return;
-  
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota || !nota.fotos) return;
-  
-  nota.fotos.splice(index, 1);
-  saveAll();
-  
-  abrirGaleriaFotos(notaId);
-  toast('Foto eliminada');
-}
-
-function verFotoZoom(src){
-  const zoom = document.createElement('div');
-  zoom.className = 'photo-zoom';
-  zoom.innerHTML = `
-    <img src="${src}" alt="Foto">
-    <button class="photo-zoom-close" onclick="this.parentElement.remove()">✕</button>
   `;
-  zoom.onclick = e => {
-    if(e.target === zoom) zoom.remove();
-  };
-  document.body.appendChild(zoom);
+  document.getElementById('modal-content').innerHTML = html;
+  document.getElementById('modal').style.display = 'flex';
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// 7. 🔗 VINCULAR CON MOVIMIENTOS
-// ═══════════════════════════════════════════════════════════════════
-
-function mostrarMovimientosVinculados(notaId){
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota) return '';
-  
-  if(!nota.vinculadoA || nota.vinculadoA.length === 0) return '';
-  
-  const movimientos = nota.vinculadoA.map(movId => {
-    const mov = state.transactions.find(t => t.id === movId);
-    if(!mov) return null;
-    
-    return `
-      <div class="linked-item">
-        <div class="linked-desc">
-          ${mov.description || mov.category}
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">
-            ${new Date(mov.date).toLocaleDateString('es-PE')}
-          </div>
-        </div>
-        <div class="linked-amount ${mov.type==='egreso'?'egreso':''}">
-          ${mov.type==='ingreso'?'+':'-'} S/ ${parseFloat(mov.amount).toFixed(2)}
-        </div>
-        <div class="linked-remove" onclick="desvincularMovimiento('${notaId}','${movId}')">✕</div>
-      </div>
-    `;
-  }).filter(Boolean).join('');
-  
-  if(!movimientos) return '';
-  
-  return `
-    <div class="linked-items">
-      <div class="linked-header">
-        🔗 Movimientos vinculados
-      </div>
-      ${movimientos}
-    </div>`;
-}
-
-function vincularMovimiento(notaId){
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota) return;
-  
-  const movimientosHtml = state.transactions
-    .filter(t => !(nota.vinculadoA || []).includes(t.id))
-    .sort((a,b) => b.date.localeCompare(a.date))
-    .slice(0, 20)
-    .map(t => `
-      <div class="share-btn" onclick="agregarVinculo('${notaId}','${t.id}')">
-        <div class="share-icon ${t.type==='ingreso'?'whatsapp':'pdf'}">
-          ${t.type==='ingreso'?'↑':'↓'}
-        </div>
-        <div class="share-label">
-          <div style="font-weight:600">${t.description || t.category}</div>
-          <div class="share-desc">
-            ${new Date(t.date).toLocaleDateString('es-PE')} · 
-            S/ ${parseFloat(t.amount).toFixed(2)}
-          </div>
-        </div>
-      </div>
-    `).join('');
-  
-  document.getElementById('modal-content').innerHTML = `
-    <div class="modal-title" style="color:var(--blue)">🔗 Vincular movimiento</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">Selecciona movimientos relacionados con esta nota</div>
-    
-    <div style="max-height:400px;overflow-y:auto">
-      ${movimientosHtml || '<div style="text-align:center;padding:40px;color:var(--muted)">No hay movimientos disponibles</div>'}
-    </div>
-    
-    <div class="btn-row" style="margin-top:16px">
-      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-    </div>`;
-  showModal();
-}
-
-function agregarVinculo(notaId, movId){
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota) return;
-  
-  if(!nota.vinculadoA) nota.vinculadoA = [];
-  if(!nota.vinculadoA.includes(movId)){
-    nota.vinculadoA.push(movId);
-    saveAll();
-    toast('Movimiento vinculado ✓');
-    closeModal();
-    render();
-  }
-}
-
-function desvincularMovimiento(notaId, movId){
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota) return;
-  
-  nota.vinculadoA = (nota.vinculadoA || []).filter(id => id !== movId);
-  saveAll();
+function setMoneda(code, symbol) {
+  state.moneda = code;
+  state.monedaSymbol = symbol;
+  save('fnz_moneda', code);
+  save('fnz_moneda_symbol', symbol);
+  closeModal();
   render();
-  toast('Desvinculado');
+  toast('Moneda actualizada a ' + code);
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// 8. 📑 DUPLICAR NOTA
-// ═══════════════════════════════════════════════════════════════════
-
-function duplicarNota(notaId){
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota) return;
-  
-  const nuevaNota = {
-    ...nota,
-    id: Date.now() + '',
-    titulo: (nota.titulo || 'Nota') + ' (copia)',
-    creado: new Date().toISOString(),
-    modificado: new Date().toISOString(),
-    // Clonar items si es lista
-    items: nota.items ? nota.items.map(i => ({...i})) : undefined
-  };
-  
-  state.notas.push(nuevaNota);
-  saveAll();
-  render();
-  toast('Nota duplicada ✓');
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 9. ⌨️ ATAJOS DE TECLADO
-// ═══════════════════════════════════════════════════════════════════
-
-document.addEventListener('keydown', e => {
-  // Solo en editor de notas
-  if(!document.activeElement || !document.activeElement.closest('#pned-content')) return;
-  
-  // Ctrl+B → Negrita
-  if(e.ctrlKey && e.key === 'b'){
-    e.preventDefault();
-    pnedCmd('bold');
-    mostrarKeyboardHint('Negrita');
-  }
-  
-  // Ctrl+I → Itálica
-  if(e.ctrlKey && e.key === 'i'){
-    e.preventDefault();
-    pnedCmd('italic');
-    mostrarKeyboardHint('Itálica');
-  }
-  
-  // Ctrl+U → Subrayado
-  if(e.ctrlKey && e.key === 'u'){
-    e.preventDefault();
-    pnedCmd('underline');
-    mostrarKeyboardHint('Subrayado');
-  }
-  
-  // Ctrl+Z → Deshacer (ya implementado)
-  if(e.ctrlKey && e.key === 'z'){
-    mostrarKeyboardHint('Deshacer');
-  }
-  
-  // Ctrl+Y → Rehacer (ya implementado)
-  if(e.ctrlKey && e.key === 'y'){
-    mostrarKeyboardHint('Rehacer');
-  }
-});
-
-function mostrarKeyboardHint(texto){
-  const existing = document.querySelector('.keyboard-hint');
-  if(existing) existing.remove();
-  
-  const hint = document.createElement('div');
-  hint.className = 'keyboard-hint show';
-  hint.textContent = texto;
-  document.body.appendChild(hint);
-  
-  setTimeout(() => {
-    hint.classList.remove('show');
-    setTimeout(() => hint.remove(), 200);
-  }, 1500);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 10. 📊 ESTADÍSTICAS
-// ═══════════════════════════════════════════════════════════════════
-
-function calcularEstadisticasNotas(){
-  const total = state.notas.length;
-  const favoritas = state.notas.filter(n => n.favorita).length;
-  const conRecordatorio = state.notas.filter(n => n.recordatorio).length;
-  const vinculadas = state.notas.filter(n => n.vinculadoA && n.vinculadoA.length > 0).length;
-  
-  return {total, favoritas, conRecordatorio, vinculadas};
-}
-
-function mostrarEstadisticas(){
-  const stats = calcularEstadisticasNotas();
-  
-  return `
-    <div class="stats-card">
-      <div class="stats-title">📊 Estadísticas</div>
-      <div class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-value">${stats.total}</div>
-          <div class="stat-label">Total notas</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">${stats.favoritas}</div>
-          <div class="stat-label">Favoritas</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">${stats.conRecordatorio}</div>
-          <div class="stat-label">Con recordatorio</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">${stats.vinculadas}</div>
-          <div class="stat-label">Vinculadas</div>
-        </div>
-      </div>
-    </div>`;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// FUNCIONES AUXILIARES
-// ═══════════════════════════════════════════════════════════════════
-
-function toggleFavorita(notaId){
-  const nota = state.notas.find(n => n.id === notaId);
-  if(!nota) return;
-  
-  nota.favorita = !nota.favorita;
-  saveAll();
-  render();
-  toast(nota.favorita ? '⭐ Agregada a favoritas' : 'Quitada de favoritas');
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 📐 EDITOR DE PLANO / BOCETO ARQUITECTÓNICO
-// ═══════════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════
-// 📐 EDITOR DE PLANO ARQUITECTÓNICO v4 — estilo FloorPlanner / AutoCAD
-// Muro continuo · Snap inteligente · Puertas · Ventanas · Escaleras
-// ═══════════════════════════════════════════════════════════════════
-
-let _PS = {
-  objs:[], undo:[], redo:[], sel:null,
-  tool:'wall', color:'#2C2C2A', wallThick:14,
-  chain:[], dimPhase:0, dimP1:null,
-  drawing:false, startX:0, startY:0, stairsPreview:null,
-  mouseX:0, mouseY:0,
-  snapPt:null, wallSnap:null, closeSnap:false,
-  drag:null, dragHandle:null, dragOx:0, dragOy:0, dragging:false,
-};
-const SNAP_PT_R=16, SNAP_ANG=12, CLOSE_R=18;
-let _planoNotaId=null;
-let _planoState=_PS; // compat
-
-function abrirEditorPlano(notaId){
-  _planoNotaId=notaId;
-  let nota=notaId?(state.notas||[]).find(n=>n.id===notaId):null;
-  if(!nota){
-    nota={id:Date.now()+'',tipo:'plano',titulo:'Nuevo plano',texto:'',creado:new Date().toISOString(),modificado:new Date().toISOString(),colorHoja:'celeste',_objetos:[]};
-    if(!state.notas)state.notas=[];
-    state.notas.unshift(nota);_planoNotaId=nota.id;saveAll();
-  }
-  _PS.objs=JSON.parse(nota._objetos?JSON.stringify(nota._objetos):'[]');
-  _PS.objs.forEach(o=>{if(o.type==='image'&&o.src){const img=new Image();img.src=o.src;o._img=img;}});
-  _PS.undo=[];_PS.redo=[];_PS.sel=null;_PS.chain=[];_PS.dimPhase=0;
-
-  // Inject styles
-  let sEl=document.getElementById('fp-style');
-  if(!sEl){sEl=document.createElement('style');sEl.id='fp-style';document.head.appendChild(sEl);}
-  sEl.textContent=`
-    #plano-overlay{position:fixed;inset:0;z-index:600;display:flex;flex-direction:column;font-family:'Inter', system-ui, sans-serif}
-    #fp-topbar{display:flex;align-items:center;gap:6px;padding:7px 12px;background:#fff;border-bottom:1px solid #ddd;flex-shrink:0}
-    .fp-back{background:var(--gold);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter', system-ui, sans-serif}
-    .fp-ptitle{flex:1;border:none;font-size:15px;font-weight:700;color:#1a1a2e;background:transparent;outline:none;padding:2px 6px;font-family:'Inter', system-ui, sans-serif}
-    .fp-tbtn{background:transparent;border:1px solid #ddd;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;color:#555;font-family:'Inter', system-ui, sans-serif;white-space:nowrap}
-    .fp-tbtn:hover{background:#f5f5f5}
-    .fp-tbtn.save{background:var(--gold);color:#fff;border-color:var(--gold)}
-    #fp-main{display:flex;flex:1;overflow:hidden}
-    #fp-left{width:62px;background:#3a3a3a;display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:2px;flex-shrink:0;overflow-y:auto}
-    #fp-left::-webkit-scrollbar{display:none}
-    .fptool{width:50px;min-height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:8px;cursor:pointer;border:none;background:transparent;color:#bbb;font-size:9px;font-weight:600;font-family:'Inter', system-ui, sans-serif;transition:all .12s;flex-shrink:0;padding:4px 2px}
-    .fptool:hover{background:rgba(255,255,255,.12);color:#fff}
-    .fptool.active{background:var(--gold);color:#fff}
-    .fptool-ic{font-size:17px;line-height:1.1}
-    .fptool-sep{width:40px;height:1px;background:rgba(255,255,255,.12);margin:2px 0;flex-shrink:0}
-    #fp-canvas-wrap{flex:1;overflow:hidden;position:relative;background:#ddd;background-image:linear-gradient(rgba(0,0,0,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.07) 1px,transparent 1px),linear-gradient(rgba(0,0,0,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.03) 1px,transparent 1px);background-size:100px 100px,100px 100px,20px 20px,20px 20px}
-    #plano-cv{display:block;touch-action:none}
-    #plano-loupe{position:absolute;pointer-events:none;display:none;border:2.5px solid #185FA5;border-radius:50%;box-shadow:none}
-    #plano-dim-inp{position:absolute;display:none;z-index:20;background:#fff;border:2px solid #185FA5;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;color:#0C447C;width:90px;text-align:center;box-shadow:none;font-family:'Inter', system-ui, sans-serif}
-    #fp-right{width:168px;background:#4a4a4a;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
-    #fp-right::-webkit-scrollbar{width:3px}#fp-right::-webkit-scrollbar-thumb{background:#666;border-radius:2px}
-    .fp-rhdr{font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.06em;padding:9px 10px 5px;border-bottom:1px solid rgba(255,255,255,.1)}
-    .fp-rgrid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(0,0,0,.2)}
-    .fp-ritem{background:#555;padding:9px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;transition:background .1s;-webkit-tap-highlight-color:transparent}
-    .fp-ritem:hover{background:#666}.fp-ritem:active{background:var(--gold)}
-    .fp-ric{font-size:20px;color:#ddd}.fp-rlbl{font-size:9px;color:#bbb;font-weight:600;text-align:center;line-height:1.2}
-    #fp-statusbar{display:flex;align-items:center;gap:10px;padding:4px 10px;background:#222;flex-shrink:0;font-size:11px;color:#999;font-family:'Inter', system-ui, sans-serif}
-    #fp-hint{color:#7ec8a0;flex:1;text-align:right}
-    .fp-rconf{padding:8px 10px}
-    .fp-rconf label{font-size:10px;color:#aaa;display:block;margin-bottom:3px}
-    .fp-rconf input[type=range]{width:100%;accent-color:var(--gold)}
-    .fp-rconf input[type=number]{width:52px;padding:2px 4px;border:1px solid #666;border-radius:4px;background:#333;color:#fff;font-size:11px;font-family:'Inter', system-ui, sans-serif}
-  `;
-
-  const ov=document.createElement('div');ov.id='plano-overlay';
-  ov.innerHTML=`
-    <div id="fp-topbar">
-      <button class="fp-back" onclick="cerrarEditorPlano()">‹ Volver</button>
-      <input class="fp-ptitle" id="plano-titulo" value="${nota.titulo||'Nuevo plano'}" placeholder="Título">
-      <button class="fp-tbtn" onclick="pUndo()">↩</button>
-      <button class="fp-tbtn" onclick="pRedo()">↪</button>
-      <button class="fp-tbtn" onclick="pClearCanvas()">🗑 Limpiar</button>
-      <button class="fp-tbtn" onclick="pExportPNG()">⬇ PNG</button>
-      <button class="fp-tbtn" style="color:#2A7A44;border-color:#C0DD97" onclick="pGeminiDescribe()">✨ IA</button>
-      <button class="fp-tbtn save" onclick="guardarPlano()">💾 Guardar</button>
-    </div>
-    <div id="fp-main">
-      <div id="fp-left">
-        <button class="fptool" id="fpt-select" onclick="pSetTool('select')" title="Seleccionar V"><span class="fptool-ic">↖</span>Sel</button>
-        <div class="fptool-sep"></div>
-        <button class="fptool active" id="fpt-wall" onclick="pSetTool('wall')" title="Muro continuo W"><span class="fptool-ic">▐▌</span>Muro</button>
-        <div class="fptool-sep"></div>
-        <button class="fptool" id="fpt-door" onclick="pSetTool('door')" title="Puerta D"><span class="fptool-ic">🚪</span>Puerta</button>
-        <button class="fptool" id="fpt-window" onclick="pSetTool('window')" title="Ventana N"><span class="fptool-ic">🪟</span>Ventana</button>
-        <button class="fptool" id="fpt-opening" onclick="pSetTool('opening')" title="Vano O"><span class="fptool-ic">⬜</span>Vano</button>
-        <div class="fptool-sep"></div>
-        <button class="fptool" id="fpt-stairs" onclick="pSetTool('stairs')" title="Escalera S"><span class="fptool-ic">🪜</span>Escal.</button>
-        <button class="fptool" id="fpt-cstairs" onclick="pSetTool('cstairs')" title="Circular"><span class="fptool-ic">🌀</span>Circ.</button>
-        <div class="fptool-sep"></div>
-        <button class="fptool" id="fpt-dim" onclick="pSetTool('dim')" title="Cota M"><span class="fptool-ic">↔</span>Cota</button>
-        <button class="fptool" id="fpt-text" onclick="pSetTool('text')" title="Texto T"><span class="fptool-ic">T</span>Texto</button>
-        <button class="fptool" id="fpt-image" onclick="pInsertImage()" title="Imagen"><span class="fptool-ic">🖼</span>Imagen</button>
-      </div>
-      <div id="fp-canvas-wrap">
-        <canvas id="plano-cv"></canvas>
-        <canvas id="plano-loupe" width="112" height="112"></canvas>
-        <input id="plano-dim-inp" type="text" placeholder="ej: 3.50m">
-      </div>
-      <div id="fp-right">
-        <div class="fp-rhdr">Habitaciones</div>
-        <div class="fp-rgrid">
-          <div class="fp-ritem" onclick="pInsertPreset('square')"><div class="fp-ric">⬜</div><div class="fp-rlbl">Cuarto</div></div>
-          <div class="fp-ritem" onclick="pInsertPreset('lshape')"><div class="fp-ric">⌐</div><div class="fp-rlbl">Forma L</div></div>
-          <div class="fp-ritem" onclick="pInsertPreset('ushape')"><div class="fp-ric">⊔</div><div class="fp-rlbl">Forma U</div></div>
-          <div class="fp-ritem" onclick="pInsertPreset('tshape')"><div class="fp-ric">⊤</div><div class="fp-rlbl">Forma T</div></div>
-        </div>
-        <div class="fp-rhdr">Escaleras</div>
-        <div class="fp-rgrid">
-          <div class="fp-ritem" onclick="pSetTool('stairs')"><div class="fp-ric">🪜</div><div class="fp-rlbl">Recta</div></div>
-          <div class="fp-ritem" onclick="pSetTool('cstairs')"><div class="fp-ric">🌀</div><div class="fp-rlbl">Circular</div></div>
-          <div class="fp-ritem" onclick="pInsertPreset('lstairs')"><div class="fp-ric">↱</div><div class="fp-rlbl">Forma L</div></div>
-          <div class="fp-ritem" onclick="pInsertPreset('ustairs')"><div class="fp-ric">⇅</div><div class="fp-rlbl">Forma U</div></div>
-        </div>
-        <div class="fp-rhdr">Aberturas</div>
-        <div class="fp-rgrid">
-          <div class="fp-ritem" onclick="pSetTool('door')"><div class="fp-ric">🚪</div><div class="fp-rlbl">Puerta</div></div>
-          <div class="fp-ritem" onclick="pSetTool('window')"><div class="fp-ric">🪟</div><div class="fp-rlbl">Ventana</div></div>
-          <div class="fp-ritem" onclick="pSetTool('opening')"><div class="fp-ric">◻</div><div class="fp-rlbl">Vano abierto</div></div>
-        </div>
-        <div class="fp-rhdr">Config.</div>
-        <div class="fp-rconf">
-          <label>Grosor muro</label>
-          <input type="range" min="6" max="40" value="14" id="fp-wt" oninput="_PS.wallThick=+this.value;document.getElementById('fp-wtv').textContent=this.value+'px'">
-          <span id="fp-wtv" style="font-size:10px;color:#aaa">14px</span>
-          <label style="margin-top:8px">Escala: 1 cuad =</label>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input type="number" value="20" min="1" max="1000" id="pscale-m" style="width:50px;padding:2px 4px;border:1px solid #666;border-radius:4px;background:#333;color:#fff;font-size:11px">
-            <span style="font-size:10px;color:#aaa">cm</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="fp-statusbar">
-      <span id="fp-coords">x:0 y:0</span>
-      <span id="fp-snapst" style="color:#EF9F27"></span>
-      <span id="fp-hint">Clic para iniciar muro · Doble clic para terminar · ESC cancela</span>
-    </div>`;
-  document.body.appendChild(ov);
-
-  const cv=document.getElementById('plano-cv');
-  const ctx=cv.getContext('2d');
-  const wrap=document.getElementById('fp-canvas-wrap');
-  const loupe=document.getElementById('plano-loupe');
-  const lctx=loupe.getContext('2d');
-  const dimInp=document.getElementById('plano-dim-inp');
-  const LR=56, LZ=4;
-
-  function pResize(){const r=wrap.getBoundingClientRect();cv.width=r.width;cv.height=r.height;pRedraw();}
-  function pPt(e){const r=cv.getBoundingClientRect();const ev=e.touches?e.touches[0]:e;return{x:ev.clientX-r.left,y:ev.clientY-r.top};}
-
-  function pAllPts(){
-    const pts=[];
-    for(const o of _PS.objs){if(o.type==='wall'){pts.push({x:o.x1,y:o.y1},{x:o.x2,y:o.y2});}}
-    for(const p of _PS.chain) pts.push(p);
-    return pts;
-  }
-
-  // Smart snap: point snap first, then angle snap
-  function pSnap(fx,fy,rx,ry){
-    // 1. Point snap
-    for(const p of pAllPts()){if(Math.hypot(rx-p.x,ry-p.y)<SNAP_PT_R)return{x:p.x,y:p.y,type:'point'};}
-    // 2. Angle snap from (fx,fy)
-    const dx=rx-fx,dy=ry-fy,len=Math.hypot(dx,dy);
-    if(len<2)return{x:rx,y:ry,type:null};
-    const ang=((Math.atan2(dy,dx)*180/Math.PI)%360+360)%360;
-    for(const sa of [0,45,90,135,180,225,270,315]){
-      const diff=Math.min(Math.abs(ang-sa),360-Math.abs(ang-sa));
-      if(diff<SNAP_ANG){
-        const rad=sa*Math.PI/180;
-        return{x:fx+Math.cos(rad)*len,y:fy+Math.sin(rad)*len,type:'angle',angle:sa};
-      }
-    }
-    return{x:rx,y:ry,type:null};
-  }
-
-  function pCheckClose(x,y){
-    if(_PS.chain.length<3)return false;
-    return Math.hypot(x-_PS.chain[0].x,y-_PS.chain[0].y)<CLOSE_R;
-  }
-
-  function pNearestWall(x,y){
-    let best=Infinity,bw=null,bt=0;
-    for(const o of _PS.objs){
-      if(o.type!=='wall')continue;
-      const dx=o.x2-o.x1,dy=o.y2-o.y1,l2=dx*dx+dy*dy;
-      if(l2<1)continue;
-      const t=Math.max(0,Math.min(1,((x-o.x1)*dx+(y-o.y1)*dy)/l2));
-      const d=Math.hypot(x-(o.x1+t*dx),y-(o.y1+t*dy));
-      if(d<best){best=d;bw=o;bt=t;}
-    }
-    if(best>45||!bw)return null;
-    const dx=bw.x2-bw.x1,dy=bw.y2-bw.y1;
-    return{wall:bw,t:bt,dist:best,x:bw.x1+bt*dx,y:bw.y1+bt*dy,angle:Math.atan2(dy,dx)};
-  }
-
-  function pWallPts(x1,y1,x2,y2,thick){
-    const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);
-    if(len<1)return null;
-    const nx=-dy/len*thick/2,ny=dx/len*thick/2;
-    return{a1:{x:x1+nx,y:y1+ny},a2:{x:x2+nx,y:y2+ny},b1:{x:x1-nx,y:y1-ny},b2:{x:x2-nx,y:y2-ny}};
-  }
-
-  function pDistSeg(px,py,ax,ay,bx,by){
-    const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;
-    if(!l2)return Math.hypot(px-ax,py-ay);
-    const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/l2));
-    return Math.hypot(px-(ax+t*dx),py-(ay+t*dy));
-  }
-
-  function pHit(o,x,y){
-    const p=9;
-    if(o.type==='wall'){const w=pWallPts(o.x1,o.y1,o.x2,o.y2,o.thick||14);if(!w)return false;return pDistSeg(x,y,w.a1.x,w.a1.y,w.a2.x,w.a2.y)<p||pDistSeg(x,y,w.b1.x,w.b1.y,w.b2.x,w.b2.y)<p;}
-    if(o.type==='door'||o.type==='window'||o.type==='opening')return Math.hypot(x-o.x,y-o.y)<(o.width||80)/2+p;
-    if(o.type==='stairs'||o.type==='lstairs')return x>=o.x-p&&x<=o.x+(o.w||80)+p&&y>=o.y-p&&y<=o.y+(o.h||80)+p;
-    if(o.type==='cstairs')return Math.hypot(x-o.x,y-o.y)<(o.r||60)+p;
-    if(o.type==='text'){ctx.font='14px DM Sans';return x>=o.x-4&&x<=o.x+ctx.measureText(o.label||'').width+4&&y>=o.y-16&&y<=o.y+4;}
-    if(o.type==='dim')return Math.hypot(x-(o.x1+o.x2)/2,y-(o.y1+o.y2)/2)<22;
-    if(o.type==='image')return x>=o.x&&x<=o.x+o.w&&y>=o.y&&y<=o.y+o.h;
-    return false;
-  }
-
-  function pGetHandles(o){
-    if(o.type==='wall'||o.type==='dim')return[{id:'p1',x:o.x1,y:o.y1},{id:'p2',x:o.x2,y:o.y2}];
-    if(o.type==='image')return[{id:'tl',x:o.x,y:o.y},{id:'br',x:o.x+o.w,y:o.y+o.h},{id:'tr',x:o.x+o.w,y:o.y},{id:'bl',x:o.x,y:o.y+o.h}];
-    return[];
-  }
-  function pHitHdl(o,x,y){for(const h of pGetHandles(o)){if(Math.hypot(x-h.x,y-h.y)<9)return h.id;}return null;}
-  function pApplyHdl(o,h,x,y){
-    if(h==='p1'){o.x1=x;o.y1=y;}if(h==='p2'){o.x2=x;o.y2=y;}
-    if(o.type==='image'){if(h==='br'){o.w=Math.max(10,x-o.x);o.h=Math.max(10,y-o.y);}if(h==='bl'){o.w=Math.max(10,o.x+o.w-x);o.x=x;o.h=Math.max(10,y-o.y);}if(h==='tr'){o.w=Math.max(10,x-o.x);o.h=Math.max(10,o.y+o.h-y);o.y=y;}if(h==='tl'){o.w=Math.max(10,o.x+o.w-x);o.h=Math.max(10,o.y+o.h-y);o.x=x;o.y=y;}}
-  }
-
-  // ─── DRAW ─────────────────────────────────────────────────────────
-  function dWall(c,o,alpha){
-    const w=pWallPts(o.x1,o.y1,o.x2,o.y2,o.thick||_PS.wallThick);if(!w)return;
-    c.save();c.globalAlpha=alpha||1;
-    c.fillStyle=o.fill||'rgba(215,210,200,.95)';
-    c.beginPath();c.moveTo(w.a1.x,w.a1.y);c.lineTo(w.a2.x,w.a2.y);c.lineTo(w.b2.x,w.b2.y);c.lineTo(w.b1.x,w.b1.y);c.closePath();c.fill();
-    c.strokeStyle=o.color||'#2C2C2A';c.lineWidth=o.sw||1.5;c.lineCap='square';
-    [[w.a1,w.a2],[w.b1,w.b2],[w.a1,w.b1],[w.a2,w.b2]].forEach(([a,b])=>{c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();});
-    c.restore();
-  }
-
-  function dDoor(c,o){
-    c.save();c.translate(o.x,o.y);c.rotate(o.angle||0);
-    const w=o.width||80,sw=o.swing||1,T=o.thick||_PS.wallThick;
-    // Erase wall area
-    c.fillStyle='#ddd';c.fillRect(-w/2,-T/2,w,T);
-    // Wall stubs
-    c.strokeStyle='#2C2C2A';c.lineWidth=1.5;c.lineCap='butt';
-    c.beginPath();c.moveTo(-w/2,-T/2);c.lineTo(-w/2,T/2);c.stroke();
-    c.beginPath();c.moveTo(w/2,-T/2);c.lineTo(w/2,T/2);c.stroke();
-    // Hinge at left end
-    c.fillStyle='#555';c.beginPath();c.arc(-w/2,0,3.5,0,Math.PI*2);c.fill();
-    // Door leaf
-    const la=(o.leafAngle||75)*Math.PI/180*sw;
-    const lx=-w/2+Math.cos(la)*w,ly=Math.sin(la)*w;
-    c.strokeStyle='#1a1a2e';c.lineWidth=2;c.lineCap='round';
-    c.beginPath();c.moveTo(-w/2,0);c.lineTo(lx,ly);c.stroke();
-    // Swing arc
-    c.strokeStyle='#185FA5';c.lineWidth=0.8;c.setLineDash([3,3]);
-    c.beginPath();
-    if(sw>0)c.arc(-w/2,0,w,0,la,false);
-    else c.arc(-w/2,0,w,0,la,true);
-    c.stroke();c.setLineDash([]);
-    c.restore();
-  }
-
-  function dWindow(c,o){
-    c.save();c.translate(o.x,o.y);c.rotate(o.angle||0);
-    const w=o.width||80,T=o.thick||_PS.wallThick;
-    c.fillStyle='#fff';c.fillRect(-w/2,-T/2,w,T);
-    c.strokeStyle='#1a1a2e';c.lineWidth=1.2;c.strokeRect(-w/2,-T/2,w,T);
-    // Glass panes
-    c.fillStyle='rgba(160,210,255,.35)';c.fillRect(-w/2+1,-T/2+1,w-2,T-2);
-    // Mullion
-    c.strokeStyle='#555';c.lineWidth=1;
-    c.beginPath();c.moveTo(0,-T/2);c.lineTo(0,T/2);c.stroke();
-    // Sill lines
-    c.strokeStyle='#2C2C2A';c.lineWidth=1.5;
-    c.beginPath();c.moveTo(-w/2,-T/2);c.lineTo(-w/2,T/2);c.stroke();
-    c.beginPath();c.moveTo(w/2,-T/2);c.lineTo(w/2,T/2);c.stroke();
-    c.restore();
-  }
-
-  function dOpening(c,o){
-    c.save();c.translate(o.x,o.y);c.rotate(o.angle||0);
-    const w=o.width||80,T=o.thick||_PS.wallThick;
-    c.fillStyle='#ddd';c.fillRect(-w/2,-T/2,w,T);
-    c.strokeStyle='#666';c.lineWidth=1.5;
-    c.beginPath();c.moveTo(-w/2,-T/2);c.lineTo(-w/2,T/2);c.stroke();
-    c.beginPath();c.moveTo(w/2,-T/2);c.lineTo(w/2,T/2);c.stroke();
-    c.restore();
-  }
-
-  function dStairs(c,o){
-    c.save();c.translate(o.x||0,o.y||0);c.rotate(o.angle||0);
-    const w=o.w||80,h=o.h||120,st=o.steps||8;
-    c.fillStyle='rgba(238,235,228,.95)';c.fillRect(0,0,w,h);
-    c.strokeStyle='#2C2C2A';c.lineWidth=1.2;c.strokeRect(0,0,w,h);
-    const sh=h/st;
-    for(let i=1;i<st;i++){c.beginPath();c.moveTo(0,i*sh);c.lineTo(w,i*sh);c.strokeStyle='#888';c.lineWidth=0.8;c.stroke();}
-    // Direction arrow
-    c.strokeStyle='#185FA5';c.lineWidth=1.5;c.lineCap='round';
-    const mx=w/2;
-    c.beginPath();c.moveTo(mx,h-8);c.lineTo(mx,10);c.stroke();
-    c.beginPath();c.moveTo(mx-6,20);c.lineTo(mx,8);c.lineTo(mx+6,20);c.stroke();
-    c.font='bold 9px DM Sans,sans-serif';c.fillStyle='#666';c.textAlign='center';c.textBaseline='bottom';
-    c.fillText(st+' peld.',mx,h-2);
-    c.restore();
-  }
-
-  function dCStairs(c,o){
-    c.save();c.translate(o.x||0,o.y||0);
-    const r=o.r||60,st=o.steps||12;
-    const ri=r*0.22;
-    c.fillStyle='rgba(238,235,228,.95)';c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.fill();
-    c.strokeStyle='#2C2C2A';c.lineWidth=1.2;c.stroke();
-    c.fillStyle='#ccc';c.beginPath();c.arc(0,0,ri,0,Math.PI*2);c.fill();c.strokeStyle='#555';c.lineWidth=1;c.stroke();
-    const as=Math.PI*2/st;
-    for(let i=0;i<st;i++){const a=i*as;c.strokeStyle='#888';c.lineWidth=0.7;c.beginPath();c.moveTo(Math.cos(a)*ri,Math.sin(a)*ri);c.lineTo(Math.cos(a)*r,Math.sin(a)*r);c.stroke();}
-    // Indicator arc
-    c.strokeStyle='#185FA5';c.lineWidth=1.2;c.setLineDash([4,3]);
-    c.beginPath();c.arc(0,0,r*0.6,-Math.PI/2,Math.PI);c.stroke();c.setLineDash([]);
-    c.restore();
-  }
-
-  function dLStairs(c,o){
-    c.save();c.translate(o.x||0,o.y||0);
-    const w=o.w||90,h=o.h||90,st1=o.steps1||5,st2=o.steps2||5;
-    c.fillStyle='rgba(238,235,228,.95)';c.strokeStyle='#2C2C2A';c.lineWidth=1.2;
-    c.fillRect(0,0,w/2,h);c.strokeRect(0,0,w/2,h);
-    c.fillRect(w/2,0,w/2,h/2);c.strokeRect(w/2,0,w/2,h/2);
-    const sh=h/st1;for(let i=1;i<st1;i++){c.strokeStyle='#888';c.lineWidth=0.7;c.beginPath();c.moveTo(0,i*sh);c.lineTo(w/2,i*sh);c.stroke();}
-    const sw=w/2/st2;for(let i=1;i<st2;i++){c.beginPath();c.moveTo(w/2+i*sw,0);c.lineTo(w/2+i*sw,h/2);c.stroke();}
-    c.fillStyle='rgba(200,195,185,.8)';c.fillRect(w/2-4,h/2-4,8,8);
-    c.restore();
-  }
-
-  function dDimLine(c,o){
-    const{x1,y1,x2,y2,label,color}=o;const col=color||'#185FA5';
-    const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);if(len<4)return;
-    const nx=dx/len,ny=dy/len,px2=-ny,py2=nx,off=22;
-    const ax1=x1+px2*off,ay1=y1+py2*off,ax2=x2+px2*off,ay2=y2+py2*off;
-    c.save();c.strokeStyle=col;c.lineWidth=1;
-    c.setLineDash([3,3]);c.globalAlpha=0.7;
-    c.beginPath();c.moveTo(x1,y1);c.lineTo(ax1,ay1);c.stroke();
-    c.beginPath();c.moveTo(x2,y2);c.lineTo(ax2,ay2);c.stroke();
-    c.setLineDash([]);c.globalAlpha=1;
-    c.beginPath();c.moveTo(ax1,ay1);c.lineTo(ax2,ay2);c.stroke();
-    c.fillStyle=col;
-    [{x:ax1,y:ay1},{x:ax2,y:ay2}].forEach(p=>{c.beginPath();c.arc(p.x,p.y,3.5,0,Math.PI*2);c.fill();});
-    // tick marks
-    [{x:ax1,y:ay1},{x:ax2,y:ay2}].forEach(p=>{const a=Math.atan2(ay2-ay1,ax2-ax1)+Math.PI/4;c.beginPath();c.moveTo(p.x-Math.cos(a)*6,p.y-Math.sin(a)*6);c.lineTo(p.x+Math.cos(a)*6,p.y+Math.sin(a)*6);c.stroke();});
-    const mx=(ax1+ax2)/2,my=(ay1+ay2)/2;const lbl=label||(Math.round(len)+'px');
-    c.font='bold 11px DM Sans,sans-serif';const tw=c.measureText(lbl).width;
-    c.fillStyle='#fff';c.fillRect(mx-tw/2-5,my-10,tw+10,14);
-    c.fillStyle=col;c.fillText(lbl,mx-tw/2,my+2);c.restore();
-  }
-
-  function dObj(c,o,alpha){
-    if(o.type==='wall')return dWall(c,o,alpha);
-    if(o.type==='door')return dDoor(c,o);
-    if(o.type==='window')return dWindow(c,o);
-    if(o.type==='opening')return dOpening(c,o);
-    if(o.type==='stairs')return dStairs(c,o);
-    if(o.type==='cstairs')return dCStairs(c,o);
-    if(o.type==='lstairs')return dLStairs(c,o);
-    if(o.type==='dim')return dDimLine(c,o);
-    c.save();c.globalAlpha=alpha||1;
-    if(o.type==='text'){c.font=`${o.fs||14}px DM Sans,sans-serif`;c.fillStyle=o.color||'#1a1a2e';c.fillText(o.label||'',o.x,o.y);}
-    if(o.type==='image'&&o._img)c.drawImage(o._img,o.x,o.y,o.w,o.h);
-    c.restore();
-  }
-
-  function dHandles(o){
-    ctx.save();ctx.fillStyle='#185FA5';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;
-    for(const h of pGetHandles(o)){ctx.beginPath();ctx.arc(h.x,h.y,5,0,Math.PI*2);ctx.fill();ctx.stroke();}
-    if(o.type==='image'){ctx.strokeStyle='#185FA580';ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.strokeRect(o.x-2,o.y-2,o.w+4,o.h+4);ctx.setLineDash([]);}
-    ctx.restore();
-  }
-
-  function pRedraw(){
-    ctx.clearRect(0,0,cv.width,cv.height);
-    // All saved objects
-    _PS.objs.forEach(o=>dObj(ctx,o));
-    // Current wall chain — draw walls segment by segment
-    if(_PS.chain.length>1){
-      for(let i=0;i<_PS.chain.length-1;i++) dWall(ctx,{type:'wall',x1:_PS.chain[i].x,y1:_PS.chain[i].y,x2:_PS.chain[i+1].x,y2:_PS.chain[i+1].y,thick:_PS.wallThick});
-    }
-    // Chain point indicators
-    _PS.chain.forEach((p,i)=>{
-      ctx.save();ctx.fillStyle=i===0?'#2A7A44':'#185FA5';ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill();ctx.restore();
-    });
-    // Wall preview from last chain point to cursor
-    if(_PS.tool==='wall'&&_PS.chain.length>0&&_PS.snapPt){
-      const last=_PS.chain[_PS.chain.length-1];
-      const sp=_PS.closeSnap?_PS.chain[0]:_PS.snapPt;
-      dWall(ctx,{type:'wall',x1:last.x,y1:last.y,x2:sp.x,y2:sp.y,thick:_PS.wallThick,color:_PS.closeSnap?'#2A7A44':'#185FA5',sw:1.5,fill:_PS.closeSnap?'rgba(42,122,68,.15)':'rgba(24,95,165,.12)'},0.7);
-    }
-    // Close-snap ring
-    if(_PS.closeSnap&&_PS.chain.length>0){
-      ctx.save();ctx.strokeStyle='#2A7A44';ctx.lineWidth=2;ctx.fillStyle='rgba(42,122,68,.18)';
-      ctx.beginPath();ctx.arc(_PS.chain[0].x,_PS.chain[0].y,CLOSE_R,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
-    }
-    // Dim preview
-    if(_PS.tool==='dim'&&_PS.dimPhase===1&&_PS.dimP1&&_PS.snapPt) dDimLine(ctx,{x1:_PS.dimP1.x,y1:_PS.dimP1.y,x2:_PS.snapPt.x,y2:_PS.snapPt.y});
-    // Snap indicators
-    if(_PS.snapPt&&(_PS.tool==='wall'||_PS.tool==='dim')){
-      const sp=_PS.snapPt;
-      ctx.save();
-      if(sp.type==='point'){ctx.strokeStyle='#185FA5';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(sp.x,sp.y,9,0,Math.PI*2);ctx.stroke();ctx.fillStyle='rgba(24,95,165,.2)';ctx.fill();}
-      else if(sp.type==='angle'){
-        const from=_PS.chain.length>0?_PS.chain[_PS.chain.length-1]:_PS.dimP1;
-        if(from){ctx.strokeStyle='#EF9F27';ctx.lineWidth=0.8;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(from.x,from.y);ctx.lineTo(sp.x,sp.y);ctx.stroke();ctx.setLineDash([]);}
-        ctx.fillStyle='#EF9F27';ctx.beginPath();ctx.arc(sp.x,sp.y,4,0,Math.PI*2);ctx.fill();
-      }
-      ctx.restore();
-    }
-    // Angle tooltip
-    if(_PS.snapPt&&_PS.chain.length>0&&!_PS.closeSnap){
-      const last=_PS.chain[_PS.chain.length-1];const sp=_PS.snapPt;
-      const ang=Math.round(((Math.atan2(sp.y-last.y,sp.x-last.x)*180/Math.PI)%360+360)%360);
-      const len=Math.hypot(sp.x-last.x,sp.y-last.y);
-      const scale=+document.getElementById('pscale-m')?.value||20;
-      const cm=Math.round(len/20*scale);
-      ctx.save();ctx.fillStyle='rgba(0,0,0,.72)';ctx.beginPath();ctx.roundRect(sp.x+12,sp.y-22,82,16,4);ctx.fill();
-      ctx.font='bold 10px DM Sans,sans-serif';ctx.fillStyle='#fff';ctx.textBaseline='middle';
-      ctx.fillText(`${ang}° · ${cm}cm`,sp.x+16,sp.y-14);ctx.restore();
-    }
-    // Door/window placement preview
-    if((_PS.tool==='door'||_PS.tool==='window'||_PS.tool==='opening')&&_PS.wallSnap){
-      const ws=_PS.wallSnap;
-      const o={type:_PS.tool,x:ws.x,y:ws.y,angle:ws.angle,width:80,thick:_PS.wallThick,swing:1,leafAngle:75};
-      dObj(ctx,o);
-      ctx.save();ctx.strokeStyle='#185FA5';ctx.lineWidth=1;ctx.setLineDash([3,2]);
-      ctx.beginPath();ctx.arc(ws.x,ws.y,6,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);ctx.restore();
-    }
-    // Stairs drag preview
-    if(_PS.tool==='stairs'&&_PS.drawing&&_PS.stairsPreview&&_PS.stairsPreview.w>10){
-      ctx.save();ctx.globalAlpha=0.6;dStairs(ctx,{..._PS.stairsPreview,steps:Math.max(4,Math.round(_PS.stairsPreview.h/14))});ctx.restore();
-    }
-    // Selection
-    if(_PS.sel)dHandles(_PS.sel);
-  }
-
-  // ── Loupe ──────────────────────────────────────────────────────
-  function pShowLoupe(x,y){
-    loupe.style.display='block';
-    const sz=LR*2;loupe.width=loupe.height=sz;loupe.style.width=loupe.style.height=sz+'px';
-    let lx=x+22,ly=y-sz-12;
-    if(lx+sz>cv.width-10)lx=x-sz-22;if(ly<10)ly=y+22;
-    loupe.style.left=lx+'px';loupe.style.top=ly+'px';
-    lctx.clearRect(0,0,sz,sz);lctx.save();
-    lctx.beginPath();lctx.arc(LR,LR,LR,0,Math.PI*2);lctx.clip();
-    lctx.fillStyle='#ddd';lctx.fillRect(0,0,sz,sz);
-    lctx.translate(LR,LR);lctx.scale(LZ,LZ);lctx.translate(-x,-y);
-    lctx.strokeStyle='rgba(0,0,0,.08)';lctx.lineWidth=0.3;
-    for(let g=Math.floor((x-LR/LZ)/20)*20;g<x+LR/LZ;g+=20){lctx.beginPath();lctx.moveTo(g,-999);lctx.lineTo(g,999);lctx.stroke();}
-    for(let g=Math.floor((y-LR/LZ)/20)*20;g<y+LR/LZ;g+=20){lctx.beginPath();lctx.moveTo(-999,g);lctx.lineTo(999,g);lctx.stroke();}
-    _PS.objs.forEach(o=>dObj(lctx,o));
-    if(_PS.chain.length>1){for(let i=0;i<_PS.chain.length-1;i++) dWall(lctx,{type:'wall',x1:_PS.chain[i].x,y1:_PS.chain[i].y,x2:_PS.chain[i+1].x,y2:_PS.chain[i+1].y,thick:_PS.wallThick});}
-    lctx.restore();
-    lctx.strokeStyle='rgba(224,82,82,.9)';lctx.lineWidth=1;
-    lctx.beginPath();lctx.moveTo(LR-14,LR);lctx.lineTo(LR+14,LR);lctx.stroke();
-    lctx.beginPath();lctx.moveTo(LR,LR-14);lctx.lineTo(LR,LR+14);lctx.stroke();
-  }
-  function pHideLoupe(){loupe.style.display='none';}
-
-  function pStatus(snap,hint){
-    const ss=document.getElementById('fp-snapst');if(ss)ss.textContent=snap||'';
-    const ht=document.getElementById('fp-hint');if(ht)ht.textContent=hint||'';
-  }
-
-  // ── Undo/Redo ────────────────────────────────────────────────────
-  function pSaveUndo(){_PS.undo.push(JSON.stringify(_PS.objs));if(_PS.undo.length>60)_PS.undo.shift();_PS.redo=[];}
-  window.pUndo=function(){if(!_PS.undo.length)return;_PS.redo.push(JSON.stringify(_PS.objs));_PS.objs=JSON.parse(_PS.undo.pop());_PS.sel=null;pRedraw();};
-  window.pRedo=function(){if(!_PS.redo.length)return;_PS.undo.push(JSON.stringify(_PS.objs));_PS.objs=JSON.parse(_PS.redo.pop());_PS.sel=null;pRedraw();};
-
-  // ── EVENTS ───────────────────────────────────────────────────────
-  cv.addEventListener('mousedown',pDown);
-  cv.addEventListener('mousemove',pMove);
-  cv.addEventListener('mouseup',pUp);
-  cv.addEventListener('dblclick',pDbl);
-  cv.addEventListener('touchstart',e=>{e.preventDefault();pDown(e);},{passive:false});
-  cv.addEventListener('touchmove',e=>{e.preventDefault();pMove(e);},{passive:false});
-  cv.addEventListener('touchend',e=>{e.preventDefault();pDbl(e);},{passive:false});
-  cv.addEventListener('contextmenu',e=>{e.preventDefault();const p=pPt(e);pCtxMenu(e.clientX,e.clientY,p.x,p.y);});
-
-  function pDown(e){
-    if(e.button===2)return;
-    const{x,y}=pPt(e);hidePCtxMenu();
-
-    if(_PS.tool==='select'){
-      if(_PS.sel){const h=pHitHdl(_PS.sel,x,y);if(h){_PS.dragHandle=h;_PS.dragging=true;_PS.dragOx=x;_PS.dragOy=y;return;}}
-      let hit=null;for(let i=_PS.objs.length-1;i>=0;i--){if(pHit(_PS.objs[i],x,y)){hit=_PS.objs[i];break;}}
-      if(hit){_PS.sel=hit;_PS.drag=hit;_PS.dragging=true;_PS.dragHandle=null;_PS.dragOx=x-((hit.x||hit.x1||0));_PS.dragOy=y-((hit.y||hit.y1||0));}
-      else _PS.sel=null;
-      pRedraw();return;
-    }
-
-    if(_PS.tool==='wall'){
-      const sp=_PS.snapPt||{x,y};
-      if(_PS.closeSnap&&_PS.chain.length>=3){
-        pSaveUndo();
-        for(let i=0;i<_PS.chain.length-1;i++) _PS.objs.push({type:'wall',x1:_PS.chain[i].x,y1:_PS.chain[i].y,x2:_PS.chain[i+1].x,y2:_PS.chain[i+1].y,thick:_PS.wallThick,color:'#2C2C2A',sw:1.5});
-        _PS.objs.push({type:'wall',x1:_PS.chain[_PS.chain.length-1].x,y1:_PS.chain[_PS.chain.length-1].y,x2:_PS.chain[0].x,y2:_PS.chain[0].y,thick:_PS.wallThick,color:'#2C2C2A',sw:1.5});
-        _PS.chain=[];pHideLoupe();pRedraw();pStatus('','✓ Habitación cerrada · Clic para nueva');return;
-      }
-      _PS.chain.push({x:sp.x,y:sp.y});
-      pStatus('','Clic → continuar · Doble clic → terminar · Acercate al inicio → cerrar');
-      pRedraw();return;
-    }
-
-    if(_PS.tool==='dim'){
-      if(_PS.dimPhase===0){_PS.dimP1={x,y};_PS.dimPhase=1;pStatus('','Clic en segundo punto');}
-      else{
-        const sp=_PS.snapPt||{x,y};const dp=_PS.dimP1;_PS.dimPhase=0;pHideLoupe();
-        const len=Math.hypot(sp.x-dp.x,sp.y-dp.y);
-        const scale=+(document.getElementById('pscale-m')?.value)||20;
-        const def=Math.round(len/20*scale)+'cm';
-        pShowDimInp(x,y,def,lbl=>{pSaveUndo();_PS.objs.push({type:'dim',x1:dp.x,y1:dp.y,x2:sp.x,y2:sp.y,label:lbl,color:'#185FA5',sw:1});pRedraw();});
-        pStatus('','');
-      }return;
-    }
-
-    if(_PS.tool==='door'||_PS.tool==='window'||_PS.tool==='opening'){
-      const ws=_PS.wallSnap;
-      if(ws){pSaveUndo();_PS.objs.push({type:_PS.tool,x:ws.x,y:ws.y,angle:ws.angle,width:80,thick:_PS.wallThick,leafAngle:75,swing:1});pRedraw();}
-      else toast('Acercate a un muro para colocar','error');
-      return;
-    }
-
-    if(_PS.tool==='stairs'){_PS.drawing=true;_PS.startX=x;_PS.startY=y;return;}
-    if(_PS.tool==='cstairs'){pSaveUndo();_PS.objs.push({type:'cstairs',x,y,r:60,steps:12});pRedraw();return;}
-    if(_PS.tool==='text'){const lbl=prompt('Texto / etiqueta:','');if(!lbl)return;pSaveUndo();_PS.objs.push({type:'text',x,y,label:lbl,color:'#1a1a2e',fs:14});pRedraw();return;}
-  }
-
-  function pMove(e){
-    const{x,y}=pPt(e);_PS.mouseX=x;_PS.mouseY=y;
-    document.getElementById('fp-coords').textContent=`x:${Math.round(x)} y:${Math.round(y)}`;
-
-    if(_PS.tool==='select'&&_PS.dragging){
-      if(_PS.dragHandle&&_PS.sel){pApplyHdl(_PS.sel,_PS.dragHandle,x,y);}
-      else if(_PS.drag){
-        const o=_PS.drag;
-        if(o.type==='wall'||o.type==='dim'){const ox1=o.x1,oy1=o.y1;o.x1=x-_PS.dragOx;o.y1=y-_PS.dragOy;o.x2+=o.x1-ox1;o.y2+=o.y1-oy1;_PS.dragOx=x-o.x1;_PS.dragOy=y-o.y1;}
-        else if(o.x!=null){o.x=x-_PS.dragOx;o.y=y-_PS.dragOy;}
-      }
-      pRedraw();return;
-    }
-
-    if(_PS.tool==='stairs'&&_PS.drawing){
-      _PS.stairsPreview={x:Math.min(_PS.startX,x),y:Math.min(_PS.startY,y),w:Math.abs(x-_PS.startX),h:Math.abs(y-_PS.startY)};
-      pRedraw();return;
-    }
-
-    if(_PS.tool==='wall'){
-      if(_PS.chain.length>0){
-        const last=_PS.chain[_PS.chain.length-1];
-        _PS.snapPt=pSnap(last.x,last.y,x,y);
-      } else {
-        _PS.snapPt={x,y,type:null};
-        for(const p of pAllPts()){if(Math.hypot(x-p.x,y-p.y)<SNAP_PT_R){_PS.snapPt={...p,type:'point'};break;}}
-      }
-      _PS.closeSnap=pCheckClose(_PS.snapPt.x,_PS.snapPt.y);
-      let sn='';
-      if(_PS.closeSnap)sn='⊙ Cerrar habitación';
-      else if(_PS.snapPt.type==='point')sn='⊙ Punto';
-      else if(_PS.snapPt.type==='angle')sn=`⊣ ${_PS.snapPt.angle}°`;
-      pStatus(sn,'');
-      if(_PS.chain.length>0)pShowLoupe(x,y);else pHideLoupe();
-      pRedraw();return;
-    }
-
-    if(_PS.tool==='dim'){
-      if(_PS.dimPhase===1){_PS.snapPt=pSnap(_PS.dimP1.x,_PS.dimP1.y,x,y);pShowLoupe(x,y);}
-      else{_PS.snapPt={x,y,type:null};for(const p of pAllPts()){if(Math.hypot(x-p.x,y-p.y)<SNAP_PT_R){_PS.snapPt={...p,type:'point'};break;}}}
-      pRedraw();return;
-    }
-
-    if(_PS.tool==='door'||_PS.tool==='window'||_PS.tool==='opening'){_PS.wallSnap=pNearestWall(x,y);pRedraw();return;}
-
-    pRedraw();
-  }
-
-  function pUp(e){
-    if(_PS.tool==='stairs'&&_PS.drawing){
-      _PS.drawing=false;const pr=_PS.stairsPreview;
-      if(pr&&pr.w>20&&pr.h>20){pSaveUndo();_PS.objs.push({type:'stairs',x:pr.x,y:pr.y,w:pr.w,h:pr.h,steps:Math.max(4,Math.round(pr.h/14)),angle:0});pRedraw();}
-      _PS.stairsPreview=null;return;
-    }
-    if(_PS.tool==='select'){_PS.dragging=false;_PS.drag=null;_PS.dragHandle=null;}
-  }
-
-  function pDbl(e){
-    const{x,y}=pPt(e);
-    if(_PS.tool==='wall'&&_PS.chain.length>1){
-      // Remove last duplicate point from dblclick
-      if(_PS.chain.length>2){_PS.chain.pop();}
-      pSaveUndo();
-      for(let i=0;i<_PS.chain.length-1;i++) _PS.objs.push({type:'wall',x1:_PS.chain[i].x,y1:_PS.chain[i].y,x2:_PS.chain[i+1].x,y2:_PS.chain[i+1].y,thick:_PS.wallThick,color:'#2C2C2A',sw:1.5});
-      _PS.chain=[];pHideLoupe();pRedraw();pStatus('','✓ Muro terminado · Clic para nuevo');return;
-    }
-    if(_PS.tool==='select'){
-      for(let i=_PS.objs.length-1;i>=0;i--){if(pHit(_PS.objs[i],x,y)){pEditObj(_PS.objs[i]);break;}}
-    }
-  }
-
-  function pEditObj(o){
-    if(o.type==='text'){const l=prompt('Texto:',o.label);if(l!==null){pSaveUndo();o.label=l;pRedraw();}}
-    else if(o.type==='dim'){const l=prompt('Medida:',o.label||'');if(l!==null){pSaveUndo();o.label=l;pRedraw();}}
-    else if(o.type==='wall'){const t=prompt('Grosor muro (px):',o.thick||_PS.wallThick);if(t){pSaveUndo();o.thick=+t||_PS.wallThick;pRedraw();}}
-    else if(o.type==='door'){
-      const a=prompt('Ancho (px), swing 1=der/-1=izq, apertura°:',`${o.width||80},${o.swing||1},${o.leafAngle||75}`);
-      if(a){pSaveUndo();const[w,s,la]=a.split(',');o.width=+w||80;o.swing=+s||1;o.leafAngle=+la||75;pRedraw();}
-    }
-    else if(o.type==='stairs'){const s=prompt('Peldaños:',o.steps||8);if(s){pSaveUndo();o.steps=+s||8;pRedraw();}}
-    else if(o.type==='cstairs'){const s=prompt('Radio (px), peldaños:',`${o.r||60},${o.steps||12}`);if(s){pSaveUndo();const[r,st]=s.split(',');o.r=+r||60;o.steps=+st||12;pRedraw();}}
-  }
-
-  function pShowDimInp(x,y,def,cb){
-    dimInp.style.display='block';dimInp.style.left=(x-45)+'px';dimInp.style.top=(y+8)+'px';
-    dimInp.value=def;dimInp.focus();dimInp.select();
-    function done(){dimInp.style.display='none';cb(dimInp.value||def);}
-    dimInp.onkeydown=e=>{if(e.key==='Enter')done();if(e.key==='Escape')dimInp.style.display='none';};
-    dimInp.onblur=done;
-  }
-
-  // Context menu
-  let _ctxTgt=null;
-  function pCtxMenu(cx,cy,x,y){
-    let hit=null;for(let i=_PS.objs.length-1;i>=0;i--){if(pHit(_PS.objs[i],x,y)){hit=_PS.objs[i];break;}}
-    if(!hit)return;_ctxTgt=hit;_PS.sel=hit;pRedraw();
-    let m=document.getElementById('plano-ctx-menu');
-    if(!m){m=document.createElement('div');m.id='plano-ctx-menu';m.className='plano-ctx-menu';
-      m.innerHTML=`<div class="plano-ctx-item" onclick="pCtxEdit()">✏️ Editar propiedades</div><div class="plano-ctx-item" onclick="pCtxDupe()">⧉ Duplicar</div><div class="plano-ctx-item" onclick="pCtxFlip()">↔ Voltear</div><div class="plano-ctx-item" onclick="pCtxRot()">↻ Rotar 90°</div><div class="plano-ctx-item" onclick="pCtxFront()">▲ Al frente</div><div class="plano-ctx-item danger" onclick="pCtxDel()">🗑 Eliminar</div>`;
-      document.body.appendChild(m);}
-    m.style.display='block';m.style.left=cx+'px';m.style.top=cy+'px';
-  }
-  function hidePCtxMenu(){const m=document.getElementById('plano-ctx-menu');if(m)m.style.display='none';}
-  document.addEventListener('click',hidePCtxMenu);
-  window.pCtxEdit=function(){if(_ctxTgt)pEditObj(_ctxTgt);};
-  window.pCtxDupe=function(){if(!_ctxTgt)return;pSaveUndo();const c=JSON.parse(JSON.stringify(_ctxTgt));delete c._img;if(c.src){const img=new Image();img.src=c.src;c._img=img;}if(c.x!=null){c.x+=20;c.y+=20;}if(c.x1!=null){c.x1+=20;c.y1+=20;c.x2+=20;c.y2+=20;}_PS.objs.push(c);pRedraw();};
-  window.pCtxFlip=function(){if(!_ctxTgt)return;pSaveUndo();const o=_ctxTgt;if(o.swing)o.swing*=-1;if(o.x1!=null){[o.x1,o.x2]=[o.x2,o.x1];[o.y1,o.y2]=[o.y2,o.y1];}pRedraw();};
-  window.pCtxRot=function(){if(!_ctxTgt)return;pSaveUndo();const o=_ctxTgt;if(o.angle!=null)o.angle=(o.angle||0)+Math.PI/2;if(o.type==='stairs'){const tmp=o.w;o.w=o.h;o.h=tmp;}pRedraw();};
-  window.pCtxFront=function(){if(!_ctxTgt)return;pSaveUndo();_PS.objs=_PS.objs.filter(o=>o!==_ctxTgt);_PS.objs.push(_ctxTgt);pRedraw();};
-  window.pCtxDel=function(){if(!_ctxTgt)return;pSaveUndo();_PS.objs=_PS.objs.filter(o=>o!==_ctxTgt);_PS.sel=null;pRedraw();};
-
-  // Toolbar
-  window.pSetTool=function(t){
-    _PS.tool=t;_PS.chain=[];_PS.dimPhase=0;_PS.drawing=false;_PS.snapPt=null;_PS.wallSnap=null;_PS.stairsPreview=null;
-    pHideLoupe();
-    document.querySelectorAll('.fptool[id^="fpt-"]').forEach(b=>b.classList.remove('active'));
-    const el=document.getElementById('fpt-'+t);if(el)el.classList.add('active');
-    cv.style.cursor=t==='select'?'default':'crosshair';
-    const hints={select:'Clic para seleccionar · Doble clic para editar · Arrastrá para mover · Del para borrar',wall:'Clic → trazar muro · Doble clic → terminar · Cerrá hacia el inicio para crear habitación',door:'Acercate a un muro → clic para colocar · Doble clic para editar swing y ancho',window:'Acercate a un muro → clic para colocar ventana',opening:'Acercate a un muro → clic para colocar vano abierto',stairs:'Arrastrá para definir escalera · Doble clic para editar peldaños',cstairs:'Clic para colocar escalera circular · Doble clic para editar',dim:'Clic en punto 1 → punto 2 → escribí la medida',text:'Clic en el canvas para agregar texto'};
-    pStatus('',hints[t]||'');pRedraw();
-  };
-
-  window.pClearCanvas=function(){if(!confirm('¿Limpiar todo el plano?'))return;pSaveUndo();_PS.objs=[];_PS.chain=[];_PS.sel=null;pRedraw();};
-
-  window.pInsertPreset=function(type){
-    pSaveUndo();
-    const cx=cv.width/2,cy=cv.height/2,W=200,H=180,T=_PS.wallThick;
-    const aw=(x1,y1,x2,y2)=>_PS.objs.push({type:'wall',x1,y1,x2,y2,thick:T,color:'#2C2C2A',sw:1.5});
-    if(type==='square'){aw(cx-W/2,cy-H/2,cx+W/2,cy-H/2);aw(cx+W/2,cy-H/2,cx+W/2,cy+H/2);aw(cx+W/2,cy+H/2,cx-W/2,cy+H/2);aw(cx-W/2,cy+H/2,cx-W/2,cy-H/2);}
-    else if(type==='lshape'){aw(cx-W/2,cy-H/2,cx+W/2,cy-H/2);aw(cx+W/2,cy-H/2,cx+W/2,cy);aw(cx+W/2,cy,cx,cy);aw(cx,cy,cx,cy+H/2);aw(cx,cy+H/2,cx-W/2,cy+H/2);aw(cx-W/2,cy+H/2,cx-W/2,cy-H/2);}
-    else if(type==='ushape'){aw(cx-W/2,cy-H/2,cx+W/2,cy-H/2);aw(cx+W/2,cy-H/2,cx+W/2,cy+H/2);aw(cx+W/2,cy+H/2,cx+W/4,cy+H/2);aw(cx+W/4,cy+H/2,cx+W/4,cy);aw(cx+W/4,cy,cx-W/4,cy);aw(cx-W/4,cy,cx-W/4,cy+H/2);aw(cx-W/4,cy+H/2,cx-W/2,cy+H/2);aw(cx-W/2,cy+H/2,cx-W/2,cy-H/2);}
-    else if(type==='tshape'){aw(cx-W/2,cy-H/2,cx+W/2,cy-H/2);aw(cx+W/2,cy-H/2,cx+W/2,cy);aw(cx+W/2,cy,cx+W/4,cy);aw(cx+W/4,cy,cx+W/4,cy+H/2);aw(cx+W/4,cy+H/2,cx-W/4,cy+H/2);aw(cx-W/4,cy+H/2,cx-W/4,cy);aw(cx-W/4,cy,cx-W/2,cy);aw(cx-W/2,cy,cx-W/2,cy-H/2);}
-    else if(type==='lstairs'){_PS.objs.push({type:'lstairs',x:cx-50,y:cy-50,w:100,h:100,steps1:6,steps2:6});}
-    else if(type==='ustairs'){_PS.objs.push({type:'stairs',x:cx-80,y:cy-60,w:38,h:80,steps:6});_PS.objs.push({type:'stairs',x:cx+42,y:cy-60,w:38,h:80,steps:6});_PS.objs.push({type:'stairs',x:cx-42,y:cy-60,w:84,h:20,steps:2});}
-    pRedraw();pSetTool('select');
-  };
-
-  window.pInsertImage=function(){
-    const inp=document.createElement('input');inp.type='file';inp.accept='image/*';
-    inp.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const img=new Image();img.onload=()=>{const sc=Math.min(300/img.width,200/img.height,1);pSaveUndo();_PS.objs.push({type:'image',x:40,y:40,w:img.width*sc,h:img.height*sc,src:ev.target.result,_img:img,op:1});pRedraw();};img.src=ev.target.result;};r.readAsDataURL(f);};inp.click();
-  };
-
-  window.pExportPNG=function(){const a=document.createElement('a');a.download='plano.png';a.href=cv.toDataURL();a.click();};
-
-  window.pGeminiDescribe=function(){
-    const key=localStorage.getItem('fnz_gemini_key');if(!key){toast('Configurá Gemini en Ajustes','error');return;}
-    const b64=cv.toDataURL('image/jpeg',0.8).split(',')[1];toast('✨ Analizando plano...');
-    fetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{inline_data:{mime_type:'image/jpeg',data:b64}},{text:'Describí este plano arquitectónico en español de Perú. Identificá habitaciones, muros dobles, puertas, ventanas y escaleras. Sé conciso (máx 3 oraciones).'}]}],generationConfig:{temperature:0.3,maxOutputTokens:300}})})
-    .then(r=>r.json()).then(d=>{const txt=d?.candidates?.[0]?.content?.parts?.[0]?.text||'Sin respuesta.';toast('✨ '+txt.substring(0,100));})
-    .catch(()=>toast('Error Gemini','error'));
-  };
-
-  function pKeyDown(e){
-    if(!document.getElementById('plano-overlay'))return;
-    if(e.target.tagName==='INPUT')return;
-    const k=e.key.toLowerCase();
-    if(k==='v')pSetTool('select');if(k==='w')pSetTool('wall');if(k==='d')pSetTool('door');if(k==='n')pSetTool('window');if(k==='s')pSetTool('stairs');if(k==='m')pSetTool('dim');if(k==='t')pSetTool('text');
-    if(k==='escape'){_PS.chain=[];_PS.dimPhase=0;_PS.drawing=false;pHideLoupe();pStatus('','');pRedraw();}
-    if((e.ctrlKey||e.metaKey)&&k==='z'){e.preventDefault();pUndo();}
-    if((e.ctrlKey||e.metaKey)&&(k==='y'||(e.shiftKey&&k==='z'))){e.preventDefault();pRedo();}
-    if((k==='delete'||k==='backspace')&&_PS.sel){pSaveUndo();_PS.objs=_PS.objs.filter(o=>o!==_PS.sel);_PS.sel=null;pRedraw();}
-  }
-  document.addEventListener('keydown',pKeyDown);
-  window._fpKeyDown=pKeyDown;
-
-  setTimeout(()=>{pResize();window.addEventListener('resize',pResize);},80);
-  pSetTool('wall');
-}
-
-function cerrarEditorPlano(){
-  document.getElementById('plano-overlay')?.remove();
-  document.getElementById('plano-ctx-menu')?.remove();
-  if(window._fpKeyDown)document.removeEventListener('keydown',window._fpKeyDown);
-  render();
-}
-
-function guardarPlano(){
-  const nota=(state.notas||[]).find(n=>n.id===_planoNotaId);if(!nota)return;
-  nota.titulo=document.getElementById('plano-titulo')?.value||'Plano sin título';
-  nota._objetos=_PS.objs.map(o=>{const c={...o};delete c._img;return c;});
-  nota.modificado=new Date().toISOString();
-  saveAll();toast('Plano guardado ✓');
-}
-
-
-
-
-
-// ═══════════════════════════════════════════════════════════════════
-// 📊 EDITOR DE TABLA AVANZADA
-// ═══════════════════════════════════════════════════════════════════
-
-let _tablaState = { data:[], fmt:[], rows:20, cols:10, selR:0, selC:0, editing:false };
-let _tablaNotaId = null;
-
-function abrirEditorTabla(notaId){
-  _tablaNotaId = notaId;
-  let nota = notaId ? (state.notas||[]).find(n=>n.id===notaId) : null;
-
-  if(!nota){
-    nota = { id:Date.now()+'', tipo:'tabla', titulo:'Tabla sin título', texto:'', creado:new Date().toISOString(), modificado:new Date().toISOString(), colorHoja:'celeste', _tablaData:null };
-    if(!state.notas) state.notas=[];
-    state.notas.unshift(nota);
-    _tablaNotaId=nota.id;
-    saveAll();
-  }
-
-  const saved = nota._tablaData ? JSON.parse(nota._tablaData) : null;
-  _tablaState.rows = saved?.rows||20;
-  _tablaState.cols = saved?.cols||10;
-  _tablaState.data = saved?.data || Array.from({length:_tablaState.rows},()=>Array(_tablaState.cols).fill(''));
-  _tablaState.fmt  = saved?.fmt  || Array.from({length:_tablaState.rows},()=>Array.from({length:_tablaState.cols},()=>({})));
-  _tablaState.selR=0;_tablaState.selC=0;
-
-  const ov=document.createElement('div');ov.id='tabla-overlay';
-  ov.innerHTML=`
-    <div id="tabla-topbar">
-      <button class="ttb-btn" onclick="cerrarEditorTabla()">‹ Volver</button>
-      <input class="ttb-title" id="tabla-titulo" value="${nota.titulo||'Tabla sin título'}" placeholder="Título de la tabla">
-      <button class="ttb-btn" onclick="guardarTabla()">Guardar</button>
-    </div>
-    <div id="tabla-toolbar">
-      <button class="ttool" onclick="tAddRow()">+ Fila</button>
-      <button class="ttool" onclick="tAddCol()">+ Col</button>
-      <button class="ttool danger" onclick="tDelRow()">− Fila</button>
-      <button class="ttool danger" onclick="tDelCol()">− Col</button>
-      <div class="ttool-sep"></div>
-      <button class="ttool" onclick="tFmt('bold')"><b>B</b></button>
-      <button class="ttool" onclick="tFmt('italic')"><i>I</i></button>
-      <button class="ttool" onclick="tAlign('left')">⬅ Izq</button>
-      <button class="ttool" onclick="tAlign('center')">⬛ Cen</button>
-      <button class="ttool" onclick="tAlign('right')">➡ Der</button>
-      <div class="ttool-sep"></div>
-      <button class="ttool" onclick="tBg('bg-yellow')" style="background:#FEFCE8">■ Amarillo</button>
-      <button class="ttool" onclick="tBg('bg-blue')" style="background:#EFF6FF">■ Azul</button>
-      <button class="ttool" onclick="tBg('bg-green')" style="background:#F0FDF4">■ Verde</button>
-      <button class="ttool" onclick="tBg('bg-red')" style="background:#FEF2F2">■ Rojo</button>
-      <button class="ttool" onclick="tBg('')">✕ Vaciar color</button>
-      <div class="ttool-sep"></div>
-      <button class="ttool" onclick="tSuma()">Σ Suma col</button>
-      <button class="ttool" onclick="tProm()">⌀ Promedio</button>
-      <button class="ttool danger" onclick="tClearCell()">🗑 Vaciar celda</button>
-    </div>
-    <div id="tabla-formula-bar">
-      <span id="tabla-cell-ref">A1</span>
-      <input id="tabla-formula-inp" placeholder="Valor o fórmula =SUMA(A1:A10)" oninput="tFormulaInput()" onkeydown="tFormulaKey(event)">
-    </div>
-    <div id="tabla-wrap"><table id="tabla-sheet"></table></div>
-    <div id="tabla-gemini-bar">
-      <span>✨ Gemini puede analizar los datos de esta tabla</span>
-      <button onclick="tGeminiAnalizar()">Analizar con IA</button>
-    </div>`;
-  document.body.appendChild(ov);
-  tBuildTable();tRenderFormulas();tSelect(0,0);
-}
-
-function cerrarEditorTabla(){ document.getElementById('tabla-overlay')?.remove(); render(); }
-
-function guardarTabla(){
-  const nota=(state.notas||[]).find(n=>n.id===_tablaNotaId);if(!nota)return;
-  nota.titulo=document.getElementById('tabla-titulo')?.value||'Tabla sin título';
-  nota._tablaData=JSON.stringify({data:_tablaState.data,fmt:_tablaState.fmt,rows:_tablaState.rows,cols:_tablaState.cols});
-  nota.modificado=new Date().toISOString();
-  saveAll();toast('Tabla guardada ✓');
-}
-
-function tColLetter(c){return String.fromCharCode(65+c);}
-function tCellId(r,c){return tColLetter(c)+(r+1);}
-
-function tBuildTable(){
-  const{rows,cols}=_tablaState;
-  let h='<thead><tr><th class="rh"></th>';
-  for(let c=0;c<cols;c++)h+=`<th onclick="tSelect(0,${c})">${tColLetter(c)}</th>`;
-  h+='</tr></thead><tbody>';
-  for(let r=0;r<rows;r++){
-    h+=`<tr><td class="rh-td" onclick="tSelect(${r},0)">${r+1}</td>`;
-    for(let c=0;c<cols;c++) h+=`<td id="ttd-${r}-${c}" onclick="tClickCell(${r},${c})" ondblclick="tDblCell(${r},${c})"><input class="tbl-cell-inp" id="tci-${r}-${c}" value="" readonly onkeydown="tCellKey(event,${r},${c})" onblur="tCommit(${r},${c})" oninput="tCellInput(${r},${c})"></td>`;
-    h+='</tr>';
-  }
-  h+='</tbody>';
-  document.getElementById('tabla-sheet').innerHTML=h;
-}
-
-function tSelect(r,c){ _tablaState.selR=r;_tablaState.selC=c;
-  document.querySelectorAll('#tabla-sheet td').forEach(td=>td.classList.remove('sel-td'));
-  const td=document.getElementById(`ttd-${r}-${c}`);if(td)td.classList.add('sel-td');
-  document.getElementById('tabla-cell-ref').textContent=tCellId(r,c);
-  document.getElementById('tabla-formula-inp').value=_tablaState.data[r]?.[c]||'';
-}
-
-function tClickCell(r,c){ if(_tablaState.editing)tCommit(_tablaState.selR,_tablaState.selC); tSelect(r,c); }
-function tDblCell(r,c){ tStartEdit(r,c); }
-
-function tStartEdit(r,c){
-  _tablaState.editing=true;const inp=document.getElementById(`tci-${r}-${c}`);
-  if(!inp)return;inp.removeAttribute('readonly');inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);
-}
-
-function tCommit(r,c){
-  _tablaState.editing=false;const inp=document.getElementById(`tci-${r}-${c}`);
-  if(!inp)return;inp.setAttribute('readonly','');_tablaState.data[r][c]=inp.value;
-  if(inp.value.startsWith('='))tRenderFormulas();
-  document.getElementById('tabla-formula-inp').value=inp.value;
-}
-
-function tCellInput(r,c){_tablaState.data[r][c]=document.getElementById(`tci-${r}-${c}`)?.value||'';}
-
-function tCellKey(e,r,c){
-  const{rows,cols}=_tablaState;
-  if(e.key==='Enter'){e.preventDefault();tCommit(r,c);if(r<rows-1)tSelect(r+1,c);}
-  else if(e.key==='Tab'){e.preventDefault();tCommit(r,c);if(c<cols-1)tSelect(r,c+1);}
-  else if(e.key==='Escape'){tCommit(r,c);tSelect(r,c);}
-  else if(!_tablaState.editing&&!e.ctrlKey&&!e.metaKey&&e.key.length===1)tStartEdit(r,c);
-  else if(!_tablaState.editing){
-    if(e.key==='ArrowUp'&&r>0){e.preventDefault();tSelect(r-1,c);}
-    if(e.key==='ArrowDown'&&r<rows-1){e.preventDefault();tSelect(r+1,c);}
-    if(e.key==='ArrowLeft'&&c>0){e.preventDefault();tSelect(r,c-1);}
-    if(e.key==='ArrowRight'&&c<cols-1){e.preventDefault();tSelect(r,c+1);}
-    if(e.key==='Delete'||e.key==='Backspace'){_tablaState.data[r][c]='';const inp=document.getElementById(`tci-${r}-${c}`);if(inp)inp.value='';tRenderFormulas();}
-  }
-}
-
-function tFormulaInput(){ const v=document.getElementById('tabla-formula-inp').value;const inp=document.getElementById(`tci-${_tablaState.selR}-${_tablaState.selC}`);if(inp)inp.value=v;_tablaState.data[_tablaState.selR][_tablaState.selC]=v; }
-function tFormulaKey(e){ if(e.key==='Enter'){tCommit(_tablaState.selR,_tablaState.selC);if(_tablaState.selR<_tablaState.rows-1)tSelect(_tablaState.selR+1,_tablaState.selC);} }
-
-function tEvalFormula(raw,vis=new Set()){
-  if(!raw||!raw.startsWith('='))return raw;
-  let expr=raw.slice(1).toUpperCase();
-  const repl=(fn,args)=>{
-    const parts=args.trim().split(':');
-    if(parts.length===2){
-      const a=parts[0].trim(),b=parts[1].trim();
-      const r1=+a.slice(1)-1,c1=a.charCodeAt(0)-65,r2=+b.slice(1)-1,c2=b.charCodeAt(0)-65;
-      const vals=[];
-      for(let r=Math.min(r1,r2);r<=Math.max(r1,r2);r++)for(let c=Math.min(c1,c2);c<=Math.max(c1,c2);c++){const v=+tEvalFormula(_tablaState.data[r]?.[c]||'',vis);if(!isNaN(v))vals.push(v);}
-      if(fn==='SUMA'||fn==='SUM')return vals.reduce((a,b)=>a+b,0);
-      if(fn==='PROMEDIO'||fn==='AVERAGE')return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
-    }
-    return 0;
-  };
-  expr=expr.replace(/(SUMA|SUM|PROMEDIO|AVERAGE)\(([^)]+)\)/g,(_,fn,args)=>repl(fn,args));
-  expr=expr.replace(/([A-J])(\d+)/g,(_,col,row)=>{const key=col+row;if(vis.has(key))return 0;vis.add(key);const v=tEvalFormula(_tablaState.data[+row-1]?.[col.charCodeAt(0)-65]||'',vis);return isNaN(+v)?0:+v;});
-  try{return +Function('"use strict";return('+expr+')')();}catch{return '#ERR';}
-}
-
-function tRenderFormulas(){
-  const{data,rows,cols}=_tablaState;
-  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
-    const raw=data[r]?.[c]||'';const inp=document.getElementById(`tci-${r}-${c}`);if(!inp)continue;
-    if(raw.startsWith('=')){const v=tEvalFormula(raw);inp.value=isNaN(+v)?v:(+v%1===0?+v:(+v).toFixed(2));}
-    else inp.value=raw;
-  }
-  tApplyFmt();
-}
-
-function tApplyFmt(){
-  const{fmt,rows,cols}=_tablaState;
-  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
-    const inp=document.getElementById(`tci-${r}-${c}`);const td=document.getElementById(`ttd-${r}-${c}`);if(!inp||!td)continue;
-    const f=fmt[r][c];
-    inp.classList.toggle('tw-bold',!!f.bold);inp.classList.toggle('tw-italic',!!f.italic);
-    inp.style.textAlign=f.align||'left';
-    ['bg-yellow','bg-blue','bg-green','bg-red'].forEach(bg=>td.classList.remove(bg));
-    if(f.bg)td.classList.add(f.bg);
-  }
-}
-
-window.tAddRow=function(){_tablaState.data.push(Array(_tablaState.cols).fill(''));_tablaState.fmt.push(Array.from({length:_tablaState.cols},()=>({})));_tablaState.rows++;tBuildTable();tRenderFormulas();tSelect(_tablaState.rows-1,_tablaState.selC);};
-window.tAddCol=function(){_tablaState.data.forEach(r=>r.push(''));_tablaState.fmt.forEach(r=>r.push({}));_tablaState.cols++;tBuildTable();tRenderFormulas();tSelect(_tablaState.selR,_tablaState.cols-1);};
-window.tDelRow=function(){if(_tablaState.rows<=1)return;_tablaState.data.splice(_tablaState.selR,1);_tablaState.fmt.splice(_tablaState.selR,1);_tablaState.rows--;tBuildTable();tRenderFormulas();tSelect(Math.min(_tablaState.selR,_tablaState.rows-1),_tablaState.selC);};
-window.tDelCol=function(){if(_tablaState.cols<=1)return;_tablaState.data.forEach(r=>r.splice(_tablaState.selC,1));_tablaState.fmt.forEach(r=>r.splice(_tablaState.selC,1));_tablaState.cols--;tBuildTable();tRenderFormulas();tSelect(_tablaState.selR,Math.min(_tablaState.selC,_tablaState.cols-1));};
-window.tFmt=function(prop){_tablaState.fmt[_tablaState.selR][_tablaState.selC][prop]=!_tablaState.fmt[_tablaState.selR][_tablaState.selC][prop];tApplyFmt();};
-window.tAlign=function(a){_tablaState.fmt[_tablaState.selR][_tablaState.selC].align=a;tApplyFmt();};
-window.tBg=function(bg){_tablaState.fmt[_tablaState.selR][_tablaState.selC].bg=bg;tApplyFmt();};
-window.tClearCell=function(){const{selR,selC}=_tablaState;_tablaState.data[selR][selC]='';_tablaState.fmt[selR][selC]={};const inp=document.getElementById(`tci-${selR}-${selC}`);if(inp)inp.value='';tRenderFormulas();};
-window.tSuma=function(){const c=_tablaState.selC,r=_tablaState.selR;_tablaState.data[r][c]=`=SUMA(${tColLetter(c)}1:${tColLetter(c)}${r})`;tRenderFormulas();};
-window.tProm=function(){const c=_tablaState.selC,r=_tablaState.selR;_tablaState.data[r][c]=`=PROMEDIO(${tColLetter(c)}1:${tColLetter(c)}${r})`;tRenderFormulas();};
-window.tGeminiAnalizar=function(){
-  const key=localStorage.getItem('fnz_gemini_key');if(!key){toast('Configurá tu API key de Gemini en Ajustes','error');return;}
-  const filas=_tablaState.data.filter(r=>r.some(c=>c!==''));
-  if(!filas.length){toast('La tabla está vacía','error');return;}
-  const csv=filas.map(r=>r.join('\t')).join('\n');
-  toast('✨ Analizando tabla con Gemini...');
-  fetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:`Analizá estos datos de tabla en español de Perú. Identificá patrones, totales relevantes, y dá 2-3 observaciones útiles. Datos:\n${csv}`}]}],generationConfig:{temperature:0.3,maxOutputTokens:400}})})
-  .then(r=>r.json()).then(d=>{
-    const txt=d?.candidates?.[0]?.content?.parts?.[0]?.text||'No se pudo analizar.';
-    const bar=document.getElementById('tabla-gemini-bar');if(bar)bar.querySelector('span').textContent='✨ '+txt;
-    toast('✓ Análisis completado');
-  }).catch(()=>toast('Error al conectar con Gemini','error'));
-};
-
-// ═══════════════════════════════════════════════════════════════════
-// 🖼 EXPORTAR NOTA COMO IMAGEN A4 VERTICAL → WHATSAPP
-// ═══════════════════════════════════════════════════════════════════
-
-async function exportarNotaA4WhatsApp(notaId){
-  const nota=(state.notas||[]).find(n=>n.id===notaId);
-  if(!nota){toast('Nota no encontrada','error');return;}
-
-  // Mostrar loader
-  const loader=document.createElement('div');loader.id='a4-loader';
-  loader.innerHTML='<div class="a4-spin"></div><p>Generando imagen A4...</p>';
-  document.body.appendChild(loader);
-
-  try{
-    // A4 a 96dpi: 794 x 1123 px
-    const W=794,H=1123;
-    const cv=document.createElement('canvas');cv.width=W;cv.height=H;
-    const ctx=cv.getContext('2d');
-
-    // Fondo blanco
-    ctx.fillStyle='#FFFFFF';ctx.fillRect(0,0,W,H);
-
-    // Borde sutil
-    ctx.strokeStyle='#E2E8F0';ctx.lineWidth=1;ctx.strokeRect(20,20,W-40,H-40);
-
-    // Header con color de la nota
-    const nc=(NOTA_COLORES&&NOTA_COLORES[nota.colorHoja])||NOTA_COLORES.amarillo;
-    ctx.fillStyle=nc.border||'#3A7D44';ctx.fillRect(20,20,W-40,56);
-
-    // Título
-    ctx.font='700 22px DM Sans, Arial, sans-serif';ctx.fillStyle='#FFFFFF';
-    ctx.fillText((nota.titulo||'Sin título').substring(0,50),40,58);
-
-    // Fecha y tipo
-    const fecha=nota.creado?new Date(nota.creado).toLocaleDateString('es-PE',{day:'numeric',month:'long',year:'numeric'}):'';
-    const tipoLbl={texto:'Nota de texto',lista:'Lista',audio:'Nota de voz',plano:'Plano / boceto',tabla:'Tabla'}[nota.tipo]||'Nota';
-    ctx.font='400 13px DM Sans, Arial, sans-serif';ctx.fillStyle='rgba(255,255,255,0.85)';
-    ctx.fillText(`${tipoLbl} • ${fecha}`,40,76);
-
-    // Línea separadora
-    ctx.strokeStyle=nc.border||'#3A7D44';ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(20,76);ctx.lineTo(W-20,76);ctx.stroke();
-
-    let yPos=110;const pad=40;const maxW=W-2*pad;
-
-    ctx.textBaseline='top';
-
-    // Función helper: texto con wrap
-    function drawWrappedText(text,x,y,maxWidth,lineHeight,font,color){
-      ctx.font=font;ctx.fillStyle=color;
-      const words=text.split(' ');let line='';let lineY=y;
-      for(const word of words){
-        const test=line?line+' '+word:word;
-        if(ctx.measureText(test).width>maxWidth&&line){
-          ctx.fillText(line,x,lineY);line=word;lineY+=lineHeight;
-          if(lineY>H-60)return lineY; // overflow guard
-        } else line=test;
-      }
-      if(line){ctx.fillText(line,x,lineY);lineY+=lineHeight;}
-      return lineY;
-    }
-
-    if(nota.tipo==='lista'&&nota.items&&nota.items.length){
-      // Lista de ítems
-      const done=nota.items.filter(i=>i.done).length;
-      ctx.font='500 14px DM Sans, Arial, sans-serif';ctx.fillStyle='#64748B';
-      ctx.fillText(`${done} de ${nota.items.length} completados`,pad,yPos);yPos+=28;
-      for(const item of nota.items){
-        if(yPos>H-80)break;
-        ctx.font='400 15px DM Sans, Arial, sans-serif';
-        ctx.fillStyle=item.done?'#94A3B8':'#1E293B';
-        const txt=(item.done?'☑ ':'○ ')+(item.texto||'').substring(0,80);
-        yPos=drawWrappedText(txt,pad,yPos,maxW,22,'400 15px DM Sans, Arial, sans-serif',item.done?'#94A3B8':'#1E293B')+6;
-      }
-    } else if(nota.tipo==='tabla'&&nota._tablaData){
-      // Tabla
-      try{
-        const saved=JSON.parse(nota._tablaData);
-        const tData=saved.data||[];
-        const rows=tData.filter(r=>r.some(c=>c!==''));
-        if(rows.length){
-          const colW=Math.min(120,Math.floor((W-2*pad)/Math.max(rows[0].length,1)));
-          ctx.font='700 12px DM Sans, Arial, sans-serif';
-          ctx.fillStyle='#F1F5F9';ctx.fillRect(pad,yPos,W-2*pad,24);
-          let colX=pad;
-          (rows[0]||[]).forEach((cell,ci)=>{
-            ctx.fillStyle='#334155';ctx.fillText((cell||'').toString().substring(0,14),colX+5,yPos+6);
-            colX+=colW;
-          });
-          yPos+=24;
-          rows.slice(1).forEach((row,ri)=>{
-            if(yPos>H-80)return;
-            ctx.fillStyle=ri%2===0?'#FFFFFF':'#F8FAFC';
-            ctx.fillRect(pad,yPos,W-2*pad,22);
-            ctx.strokeStyle='#E2E8F0';ctx.lineWidth=0.5;ctx.strokeRect(pad,yPos,W-2*pad,22);
-            let cx=pad;ctx.font='400 12px DM Sans, Arial, sans-serif';ctx.fillStyle='#1E293B';
-            row.forEach(cell=>{ctx.fillText((cell||'').toString().substring(0,14),cx+5,yPos+5);cx+=colW;});
-            yPos+=22;
-          });
-        }
-      } catch(e){}
-    } else if(nota.tipo==='plano'&&nota._objetos&&nota._objetos.length){
-      // Dibujar objetos del plano
-      const objetos=nota._objetos;
-      const scale=Math.min(maxW/800,600/600,1);
-      ctx.save();ctx.translate(pad,yPos);ctx.scale(scale,scale);
-      for(const o of objetos){
-        ctx.globalAlpha=o.op||1;ctx.strokeStyle=o.color||'#1a1a2e';ctx.lineWidth=o.sw||2;ctx.lineCap='round';ctx.lineJoin='round';
-        if(o.type==='pen'&&o.pts&&o.pts.length>1){ctx.beginPath();ctx.moveTo(o.pts[0].x,o.pts[0].y);for(let i=1;i<o.pts.length;i++)ctx.lineTo(o.pts[i].x,o.pts[i].y);ctx.stroke();}
-        if(o.type==='line'){ctx.beginPath();ctx.moveTo(o.x1,o.y1);ctx.lineTo(o.x2,o.y2);ctx.stroke();}
-        if(o.type==='rect'){ctx.strokeRect(o.x,o.y,o.w,o.h);}
-        if(o.type==='text'){ctx.font=`${o.fs||14}px DM Sans, Arial`;ctx.fillStyle=o.color||'#1a1a2e';ctx.fillText(o.label||'',o.x,o.y);}
-        // dim
-        if(o.type==='dim'){
-          const{x1,y1,x2,y2,label,color}=o;const col=color||'#185FA5';
-          const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);if(len<4)continue;
-          const nx=dx/len,ny=dy/len,off=24;const ax1=x1-ny*off,ay1=y1+nx*off,ax2=x2-ny*off,ay2=y2+nx*off;
-          ctx.save();ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.setLineDash([4,3]);ctx.globalAlpha=0.7;
-          ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(ax1,ay1);ctx.stroke();
-          ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(ax2,ay2);ctx.stroke();
-          ctx.setLineDash([]);ctx.globalAlpha=1;ctx.beginPath();ctx.moveTo(ax1,ay1);ctx.lineTo(ax2,ay2);ctx.stroke();
-          const mx=(ax1+ax2)/2,my=(ay1+ay2)/2;const lbl=label||Math.round(len)+'px';
-          ctx.font='700 11px DM Sans, Arial';const tw=ctx.measureText(lbl).width;
-          ctx.fillStyle='#fff';ctx.fillRect(mx-tw/2-4,my-10,tw+8,14);
-          ctx.fillStyle=col;ctx.fillText(lbl,mx-tw/2,my+2);ctx.restore();
-        }
-        if(o.type==='image'&&o.src){
-          const img=new Image();img.src=o.src;
-          try{ctx.drawImage(img,o.x,o.y,o.w,o.h);}catch(e){}
-        }
-      }
-      ctx.restore();
-      yPos+=Math.min(600*scale+20,H-yPos-80);
-    } else {
-      // Nota de texto
-      const rawTxt=(nota.texto||'').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'').trim();
-      if(rawTxt){
-        yPos=drawWrappedText(rawTxt,pad,yPos,maxW,22,'400 15px DM Sans, Arial, sans-serif','#1E293B')+4;
-      }
-      if(nota.tipo==='audio'&&nota.texto){
-        ctx.font='400 13px DM Sans, Arial, sans-serif';ctx.fillStyle='#64748B';
-        ctx.fillText('🎙 Transcripción de audio',pad,yPos);yPos+=22;
-      }
-    }
-
-    // Footer
-    ctx.fillStyle='#F8FAFC';ctx.fillRect(20,H-50,W-40,30);
-    ctx.font='400 11px DM Sans, Arial, sans-serif';ctx.fillStyle='#94A3B8';
-    ctx.fillText('Mis Finanzas • '+new Date().toLocaleString('es-PE'),pad,H-29);
-    const appTxt='Nota personal';ctx.fillText(appTxt,W-pad-ctx.measureText(appTxt).width,H-29);
-
-    // Convertir a blob
-    document.getElementById('a4-loader')?.remove();
-
-    cv.toBlob(async blob=>{
-      const file=new File([blob],'nota-a4.jpg',{type:'image/jpeg'});
-      // Intentar Web Share API con archivo (móvil)
-      if(navigator.canShare&&navigator.canShare({files:[file]})){
-        try{ await navigator.share({files:[file],title:nota.titulo||'Nota',text:'Nota compartida desde Mis Finanzas'}); return; }
-        catch(e){ /* usuario canceló */ }
-      }
-      // Fallback: descargar + abrir WhatsApp
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');a.href=url;a.download='nota-a4.jpg';a.click();
-      setTimeout(()=>{
-        URL.revokeObjectURL(url);
-        const txt=encodeURIComponent(`📝 *${nota.titulo||'Nota'}* — imagen adjunta\n_Mis Finanzas App_`);
-        window.open(`https://wa.me/?text=${txt}`,'_blank');
-      },800);
-    },'image/jpeg',0.92);
-
-  } catch(err){
-    document.getElementById('a4-loader')?.remove();
-    toast('Error al generar imagen: '+err.message,'error');
-  }
-}
-
-// syncAgendaToSheets está definida arriba (usa GET con _sendToSheets)
-
 </script>
-</body>
-</html>
+</body></html>
