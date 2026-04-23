@@ -5917,7 +5917,7 @@ async function notionCargarManual() {
       <div class="btn-row">
         <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
         <button style="flex:2;background:#475569;color:#fff;border:none;border-radius:8px;padding:13px;font-weight:700;font-family:'Inter', system-ui, sans-serif;font-size:14px;cursor:pointer"
-          onclick="notionConfirmarCarga(${JSON.stringify(soloNuevos.map(p=>p.id))}, ${JSON.stringify(posibleDup.map(d=>d.pageId))}, ${JSON.stringify(allResults.map(p=>p.id))})">
+          onclick='notionConfirmarCarga(${JSON.stringify(soloNuevos.map(p=>p.id))}, ${JSON.stringify(posibleDup.map(d=>d.pageId))}, ${JSON.stringify(allResults.map(p=>p.id))})'>
           ✓ Importar ${soloNuevos.length} nuevos
         </button>
       </div>`;
