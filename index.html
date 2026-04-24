@@ -3168,44 +3168,116 @@ function enviarTodoASheets() {
   const agenda = state.agenda || [];
   const deudas = state.debts || [];
 
-  const total = txs.length + agenda.length + deudas.length;
+  // 1. AGRUPAR TRANSACCIONES POR ID DE NOTION
+  const mergedMap = new Map();
+  const independentTxs = [];
+  
+  txs.forEach(tx => {
+    if (tx.negocio && tx._notionRowId) {
+      const nid = tx._notionRowId;
+      if (!mergedMap.has(nid)) {
+        mergedMap.set(nid, {
+          id: tx.id.replace(/-ing$|-mov$|-mat$|-otr$/, ''), 
+          fecha: tx.date,
+          cliente: tx.cliente || '-',
+          contacto: tx.contacto || tx.telefono || '-',
+          servicio1: tx.servicio1 || tx.category || '-',
+          servicio2: tx.servicio2 || '-',
+          servicio3: tx.servicio3 || '-',
+          servicio4: tx.servicio4 || '-',
+          ubicacion: tx.ubicacion || '-',
+          formaPago: tx.formaPago || '-',
+          ingreso: 0, movilidad: 0, materiales: 0, otros: 0, meta: 0,
+          description: tx.description || '-',
+          _notionRowId: nid
+        });
+      }
+      const m = mergedMap.get(nid);
+      const val = parseFloat(tx.amount) || 0;
+      const cat = (tx.category || '').toLowerCase();
+      
+      if (tx.type === 'ingreso') {
+        m.ingreso += val;
+      } else {
+        if (cat.includes('movilidad')) m.movilidad += val;
+        else if (cat.includes('material')) m.materiales += val;
+        else m.otros += val;
+      }
+      if (tx.servicio1 && tx.servicio1 !== '-') m.servicio1 = tx.servicio1;
+      if (tx.servicio2 && tx.servicio2 !== '-') m.servicio2 = tx.servicio2;
+      if (tx.servicio3 && tx.servicio3 !== '-') m.servicio3 = tx.servicio3;
+      if (tx.servicio4 && tx.servicio4 !== '-') m.servicio4 = tx.servicio4;
+    } else {
+      independentTxs.push(tx);
+    }
+  });
+
+  const queue = [];
+  mergedMap.forEach(item => queue.push({ type: 'trabajo', item }));
+  independentTxs.forEach(tx => queue.push({ type: 'tx', modo: tx.negocio?'negocio':'personal', tx }));
+  agenda.forEach(item => queue.push({ type: 'agenda', item, modo: 'negocio' }));
+  deudas.forEach(item => queue.push({ type: 'deuda', item, modo: 'negocio' }));
+
+  const total = queue.length;
   if (total === 0) return toast('No hay datos para enviar', 'error');
 
-  if (!confirm(`¿Enviar TODO a Sheets?\n\n· ${txs.length} movimientos\n· ${agenda.length} elementos de agenda\n· ${deudas.length} deudas\n\nSi ya existen en Sheets se actualizarán, no se duplicarán.`)) return;
+  if (!confirm(`Se han agrupado los datos para que coincidan con Notion.\n\n· ${mergedMap.size} Registros agrupados (Cobros+Gastos)\n· ${independentTxs.length} Movimientos sueltos\n· ${agenda.length} Agenda\n· ${deudas.length} Deudas\n\nTotal a enviar: ${total} filas.\n\n¿Deseas continuar?`)) return;
 
   const status = document.getElementById('notion-sync-status');
-  let enviados = 0;
-  const todos = [];
-
-  // Movimientos
-  txs.forEach(tx => todos.push({ delay: todos.length * 200, fn: () => {
-    const payload = { type:'tx', modo: tx.negocio?'negocio':'personal', timestamp:'tx_'+tx.id+'_'+Date.now(), tx };
-    fetch(url+'?data='+encodeURIComponent(JSON.stringify(payload)), {method:'GET',mode:'no-cors'})
-      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${total}`; if(enviados===total) done(); });
-  }}));
-
-  // Agenda
-  agenda.forEach(item => todos.push({ delay: todos.length * 200, fn: () => {
-    const payload = { type:'agenda', item, modo:'negocio', timestamp:'ag_'+item.id+'_'+Date.now() };
-    fetch(url+'?data='+encodeURIComponent(JSON.stringify(payload)), {method:'GET',mode:'no-cors'})
-      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${total}`; if(enviados===total) done(); });
-  }}));
-
-  // Deudas
-  deudas.forEach(d => todos.push({ delay: todos.length * 200, fn: () => {
-    const payload = { type:'deuda', item:d, modo:'negocio', timestamp:'deu_'+d.id+'_'+Date.now() };
-    fetch(url+'?data='+encodeURIComponent(JSON.stringify(payload)), {method:'GET',mode:'no-cors'})
-      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${total}`; if(enviados===total) done(); });
-  }}));
-
-  // Disparar con delay para no saturar
-  todos.forEach(({delay, fn}) => setTimeout(fn, delay));
-  if(status) status.textContent = `⬆ Iniciando envío de ${total} registros...`;
-
-  function done() {
-    if(status) status.textContent = `✓ ${total} registros enviados a Sheets`;
-    toast(`✓ Todo enviado a Sheets — ${txs.length} mov · ${agenda.length} agenda · ${deudas.length} deudas`);
+  if (status) {
+    status.style.display = 'block';
+    status.innerHTML = `
+      <div id="sync-panel" style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; margin:20px 0; box-shadow:0 10px 25px rgba(0,0,0,0.1); border-left:5px solid var(--blue)">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+          <div style="font-weight:700; color:var(--text); font-size:16px">⬆ Sincronizando con Google Sheets</div>
+          <div id="sync-counter" style="font-family:monospace; font-weight:800; color:var(--blue); font-size:18px; background:rgba(46,134,171,0.1); padding:4px 12px; border-radius:20px">0 / ${total}</div>
+        </div>
+        <div style="width:100%; height:10px; background:#edf2f7; border-radius:10px; overflow:hidden; margin-bottom:10px">
+          <div id="sync-progress-bar" style="width:0%; height:100%; background:linear-gradient(90deg, var(--blue), #4fd1c5); transition:width 0.4s"></div>
+        </div>
+        <div id="sync-status-msg" style="font-size:13px; color:var(--muted)">Iniciando transferencia...</div>
+      </div>
+    `;
   }
+
+  let enviados = 0;
+  let errores = 0;
+
+  async function processSequential() {
+    for (const task of queue) {
+      try {
+        const payload = { ...task, timestamp: 'sync_' + Date.now() + '_' + enviados };
+        const fullUrl = url + '?data=' + encodeURIComponent(JSON.stringify(payload));
+        await fetch(fullUrl, { method: 'GET', mode: 'no-cors' });
+        enviados++;
+        if (status) {
+          const bar = document.getElementById('sync-progress-bar');
+          const counter = document.getElementById('sync-counter');
+          const msg = document.getElementById('sync-status-msg');
+          if (bar) bar.style.width = Math.round((enviados/total)*100) + '%';
+          if (counter) counter.textContent = enviados + ' / ' + total;
+          if (msg) msg.textContent = 'Enviando fila ' + enviados + '...';
+        }
+      } catch (e) {
+        errores++;
+      }
+      await new Promise(r => setTimeout(r, 150));
+    }
+
+    if (status) {
+      document.getElementById('sync-panel').innerHTML = `
+        <div style="text-align:center">
+          <div style="font-size:30px">✅</div>
+          <div style="font-weight:700">Sincronización Finalizada</div>
+          <div style="margin:10px 0">Se enviaron ${enviados} de ${total} registros.</div>
+          <button onclick="document.getElementById('notion-sync-status').style.display='none'" style="background:var(--blue); color:white; border:none; padding:8px 20px; border-radius:8px; cursor:pointer">Cerrar</button>
+        </div>
+      `;
+    }
+    toast('✓ Sincronización completa');
+  }
+
+  processSequential();
 }
 
 // ══════════════════════════════════════════════════════
