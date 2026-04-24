@@ -3413,6 +3413,11 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
             id: nId + '-mov',
             type: 'egreso',
             amount: movil,
+            servicio1: servicio,
+            servicio2: iSvc2 >= 0 ? r[iSvc2]?.trim() : '',
+            servicio3: iSvc3 >= 0 ? r[iSvc3]?.trim() : '',
+            servicio4: iSvc4 >= 0 ? r[iSvc4]?.trim() : '',
+
             category: 'Movilidad',
             catId: 'cne5',
             description: 'Movilidad — ' + (clienteFinal !== '(Sin cliente)' ? clienteFinal : fecha),
@@ -3432,6 +3437,11 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
             id: nId + '-mat',
             type: 'egreso',
             amount: mat,
+            servicio1: servicio,
+            servicio2: iSvc2 >= 0 ? r[iSvc2]?.trim() : '',
+            servicio3: iSvc3 >= 0 ? r[iSvc3]?.trim() : '',
+            servicio4: iSvc4 >= 0 ? r[iSvc4]?.trim() : '',
+
             category: 'Materiales',
             catId: 'cne1',
             description: 'Materiales — ' + (clienteFinal !== '(Sin cliente)' ? clienteFinal : fecha),
@@ -3451,6 +3461,11 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
             id: nId + '-otr',
             type: 'egreso',
             amount: otros,
+            servicio1: servicio,
+            servicio2: iSvc2 >= 0 ? r[iSvc2]?.trim() : '',
+            servicio3: iSvc3 >= 0 ? r[iSvc3]?.trim() : '',
+            servicio4: iSvc4 >= 0 ? r[iSvc4]?.trim() : '',
+
             category: 'Otro gasto negocio',
             catId: 'cne6',
             description: 'Otros gastos — ' + (clienteFinal !== '(Sin cliente)' ? clienteFinal : fecha),
@@ -8027,7 +8042,12 @@ async function guardarFinalizacion(id){
       if(cobrado > 0)    _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_ing', amount: cobrado, type: 'ingreso' }, modo: 'negocio' });
       if(movilidad > 0)  _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_mov', amount: movilidad, type: 'egreso', category: 'Movilidad', description: 'Movilidad · '+agDesc }, modo: 'negocio' });
       if(materiales > 0) _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_mat', amount: materiales, type: 'egreso', category: 'Materiales', description: 'Materiales · '+agDesc }, modo: 'negocio' });
-      if(otros > 0)      _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_otr', amount: otros, type: 'egreso', category: 'Mantenimiento o Rep', description: 'Otros Gastos · '+agDesc }, modo: 'negocio' });
+      if(otros > 0)      _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_otr', amount: otros,
+            servicio1: servicio,
+            servicio2: iSvc2 >= 0 ? r[iSvc2]?.trim() : '',
+            servicio3: iSvc3 >= 0 ? r[iSvc3]?.trim() : '',
+            servicio4: iSvc4 >= 0 ? r[iSvc4]?.trim() : '',
+ type: 'egreso', category: 'Mantenimiento o Rep', description: 'Otros Gastos · '+agDesc }, modo: 'negocio' });
     }, 500);
   }
   closeModal(); render();
