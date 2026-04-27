@@ -855,6 +855,7 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 <div class="toast" id="toast" style="display:none"></div>
 
 <script>
+   
 const GEMINI_URL = k => `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${k}`;
 
 // ── Colores de hoja de nota ──
@@ -1211,6 +1212,23 @@ function applyModoTheme(){
 function load(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch{return def;}}
 function save(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch{}}
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+let micSilenceTimer = null;
+let micFullTranscript = '';
+let _micSessionBase = '';
+let _micSessionFinals = '';
 let state = {
   modo:         load('fnz_modo','personal'),
   nombreUsuario: load('fnz_nombre_usuario',''),
@@ -4228,14 +4246,43 @@ function renderNotaCard3(n){
     if(!n || !n.id) return '';
     const nc=(NOTA_COLORES&&NOTA_COLORES[n.colorHoja])||NOTA_COLORES.amarillo;
     const fecha=n.modificado||n.creado ? new Date(n.modificado||n.creado).toLocaleDateString('es-PE',{day:'numeric',month:'short'}) : '';
-    const tc={ic:'📝',lbl:'Texto',bg:'#EAF3DE',col:'#27500A'};
+
+    const tipoConf={
+      texto: {ic:'📝',lbl:'Texto',bg:'#EAF3DE',col:'#27500A'},
+      lista: {ic:'📋',lbl:'Lista',bg:'#E6F1FB',col:'#0C447C'},
+      audio: {ic:'🎙',lbl:'Audio',bg:'#FCEBEB',col:'#791F1F'},
+      plano: {ic:'📐',lbl:'Plano',bg:'#FAEEDA',col:'#633806'},
+      tabla: {ic:'📊',lbl:'Tabla',bg:'#E1F5EE',col:'#085041'},
+    };
+    const tc=tipoConf[n.tipo]||tipoConf.texto;
+
+    let previewHtml='';
+    if(n.tipo==='lista'&&n.items&&n.items.length){
+      const done=n.items.filter(i=>i.done).length;
+      const pct=Math.round(done/n.items.length*100);
+      const items=n.items.slice(0,3).map(i=>`<span style="display:block;font-size:12px;line-height:1.6;${i.done?'opacity:.45;text-decoration:line-through':''}">${i.done?'☑':'○'} ${(i.texto||'').substring(0,40)}</span>`).join('');
+      previewHtml=`${items}
+        <div class="nc3-progress">
+          <div class="nc3-prog-bar"><div class="nc3-prog-fill" style="width:${pct}%;background:${nc.border}"></div></div>
+          <span style="font-size:10px;font-weight:700;color:var(--muted)">${done}/${n.items.length}</span>
+        </div>`;
+    } else if(n.tipo==='audio'){
+      previewHtml=`<div style="font-size:11px;color:var(--muted)">🎙 Grabación de audio</div>`;
+    } else if(n.texto){
+      previewHtml=`<div class="nc3-preview">${(n.texto||'').replace(/<[^>]+>/g,'').substring(0,80)}...</div>`;
+    }
+
     return `
       <div class="nc3" onclick="abrirEditorNota('${n.id}')">
         <div class="nc3-body">
           <div class="nc3-icon-box" style="background:${nc.bg}">${tc.ic}</div>
           <div class="nc3-main">
-            <div class="nc3-title">${n.titulo||'Sin título'}</div>
+            <div class="nc3-top">
+              <div class="nc3-title">${n.titulo||'Sin título'}</div>
+              <span class="nc3-badge" style="background:${tc.bg};color:${tc.col}">${tc.lbl}</span>
+            </div>
             <div class="nc3-meta">${fecha}</div>
+            ${previewHtml}
           </div>
         </div>
       </div>`;
@@ -9835,13 +9882,15 @@ function abrirEditarNota(id){ abrirEditorNotaBloque(id); }
 
 
 function switchPage(page){
-  // Stop mic if active when navigating away
-  if(micListening) stopListening();
-  if(listaMicActivo) pararListaMicDefinitivo();
+  try {
+    if(typeof micListening !== 'undefined' && micListening) { if(typeof stopListening === 'function') stopListening(); }
+    if(typeof listaMicActivo !== 'undefined' && listaMicActivo) {
+       if (typeof pararListaMicDefinitivo === 'function') pararListaMicDefinitivo();
+    }
+  } catch(e){ console.warn("switchPage error:", e); }
   state.page=page;
-  render(); // render calls applyModoTheme which handles tab highlighting
+  render();
 }
-function prevMonth(){if(state.filterMonth===0){state.filterMonth=11;state.filterYear--;}else state.filterMonth--;render();}
 function nextMonth(){if(state.filterMonth===11){state.filterMonth=0;state.filterYear++;}else state.filterMonth++;render();}
 function showModal(){
   document.getElementById('modal').style.display='flex';
@@ -10104,7 +10153,7 @@ loadFromSheets(false);
 })();
 // ─────────────────────────────────────────────
 let recognition = null;
-let micListening = false;
+
 let micParsed = null;
 
 // ── Números en palabras (extendido) ──
@@ -11357,7 +11406,7 @@ function resetMicModal() {
 
 function openMicModal() {
   // ★ Detener lista mic si está activo — evita conflicto de 2 instancias SR
-  if(listaMicActivo || listaRec){
+  if((typeof listaMicActivo !== 'undefined' && listaMicActivo) || (typeof listaRec !== 'undefined' && listaRec)){
     listaMicActivo = false;
     clearTimeout(_listaBufTimer);
     if(listaRec){ try{listaRec.stop();}catch(e){} listaRec=null; }
@@ -11429,11 +11478,11 @@ function toggleListening() {
 }
 
 // ── Variables de control del micrófono ──
-let micSilenceTimer   = null;
-let micFullTranscript = '';
+
+
 let micRestartLock    = false;
-let _micSessionBase   = ''; // ★ texto acumulado ANTES del restart actual
-let _micSessionFinals = ''; // ★ finales de la sesión actual (no del restart)
+ // ★ texto acumulado ANTES del restart actual
+ // ★ finales de la sesión actual (no del restart)
 const MIC_SILENCE_MS  = /android/i.test(navigator.userAgent) ? 3500 : 2500; // ★ Android necesita más tiempo
 
 function startListening() {
