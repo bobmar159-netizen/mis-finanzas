@@ -5377,13 +5377,15 @@ async function _pushToNotion(item, cobrado) {
     return null;
   };
 
-  const setProp = (col, value) => {
+    const setProp = (col, value) => {
     if (!col || value === null || value === undefined || value === '') return;
-    if (col.type === 'title')        payload.properties[col.name] = { title: [{ text: { content: String(value) } }] };
-    else if (col.type === 'rich_text') payload.properties[col.name] = { rich_text: [{ text: { content: String(value) } }] };
+    const strVal = String(value);
+    if (col.type === 'title')        payload.properties[col.name] = { title: [{ text: { content: strVal } }] };
+    else if (col.type === 'rich_text') payload.properties[col.name] = { rich_text: [{ text: { content: strVal } }] };
     else if (col.type === 'number')  payload.properties[col.name] = { number: parseFloat(value) || 0 };
-    else if (col.type === 'select')  payload.properties[col.name] = { select: { name: String(value) } };
-    else if (col.type === 'date')    payload.properties[col.name] = { date: { start: String(value) } };
+    else if (col.type === 'select')  payload.properties[col.name] = { select: { name: strVal } };
+    else if (col.type === 'date')    payload.properties[col.name] = { date: { start: strVal } };
+    else if (col.type === 'phone_number') payload.properties[col.name] = { phone_number: strVal };
   };
 
   const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
@@ -5401,6 +5403,7 @@ async function _pushToNotion(item, cobrado) {
   setProp(findCol('servicio 2','svc2'), svc2);
   setProp(findCol('distrito','ubicacion','ubicación'), item.ubicacion);
 
+    console.log("Pushing to Notion Finance:", payload);
   const res = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/pages'), {
     method: 'POST',
     headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
