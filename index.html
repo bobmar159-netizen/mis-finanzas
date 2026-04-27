@@ -5355,7 +5355,6 @@ async function _pushToNotion(item, cobrado) {
   const dbId  = localStorage.getItem('fnz_notion_dbid');
   if (!token || !dbId) throw new Error('Notion no configurado');
 
-  // Extraer campos extendidos de cobrado
   const ingreso    = typeof cobrado === 'object' ? (cobrado.ingreso    || 0) : (cobrado || 0);
   const movilidad  = typeof cobrado === 'object' ? (cobrado.movilidad  || 0) : 0;
   const materiales = typeof cobrado === 'object' ? (cobrado.materiales || 0) : 0;
@@ -5365,297 +5364,14 @@ async function _pushToNotion(item, cobrado) {
   const observaciones = typeof cobrado === 'object' ? (cobrado.observaciones || '') : '';
   const svc1 = typeof cobrado === 'object' ? (cobrado.svc1 || item.servicio || '') : (item.servicio || '');
   const svc2 = typeof cobrado === 'object' ? (cobrado.svc2 || '') : '';
-  const svc3 = typeof cobrado === 'object' ? (cobrado.svc3 || '') : '';
-  const svc4 = typeof cobrado === 'object' ? (cobrado.svc4 || '') : '';
-
-  const props = await _fetchNotionSchema(token, dbId);
-  const payload = {
-    parent: { database_id: dbId },
-    properties: {}
-  };
-
-  // Helper para encontrar el nombre exacto de la columna en Notion basado en nombres probables
-  const findCol = (...names) => {
-    for (const n of names) {
-      const match = Object.keys(props).find(k => k.toLowerCase() === n.toLowerCase());
-      if (match) return { name: match, type: props[match].type };
-    }
-    return null;
-  };
-
-  // ── Helper para set de propiedades según tipo de columna Notion ──
-  const setProp = (col, value) => {
-    if (!col || value === null || value === undefined || value === '') return;
-    if (col.type === 'title')        payload.properties[col.name] = { title: [{ text: { content: String(value) } }] };
-    else if (col.type === 'rich_text') payload.properties[col.name] = { rich_text: [{ text: { content: String(value) } }] };
-    else if (col.type === 'number')  payload.properties[col.name] = { number: parseFloat(value) || 0 };
-    else if (col.type === 'select')  payload.properties[col.name] = { select: { name: String(value) } };
-    else if (col.type === 'date')    payload.properties[col.name] = { date: { start: String(value) } };
-    else if (col.type === 'phone_number') payload.properties[col.name] = { phone_number: String(value) };
-    else if (col.type === 'multi_select') payload.properties[col.name] = { multi_select: [{ name: String(value) }] };
-    else if (col.type === 'url')     payload.properties[col.name] = { url: String(value) };
-  };
-
-  // ── CLIENTE (título de la página) + columna rich_text si existe por separado ──
-  const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
-  if (pTitle) payload.properties[pTitle] = { title: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
-  // Si hay una columna 'Cliente' de tipo rich_text separada, también la llenamos
-  const pCliente = findCol('cliente','name','nombre');
-  if (pCliente && pCliente.type !== 'title') setProp(pCliente, item.cliente || '(Sin cliente)');
-
-  // ── FECHA + HORA ──
-  const fullIso = (item.fecha||todayStr()) + (item.hora ? 'T'+item.hora+':00' : 'T09:00:00') + '-05:00';
-  setProp(findCol('fecha','date','día','dia'), fullIso);
-
-  // ── CONTACTO / TELÉFONO ──
-  if (item.telefono) {
-    const pCon = findCol('contacto','telefono','teléfono','tel','phone');
-    if (pCon?.type === 'phone_number') payload.properties[pCon.name] = { phone_number: item.telefono };
-    else setProp(pCon, item.telefono);
-  }
-
-  // ── SERVICIOS 1-4 ──
-  const svcCols = [
-    findCol('servicio 1','servicio1','servicio','tipo','categoria','category'),
-    findCol('servicio 2','servicio2'),
-    findCol('servicio 3','servicio3'),
-    findCol('servicio 4','servicio4')
-  ];
-  [svc1,svc2,svc3,svc4].forEach((s,i) => { if(s) setProp(svcCols[i], s); });
-
-  // ── DISTRITO ──
-  if (item.ubicacion) setProp(findCol('distrito','ubicacion','ubicación','zona'), item.ubicacion);
-
-  // ── FORMA DE PAGO ──
-  if (formaPago) setProp(findCol('forma de pago','forma','pago','payment','método de pago'), formaPago);
-
-  // ── MOVILIDAD ──
-  if (movilidad > 0) setProp(findCol('movilidad','pasajes','gasolina','combustible','transporte'), movilidad);
-
-  // ── MATERIALES ──
-  if (materiales > 0) setProp(findCol('materiales','material','insumos','compras'), materiales);
-
-  // ── OTROS ──
-  if (otros > 0) setProp(findCol('otros','otros gastos','gastos extra','extra'), otros);
-
-  // ── META ──
-  if (meta > 0) setProp(findCol('meta','objetivo','goal','target'), meta);
-
-  // ── PRECIO DEL SERVICIO ──
-  setProp(findCol('precio del servicio','precio','monto','importe','total','amount'), ingreso);
-
-  // ── OBSERVACIONES ──
-  const extrasObs = [];
-  if (item.precio && item.precio !== ingreso) extrasObs.push(`(Precio acordado: S/${item.precio})`);
-  const notasFinal = [observaciones, ...extrasObs, item.notas||''].filter(Boolean).join(' · ');
-  if (notasFinal) setProp(findCol('observaciones','nota','notas','descripcion','descripción','notes'), notasFinal);
-
-  const notionUrl = 'https://api.notion.com/v1/pages';
-  const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
-  
-  const res = await fetch(proxyUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Notion-Version': '2022-06-28',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text().catch(()=>'');
-    throw new Error('HTTP ' + res.status + ' - ' + errorText);
-  }
-
-  return await res.json(); // Retorna la página creada, donde podremos extraer el id
-}
-
-async function _updateNotionPage(pageId, updatedTx) {
-  const token = localStorage.getItem('fnz_notion_token');
-  const dbId  = localStorage.getItem('fnz_notion_dbid');
-  if (!token || !dbId) throw new Error('Notion no configurado');
-
-  const props = await _fetchNotionSchema(token, dbId);
-  const payload = { properties: {} };
-
-  const findCol = (...names) => {
-    for (const n of names) {
-      const match = Object.keys(props).find(k => k.toLowerCase() === n.toLowerCase());
-      if (match) return { name: match, type: props[match].type };
-    }
-    return null;
-  };
-
-  const setProp = (col, value) => {
-    if (!col || value === null || value === undefined || value === '') return;
-    if (col.type === 'title')        payload.properties[col.name] = { title: [{ text: { content: String(value) } }] };
-    else if (col.type === 'rich_text') payload.properties[col.name] = { rich_text: [{ text: { content: String(value) } }] };
-    else if (col.type === 'number')  payload.properties[col.name] = { number: parseFloat(value) || 0 };
-    else if (col.type === 'select')  payload.properties[col.name] = { select: { name: String(value) } };
-    else if (col.type === 'date')    payload.properties[col.name] = { date: { start: String(value) } };
-    else if (col.type === 'phone_number') payload.properties[col.name] = { phone_number: String(value) };
-  };
-
-  // Título (cliente)
-  const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
-  if (pTitle && updatedTx.cliente) payload.properties[pTitle] = { title: [{ text: { content: updatedTx.cliente } }] };
-
-  setProp(findCol('fecha','date','día','dia'), updatedTx.date);
-
-  // Monto según categoría
-  const catL = (updatedTx.category || '').toLowerCase();
-  if (updatedTx.type === 'ingreso') {
-    setProp(findCol('precio del servicio','precio','monto','importe','total','amount'), parseFloat(updatedTx.amount)||0);
-    // Servicios del item de agenda si están adjuntos
-    if (updatedTx.servicio1) setProp(findCol('servicio 1','servicio1','servicio','tipo','categoria','category'), updatedTx.servicio1);
-    if (updatedTx.servicio2) setProp(findCol('servicio 2','servicio2'), updatedTx.servicio2);
-    if (updatedTx.servicio3) setProp(findCol('servicio 3','servicio3'), updatedTx.servicio3);
-    if (updatedTx.servicio4) setProp(findCol('servicio 4','servicio4'), updatedTx.servicio4);
-    if (updatedTx.formaPago) setProp(findCol('forma de pago','forma','pago','payment'), updatedTx.formaPago);
-  } else {
-    if (catL.includes('movilidad')||catL.includes('pasaje')||catL.includes('gasolina'))
-      setProp(findCol('movilidad','pasajes','gasolina','combustible','transporte'), parseFloat(updatedTx.amount)||0);
-    else if (catL.includes('material'))
-      setProp(findCol('materiales','material','insumos','compras'), parseFloat(updatedTx.amount)||0);
-    else
-      setProp(findCol('otros','otros gastos','gastos extra'), parseFloat(updatedTx.amount)||0);
-  }
-
-  if (updatedTx.ubicacion) setProp(findCol('distrito','ubicacion','ubicación','zona'), updatedTx.ubicacion);
-  if (updatedTx.telefono)  setProp(findCol('contacto','telefono','teléfono','tel','phone'), updatedTx.telefono);
-  if (updatedTx.description) setProp(findCol('observaciones','nota','notas','descripcion','descripción'), updatedTx.description);
-
-  const notionUrl = 'https://api.notion.com/v1/pages/' + pageId;
-  const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
-  const res = await fetch(proxyUrl, {
-    method: 'PATCH',
-    headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  if (!res.ok) { const e = await res.text().catch(()=>''); throw new Error('HTTP '+res.status+' - '+e); }
-}
-
-// ── Archivar página en Notion (equivale a "eliminar" en la app) ──
-async function _deleteNotionPage(pageId) {
-  const token = localStorage.getItem('fnz_notion_token');
-  if (!token || !pageId) return;
-  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/pages/' + pageId);
-  try {
-    await fetch(proxyUrl, {
-      method: 'PATCH',
-      headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ archived: true })
-    });
-  } catch(e) { console.warn('[Notion] No se pudo archivar página:', pageId, e.message); }
-}
-
-// ── PATCH completo al finalizar un trabajo (actualiza todos los campos del cobro) ──
-async function _updateNotionPageFull(pageId, item, cobroObj) {
-  const token = localStorage.getItem('fnz_notion_token');
-  const dbId  = localStorage.getItem('fnz_notion_dbid');
-  if (!token || !dbId || !pageId) throw new Error('Notion no configurado');
-
-  const ingreso    = cobroObj.ingreso    || 0;
-  const movilidad  = cobroObj.movilidad  || 0;
-  const materiales = cobroObj.materiales || 0;
-  const otros      = cobroObj.otros      || 0;
-  const meta       = cobroObj.meta       || 0;
-  const formaPago  = cobroObj.formaPago  || '';
-  const observaciones = cobroObj.observaciones || '';
-  const svc1 = cobroObj.svc1 || item.servicio1 || item.servicio || '';
-  const svc2 = cobroObj.svc2 || '';
-  const svc3 = cobroObj.svc3 || '';
-  const svc4 = cobroObj.svc4 || '';
-
-  const props = await _fetchNotionSchema(token, dbId);
-  const payload = { properties: {} };
-
-  const findCol = (...names) => {
-    for (const n of names) {
-      const match = Object.keys(props).find(k => k.toLowerCase() === n.toLowerCase());
-      if (match) return { name: match, type: props[match].type };
-    }
-    return null;
-  };
-
-  const setProp = (col, value) => {
-    if (!col || value === null || value === undefined || value === '') return;
-    if (col.type === 'title')        payload.properties[col.name] = { title: [{ text: { content: String(value) } }] };
-    else if (col.type === 'rich_text') payload.properties[col.name] = { rich_text: [{ text: { content: String(value) } }] };
-    else if (col.type === 'number')  payload.properties[col.name] = { number: parseFloat(value) || 0 };
-    else if (col.type === 'select')  payload.properties[col.name] = { select: { name: String(value) } };
-    else if (col.type === 'date')    payload.properties[col.name] = { date: { start: String(value) } };
-    else if (col.type === 'phone_number') payload.properties[col.name] = { phone_number: String(value) };
-    else if (col.type === 'multi_select') payload.properties[col.name] = { multi_select: [{ name: String(value) }] };
-  };
-
-  // ── Cliente (título) + columna rich_text separada si existe ──
-  const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
-  if (pTitle && item.cliente) payload.properties[pTitle] = { title: [{ text: { content: item.cliente } }] };
-  const pCliente2 = findCol('cliente','name','nombre');
-  if (pCliente2 && pCliente2.type !== 'title') setProp(pCliente2, item.cliente || '');
-
-  // ── Fecha ──
-  setProp(findCol('fecha','date','día','dia'), item.fecha);
-
-  // ── Contacto ──
-  if (item.telefono) {
-    const pCon = findCol('contacto','telefono','teléfono','tel','phone');
-    if (pCon?.type === 'phone_number') payload.properties[pCon.name] = { phone_number: item.telefono };
-    else setProp(pCon, item.telefono);
-  }
-
-  // ── Servicios 1-4 ──
-  const svcCols = [
-    findCol('servicio 1','servicio1','servicio','tipo','categoria','category'),
-    findCol('servicio 2','servicio2'),
-    findCol('servicio 3','servicio3'),
-    findCol('servicio 4','servicio4')
-  ];
-  [svc1,svc2,svc3,svc4].forEach((s,i) => { if(s) setProp(svcCols[i], s); });
-
-  // ── Distrito ──
-  if (item.ubicacion) setProp(findCol('distrito','ubicacion','ubicación','zona'), item.ubicacion);
-
-  // ── Forma de pago ──
-  if (formaPago) setProp(findCol('forma de pago','forma','pago','payment','método de pago'), formaPago);
-
-  // ── Precio del servicio ──
-  setProp(findCol('precio del servicio','precio','monto','importe','total','amount'), ingreso);
-
-  // ── Gastos ──
-  if (movilidad  > 0) setProp(findCol('movilidad','pasajes','gasolina','combustible','transporte'), movilidad);
-  if (materiales > 0) setProp(findCol('materiales','material','insumos','compras'), materiales);
-  if (otros      > 0) setProp(findCol('otros','otros gastos','gastos extra','extra'), otros);
-  if (meta       > 0) setProp(findCol('meta','objetivo','goal','target'), meta);
-
-  // ── Observaciones ──
-  const notasFinal = [observaciones, item.notas||''].filter(Boolean).join(' · ');
-  if (notasFinal) setProp(findCol('observaciones','nota','notas','descripcion','descripción','notes'), notasFinal);
-
-  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/pages/' + pageId);
-  const res = await fetch(proxyUrl, {
-    method: 'PATCH',
-    headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  if (!res.ok) { const e = await res.text().catch(()=>''); throw new Error('HTTP '+res.status+' - '+e.slice(0,120)); }
-  return await res.json();
-}
-
-// ── POST para Control de Clientes Potenciales (Visitas) ──
-async function _pushToNotionClientes(item) {
-  const token = localStorage.getItem('fnz_notion_token');
-  const dbId = localStorage.getItem('fnz_notion_dbid_clientes');
-  if (!token || !dbId) throw new Error('Notion DB Clientes no configurada');
 
   const props = await _fetchNotionSchema(token, dbId);
   const payload = { parent: { database_id: dbId }, properties: {} };
 
-  const findCol = (...names) => {
+      const findCol = (...names) => {
+    const normalize = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "");
     for (const n of names) {
-      const match = Object.keys(props).find(k => k.toLowerCase() === n.toLowerCase());
+      const match = Object.keys(props).find(k => normalize(k) === normalize(n));
       if (match) return { name: match, type: props[match].type };
     }
     return null;
@@ -5668,30 +5384,25 @@ async function _pushToNotionClientes(item) {
     else if (col.type === 'number')  payload.properties[col.name] = { number: parseFloat(value) || 0 };
     else if (col.type === 'select')  payload.properties[col.name] = { select: { name: String(value) } };
     else if (col.type === 'date')    payload.properties[col.name] = { date: { start: String(value) } };
-    else if (col.type === 'phone_number') payload.properties[col.name] = { phone_number: String(value) };
   };
 
-  const isoWithTime = (d) => d ? d + 'T09:00:00-05:00' : '';
+  const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
+  if (pTitle) payload.properties[pTitle] = { title: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
 
-  setProp(findCol('cliente','name'), item.cliente || '(Sin cliente)');
-  
-  // Date Logic: Visita vs Construcción
-  const fVisita = item.tipo === 'visita' ? item.fecha : '';
-  const fConst  = item.tipo === 'trabajo' ? item.fecha : '';
-  
-  if(fVisita) setProp(findCol('fecha de visita','visita'), isoWithTime(fVisita));
-  if(fConst)  setProp(findCol('fecha de construcción','construccion'), isoWithTime(fConst));
+  setProp(findCol('fecha'), item.fecha);
+  setProp(findCol('ingreso'), ingreso);
+  setProp(findCol('movilidad'), movilidad);
+  setProp(findCol('materiales'), materiales);
+  setProp(findCol('otros'), otros);
+  setProp(findCol('meta'), meta);
+  setProp(findCol('forma de pago'), formaPago);
+  setProp(findCol('observaciones','notas'), observaciones);
+  setProp(findCol('servicio 1','svc1'), svc1);
+  setProp(findCol('servicio 2','svc2'), svc2);
+  setProp(findCol('distrito','ubicacion','ubicación'), item.ubicacion);
 
-  setProp(findCol('whatsapp','telefono'), item.telefono || '');
-  setProp(findCol('estado'), item.estado || 'en proceso');
-  setProp(findCol('ubicación','distrito'), item.ubicacion || '');
-
-  let existingPageId = (item._notionRowId || '').trim();
-  const url = existingPageId ? 'https://api.notion.com/v1/pages/' + existingPageId : 'https://api.notion.com/v1/pages';
-  const method = existingPageId ? 'PATCH' : 'POST';
-
-  const res = await fetch('https://corsproxy.io/?' + encodeURIComponent(url), {
-    method,
+  const res = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://api.notion.com/v1/pages'), {
+    method: 'POST',
     headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
@@ -7808,6 +7519,16 @@ async function guardarFinalizacion(id){
       ingreso: cobrado, movilidad, materiales, otros, meta, observaciones: notas
     };
     _sendToSheets(urlSh, { type:'trabajo', item: itemTrabajo, modo: state.modo });
+    
+    // --- Notion Sync ---
+    const cobroObj = {
+      ingreso: cobrado, movilidad, materiales, otros, meta,
+      formaPago, observaciones: notas, svc1, svc2
+    };
+    // 1. Sync to Finance DB (Reporte Diario)
+    _pushToNotion(item, cobroObj).catch(e => console.warn("Notion Finance Sync failed:", e));
+    // 2. Sync to Clientes DB (Update status and info)
+    _pushToNotionClientes(item).catch(e => console.warn("Notion Clientes Sync failed:", e));
   }
 
   saveAll(); render(); closeModal();
