@@ -895,7 +895,7 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
       <button class="tab" onclick="switchPage('notas')" id="tab-notas-p"><span class="tab-icon">📝</span>Notas</button>
     </div>
     <!-- ── NEGOCIO TABS (2 filas de 4) ── -->
-    <div class="tabs tabs-negocio" id="tabs-negocio-row1" style="display:none;grid-template-columns:repeat(4,1fr)">
+    <div class="tabs tabs-negocio" id="tabs-negocio-row1" style="display:none;grid-template-columns:repeat(5,1fr)">
       <button class="tab active" onclick="switchPage('dashboard')" id="tab-dashboard-n"><span class="tab-icon">⊞</span>Inicio</button>
       <button class="tab" onclick="switchPage('movimientos')" id="tab-movimientos-n"><span class="tab-icon">↕</span>Movim.</button>
       <button class="tab" onclick="switchPage('deudas')" id="tab-deudas"><span class="tab-icon">🏦</span>Deudas</button>
@@ -1260,7 +1260,7 @@ function applyModoTheme(){
 
   // Redirect to valid page for current mode if needed
   const pagesPersonal = ['dashboard','movimientos','categorias','metas','presupuesto','notas','ajustes','graficos'];
-  const pagesNegocio  = ['dashboard','movimientos','deudas','agenda','servicios','categorias','graficos','notas','ajustes'];
+  const pagesNegocio  = ['dashboard','movimientos','deudas','agenda','servicios','categorias','graficos','notas','ajustes','inventario'];
   const validPages    = isNeg ? pagesNegocio : pagesPersonal;
   if(!validPages.includes(state.page)) state.page = 'dashboard';
 
