@@ -5,22 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#F9F7F3">
+<meta name="theme-color" content="#F2F5F8">
 <title>Mis Finanzas</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root {
-  --gold:#3A7D44;--gold2:#52A85A;--red:#E05252;--green:#4CAF85;--blue:#2E86AB;
-  --bg:#F2F7F2;--card:#FFFFFF;--border:#D4E8D4;--text:#1A2E1A;--muted:#7BAE7F;--dim:#A8C9AB;
-  --ing-color:#52A85A;--ing-bg:#EAF3DE;--ing-text:#3B6D11;
+  --gold:#546878;--gold2:#6A8494;--red:#D94040;--green:#546878;--blue:#2E73AB;
+  --bg:#F2F5F8;--card:#FFFFFF;--border:#D0DDE6;--text:#1A2C35;--muted:#6E8FA0;--dim:#A3BCC9;
+  --ing-color:#546878;--ing-bg:#EBF1F5;--ing-text:#2A4455;
+  --gas-orange:#F47C3C;--gas-orange-bg:#FFF2EA;--gas-blue:#546878;--gas-blue-bg:#EBF1F5;
 }
 
 /* ── 6 TEMAS — variables CSS completas ── */
 #app.tema-oceano {
-  --gold:#1565C0;--gold2:#2E86AB;--red:#E05252;--green:#1D9E75;--blue:#2E86AB;
-  --bg:#F0F4FF;--card:#FFFFFF;--border:#BBDEFB;--text:#0D1B3E;--muted:#5B8DB8;--dim:#90CAF9;
-  --ing-color:#185FA5;--ing-bg:#E6F1FB;--ing-text:#0C447C;
+  --gold:#546878;--gold2:#6A8494;--red:#D94040;--green:#546878;--blue:#2E73AB;
+  --bg:#EDF3F6;--card:#FFFFFF;--border:#C5D8E4;--text:#0E2530;--muted:#5A8499;--dim:#8AAFBE;
+  --ing-color:#546878;--ing-bg:#E4EEF4;--ing-text:#1E3D4F;
 }
 #app.tema-ambar {
   --gold:#854F0B;--gold2:#EF9F27;--red:#C62828;--green:#0F6E56;--blue:#185FA5;
@@ -49,9 +50,9 @@
 #app.tema-rosa .mv-icon-box{border-radius:50%}
 #app.tema-rosa .card{border-radius:24px}
 #app.tema-slate {
-  --gold:#3B6D11;--gold2:#639922;--red:#A32D2D;--green:#0F6E56;--blue:#185FA5;
+  --gold:#3B6D11;--gold2:var(--gold);--red:#A32D2D;--green:#0F6E56;--blue:#185FA5;
   --bg:#F5F5F0;--card:#FFFFFF;--border:#D3D1C7;--text:#2C2C2A;--muted:#5F5E5A;--dim:#B4B2A9;
-  --ing-color:#3B6D11;--ing-bg:#EAF3DE;--ing-text:#27500A;
+  --ing-color:#3B6D11;--ing-bg:#EBF1F5;--ing-text:#2A4455;
 }
 #app.tema-slate .mv-card{border:none;border-bottom:2px solid #D3D1C7;border-radius:4px;background:transparent}
 #app.tema-slate .mv-card.open{border-bottom-color:var(--gold)}
@@ -70,21 +71,21 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .h-balance-val{font-family:'Playfair Display',serif;font-size:20px;font-weight:600}
 .tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:0;padding-bottom:0;border-bottom:1px solid var(--border)}
 .tabs-row2{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-bottom:1px solid var(--border)}
-.tab{width:100%;padding:9px 4px 10px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:2px}
-.tab.active{color:var(--gold);border-bottom-color:var(--gold);background:var(--ing-bg,#E8F5E9)}
+.tab{width:100%;padding:9px 4px 10px;background:transparent;border:none;border-bottom:3px solid transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold);background:linear-gradient(to bottom,transparent,rgba(61,102,119,0.06))}
 .tabs-row2 .tab{background:transparent}
-.tabs-row2 .tab.active{background:var(--ing-bg,#E8F5E9)}
+.tabs-row2 .tab.active{background:var(--ing-bg,#EBF1F5)}
 .tab-icon{font-size:20px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 2px 8px #00000008}
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:18px;box-shadow:0 4px 18px rgba(26,44,53,0.08)}
 .section-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--gold);margin-bottom:6px}
 .section-sub{font-size:11px;color:var(--muted);margin-bottom:14px}
-.summary-card{border-radius:16px;padding:22px 20px}
+.summary-card{border-radius:22px;padding:22px 20px;box-shadow:0 6px 24px rgba(26,44,53,0.10)}
 .summary-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
 .summary-amount{font-family:'Playfair Display',serif;font-size:38px}
 .summary-detail{font-size:12px;color:var(--muted);margin-top:6px}
-.progress-bar{background:#F1F5F9;border-radius:4px;height:6px;overflow:hidden;margin-top:12px}
-.progress-fill{height:100%;border-radius:4px;transition:width 1s ease}
-.debt-card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 2px 8px #00000008;padding:18px;margin-bottom:12px;position:relative;overflow:hidden}
+.progress-bar{background:#E8ECF0;border-radius:6px;height:7px;overflow:hidden;margin-top:12px}
+.progress-fill{height:100%;border-radius:6px;transition:width 1s ease}
+.debt-card{background:var(--card);border:1px solid var(--border);border-radius:20px;box-shadow:0 4px 16px rgba(26,44,53,0.07);padding:18px;margin-bottom:12px;position:relative;overflow:hidden}
 .debt-accent{position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px}
 .debt-body{display:flex;align-items:flex-start;gap:12px}
 .debt-info{flex:1}
@@ -96,19 +97,19 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .cuotas-track{display:flex;gap:4px;flex-wrap:wrap;margin-top:12px}
 .cuota-dot{height:6px;border-radius:3px;transition:background .3s;flex-shrink:0}
 .cuotas-meta{display:flex;justify-content:space-between;margin-top:7px;font-size:11px;color:var(--muted)}
-.motivation{margin-top:10px;background:#F0FDF4;border:1px solid #4CAF8533;border-radius:8px;padding:7px 10px;font-size:11px;color:var(--green)}
+.motivation{margin-top:10px;background:#EBF1F5;border:1px solid #54687833;border-radius:8px;padding:7px 10px;font-size:11px;color:var(--gold)}
 .circle-wrap{position:relative;flex-shrink:0}
 .circle-inner{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
-.service-card{background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:0 1px 4px #0000000a;padding:14px 16px;display:flex;align-items:center;gap:14px;margin-bottom:10px;transition:border-color .2s}
-.service-card.urgent{border-color:#E0525255}
-.service-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.service-card{background:var(--card);border:1px solid var(--border);border-radius:18px;box-shadow:0 3px 14px rgba(26,44,53,0.07);padding:14px 16px;display:flex;align-items:center;gap:14px;margin-bottom:10px;transition:border-color .2s,box-shadow .2s}
+.service-card.urgent{border-color:#D9404055;box-shadow:0 3px 14px rgba(217,64,64,0.12)}
+.service-icon{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
 .service-name{font-size:15px;font-weight:600}
 .service-name.paid{color:var(--muted);text-decoration:line-through}
 .service-sub{font-size:11px;color:var(--muted);margin-top:2px}
 .service-amount{font-family:'Playfair Display',serif;font-size:16px;margin-left:auto;flex-shrink:0}
 .tx-row{display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid var(--border)}
 .tx-row:last-child{border-bottom:none}
-.tx-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.tx-icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,0.07)}
 .tx-info{flex:1;min-width:0}
 .tx-name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tx-sub{font-size:12px;color:var(--muted);margin-top:3px}
@@ -118,32 +119,32 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .tx-btn:hover{opacity:1}
 
 /* ── Nueva tarjeta de movimiento desplegable ── */
-.mv-card{background:var(--card);border:0.5px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:border-color .2s}
+.mv-card{background:var(--card);border:0.5px solid var(--border);border-radius:18px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .2s,box-shadow .2s;box-shadow:0 3px 12px rgba(26,44,53,0.06)}
 .mv-card:active{opacity:.92}
-.mv-card.open{border-color:var(--gold)}
+.mv-card.open{border-color:var(--gold);box-shadow:0 6px 20px rgba(61,102,119,0.12)}
 .mv-top{display:flex;align-items:center;gap:12px}
-.mv-icon-box{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-.mv-icon-ing{background:var(--ing-bg,#EAF3DE)}
+.mv-icon-box{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.mv-icon-ing{background:var(--ing-bg,#EBF1F5)}
 .mv-icon-egr{background:#FFEBEE}
 .mv-main{flex:1;min-width:0}
 .mv-row1{display:flex;align-items:center;gap:6px;margin-bottom:3px}
 .mv-svc{font-size:15px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
-.mv-badge-ing{background:var(--ing-bg,#EAF3DE);color:var(--ing-text,#3B6D11);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;flex-shrink:0;white-space:nowrap}
+.mv-badge-ing{background:var(--ing-bg,#EBF1F5);color:var(--ing-text,#2A4455);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;flex-shrink:0;white-space:nowrap}
 .mv-badge-egr{background:#FFEBEE;color:#791F1F;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;flex-shrink:0;white-space:nowrap}
 .mv-cli{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mv-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
 .mv-amt{font-size:16px;font-weight:700}
-.mv-amt-ing{color:var(--ing-color,#52A85A)}
+.mv-amt-ing{color:var(--ing-color,#546878)}
 .mv-amt-egr{color:#C62828}
 .mv-chevron{font-size:10px;color:var(--muted);transition:transform .2s}
 .mv-card.open .mv-chevron{transform:rotate(180deg)}
 
 /* ── AGENDA CARD v2 — colapsable ── */
-.ag-card{background:var(--card);border:1px solid var(--border);border-radius:16px;margin-bottom:10px;overflow:hidden;transition:border-color .2s;-webkit-tap-highlight-color:transparent}
-.ag-card.open{border-color:var(--gold)}
+.ag-card{background:var(--card);border:1px solid var(--border);border-radius:20px;margin-bottom:12px;overflow:hidden;transition:border-color .2s,box-shadow .2s;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 18px rgba(26,44,53,0.07)}
+.ag-card.open{border-color:var(--gold);box-shadow:0 6px 24px rgba(61,102,119,0.15)}
 .ag-card-head{padding:14px 16px;cursor:pointer;display:flex;gap:12px;align-items:flex-start}
 .ag-card-head:active{opacity:.9}
-.ag-card-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.ag-card-icon{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.10)}
 .ag-card-body{flex:1;min-width:0}
 .ag-card-nombre{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;margin-bottom:5px}
 .ag-card-meta{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:4px}
@@ -167,49 +168,49 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .mv-d-btn{flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;border:0.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer}
 .mv-d-btn:active{opacity:.7}
 .mv-d-btn.del{color:#C62828;border-color:#C6282833}
-.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#fff;border:none;border-radius:12px;padding:15px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;transition:opacity .2s}
-.btn-gold:hover{opacity:.85}
+.btn-gold{background:linear-gradient(135deg,#3D6677,#2E5265);color:#fff;border:none;border-radius:14px;padding:15px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;transition:opacity .2s,transform .15s;box-shadow:0 4px 14px rgba(61,102,119,0.30)}
+.btn-gold:hover{opacity:.88;transform:translateY(-1px)}
 .btn-blue{background:linear-gradient(135deg,#1A6B8A,var(--blue));color:#fff;border:none;border-radius:10px;padding:13px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer}
-.btn-green{background:linear-gradient(135deg,#2d7a57,var(--green));color:#fff;border:none;border-radius:10px;padding:13px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer}
-.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:12px;padding:14px 18px;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;transition:all .2s}
+.btn-green{background:linear-gradient(135deg,#3D5F70,var(--gold));color:#fff;border:none;border-radius:10px;padding:13px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer}
+.btn-ghost{background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:14px;padding:14px 18px;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;transition:all .2s}
 .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
 .btn-row{display:flex;gap:8px;margin-top:6px}
 .btn-row>*{flex:1}
 .overlay{position:fixed;inset:0;background:#00000066;z-index:100;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .2s}
-.modal{background:#FFFFFF;border:1px solid var(--border);border-radius:24px 24px 0 0;padding:28px 22px 40px;width:100%;max-width:430px;max-height:90vh;overflow-y:auto;animation:slideUp .25s ease}
+.modal{background:#FFFFFF;border:1px solid var(--border);border-radius:28px 28px 0 0;padding:28px 22px 40px;width:100%;max-width:430px;max-height:90vh;overflow-y:auto;animation:slideUp .25s ease;box-shadow:0 -8px 40px rgba(26,44,53,0.14)}
 .modal-title{font-family:'Playfair Display',serif;font-size:20px;margin-bottom:22px}
 .field{margin-bottom:16px}
 .field-label{font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;display:block}
-.field input,.field select,.field textarea{background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:14px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;width:100%;transition:border-color .2s}
-.field input:focus,.field select:focus{outline:none;border-color:#3A7D4466}
+.field input,.field select,.field textarea{background:#F5F8FA;border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;width:100%;transition:border-color .2s}
+.field input:focus,.field select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(61,102,119,0.12)}
 .field select option{background:#FFFFFF}
 .type-toggle{display:flex;gap:8px}
 .type-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;cursor:pointer;transition:all .2s}
-.type-btn.sel-in{border-color:var(--green);background:#F0FDF4;color:var(--green)}
+.type-btn.sel-in{border-color:var(--gold);background:#EBF1F5;color:var(--gold)}
 .type-btn.sel-out{border-color:var(--red);background:#FEF2F2;color:var(--red)}
 .month-nav{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 .month-nav button{background:#FFFFFF;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:16px;cursor:pointer}
 .month-nav span{flex:1;text-align:center;font-size:14px;color:var(--text)}
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:200;padding:11px 22px;border-radius:30px;font-size:13px;font-weight:500;white-space:nowrap;animation:fadeUp .3s ease;pointer-events:none}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:200;padding:12px 24px;border-radius:30px;font-size:13px;font-weight:600;white-space:nowrap;animation:fadeUp .3s ease;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,0.15)}
 .group-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px}
 .stat-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.stat-mini{background:#FFFFFF;border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 1px 4px #0000000a}
+.stat-mini{background:#FFFFFF;border:1px solid var(--border);border-radius:18px;padding:16px;box-shadow:0 3px 12px rgba(26,44,53,0.07)}
 .stat-mini-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
 .stat-mini-val{font-family:'Playfair Display',serif;font-size:22px}
 .chart-wrap{position:relative}
 
 /* ── CATEGORY MANAGER ── */
 .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-.cat-chip{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:all .2s;position:relative}
+.cat-chip{background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:all .2s;position:relative}
 .cat-chip:active{transform:scale(.96)}
-.cat-chip.selected{border-color:var(--gold);background:#E8F5E9}
+.cat-chip.selected{border-color:var(--gold);background:rgba(61,102,119,0.07)}
 .cat-chip-icon{font-size:26px;line-height:1}
 .cat-chip-name{font-size:11px;color:var(--text);font-weight:500;text-align:center;line-height:1.2;word-break:break-word}
 .cat-chip-del{position:absolute;top:4px;right:4px;background:none;border:none;color:#E0525266;font-size:12px;cursor:pointer;padding:2px;display:none}
 .cat-chip:hover .cat-chip-del{display:block}
 .cat-type-toggle{display:flex;gap:6px;margin-bottom:16px}
 .cat-type-btn{flex:1;padding:9px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
-.cat-type-btn.active-in{border-color:var(--green);background:#F0FDF4;color:var(--green)}
+.cat-type-btn.active-in{border-color:var(--gold);background:#EBF1F5;color:var(--gold)}
 .cat-type-btn.active-out{border-color:var(--red);background:#FEF2F2;color:var(--red)}
 
 /* Emoji picker */
@@ -218,7 +219,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .emoji-grid{display:flex;flex-wrap:wrap;gap:4px}
 .emoji-btn{width:38px;height:38px;border-radius:8px;border:1px solid transparent;background:#F8FAFC;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .emoji-btn:hover{background:#F1F5F9}
-.emoji-btn.picked{border-color:var(--gold);background:#E8F5E9}
+.emoji-btn.picked{border-color:var(--gold);background:#EBF1F5}
 .emoji-preview{width:56px;height:56px;border-radius:14px;background:#F8FAFC;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0}
 .color-dot{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
 .color-dot.picked{border-color:#fff;transform:scale(1.15)}
@@ -231,7 +232,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .ubic-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #C9A84C66;border-radius:10px;max-height:180px;overflow-y:auto;z-index:300;box-shadow:0 4px 16px #0000001a}
 .ubic-opt{padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:0.5px solid var(--border)}
 .ubic-opt:last-child{border-bottom:none}
-.ubic-opt:hover{background:#E8F5E9}
+.ubic-opt:hover{background:#EBF1F5}
 
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
@@ -243,10 +244,10 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 #app.modo-negocio .active-negocio { background:var(--gold); color:#fff; box-shadow:0 2px 8px var(--gold)44; }
 
 /* ── MODO TOGGLE ── */
-.modo-toggle { display:flex; align-items:center; background:#DFF0DF; border-radius:20px; padding:3px; gap:2px; margin-bottom:10px; }
+.modo-toggle { display:flex; align-items:center; background:#D8E5EC; border-radius:20px; padding:3px; gap:2px; margin-bottom:10px; }
 .modo-btn { flex:1; padding:6px 10px; border:none; border-radius:16px; font-family:'DM Sans',sans-serif; font-size:11px; font-weight:700; cursor:pointer; transition:all .25s; background:transparent; color:var(--muted); }
-.modo-btn.active-personal { background:var(--gold); color:#fff; box-shadow:0 2px 8px var(--gold)44; }
-.modo-btn.active-negocio  { background:var(--gold); color:#fff; box-shadow:0 2px 8px var(--gold)44; }
+.modo-btn.active-personal { background:var(--gold); color:#fff; box-shadow:0 2px 8px rgba(84,104,120,0.35); }
+.modo-btn.active-negocio  { background:var(--gold); color:#fff; box-shadow:0 2px 8px rgba(84,104,120,0.35); }
 
 /* ── MIC FAB ── */
 .mic-chip{background:#F1F5F9;border:1px solid #E2E8F0;border-radius:20px;padding:5px 10px;font-size:11px;font-weight:500;color:#475569;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s}
@@ -275,8 +276,8 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
   user-select: none;
   -webkit-user-select: none;
 }
-#micFab.dragging { cursor: grabbing; opacity:.85; box-shadow:0 8px 28px #3A7D4488; }
-#micFab:not(.dragging):hover { transform: scale(1.08); box-shadow: 0 6px 24px #3A7D4477; }
+#micFab.dragging { cursor: grabbing; opacity:.85; box-shadow:0 8px 28px #54687888; }
+#micFab:not(.dragging):hover { transform: scale(1.08); box-shadow: 0 6px 24px #54687877; }
 #micFab.listening { background: linear-gradient(135deg, #E05252, #f87171); box-shadow: 0 4px 20px #E0525266; animation: micPulse 1s infinite; }
 
 @keyframes micPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
@@ -327,7 +328,7 @@ body{font-family:'DM Sans',sans-serif;color:var(--text)}
 .chat-ia-bubble.ai{align-self:flex-start;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:4px 16px 16px 16px}
 
 /* ── NOTA CARD v2 ── */
-.nc2{background:var(--card);border:1px solid var(--border);border-radius:18px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 6px #00000008}
+.nc2{background:var(--card);border:1px solid var(--border);border-radius:22px;margin-bottom:12px;overflow:hidden;box-shadow:0 4px 16px rgba(26,44,53,0.08)}
 .nc2-body{padding:16px 16px 12px 20px;cursor:pointer;position:relative}
 .nc2-accent{position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:18px 0 0 18px}
 .nc2-actions{display:flex;border-top:1px solid var(--border);padding:0 4px}
@@ -342,7 +343,7 @@ table.nt th{background:#F1F5F9;color:#1E293B;font-weight:700;padding:9px 13px;bo
 table.nt td{padding:8px 12px;border:1px solid #E2E8F0;min-width:64px;color:#334155;vertical-align:middle;background:#fff}
 table.nt tbody tr:nth-child(even) td{background:#F8FAFC}
 table.nt tbody tr:hover td{background:#EFF6FF}
-table.nt tr.nt-total td{background:#F0FDF4!important;font-weight:700;color:#166534;border-top:2px solid #86EFAC}
+table.nt tr.nt-total td{background:#EBF1F5!important;font-weight:700;color:#2A4455;border-top:2px solid #A8BCC9}
 table.nt tr.nt-total td:first-child{font-weight:700;color:#374151}
 table.nt th:not(:first-child),table.nt td:not(:first-child){text-align:right}
 table.nt th:first-child,table.nt td:first-child{text-align:left}
@@ -431,7 +432,7 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 #ned-editor mark { background: #FFF9C4; padding: 0 2px; border-radius: 3px; }
 /* checklist */
 #ned-editor .ned-row { display: flex; align-items: flex-start; gap: 8px; min-height: 32px; padding: 1px 0; }
-#ned-editor .ned-row input[type=checkbox] { margin-top: 7px; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; accent-color: #3A7D44; }
+#ned-editor .ned-row input[type=checkbox] { margin-top: 7px; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; accent-color: #546878; }
 #ned-editor .ned-row .ned-txt { flex: 1; outline: none; min-height: 22px; line-height: 32px; padding: 0; border: none; font-size: 15px; font-family: inherit; background: transparent; color: inherit; width: 100%; }
 #ned-editor .ned-row.ned-done .ned-txt { text-decoration: line-through; opacity: .5; }
 /* photo strip */
@@ -562,7 +563,7 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .pn-cell-ops.visible{opacity:1;pointer-events:auto}
 .pn-op-btn{padding:8px 11px;border:none;border-radius:7px;font-size:14px;font-weight:700;color:#FFF;cursor:pointer;transition:all 0.15s;min-width:36px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
 .pn-op-btn:active{transform:scale(0.92)}
-.pn-op-btn.suma{background:#2E7D32}
+.pn-op-btn.suma{background:#2A4455}
 .pn-op-btn.mult{background:#1565C0}
 .pn-op-btn.div{background:#E65100}
 .pn-op-btn.resta{background:#C62828}
@@ -603,9 +604,9 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .tag.obra{background:#FFF3E0;color:#E65100}
 .tag.cliente{background:#E3F2FD;color:#1565C0}
 .tag.urgente{background:#FFEBEE;color:#C62828}
-.tag.factura{background:#E8F5E9;color:#2E7D32}
+.tag.factura{background:#EBF1F5;color:#2A4455}
 .tag.pendiente{background:#FFF9C4;color:#F57F17}
-.tag.completado{background:#E8F5E9;color:#2E7D32}
+.tag.completado{background:#EBF1F5;color:#2A4455}
 .tag-input-wrap{position:relative;margin-top:12px}
 .tag-input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--card);color:var(--text);font-family:'DM Sans',sans-serif}
 .tag-suggestions{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:1000}
@@ -630,8 +631,8 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .share-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
 .share-icon.pdf{background:#FFEBEE;color:#C62828}
 .share-icon.whatsapp{background:#E8F5E9;color:#25D366}
-.share-icon.copy{background:#E3F2FD;color:#1565C0}
-.share-icon.excel{background:#E8F5E9;color:#0F6E56}
+.share-icon.copy{background:#EBF1F5;color:#2A4455}
+.share-icon.excel{background:#EBF1F5;color:#2A4455}
 .share-label{flex:1}
 .share-desc{font-size:11px;color:var(--muted);margin-top:2px}
 .share-close{position:absolute;top:12px;right:12px;background:none;border:none;font-size:24px;color:var(--muted);cursor:pointer;padding:4px}
@@ -645,7 +646,7 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .nh-capture-row::-webkit-scrollbar{display:none}
 .nh-cpill{display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:20px;border:1px solid var(--border);background:var(--card);font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif;transition:all .15s;flex-shrink:0}
 .nh-cpill:active{transform:scale(.95)}
-.nh-cpill.texto{border-color:#C0DD97;background:#EAF3DE;color:#27500A}
+.nh-cpill.texto{border-color:#A8BCC9;background:#EBF1F5;color:#2A4455}
 .nh-cpill.voz{border-color:#F7C1C1;background:#FCEBEB;color:#791F1F}
 .nh-cpill.lista{border-color:#B5D4F4;background:#E6F1FB;color:#0C447C}
 .nh-cpill.plano{border-color:#FAC775;background:#FAEEDA;color:#633806}
@@ -662,7 +663,7 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .nh-sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px}
 .nh-sec-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .nh-sec-more{font-size:11px;color:var(--gold);cursor:pointer;font-weight:600}
-.nc3{background:var(--card);border:1px solid var(--border);border-radius:16px;margin:0 16px 8px;overflow:hidden;position:relative}
+.nc3{background:var(--card);border:1px solid var(--border);border-radius:18px;margin:0 16px 10px;overflow:hidden;position:relative;box-shadow:0 3px 12px rgba(26,44,53,0.07)}
 .nc3:active{opacity:.93}
 .nc3-body{padding:12px 14px 10px 14px;cursor:pointer;display:flex;gap:10px;align-items:flex-start}
 .nc3-icon-box{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
@@ -716,9 +717,9 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 #plano-propbar label{display:flex;align-items:center;gap:4px}
 #plano-propbar input[type=range]{width:60px;accent-color:var(--gold)}
 #plano-propbar input[type=number]{width:55px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;font-size:11px;font-family:'DM Sans',sans-serif;background:var(--card);color:var(--text)}
-#plano-gemini-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#EAF3DE;border-top:1px solid #C0DD97;flex-shrink:0}
-#plano-gemini-bar span{font-size:12px;color:#27500A;flex:1}
-#plano-gemini-bar button{background:#2A7A44;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
+#plano-gemini-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#EBF1F5;border-top:1px solid #A8BCC9;flex-shrink:0}
+#plano-gemini-bar span{font-size:12px;color:#2A4455;flex:1}
+#plano-gemini-bar button{background:#546878;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
 .plano-ctx-menu{position:fixed;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.14);z-index:700;display:none;overflow:hidden;min-width:150px}
 .plano-ctx-item{padding:10px 16px;cursor:pointer;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif}
 .plano-ctx-item:hover{background:var(--bg)}
@@ -748,9 +749,9 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .tbl-cell-inp{width:100%;height:100%;border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:12px;padding:2px 6px;color:var(--text);outline:none}
 .tbl-cell-inp.tw-bold{font-weight:700}
 .tbl-cell-inp.tw-italic{font-style:italic}
-#tabla-gemini-bar{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#EAF3DE;border-top:1px solid #C0DD97;flex-shrink:0}
-#tabla-gemini-bar span{font-size:12px;color:#27500A;flex:1}
-#tabla-gemini-bar button{background:#2A7A44;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
+#tabla-gemini-bar{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#EBF1F5;border-top:1px solid #A8BCC9;flex-shrink:0}
+#tabla-gemini-bar span{font-size:12px;color:#2A4455;flex:1}
+#tabla-gemini-bar button{background:#546878;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
 
 /* ── A4 EXPORT LOADER ── */
 #a4-loader{position:fixed;inset:0;z-index:800;background:rgba(0,0,0,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
@@ -824,6 +825,42 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 .keyboard-hint{position:fixed;bottom:20px;right:20px;background:rgba(0,0,0,0.8);color:#FFF;padding:8px 12px;border-radius:8px;font-size:11px;z-index:999;opacity:0;pointer-events:none;transition:opacity .2s}
 .keyboard-hint.show{opacity:1}
 .kbd{background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;font-family:monospace;margin:0 2px}
+/* ── GAS NATURAL — VISUAL POLISH ── */
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#C5D5DD;border-radius:4px}
+
+/* Header improved */
+#header{background:var(--bg);border-bottom:1px solid var(--border);padding:16px 20px 0;flex-shrink:0;backdrop-filter:blur(8px)}
+
+/* Modo toggle pill */
+.modo-toggle{display:flex;background:#E4EBF0;border-radius:30px;padding:3px;margin-bottom:10px}
+.modo-btn{flex:1;padding:7px 6px;border:none;border-radius:28px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .22s;background:transparent;color:var(--muted)}
+.modo-btn.active-personal,.modo-btn.active-negocio{background:var(--gold);color:#fff;box-shadow:0 2px 8px rgba(61,102,119,0.30)}
+
+/* ag-card nombre font */
+.ag-card-nombre{font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700}
+
+/* Pill badges on agenda */
+.ag-card-pill{font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;letter-spacing:.02em}
+
+/* section-title improved */
+.section-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--gold);margin-bottom:6px;letter-spacing:-.01em}
+
+/* Gas-orange accent for active states */
+.gas-accent{color:var(--gas-orange)!important}
+.gas-accent-bg{background:var(--gas-orange-bg)!important;border-color:var(--gas-orange)!important}
+
+/* Emoji picker selected */
+.emoji-btn.picked{border-color:var(--gold);background:rgba(61,102,119,0.10)}
+
+/* Nota filter active */
+.nota-filter-btn.active,.pn-filter-btn.active,.nh-fpill.active{border-color:var(--gold);background:rgba(61,102,119,0.08);color:var(--gold)}
+
+/* ag-card-actions button polish */
+.ag-act-btn{border-radius:12px!important;font-weight:700;transition:transform .12s,opacity .12s}
+.ag-act-btn:active{transform:scale(.96);opacity:.85}
+
+/* Section title pill (header) */
+.h-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--gold)}
 
 </style>
 </head>
@@ -975,10 +1012,10 @@ const DISTRITOS_LIMA = [
 const MONTHS_FULL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const MONTHS_SHORT=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const DEBT_CATS=['Banco','Tarjeta de crédito','Préstamo personal','Préstamo familiar','Otro'];
-const DEBT_COLORS=['#2E86AB','#9B59B6','#E67E22','#E05252','#4CAF85','#C9A84C'];
+const DEBT_COLORS=['#2E86AB','#9B59B6','#E67E22','#E05252','var(--gold)','#C9A84C'];
 
 const DEFAULT_CATS_IN = [
-  {id:'ci1',name:'Sueldo',icon:'💼',color:'#4CAF85',type:'ingreso'},
+  {id:'ci1',name:'Sueldo',icon:'💼',color:'var(--gold)',type:'ingreso'},
   {id:'ci2',name:'Freelance',icon:'💻',color:'#2E86AB',type:'ingreso'},
   {id:'ci3',name:'Negocio',icon:'🏪',color:'#C9A84C',type:'ingreso'},
   {id:'ci4',name:'Inversión',icon:'📈',color:'#9B59B6',type:'ingreso'},
@@ -1025,7 +1062,7 @@ const EMOJI_GROUPS = [
   {label:'Personas & Familia',emojis:['👶','👦','👧','👨','👩','👴','👵','👪','💑','🧒','💝','🎁','🎂','🎉','🥳','💒','⛪','🙏','🤝','👋']},
 ];
 
-const CAT_COLORS=['#4CAF85','#2E86AB','#C9A84C','#E05252','#9B59B6','#E67E22','#1ABC9C','#E91E63','#FF9800','#607D8B','#795548','#3498DB','#F44336','#FF5722','#00BCD4'];
+const CAT_COLORS=['var(--gold)','#2E86AB','#C9A84C','#E05252','#9B59B6','#E67E22','#1ABC9C','#E91E63','#FF9800','#607D8B','#795548','#3498DB','#F44336','#FF5722','#00BCD4'];
 
 // ── Iconos SVG personalizados para artefactos ──
 const APPLIANCE_SVG = {
@@ -1055,7 +1092,7 @@ const DEFAULT_CATS_NEG_IN = [
   {id:'cn14',name:'Calefón',           icon:'🌡️',color:'#2E86AB',type:'ingreso'},
   {id:'cn15',name:'Parrilla a Gas',    icon:'🥩',color:'#C0392B',type:'ingreso'},
   {id:'cn9',name:'Otro Servicio',     icon:'💰',color:'#1ABC9C',type:'ingreso'},
-  {id:'transfer_neg_in',name:'Transferencia recibida',icon:'⇄',color:'#4CAF85',type:'ingreso'},
+  {id:'transfer_neg_in',name:'Transferencia recibida',icon:'⇄',color:'var(--gold)',type:'ingreso'},
   {id:'transfer_neg_retiro',name:'Retiro personal',icon:'💼',color:'#C9A84C',type:'ingreso'},
 ];
 const DEFAULT_CATS_NEG_EX = [
@@ -1380,7 +1417,7 @@ function renderNegocioCard(){
   var ni=negIn.reduce(function(s,t){return s+t.amount;},0);
   var ne=negEx.reduce(function(s,t){return s+t.amount;},0);
   var nb=ni-ne;
-  var nc=nb>=0?'#4CAF85':'#E05252';
+  var nc=nb>=0?'var(--gold)':'#E05252';
   return '<div onclick="switchModo(\'negocio\')" style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border:1px solid #1565C033;border-radius:14px;padding:14px 16px;margin-bottom:12px;cursor:pointer;display:flex;align-items:center;gap:14px">'
     +'<div style="font-size:26px">🔵</div>'
     +'<div style="flex:1">'
@@ -1409,9 +1446,9 @@ function renderResumenSemanal(){
   return `<div class="card" style="margin-bottom:12px;border-color:#C9A84C33">
     <div style="font-size:12px;color:var(--muted);margin-bottom:8px">📅 Esta semana · ${getWeekLabel()}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:${alertas.length?'10px':'0'}">
-      <div style="text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Ingresos</div><div style="font-size:15px;font-weight:600;color:var(--green)">+${fmt(ing)}</div></div>
+      <div style="text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Ingresos</div><div style="font-size:15px;font-weight:600;color:var(--gold)">+${fmt(ing)}</div></div>
       <div style="text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Egresos</div><div style="font-size:15px;font-weight:600;color:var(--red)">-${fmt(egr)}</div></div>
-      <div style="text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Balance</div><div style="font-size:15px;font-weight:600;color:${bal>=0?'var(--green)':'var(--red)'}">${bal>=0?'+':''}${fmt(bal)}</div></div>
+      <div style="text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Balance</div><div style="font-size:15px;font-weight:600;color:${bal>=0?'var(--gold)':'var(--red)'}">${bal>=0?'+':''}${fmt(bal)}</div></div>
     </div>
     ${alertas.length?`<div style="background:#FEF2F2;border-radius:8px;padding:8px;margin-top:4px">
       ${alertas.map(p=>{const g=getGastadoCategoria(p.categoria);const over=g>p.limite;return `<div style="font-size:12px;color:${over?'var(--red)':'#E67E22'}">${over?'⚠':'⚡'} ${p.icon} ${p.categoria}: ${fmt(g)} / ${fmt(p.limite)}</div>`;}).join('')}
@@ -1420,7 +1457,7 @@ function renderResumenSemanal(){
 }
 
 function renderDashboard(){
-  const bal=balance(),balColor=bal>=0?'var(--green)':'var(--red)';
+  const bal=balance(),balColor=bal>=0?'var(--gold)':'var(--red)';
   const inc=totalIncome(),exp=totalExpense();
   const filtered=filteredTx();
   const urgent=state.servicios.filter(s=>!s.pagado&&daysUntil(s.venceDia)<=5);
@@ -1476,7 +1513,7 @@ function renderDashboard(){
           <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px">${proxTrab.servicio||'Sin servicio'}</div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:6px">👤 ${proxTrab.cliente||'Sin cliente'}${proxTrab.ubicacion?' · '+proxTrab.ubicacion:''}</div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            ${proxTrab.hora?`<span style="font-size:11px;background:var(--ing-bg,#EAF3DE);color:var(--gold);padding:2px 8px;border-radius:20px;font-weight:600">🕐 ${horaTo12(proxTrab.hora)}</span>`:''}
+            ${proxTrab.hora?`<span style="font-size:11px;background:var(--ing-bg,#EBF1F5);color:var(--gold);padding:2px 8px;border-radius:20px;font-weight:600">🕐 ${horaTo12(proxTrab.hora)}</span>`:''}
             <span style="font-size:11px;background:${proxTrab.fecha===hoyStr?'#FFF3E0':'var(--bg)'};color:${proxTrab.fecha===hoyStr?'#E65100':'var(--muted)'};padding:2px 8px;border-radius:20px;font-weight:600">${fmtAgFecha(proxTrab.fecha)}</span>
             ${proxTrab.precio?`<span style="font-size:11px;color:var(--gold);font-weight:700">S/ ${proxTrab.precio}</span>`:''}
           </div>
@@ -1499,7 +1536,7 @@ function renderDashboard(){
       return `<div class="tx-row">
         <div class="tx-icon" style="background:${cat?cat.color+'18':'#66666618'}">${cat?iconHtml(cat.icon):(t.type==='ingreso'?'↑':'↓')}</div>
         <div class="tx-info"><div class="tx-name">${t.description||t.category}</div><div class="tx-sub">${t.category} · ${t.date}</div></div>
-        <div class="tx-amount" style="color:${t.type==='ingreso'?'var(--green)':'var(--red)'}">${t.type==='ingreso'?'+':'-'}${fmt(t.amount)}</div>
+        <div class="tx-amount" style="color:${t.type==='ingreso'?'var(--gold)':'var(--red)'}">${t.type==='ingreso'?'+':'-'}${fmt(t.amount)}</div>
       </div>`;
     }).join('')}
     ${filtered.length>5?`<div style="text-align:center;font-size:12px;color:var(--muted);margin-top:10px;cursor:pointer" onclick="switchPage('movimientos')">Ver todos (${filtered.length}) →</div>`:''}
@@ -1519,7 +1556,7 @@ function renderDashboard(){
       <div style="display:flex;gap:0;justify-content:center;margin-top:14px;background:var(--bg);border-radius:12px;overflow:hidden">
         <div style="flex:1;padding:10px 8px;border-right:1px solid var(--border)">
           <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Ingresos</div>
-          <div style="color:var(--green);font-weight:700;font-size:15px">+${fmt(inc)}</div>
+          <div style="color:var(--gold);font-weight:700;font-size:15px">+${fmt(inc)}</div>
         </div>
         <div style="flex:1;padding:10px 8px">
           <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Egresos</div>
@@ -1601,7 +1638,7 @@ function renderMovimientos(){
     if(c.includes('instalac')) return {icon:'🏗️',color:'#01579B'};
     if(c.includes('conversion')||c.includes('conversión')) return {icon:'🔄',color:'#0288D1'};
     if(c.includes('document')) return {icon:'📄',color:'#37474F'};
-    return {icon:t.type==='ingreso'?'⬆':'⬇', color:t.type==='ingreso'?'#3A7D44':'#C62828'};
+    return {icon:t.type==='ingreso'?'⬆':'⬇', color:t.type==='ingreso'?'var(--gold)':'#C62828'};
   };
 
   // ── Fecha legible ──
@@ -1639,9 +1676,9 @@ function renderMovimientos(){
       ${window._movBusqueda?`<button onclick="window._movBusqueda='';render()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px">✕</button>`:''}
     </div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      <div onclick="window._movFiltro='ingresos';render()" style="flex:1;background:${window._movFiltro==='ingresos'?'var(--ing-bg,#EAF3DE)':'#EAF3DE'};border:1px solid ${window._movFiltro==='ingresos'?'var(--gold)':'#4CAF8533'};border-radius:10px;padding:12px;cursor:pointer;transition:all .2s">
-        <div style="font-size:10px;color:#27500A88;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ingresos</div>
-        <div style="color:#3A7D44;font-weight:700;font-size:15px">+${fmt(inc)}</div>
+      <div onclick="window._movFiltro='ingresos';render()" style="flex:1;background:${window._movFiltro==='ingresos'?'var(--ing-bg,#EBF1F5)':'#EBF1F5'};border:1px solid ${window._movFiltro==='ingresos'?'var(--gold)':'#54687833'};border-radius:10px;padding:12px;cursor:pointer;transition:all .2s">
+        <div style="font-size:10px;color:#2A445588;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ingresos</div>
+        <div style="color:var(--gold);font-weight:700;font-size:15px">+${fmt(inc)}</div>
       </div>
       <div onclick="window._movFiltro='egresos';render()" style="flex:1;background:${window._movFiltro==='egresos'?'#FFCDD2':'#FFEBEE'};border:1px solid ${window._movFiltro==='egresos'?'#C62828':'#E0525233'};border-radius:10px;padding:12px;cursor:pointer;transition:all .2s">
         <div style="font-size:10px;color:#C6282888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Egresos</div>
@@ -1948,12 +1985,12 @@ function renderDeudas(){
               <div class="debt-pending"><div class="debt-pending-amt" style="color:${d.color}">${done?'✓ Pagada':fmt(pendiente)}</div>${!done?`<div class="debt-pending-lbl">pendiente</div>`:''}</div>
             </div>
             <div class="cuotas-track">${Array.from({length:d.cuotasTotales},(_,i)=>`<div class="cuota-dot" style="width:${dw}px;background:${i<d.cuotasPagadas?d.color:'#E2E8F0'}"></div>`).join('')}</div>
-            <div class="cuotas-meta"><span><span style="color:var(--green);font-weight:600">${d.cuotasPagadas}</span> pagadas · <span style="color:var(--red);font-weight:600">${restantes}</span> restantes</span><span>${fmt(d.cuotaMonto)}/mes</span></div>
+            <div class="cuotas-meta"><span><span style="color:var(--gold);font-weight:600">${d.cuotasPagadas}</span> pagadas · <span style="color:var(--red);font-weight:600">${restantes}</span> restantes</span><span>${fmt(d.cuotaMonto)}/mes</span></div>
           </div>
         </div>
         ${msg?`<div class="motivation">${msg}</div>`:''}
         <div style="display:flex;gap:6px;margin-top:12px">
-          ${!done?`<button onclick="pagarCuota('${d.id}')" style="flex:1;background:#F0FDF4;border:1px solid #4CAF8544;color:var(--green);border-radius:8px;padding:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">✓ Pagar cuota</button>`:''}
+          ${!done?`<button onclick="pagarCuota('${d.id}')" style="flex:1;background:#EBF1F5;border:1px solid #54687844;color:var(--gold);border-radius:8px;padding:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">✓ Pagar cuota</button>`:''}
           <button onclick="openEditDebt('${d.id}')" style="width:36px;height:36px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:13px">✎</button>
           <button onclick="deleteDebt('${d.id}')" style="width:36px;height:36px;background:none;border:none;color:#E0525266;cursor:pointer;font-size:14px">✕</button>
         </div>
@@ -1969,11 +2006,11 @@ function renderDeudas(){
       const pct=Math.round(((p.capital-p.capitalPendiente)/p.capital)*100);
       const done=p.capitalPendiente<=0;
       const restantes=p.plazo-pagosH;
-      return `<div class="debt-card" style="border-color:${done?'#4CAF8533':'var(--border)'}">
-        <div class="debt-accent" style="background:${done?'#4CAF85':'#9B59B6'}"></div>
+      return `<div class="debt-card" style="border-color:${done?'#54687833':'var(--border)'}">
+        <div class="debt-accent" style="background:${done?'var(--gold)':'#9B59B6'}"></div>
         <!-- Fila 1: círculo + nombre + monto -->
         <div class="debt-body">
-          ${circleProgress(pct,62,5,done?'#4CAF85':'#9B59B6',`<span style="font-size:10px;font-weight:700">${pct}%</span>`)}
+          ${circleProgress(pct,62,5,done?'var(--gold)':'#9B59B6',`<span style="font-size:10px;font-weight:700">${pct}%</span>`)}
           <div class="debt-info">
             <div style="display:flex;justify-content:space-between;align-items:flex-start">
               <div>
@@ -1982,7 +2019,7 @@ function renderDeudas(){
                 <div style="font-size:11px;color:#9B59B6;margin-top:2px;font-weight:500">${{solo_interes:'Solo interés mensual',frances:'Cuota fija (francés)',aleman:'Capital fijo (alemán)'}[p.sistema||'solo_interes']}</div>
               </div>
               <div class="debt-pending">
-                <div class="debt-pending-amt" style="color:${done?'#4CAF85':'#9B59B6'}">${done?'✓ Saldado':fmt(p.capitalPendiente)}</div>
+                <div class="debt-pending-amt" style="color:${done?'var(--gold)':'#9B59B6'}">${done?'✓ Saldado':fmt(p.capitalPendiente)}</div>
                 ${!done?`<div class="debt-pending-lbl">capital pendiente</div>`:''}
               </div>
             </div>
@@ -1995,7 +2032,7 @@ function renderDeudas(){
         </div>
         <!-- Fila 2: cajas de montos (ancho completo) -->
         ${done
-          ?`<div style="background:#F0FDF4;border:1px solid #4CAF8533;border-radius:8px;padding:8px;margin-top:10px;text-align:center;font-size:12px;color:#4CAF85;font-weight:600">🎉 Préstamo cancelado · Total pagado en intereses: ${fmt(totalIntPagado)}</div>`
+          ?`<div style="background:#EBF1F5;border:1px solid #54687833;border-radius:8px;padding:8px;margin-top:10px;text-align:center;font-size:12px;color:var(--gold);font-weight:600">🎉 Préstamo cancelado · Total pagado en intereses: ${fmt(totalIntPagado)}</div>`
           :`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px">
               <div style="background:#FEF2F2;border-radius:8px;padding:8px;text-align:center">
                 <div style="font-size:9px;color:#A32D2D;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Interés del mes</div>
@@ -2013,7 +2050,7 @@ function renderDeudas(){
               </div>
               <div style="text-align:right">
                 <div style="font-size:10px;color:#9B59B6">${fmt(interes)} interés</div>
-                <div style="font-size:10px;color:#2E7D32">+ ${fmt(capitalMes)} capital</div>
+                <div style="font-size:10px;color:#2A4455">+ ${fmt(capitalMes)} capital</div>
               </div>
             </div>`}
         <!-- Botones -->
@@ -2101,7 +2138,7 @@ function openAddPrestPers(pre){
       <label class="field-label">Quién debe</label>
       <div class="type-toggle">
         <button class="type-btn" id="pp-debo" onclick="setPPTipo('debo')" style="border-color:#E05252;background:#FEF2F2;color:#E05252">Yo debo</button>
-        <button class="type-btn" id="pp-meden" onclick="setPPTipo('meden')" style="border-color:#4CAF85;background:#F0FDF4;color:#4CAF85">Me deben</button>
+        <button class="type-btn" id="pp-meden" onclick="setPPTipo('meden')" style="border-color:var(--gold);background:#EBF1F5;color:var(--gold)">Me deben</button>
       </div>
     </div>
     <div class="field"><label class="field-label">Nombre (persona)</label><input id="pp-nombre" type="text" placeholder="Ej: Juan Pérez"></div>
@@ -2179,8 +2216,8 @@ function setPPTipo(tipo){
   window._ppTipo=tipo;
   document.getElementById('pp-debo').style.background=tipo==='debo'?'#FEF2F2':'transparent';
   document.getElementById('pp-debo').style.color=tipo==='debo'?'#E05252':'var(--muted)';
-  document.getElementById('pp-meden').style.background=tipo==='meden'?'#F0FDF4':'transparent';
-  document.getElementById('pp-meden').style.color=tipo==='meden'?'#4CAF85':'var(--muted)';
+  document.getElementById('pp-meden').style.background=tipo==='meden'?'#EBF1F5':'transparent';
+  document.getElementById('pp-meden').style.color=tipo==='meden'?'var(--gold)':'var(--muted)';
 }
 
 function calcPPPreview(){
@@ -2215,7 +2252,7 @@ function calcPPPreview(){
     tbody.innerHTML=tabla.map((r,i)=>`<tr style="background:${i%2===0?'#F8F5FF':'#fff'}">
       <td style="padding:4px 6px;text-align:center;color:#6C3483;font-weight:600">${r.mes}</td>
       <td style="padding:4px 6px;text-align:right;color:#C62828">S/ ${r.interes.toFixed(2)}</td>
-      <td style="padding:4px 6px;text-align:right;color:#2E7D32">S/ ${r.capitalMes.toFixed(2)}</td>
+      <td style="padding:4px 6px;text-align:right;color:#2A4455">S/ ${r.capitalMes.toFixed(2)}</td>
       <td style="padding:4px 6px;text-align:right;font-weight:600;color:#6C3483">S/ ${r.cuota.toFixed(2)}</td>
       <td style="padding:4px 6px;text-align:right;color:var(--muted)">S/ ${r.saldo.toFixed(2)}</td>
     </tr>`).join('');
@@ -2315,7 +2352,7 @@ function editPrestPers(id){
     <div class="field"><label class="field-label">Tipo</label>
       <div class="type-toggle">
         <button class="type-btn ${p.tipo==='debo'?'sel-out':''}" id="ep-debo" onclick="setEPTipo('debo')" style="${p.tipo==='debo'?'border-color:#E05252;background:#FEF2F2;color:#E05252':''}">Yo debo</button>
-        <button class="type-btn ${p.tipo==='meden'?'sel-in':''}" id="ep-meden" onclick="setEPTipo('meden')" style="${p.tipo==='meden'?'border-color:#4CAF85;background:#F0FDF4;color:#4CAF85':''}">Me deben</button>
+        <button class="type-btn ${p.tipo==='meden'?'sel-in':''}" id="ep-meden" onclick="setEPTipo('meden')" style="${p.tipo==='meden'?'border-color:var(--gold);background:#EBF1F5;color:var(--gold)':''}">Me deben</button>
       </div>
     </div>
     <div class="btn-row">
@@ -2331,7 +2368,7 @@ function setEPTipo(tipo){
   const debo=document.getElementById('ep-debo');
   const meden=document.getElementById('ep-meden');
   if(debo){ debo.style.background=tipo==='debo'?'#FEF2F2':'transparent'; debo.style.color=tipo==='debo'?'#E05252':'var(--muted)'; debo.style.borderColor=tipo==='debo'?'#E05252':'var(--border)'; }
-  if(meden){ meden.style.background=tipo==='meden'?'#F0FDF4':'transparent'; meden.style.color=tipo==='meden'?'#4CAF85':'var(--muted)'; meden.style.borderColor=tipo==='meden'?'#4CAF85':'var(--border)'; }
+  if(meden){ meden.style.background=tipo==='meden'?'#EBF1F5':'transparent'; meden.style.color=tipo==='meden'?'var(--gold)':'var(--muted)'; meden.style.borderColor=tipo==='meden'?'var(--gold)':'var(--border)'; }
 }
 
 function saveEditPrestPers(id){
@@ -2373,13 +2410,13 @@ function renderMetas(){
               <div style="font-size:11px;color:var(--muted);margin-top:2px">Fecha límite: ${m.fechaLimite||'—'}</div>
             </div>
             <div style="text-align:right">
-              <div style="font-size:16px;font-weight:600;color:${done?'var(--green)':'var(--gold)'}">${fmt(m.ahorrado)}</div>
+              <div style="font-size:16px;font-weight:600;color:${done?'var(--gold)':'var(--gold)'}">${fmt(m.ahorrado)}</div>
               <div style="font-size:10px;color:var(--muted)">de ${fmt(m.objetivo)}</div>
             </div>
           </div>
-          <div class="progress-bar" style="height:8px"><div class="progress-fill" style="width:${pct}%;background:${done?'var(--green)':'var(--gold)'}"></div></div>
+          <div class="progress-bar" style="height:8px"><div class="progress-fill" style="width:${pct}%;background:${done?'var(--gold)':'var(--gold)'}"></div></div>
           <div style="display:flex;justify-content:space-between;margin-top:6px">
-            <span style="font-size:11px;color:${done?'var(--green)':'var(--muted)'}">
+            <span style="font-size:11px;color:${done?'var(--gold)':'var(--muted)'}">
               ${done?'🎉 ¡Meta alcanzada!':'Faltan '+fmt(restante)}
             </span>
             <span style="font-size:11px;color:var(--gold);font-weight:600">${pct}%</span>
@@ -2499,11 +2536,11 @@ function renderPresupuesto(){
         <div style="font-size:14px;font-weight:500">${p.icon||''} ${p.categoria}</div>
         <div style="text-align:right">
           <div style="font-size:13px;font-weight:600;color:${over?'var(--red)':'var(--text)'}">${fmt(gastado)} <span style="font-size:11px;color:var(--muted)">/ ${fmt(p.limite)}</span></div>
-          ${over?`<div style="font-size:10px;color:var(--red)">⚠ Excedido por ${fmt(gastado-p.limite)}</div>`:`<div style="font-size:10px;color:var(--green)">Disponible: ${fmt(disponible)}</div>`}
+          ${over?`<div style="font-size:10px;color:var(--red)">⚠ Excedido por ${fmt(gastado-p.limite)}</div>`:`<div style="font-size:10px;color:var(--gold)">Disponible: ${fmt(disponible)}</div>`}
         </div>
       </div>
       <div class="progress-bar" style="height:6px">
-        <div class="progress-fill" style="width:${pct}%;background:${over?'var(--red)':pct>80?'#E67E22':'var(--green)'}"></div>
+        <div class="progress-fill" style="width:${pct}%;background:${over?'var(--red)':pct>80?'#E67E22':'var(--gold)'}"></div>
       </div>
       <button onclick="deletePresup('${p.id}')" style="position:absolute;top:8px;right:8px;background:none;border:none;color:#E0525244;cursor:pointer;font-size:12px">✕</button>
     </div>`;
@@ -2562,15 +2599,15 @@ function renderServicios(){
   const serviceCard=s=>{
     const days=daysUntil(s.venceDia),urgent=!s.pagado&&days<=5;
     return `<div class="service-card ${urgent?'urgent':''}" style="${s.pagado?'opacity:.6':''}">
-      <div class="service-icon" style="background:${s.pagado?'#F0FDF4':urgent?'#FEF2F2':'#F8FAFC'}">${iconHtml(s.icon)}</div>
+      <div class="service-icon" style="background:${s.pagado?'#EBF1F5':urgent?'#FEF2F2':'#F8FAFC'}">${iconHtml(s.icon)}</div>
       <div style="flex:1">
         <div class="service-name ${s.pagado?'paid':''}">${s.name}</div>
         <div class="service-sub">${s.pagado?'✓ Pagado este mes':`Vence día ${s.venceDia}${urgent?' · ⚠ pronto':''}`}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-        <div class="service-amount" style="color:${s.pagado?'var(--green)':urgent?'var(--red)':'var(--gold)'}">${fmt(s.monto)}</div>
+        <div class="service-amount" style="color:${s.pagado?'var(--gold)':urgent?'var(--red)':'var(--gold)'}">${fmt(s.monto)}</div>
         <div style="display:flex;gap:4px">
-          <button onclick="toggleService('${s.id}')" style="background:${s.pagado?'#EFF6FF':'#F0FDF4'};border:1px solid ${s.pagado?'#2E86AB44':'#4CAF8544'};color:${s.pagado?'var(--blue)':'var(--green)'};border-radius:7px;width:28px;height:28px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center">${s.pagado?'↺':'✓'}</button>
+          <button onclick="toggleService('${s.id}')" style="background:${s.pagado?'#EFF6FF':'#EBF1F5'};border:1px solid ${s.pagado?'#2E86AB44':'#54687844'};color:${s.pagado?'var(--blue)':'var(--gold)'};border-radius:7px;width:28px;height:28px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center">${s.pagado?'↺':'✓'}</button>
           <button onclick="openEditService('${s.id}')" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;width:28px;height:28px;cursor:pointer;font-size:12px">✎</button>
           <button onclick="deleteService('${s.id}')" style="background:none;border:none;color:#E0525266;cursor:pointer;font-size:13px;width:28px;height:28px">✕</button>
         </div>
@@ -2679,9 +2716,9 @@ function renderPrestamos(){
               <div style="font-size:10px;color:#E05252">Interés este mes</div>
               <div style="font-size:13px;font-weight:600;color:#E05252">${fmt(intEsp)}</div>
             </div>
-            <div style="background:#F0FDF4;border-radius:8px;padding:8px;text-align:center">
-              <div style="font-size:10px;color:var(--green)">Total intereses pagados</div>
-              <div style="font-size:13px;font-weight:600;color:var(--green)">${fmt(totalInteresesPagados(p))}</div>
+            <div style="background:#EBF1F5;border-radius:8px;padding:8px;text-align:center">
+              <div style="font-size:10px;color:var(--gold)">Total intereses pagados</div>
+              <div style="font-size:13px;font-weight:600;color:var(--gold)">${fmt(totalInteresesPagados(p))}</div>
             </div>
           </div>
           <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:#9B59B6"></div></div>
@@ -2694,7 +2731,7 @@ function renderPrestamos(){
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-top:12px">
-        <button onclick="openRegistrarPago('${p.id}')" style="flex:2;background:#F0FDF4;border:1px solid #4CAF8544;color:var(--green);border-radius:8px;padding:9px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">💳 Registrar pago</button>
+        <button onclick="openRegistrarPago('${p.id}')" style="flex:2;background:#EBF1F5;border:1px solid #54687844;color:var(--gold);border-radius:8px;padding:9px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">💳 Registrar pago</button>
         <button onclick="verHistorialPrestamo('${p.id}')" style="flex:1;background:#F8FAFC;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer">📋 Historial</button>
         <button onclick="openEditPrestamo('${p.id}')" style="width:36px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:13px">✎</button>
         <button onclick="deletePrestamo('${p.id}')" style="width:36px;background:none;border:none;color:#E0525266;cursor:pointer;font-size:14px">✕</button>
@@ -2832,7 +2869,7 @@ function openRegistrarPago(id){
     </div>
     <div class="btn-row">
       <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button style="flex:2;background:linear-gradient(135deg,#2d7a57,#4CAF85);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="guardarPagoPrestamo('${id}')">✓ Guardar pago</button>
+      <button style="flex:2;background:linear-gradient(135deg,#3D5F70,var(--gold));color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="guardarPagoPrestamo('${id}')">✓ Guardar pago</button>
     </div>`;
   window._pagoTipo='interes';
   showModal();
@@ -3067,7 +3104,7 @@ function _updateSyncBadge(){
   // Notion tiene prioridad si está activo
   const notionActive = localStorage.getItem('fnz_notion_polling')==='1';
   const notionLast   = localStorage.getItem('fnz_notion_last_sync');
-  const cfg={idle:{t:'',bg:'transparent',c:'transparent'},syncing:{t:'↑ Sincronizando...',bg:'#EFF6FF',c:'#1565C0'},ok:{t:'✓ Guardado en Sheets',bg:'#F0FDF4',c:'#4CAF85'},error:{t:'⚠ Error al sincronizar',bg:'#FEF2F2',c:'#E05252'}};
+  const cfg={idle:{t:'',bg:'transparent',c:'transparent'},syncing:{t:'↑ Sincronizando...',bg:'#EFF6FF',c:'#1565C0'},ok:{t:'✓ Guardado en Sheets',bg:'#EBF1F5',c:'var(--gold)'},error:{t:'⚠ Error al sincronizar',bg:'#FEF2F2',c:'#E05252'}};
   const s=cfg[_syncStatus]||cfg.idle;
   if(notionActive){
     const hora = notionLast ? new Date(notionLast).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}) : '--:--';
@@ -3123,7 +3160,7 @@ function guardarNombreUsuario(){
 // SISTEMA DE TEMAS — 6 diseños
 // ══════════════════════════════════════════════════
 const TEMAS_APP = [
-  { id:'esmeralda', nombre:'Esmeralda', emoji:'🌿', desc:'Verde sage · Actual',      bg:'#F2F7F2', accent:'#3A7D44' },
+  { id:'esmeralda', nombre:'Esmeralda', emoji:'🌿', desc:'Verde sage · Actual',      bg:'#F2F7F2', accent:'var(--gold)' },
   { id:'oceano',    nombre:'Océano',    emoji:'🌊', desc:'Azul profundo',            bg:'#F0F4FF', accent:'#1565C0' },
   { id:'ambar',     nombre:'Ámbar',     emoji:'🔥', desc:'Borde lateral dorado',     bg:'#FFF8F0', accent:'#854F0B' },
   { id:'noche',     nombre:'Noche',     emoji:'🌙', desc:'Modo oscuro completo',     bg:'#0F0F1A', accent:'#9F5AE5' },
@@ -4179,7 +4216,7 @@ function renderNotaCard3(n){
     : '';
 
   const tipoConf={
-    texto: {ic:'📝',lbl:'Texto',bg:'#EAF3DE',col:'#27500A'},
+    texto: {ic:'📝',lbl:'Texto',bg:'#EBF1F5',col:'#2A4455'},
     lista: {ic:'📋',lbl:'Lista',bg:'#E6F1FB',col:'#0C447C'},
     audio: {ic:'🎙',lbl:'Audio',bg:'#FCEBEB',col:'#791F1F'},
     plano: {ic:'📐',lbl:'Plano',bg:'#FAEEDA',col:'#633806'},
@@ -4247,7 +4284,7 @@ function renderNotaCard3(n){
         <div class="nc3-meta">
           <span>${fecha}</span>
           ${n.recordatorio?`<span style="background:#FEF2F2;color:#DC2626;padding:1px 7px;border-radius:8px;font-weight:600;font-size:10px">⏰ ${n.recordatorio}</span>`:''}
-          ${n.fotos&&n.fotos.length?`<span style="background:#F0FDF4;color:#15803D;padding:1px 7px;border-radius:8px;font-weight:600;font-size:10px">📷 ${n.fotos.length}</span>`:''}
+          ${n.fotos&&n.fotos.length?`<span style="background:#EBF1F5;color:#546878;padding:1px 7px;border-radius:8px;font-weight:600;font-size:10px">📷 ${n.fotos.length}</span>`:''}
         </div>
         ${previewHtml}
         ${tagsHtml}
@@ -4403,7 +4440,7 @@ function abrirNotaTypeMenu(){
         </div>
 
         <div class="nota-type-item" onclick="cerrarNotaTypeMenu();abrirModoLista('lista','Lista de compras')">
-          <div class="nota-type-ic" style="background:#E8F5E9">📋</div>
+          <div class="nota-type-ic" style="background:#EBF1F5">📋</div>
           <div>
             <div class="nota-type-lbl">Lista de ítems</div>
             <div class="nota-type-sub">Checklist con precios y totales por voz</div>
@@ -4439,7 +4476,7 @@ function abrirNotaTypeMenu(){
         </div>
 
         <div class="nota-type-item" onclick="cerrarNotaTypeMenu();abrirEditorTabla(null)">
-          <div class="nota-type-ic" style="background:#F0FDF4">📊</div>
+          <div class="nota-type-ic" style="background:#EBF1F5">📊</div>
           <div>
             <div class="nota-type-lbl">Tabla avanzada</div>
             <div class="nota-type-sub">Hoja editable con fórmulas y colores</div>
@@ -4733,7 +4770,7 @@ function abrirChatIA(notaId){
       <!-- Mensajes -->
       <div id="chat-ia-msgs" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:var(--bg)">
         <!-- Bienvenida IA -->
-        <div class="chat-ia-bubble ai" style="background:#F0FDF4;border:1px solid #4CAF8533;font-style:italic;font-size:13px;color:#2D5F3A">
+        <div class="chat-ia-bubble ai" style="background:#EBF1F5;border:1px solid #54687833;font-style:italic;font-size:13px;color:#2A4455">
           Hola, soy tu asistente IA. Puedo hacer un resumen de esta nota, extraer puntos clave, crear una lista de tareas o responder cualquier pregunta. ¿Qué necesitás?
         </div>
         <!-- Acciones rápidas -->
@@ -4864,7 +4901,7 @@ async function compartirNota(notaId){
     <div style="font-size:13px;color:var(--muted);margin-bottom:16px">"${titulo}"</div>
     <div style="display:flex;flex-direction:column;gap:8px">
       <button onclick="closeModal();compartirNotaWhatsApp('${notaId}')"
-        style="background:#F0FDF4;border:1px solid #25D36633;border-radius:12px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:#15803D;display:flex;align-items:center;gap:12px;font-weight:600">
+        style="background:#EBF1F5;border:1px solid #25D36633;border-radius:12px;padding:13px;text-align:left;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;color:#546878;display:flex;align-items:center;gap:12px;font-weight:600">
         📱 <span>Compartir por WhatsApp</span>
       </button>
       <button onclick="closeModal();_copiarNotaPortapapeles('${notaId}')"
@@ -5891,9 +5928,9 @@ async function notionCargarManual() {
 
       <!-- RESUMEN -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
-        <div style="background:#F0FDF4;border:1px solid #4CAF8533;border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:22px;font-weight:800;color:#27500A">${soloNuevos.length}</div>
-          <div style="font-size:10px;font-weight:700;color:#27500A;text-transform:uppercase">Nuevos</div>
+        <div style="background:#EBF1F5;border:1px solid #54687833;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:800;color:#2A4455">${soloNuevos.length}</div>
+          <div style="font-size:10px;font-weight:700;color:#2A4455;text-transform:uppercase">Nuevos</div>
         </div>
         <div style="background:#FFFBEB;border:1px solid #EF9F2733;border-radius:10px;padding:10px;text-align:center">
           <div style="font-size:22px;font-weight:800;color:#633806">${posibleDup.length}</div>
@@ -5907,8 +5944,8 @@ async function notionCargarManual() {
 
       <!-- DETALLE NUEVOS -->
       ${soloNuevos.length > 0 ? `
-        <div style="background:#F0FDF4;border:1px solid #4CAF8522;border-radius:10px;padding:10px;margin-bottom:10px;max-height:140px;overflow-y:auto">
-          <div style="font-size:11px;font-weight:700;color:#27500A;margin-bottom:6px">✅ Se importarán (${soloNuevos.length})</div>
+        <div style="background:#EBF1F5;border:1px solid #54687822;border-radius:10px;padding:10px;margin-bottom:10px;max-height:140px;overflow-y:auto">
+          <div style="font-size:11px;font-weight:700;color:#2A4455;margin-bottom:6px">✅ Se importarán (${soloNuevos.length})</div>
           ${soloNuevos.slice(0,10).map(p => {
             const ps = p.properties||{};
             const tEnt = Object.entries(ps).find(([,v])=>v.type==='title');
@@ -6393,7 +6430,7 @@ function renderAjustes(){
       <div style="margin-top:10px;background:#F5F3FF;border:1px solid #8B5CF633;border-radius:8px;padding:10px;font-size:11px;color:var(--muted);line-height:1.7">
         <strong style="color:#7C3AED">Obtener key gratis:</strong> aistudio.google.com/apikey → Crear clave de API
       </div>
-      <button onclick="descargarAppsScript()" style="width:100%;margin-top:10px;background:#F0FDF4;border:1px solid #4CAF8544;color:var(--green);border-radius:10px;padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">⬇ Descargar código Apps Script</button>
+      <button onclick="descargarAppsScript()" style="width:100%;margin-top:10px;background:#EBF1F5;border:1px solid #54687844;color:var(--gold);border-radius:10px;padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">⬇ Descargar código Apps Script</button>
     `)}
 
     ${sec('sheets','📊','Google Sheets','Sincronización v9.0 SAAS','#1565C0',`
@@ -6412,7 +6449,7 @@ function renderAjustes(){
         <button onclick="saveSheetsUrl()" style="flex:2;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">💾 Guardar URL</button>
         <button onclick="testSheetsSync()" style="flex:1;background:transparent;border:1px solid #1565C044;color:#1565C0;border-radius:10px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Probar</button>
       </div>
-      <button onclick="reloadFromSheets()" style="width:100%;margin-top:8px;background:#F0FDF4;border:1px solid #3A7D4444;color:#3A7D44;border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">☁️ Restaurar datos desde Sheets</button>
+      <button onclick="reloadFromSheets()" style="width:100%;margin-top:8px;background:#EBF1F5;border:1px solid #54687844;color:var(--gold);border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">☁️ Restaurar datos desde Sheets</button>
       <button onclick="syncAllTxToSheets(false)" style="width:100%;margin-top:6px;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">⬆ Enviar TODO a Sheets</button>
     `)}
 
@@ -6459,7 +6496,7 @@ function renderAjustes(){
           style="background:linear-gradient(135deg,#6B46C1,#7C3AED);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;margin-top:4px">
           💾 Guardar credenciales
         </button>
-        <div style="font-size:11px;text-align:center;font-weight:600;color:${notionToken&&notionDbId?'#27500A':'#888'}">
+        <div style="font-size:11px;text-align:center;font-weight:600;color:${notionToken&&notionDbId?'#2A4455':'#888'}">
           ${notionToken&&notionDbId?'✅ Notion DB1 conectado':'⚠ Sin credenciales DB1'}
           ${localStorage.getItem('fnz_notion_dbid_clientes') ? ' · 👥 DB2 OK' : ''}
         </div>
@@ -6523,7 +6560,7 @@ function renderAjustes(){
         {icon:'🏦',label:'Deudas',val:debtCount,color:'var(--blue)'},
         {icon:'💸',label:'Préstamos',val:presCount,color:'#9B59B6'},
         {icon:'🏠',label:'Servicios',val:svcCount,color:'var(--gold)'},
-        {icon:'🏷',label:'Categorías',val:catCount,color:'var(--green)'},
+        {icon:'🏷',label:'Categorías',val:catCount,color:'var(--gold)'},
       ].map(r=>`
         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
           <div style="display:flex;align-items:center;gap:10px">
@@ -6818,7 +6855,7 @@ function requestNotifPermission(){
     if(perm==='granted'){
       toast('✓ Notificaciones activadas');
       document.getElementById('notif-btn').textContent='✓ Activadas';
-      document.getElementById('notif-btn').style.background='var(--green)';
+      document.getElementById('notif-btn').style.background='var(--gold)';
     } else {
       toast('Permiso denegado — activalo manualmente en tu navegador','error');
     }
@@ -6862,7 +6899,7 @@ function checkNotifBtn(){
   if(!btn) return;
   if(Notification.permission==='granted'){
     btn.textContent='✓ Activadas';
-    btn.style.background='var(--green)';
+    btn.style.background='var(--gold)';
     btn.style.color='#fff';
   }
 }
@@ -6878,11 +6915,11 @@ const AGENDA_ESTADOS = {
   pendiente:     { label:'Pendiente',     bg:'#FAEEDA', color:'#633806', border:'#EF9F27' },
   reprogramo:    { label:'Reprogramó',    bg:'#EEEDFE', color:'#3C3489', border:'#7F77DD' },
   se_desanimo:   { label:'Se desanimó',   bg:'#F1EFE8', color:'#444441', border:'#888780' },
-  se_finalizo:   { label:'Se finalizó',   bg:'#EAF3DE', color:'#27500A', border:'#639922' },
+  se_finalizo:   { label:'Se finalizó',   bg:'#EBF1F5', color:'#2A4455', border:'#546878' },
 };
 // Estados del PAGO (solo aplica cuando estado=se_finalizo)
 const AGENDA_PAGO = {
-  completo:  { label:'Cobro completo',  bg:'#EAF3DE', color:'#27500A' },
+  completo:  { label:'Cobro completo',  bg:'#EBF1F5', color:'#2A4455' },
   parcial:   { label:'Cobro parcial',   bg:'#FAEEDA', color:'#633806' },
   sin_cobro: { label:'Sin cobro',       bg:'#FCEBEB', color:'#791F1F' },
 };
@@ -6910,7 +6947,7 @@ function diasHastaLabel(fecha){
   const diff = Math.round((d-hoy)/(1000*60*60*24));
   if(diff<0) return { txt:'Vencido '+Math.abs(diff)+'d', color:'#791F1F', bg:'#FCEBEB' };
   if(diff===0) return { txt:'Hoy', color:'#0C447C', bg:'#E6F1FB' };
-  if(diff===1) return { txt:'Mañana', color:'#27500A', bg:'#EAF3DE' };
+  if(diff===1) return { txt:'Mañana', color:'#2A4455', bg:'#EBF1F5' };
   return { txt:'En '+diff+' días', color:'#444441', bg:'#F1EFE8' };
 }
 
@@ -6970,15 +7007,15 @@ function renderAgenda(){
         <div style="font-size:9px;color:${esHoy?'#0D0D0F':'var(--muted)'};text-transform:uppercase;letter-spacing:.04em">${DIAS_CORTO[d.getDay()]}</div>
         <div style="font-size:15px;font-weight:600;color:${esHoy?'#0D0D0F':'var(--text)'};margin:2px 0">${d.getDate()}</div>
         <div style="display:flex;justify-content:center;gap:2px;min-height:8px">
-          ${hayTrab?`<div style="width:6px;height:6px;border-radius:50%;background:#6C3483"></div>`:''}
-          ${hayVis?`<div style="width:6px;height:6px;border-radius:50%;background:#1565C0"></div>`:''}
+          ${hayTrab?`<div style="width:6px;height:6px;border-radius:50%;background:#F47C3C"></div>`:''}
+          ${hayVis?`<div style="width:6px;height:6px;border-radius:50%;background:#3D6677"></div>`:''}
         </div>
       </div>`;
     }).join('')}
   </div>
   <div style="display:flex;gap:12px;margin-bottom:14px;font-size:11px;color:var(--muted)">
-    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6C3483;margin-right:4px"></span>Trabajo</span>
-    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1565C0;margin-right:4px"></span>Visita</span>
+    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F47C3C;margin-right:4px"></span>Trabajo</span>
+    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3D6677;margin-right:4px"></span>Visita</span>
   </div>`;
 
   function agendaCard(item){
@@ -6989,8 +7026,10 @@ function renderAgenda(){
     const cardId = 'agcard_'+item.id;
     const estaActivo = ['agendado','pendiente','reprogramo'].includes(_migEst(item.estado));
 
-    const icono = isVisita ? '👁' : '🔧';
-    const iconBg = isVisita ? '#EFF6FF' : '#F3F0FF';
+    const icono = isVisita
+      ? `<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 2C9.1 2 6 5.1 6 9C6 14.5 13 24 13 24C13 24 20 14.5 20 9C20 5.1 16.9 2 13 2Z" fill="#3D6677"/><circle cx="13" cy="9" r="3.5" fill="#FFFFFF"/></svg>`
+      : `<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 3C13 3 8.5 7.5 8.5 12.5C8.5 14 8.9 15.3 9.7 16.3C9.5 15.7 9.4 15.1 9.4 14.4C9.4 12.2 11.5 10 11.5 8C12.6 10.2 14.1 11.7 14.1 14C14.1 15 13.8 15.9 13.3 16.7C14.7 15.3 15.6 13.5 15.6 11.5C15.6 7 13 3 13 3Z" fill="#F47C3C"/><path d="M13 23C10.5 23 8.5 21 8.5 18.5C8.5 17 9.4 15.7 10.8 15C10.7 16.2 11.5 17.5 13 18.5C14.5 17.5 15.3 16.2 15.2 15C16.6 15.7 17.5 17 17.5 18.5C17.5 21 15.5 23 13 23Z" fill="#C8520A"/></svg>`;
+    const iconBg = isVisita ? '#EAF1F6' : '#FFF2E8';
 
     const [y,m,d] = (item.fecha||'').split('-');
     const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -7012,7 +7051,7 @@ function renderAgenda(){
         </div>` : '';
 
     const telHtml = item.telefono
-      ? `<a href="tel:${item.telefono}" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:6px;background:#F0FDF4;border:1px solid #4CAF8533;border-radius:8px;padding:6px 11px;font-size:12px;color:#27500A;text-decoration:none;font-weight:600">📞 ${item.telefono}</a>` : '';
+      ? `<a href="tel:${item.telefono}" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:6px;background:#EBF1F5;border:1px solid #54687833;border-radius:8px;padding:6px 11px;font-size:12px;color:#2A4455;text-decoration:none;font-weight:600">📞 ${item.telefono}</a>` : '';
 
     const notasHtml = item.notas
       ? `<div style="background:#FFFBEB;border:1px solid #EF9F2733;border-radius:8px;padding:8px 11px;font-size:12px;color:#633806">📝 ${item.notas}</div>` : '';
@@ -7029,7 +7068,7 @@ function renderAgenda(){
         <button class="ag-act-btn" style="background:#F1EFE8;border:1px solid #B4B2A9;color:#444441;padding:10px;font-size:11px;font-weight:700;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px"
           onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','se_desanimo')">✗ Desanimó</button>
         ${!isVisita
-          ? `<button class="ag-act-btn" style="background:#EAF3DE;border:1px solid #97C459;color:#27500A;grid-column: span 2;padding:12px;font-size:12px;font-weight:800;border-radius:10px;cursor:pointer"
+          ? `<button class="ag-act-btn" style="background:#EBF1F5;border:1px solid #A8BCC9;color:#2A4455;grid-column: span 2;padding:12px;font-size:12px;font-weight:800;border-radius:10px;cursor:pointer"
               onclick="event.stopPropagation();abrirModalCobro('${item.id}')">✓ Finalizar y Cobrar</button>`
           : `<button class="ag-act-btn" style="background:#FFF3E0;border:1px solid #FFCC80;color:#BF360C;grid-column: span 2;padding:12px;font-size:12px;font-weight:800;border-radius:10px;cursor:pointer"
               onclick="event.stopPropagation();convertirVisitaATrabajo('${item.id}')">🔨 Agendó Construcción</button>`}
@@ -7040,7 +7079,7 @@ function renderAgenda(){
         <button onclick="event.stopPropagation();editAgendaItem('${item.id}')"
           style="flex:1;padding:9px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">✎ Editar</button>
         ${item.telefono ? `<button onclick="event.stopPropagation();abrirWhatsAppAgenda('${item.id}')"
-          style="width:40px;background:#E8F5E2;border:1px solid #9FE1CB;color:#085041;border-radius:10px;cursor:pointer;font-size:18px">💬</button>` : ''}
+          style="width:40px;background:#EBF1F5;border:1px solid #A8BCC9;color:#2A4455;border-radius:10px;cursor:pointer;font-size:18px">💬</button>` : ''}
         <button onclick="event.stopPropagation();deleteAgendaItem('${item.id}')"
           style="width:40px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700">✕</button>
       </div>`;
@@ -7049,7 +7088,7 @@ function renderAgenda(){
     <div class="ag-card" id="${cardId}">
       <!-- ENCABEZADO: CLICK PARA DESPLEGAR TODO -->
       <div class="ag-card-head" onclick="toggleAgendaCard('${cardId}')" style="padding:14px 16px; display:flex; gap:12px; align-items:center; cursor:pointer">
-        <div class="ag-card-icon" style="width:48px; height:48px; border-radius:14px; background:${iconBg}; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0">${icono}</div>
+        <div class="ag-card-icon" style="width:52px; height:52px; border-radius:50%; background:${iconBg}; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 3px 10px rgba(0,0,0,0.10)">${icono}</div>
         <div class="ag-card-body" style="flex:1; min-width:0">
           <div class="ag-card-nombre" style="font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.2; margin-bottom:5px">${item.cliente||'Sin cliente'}</div>
           <div class="ag-card-meta" style="display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin-bottom:4px">
@@ -7094,8 +7133,8 @@ function renderAgenda(){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold)">Agenda</div>
       <div style="display:flex;gap:6px">
-        <button onclick="openAddAgenda('visita')" style="background:#EFF6FF;border:1px solid #1565C044;color:#0C447C;border-radius:8px;padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">＋ Visita</button>
-        <button onclick="openAddAgenda('trabajo')" style="background:#F3F0FF;border:1px solid #9B59B644;color:#6C3483;border-radius:8px;padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">＋ Trabajo</button>
+        <button onclick="openAddAgenda('visita')" style="background:#EAF1F6;border:1px solid #3D667744;color:#2A4F60;border-radius:10px;padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">＋ Visita</button>
+        <button onclick="openAddAgenda('trabajo')" style="background:#FFF2E8;border:1px solid #F47C3C44;color:#C8520A;border-radius:10px;padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">🔥 Trabajo</button>
       </div>
     </div>
     ${semanaHtml}
@@ -7737,20 +7776,20 @@ function abrirModalCobro(id){
     AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${s===presel?'selected':''}>${s}</option>`).join('');
 
   document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title" style="color:#27500A">✓ Finalizar trabajo</div>
+    <div class="modal-title" style="color:#2A4455">✓ Finalizar trabajo</div>
     <div style="background:linear-gradient(135deg,#F3F0FF,#E8E5FE);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px">
       <div style="font-weight:700;color:#3C3489">${item.cliente||'Cliente'}</div>
       <div style="color:#6C3483;margin-top:2px;font-size:12px">${item.servicio||'Sin servicio'} · Precio acordado: <strong>${fmt(precio)}</strong></div>
     </div>
 
     <!-- INGRESO -->
-    <div style="background:#F0FDF4;border:1px solid #4CAF8533;border-radius:12px;padding:12px;margin-bottom:8px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#27500A;margin-bottom:10px">💰 Ingreso del servicio</div>
+    <div style="background:#EBF1F5;border:1px solid #54687833;border-radius:12px;padding:12px;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#2A4455;margin-bottom:10px">💰 Ingreso del servicio</div>
       <div class="field" style="margin-bottom:10px">
-        <label class="field-label" style="color:#27500A;font-weight:700">¿Cuánto cobró? (S/)</label>
+        <label class="field-label" style="color:#2A4455;font-weight:700">¿Cuánto cobró? (S/)</label>
         <div style="display:flex;gap:8px">
-          <input id="cobro-monto" type="number" inputmode="decimal" placeholder="0.00" value="${precio}" style="font-size:18px;font-weight:700;flex:2;color:#27500A">
-          <button onclick="setCobro(${precio})" style="flex:1;background:#EAF3DE;border:1px solid #63992244;color:#27500A;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">Todo</button>
+          <input id="cobro-monto" type="number" inputmode="decimal" placeholder="0.00" value="${precio}" style="font-size:18px;font-weight:700;flex:2;color:#2A4455">
+          <button onclick="setCobro(${precio})" style="flex:1;background:#EBF1F5;border:1px solid #54687844;color:#2A4455;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">Todo</button>
           <button onclick="setCobro(0)" style="flex:1;background:#FCEBEB;border:1px solid #E24B4A44;color:#791F1F;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">Nada</button>
         </div>
       </div>
@@ -7832,7 +7871,7 @@ function abrirModalCobro(id){
 
     <div class="btn-row">
       <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button style="flex:2;background:linear-gradient(135deg,#27500A,#4CAF50);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="guardarFinalizacion('${id}')">
+      <button style="flex:2;background:linear-gradient(135deg,#3D5F70,#546878);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="guardarFinalizacion('${id}')">
         ✓ Guardar &amp; Enviar a Notion
       </button>
     </div>`;
@@ -8017,7 +8056,7 @@ function openAgendaVoz(){
     </div>
     <div id="av-preview" style="display:none;background:#F3F0FF;border:1px solid #9B59B644;border-radius:12px;padding:12px;margin-bottom:14px"></div>
     <div style="display:flex;gap:8px">
-      <button id="av-btn" onclick="toggleAgendaVoz()" style="flex:1;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:12px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">🎙 Escuchar</button>
+      <button id="av-btn" onclick="toggleAgendaVoz()" style="flex:1;background:linear-gradient(135deg,#546878,#6A8494);color:#fff;border:none;border-radius:12px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">🎙 Escuchar</button>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <button class="btn-ghost" onclick="closeModal()" style="flex:1">Cancelar</button>
@@ -8456,7 +8495,7 @@ function resetAllData(){
 function descargarAppsScript(){
   // AVISO: este código embebido puede estar desactualizado.
   // Siempre usa el GAS más reciente desde tu repositorio.
-  const codigo="// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// MIS FINANZAS \u2014 Google Apps Script v6.4\n// Dise\u00f1o estilo Notion \u2014 limpio y moderno\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n// Hojas v\u00e1lidas \u2014 cualquier otra se elimina autom\u00e1ticamente\nvar HOJAS_VALIDAS = ['Construcciones y Visitas', 'Movimientos Negocio', 'Deudas y Movimientos', 'Servicios Fijos', 'Metas de Ahorro', 'Prestamos', 'Notas'];\n\nfunction autorizarCalendar() {\n  try {\n    var cal = CalendarApp.getDefaultCalendar();\n    Logger.log('Calendar autorizado OK: ' + cal.getName());\n    return 'OK: ' + cal.getName();\n  } catch (e) { return 'Error: ' + e.message; }\n}\n\nfunction probarCalendar() {\n  try {\n    var cal = CalendarApp.getDefaultCalendar();\n    var ahora = new Date();\n    var ev = cal.createEvent('TEST Mis Finanzas', ahora, new Date(ahora.getTime() + 3600000));\n    ev.deleteEvent();\n    return 'OK';\n  } catch (e) { return 'Error: ' + e.message; }\n}\n\nfunction inicializarHojas() {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sh1 = getOrCreate(ss, 'Construcciones y Visitas');\n  var sh2 = getOrCreate(ss, 'Movimientos Negocio');\n  var sh3 = getOrCreate(ss, 'Deudas y Movimientos');\n  var sh4 = getOrCreate(ss, 'Notas');\n  initConstrucciones(sh1);\n  initMovNegocio(sh2);\n  initDeudasSheet(sh3);\n  // Init Notas\n  if (sh4.getLastRow() === 0) {\n    sh4.appendRow(['  Fecha','  Tipo','  T\u00edtulo','  Contenido / \u00cdtems','  Recordatorio','  Estado']);\n    aplicarEstiloNotion(sh4, {header:'#1C1C1C'}, 6);\n    sh4.setColumnWidth(1,110);sh4.setColumnWidth(2,130);sh4.setColumnWidth(3,200);\n    sh4.setColumnWidth(4,340);sh4.setColumnWidth(5,150);sh4.setColumnWidth(6,120);\n  }\n  limpiarHojasViejas();\n  Logger.log('Hojas inicializadas correctamente');\n}\n\nfunction limpiarHojasViejas() {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var hojas = ss.getSheets();\n  for (var i = hojas.length - 1; i >= 0; i--) {\n    var nombre = hojas[i].getName();\n    var esValida = false;\n    for (var j = 0; j < HOJAS_VALIDAS.length; j++) {\n      if (nombre === HOJAS_VALIDAS[j]) { esValida = true; break; }\n    }\n    if (!esValida && ss.getSheets().length > 1) {\n      try { ss.deleteSheet(hojas[i]); } catch(e) {}\n    }\n  }\n}\n\n// \u2605 Anti-duplicado via PropertiesService \u2014 ver doGet\n\nfunction doGet(e) {\n  try {\n    var raw = e && e.parameter && e.parameter.data ? e.parameter.data : null;\n    if (!raw) return ContentService.createTextOutput('Mis Finanzas v6.4 activo');\n    var data = JSON.parse(decodeURIComponent(raw));\n    if (data.test) return jsonOk({ ok: true, version: '6.4' });\n\n    // Sin anti-duplicado \u2014 cada request se procesa siempre\n\n    var ss = SpreadsheetApp.getActiveSpreadsheet();\n\n    if      (data.type === 'agenda')            { handleAgenda(ss, data); }\n    else if (data.type === 'agenda_estado')     { handleAgendaEstado(ss, data); }\n    else if (data.type === 'agenda_delete')     { handleAgendaDelete(ss, data); }\n    else if (data.type === 'agenda_conversion') { handleAgendaConversion(ss, data); }\n    else if (data.type === 'tx')                { handleTx(ss, data); }\n    else if (data.type === 'deuda')             { handleDeuda(ss, data); }\n    else if (data.type === 'servicio')          { handleServicio(ss, data); }\n    else if (data.type === 'meta')              { handleMeta(ss, data); }\n    else if (data.type === 'prestamo')          { handlePrestamo(ss, data); }\n    else if (data.type === 'nota')              { handleNota(ss, data); }\n\n    return jsonOk({ ok: true });\n  } catch (err) {\n    Logger.log('Error: ' + err.message);\n    return jsonOk({ ok: false, error: err.message });\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// DISE\u00d1O NOTION \u2014 funciones de estilo\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n// Colores por hoja\nvar TEMAS = {\n  'Construcciones y Visitas': { header: '#1C1C1C', alt: '#FAFAFA', badge_a: '#FFF3E0', badge_b: '#E3F2FD', badge_ok: '#E8F5E9', badge_pen: '#FFF8E1' },\n  'Movimientos Negocio':      { header: '#1C1C1C', alt: '#FAFAFA', badge_ing: '#E8F5E9', badge_egr: '#FCE4EC' },\n  'Deudas y Movimientos':     { header: '#1C1C1C', alt: '#FAFAFA' }\n};\n\nfunction aplicarEstiloNotion(sh, tema, numCols) {\n  // Fila de encabezado\n  var hRange = sh.getRange(1, 1, 1, numCols);\n  hRange.setBackground(tema.header)\n        .setFontColor('#FFFFFF')\n        .setFontWeight('bold')\n        .setFontSize(11)\n        .setFontFamily('Arial')\n        .setHorizontalAlignment('left')\n        .setVerticalAlignment('middle')\n        .setBorder(false, false, false, false, false, false);\n  sh.setRowHeight(1, 36);\n  sh.setFrozenRows(1);\n\n  // Ocultar l\u00edneas de cuadr\u00edcula\n  sh.setHiddenGridlines(true);\n}\n\nfunction aplicarFilaNotion(sh, row, numCols, altBg) {\n  var bg = (row % 2 === 0) ? altBg : '#FFFFFF';\n  sh.getRange(row, 1, 1, numCols)\n    .setBackground(bg)\n    .setFontSize(10)\n    .setFontFamily('Arial')\n    .setVerticalAlignment('middle')\n    .setBorder(false, false, true, false, false, false, '#F0F0F0', SpreadsheetApp.BorderStyle.SOLID);\n  sh.setRowHeight(row, 32);\n}\n\nfunction badgeCell(sh, row, col, texto, bgColor, textColor) {\n  var cell = sh.getRange(row, col);\n  cell.setValue(texto);\n  cell.setBackground(bgColor || '#F5F5F5');\n  cell.setFontColor(textColor || '#333333');\n  cell.setFontWeight('bold');\n  cell.setFontSize(10);\n  cell.setHorizontalAlignment('center');\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// HOJA 1 \u2014 CONSTRUCCIONES Y VISITAS\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction initConstrucciones(sh) {\n  if (sh.getLastRow() > 0) { return; }\n  var headers = ['  Fecha', '  Hora', '  Tipo', '  Cliente', '  Servicio', '  Ubicaci\u00f3n', '  Precio S/.', '  Estado', '  Tel\u00e9fono', '  Notas', 'CalID'];\n  sh.appendRow(headers);\n  aplicarEstiloNotion(sh, TEMAS['Construcciones y Visitas'], 11);\n  // Anchos estilo Notion\n  sh.setColumnWidth(1, 110);  // Fecha\n  sh.setColumnWidth(2, 80);   // Hora\n  sh.setColumnWidth(3, 120);  // Tipo\n  sh.setColumnWidth(4, 160);  // Cliente\n  sh.setColumnWidth(5, 170);  // Servicio\n  sh.setColumnWidth(6, 140);  // Ubicaci\u00f3n\n  sh.setColumnWidth(7, 110);  // Precio\n  sh.setColumnWidth(8, 120);  // Estado\n  sh.setColumnWidth(9, 120);  // Tel\u00e9fono\n  sh.setColumnWidth(10, 200); // Notas\n  sh.setColumnWidth(11, 20);  // CalID oculto\n  sh.hideColumns(11);\n}\n\nfunction handleAgenda(ss, data) {\n  var item = data.item || data.agenda;\n  if (!item) { return; }\n  var sh = getOrCreate(ss, 'Construcciones y Visitas');\n  initConstrucciones(sh);\n\n  var esVisita = item.tipo === 'visita';\n\n  // Buscar fila existente por ID\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === item.id) { foundRow = i; break; }\n  }\n\n  var calId = '-';\n  if (foundRow > 0) {\n    // Edici\u00f3n \u2014 conservar CalID existente\n    calId = sh.getRange(foundRow, 11).getValue() || '-';\n    // Actualizar Calendar si existe\n    try {\n      if (calId && calId !== '-') {\n        var ev = CalendarApp.getEventById(calId);\n        if (ev) {\n          var p2 = item.fecha.split('-'), h2 = (item.hora||'09:00').split(':');\n          var inicio2 = new Date(Number(p2[0]),Number(p2[1])-1,Number(p2[2]),Number(h2[0]),Number(h2[1]||0),0);\n          ev.setTime(inicio2, new Date(inicio2.getTime()+7200000));\n          if (!esVisita && item.servicio) ev.setTitle(item.servicio+' \u2014 '+(item.cliente||'Cliente'));\n          if (item.ubicacion) ev.setLocation(item.ubicacion);\n        }\n      }\n    } catch(e) {}\n  } else {\n    // Nuevo \u2014 crear evento Calendar\n    try { calId = crearEventoCalendar(item) || '-'; } catch(e) {}\n  }\n\n  var valores = [\n    '  ' + fmtDate(item.fecha),\n    '  ' + (item.hora || '-'),\n    esVisita ? 'Visita' : 'Construcci\u00f3n',\n    '  ' + (item.cliente || '-'),\n    '  ' + (esVisita ? '-' : (item.servicio || '-')),\n    '  ' + (item.ubicacion || '-'),\n    esVisita ? '-' : (item.precio ? toNum(item.precio) : '-'),\n    item.estado === 'completado' ? 'Completado' : 'Pendiente',\n    '  ' + (item.telefono || '-'),\n    '  ' + (item.notas || '-'),\n    calId\n  ];\n\n  if (foundRow > 0) {\n    sh.getRange(foundRow, 1, 1, 11).setValues([valores]);\n    aplicarFilaNotion(sh, foundRow, 11, '#FAFAFA');\n    var row = foundRow;\n  } else {\n    sh.appendRow(valores);\n    var row = sh.getLastRow();\n    sh.getRange(row, 1).setNote(item.id || '');\n  }\n\n  if (esVisita) {\n    badgeCell(sh, row, 3, 'Visita', '#E3F2FD', '#1565C0');\n  } else {\n    badgeCell(sh, row, 3, 'Construcci\u00f3n', '#FFF3E0', '#E65100');\n  }\n  var esComp = item.estado === 'completado';\n  badgeCell(sh, row, 8, esComp ? '\u2713 Completado' : '\u25cb Pendiente', esComp ? '#E8F5E9' : '#FFF8E1', esComp ? '#2E7D32' : '#F57F17');\n  if (!esVisita && item.precio) {\n    sh.getRange(row, 7).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#2E7D32');\n  }\n}\n\nfunction handleAgendaEstado(ss, data) {\n  var ae = data.agenda_estado; if (!ae) { return; }\n  var sh = ss.getSheetByName('Construcciones y Visitas'); if (!sh) { return; }\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === ae.id) {\n      var esComp = ae.estado === 'completado';\n      badgeCell(sh, i, 8, esComp ? '\u2713 Completado' : '\u25cb Pendiente', esComp ? '#E8F5E9' : '#FFF8E1', esComp ? '#2E7D32' : '#F57F17');\n      try {\n        var calId = sh.getRange(i, 11).getValue();\n        if (calId && calId !== '-') {\n          var ev = CalendarApp.getEventById(calId);\n          if (ev) {\n            var t = ev.getTitle();\n            if (esComp) { if (t.indexOf('[OK] ') < 0) ev.setTitle('[OK] ' + t); }\n            else { ev.setTitle(t.replace('[OK] ', '')); }\n          }\n        }\n      } catch(e) {}\n      break;\n    }\n  }\n}\n\nfunction handleAgendaDelete(ss, data) {\n  if (!data.id) { return; }\n  var sh = ss.getSheetByName('Construcciones y Visitas'); if (!sh) { return; }\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === data.id) {\n      try {\n        var calId = sh.getRange(i, 11).getValue();\n        if (calId && calId !== '-') { var ev = CalendarApp.getEventById(calId); if (ev) ev.deleteEvent(); }\n      } catch(e) {}\n      badgeCell(sh, i, 8, '\u2717 Eliminado', '#F5F5F5', '#9E9E9E');\n      sh.getRange(i, 1, 1, 11).setBackground('#F9F9F9').setFontColor('#BDBDBD');\n      break;\n    }\n  }\n}\n\nfunction handleAgendaConversion(ss, data) {\n  var item = data.item;\n  if (!item || !data.id) { return; }\n  var sh = ss.getSheetByName('Construcciones y Visitas');\n  if (!sh) { handleAgenda(ss, data); return; } // si no existe la hoja, crear normal\n\n  // Buscar la fila por id (guardado en nota de celda A)\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === data.id) { foundRow = i; break; }\n  }\n\n  var fechaConv = fmtDate(new Date().toISOString().split('T')[0]);\n\n  if (foundRow > 0) {\n    // Actualizar fila existente\n    sh.getRange(foundRow, 1, 1, 10).setValues([[\n      '  ' + fmtDate(item.fecha),\n      '  ' + (item.hora || '-'),\n      'Construcci\u00f3n',\n      '  ' + (item.cliente || '-'),\n      '  ' + (item.servicio || '-'),\n      '  ' + (item.ubicacion || '-'),\n      item.precio ? toNum(item.precio) : '-',\n      '\u25cb Pendiente',\n      '  ' + (item.telefono || '-'),\n      '  Convertido de Visita el ' + fechaConv + (item.fechaVisitaOriginal ? ' (visita: ' + fmtDate(item.fechaVisitaOriginal) + ')' : '')\n    ]]);\n    aplicarFilaNotion(sh, foundRow, 11, '#FAFAFA');\n    badgeCell(sh, foundRow, 3, 'Construcci\u00f3n', '#FFF3E0', '#E65100');\n    badgeCell(sh, foundRow, 8, '\u25cb Pendiente', '#FFF8E1', '#F57F17');\n    if (item.precio) {\n      sh.getRange(foundRow, 7).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#2E7D32');\n    }\n    // Actualizar Calendar si existe\n    try {\n      var calId = sh.getRange(foundRow, 11).getValue();\n      if (calId && calId !== '-') {\n        var ev = CalendarApp.getEventById(calId);\n        if (ev) {\n          var iconoConv = '\ud83d\udd27';\n          var servConv = (item.servicio || '').toLowerCase();\n          if (servConv.indexOf('terma') >= 0 || servConv.indexOf('calef') >= 0)       { iconoConv = '\ud83d\udebf'; }\n          else if (servConv.indexOf('cocina') >= 0 || servConv.indexOf('horno') >= 0) { iconoConv = '\ud83c\udf73'; }\n          else if (servConv.indexOf('parrilla') >= 0)                                 { iconoConv = '\ud83d\udd25'; }\n          else if (servConv.indexOf('punto') >= 0 || servConv.indexOf('conexi') >= 0) { iconoConv = '\u26a1'; }\n          else if (servConv.indexOf('modific') >= 0 || servConv.indexOf('red') >= 0)  { iconoConv = '\ud83d\udd29'; }\n          else if (servConv.indexOf('reparac') >= 0)                                  { iconoConv = '\ud83d\udee0\ufe0f'; }\n          else if (servConv.indexOf('gasfiter') >= 0)                                 { iconoConv = '\ud83d\udca7'; }\n          ev.setTitle(iconoConv + ' ' + (item.servicio || 'Construcci\u00f3n') + ' \u2014 ' + (item.cliente || 'Cliente'));\n          var p2 = item.fecha.split('-'), h2 = (item.hora || '09:00').split(':');\n          var inicio2 = new Date(Number(p2[0]), Number(p2[1])-1, Number(p2[2]), Number(h2[0]), Number(h2[1]||0), 0);\n          ev.setTime(inicio2, new Date(inicio2.getTime() + 7200000));\n          var desc2 = '\ud83d\udc64 ' + (item.cliente||'-') + '\\n' +\n                      iconoConv + ' ' + (item.servicio||'-') + '\\n' +\n                      (item.precio ? '\ud83d\udcb0 S/ ' + toNum(item.precio).toFixed(2) + '\\n' : '') +\n                      (item.ubicacion ? '\ud83d\udccd ' + item.ubicacion + '\\n' : '') +\n                      (item.hora ? '\ud83d\udd50 ' + item.hora + '\\n' : '') +\n                      (item.telefono ? '\ud83d\udcde ' + item.telefono + '\\n' : '') +\n                      '\ud83d\udd04 Convertido de Visita el ' + fechaConv;\n          ev.setDescription(desc2);\n        }\n      }\n    } catch(e) { Logger.log('Cal conversion error: ' + e.message); }\n  } else {\n    // No encontr\u00f3 la fila \u2014 crear como nueva construcci\u00f3n\n    handleAgenda(ss, data);\n  }\n}\n\nfunction crearEventoCalendar(item) {\n  var cal = CalendarApp.getDefaultCalendar();\n  if (!item.fecha) { return null; }\n  var p = item.fecha.split('-'), h = (item.hora || '09:00').split(':');\n  var inicio = new Date(Number(p[0]), Number(p[1])-1, Number(p[2]), Number(h[0]), Number(h[1]||0), 0);\n  var fin = new Date(inicio.getTime() + 7200000);\n  var esVisita = item.tipo === 'visita';\n\n  // \u00cdcono seg\u00fan servicio\n  var iconoServicio = '\ud83d\udd27';\n  var serv = (item.servicio || '').toLowerCase();\n  if (serv.indexOf('terma') >= 0 || serv.indexOf('calef') >= 0)      { iconoServicio = '\ud83d\udebf'; }\n  else if (serv.indexOf('cocina') >= 0 || serv.indexOf('horno') >= 0) { iconoServicio = '\ud83c\udf73'; }\n  else if (serv.indexOf('parrilla') >= 0)                             { iconoServicio = '\ud83d\udd25'; }\n  else if (serv.indexOf('secadora') >= 0)                             { iconoServicio = '\ud83c\udf00'; }\n  else if (serv.indexOf('punto') >= 0 || serv.indexOf('conexi') >= 0) { iconoServicio = '\u26a1'; }\n  else if (serv.indexOf('document') >= 0)                             { iconoServicio = '\ud83d\udccb'; }\n  else if (serv.indexOf('modific') >= 0 || serv.indexOf('red') >= 0)  { iconoServicio = '\ud83d\udd29'; }\n  else if (serv.indexOf('reparac') >= 0)                              { iconoServicio = '\ud83d\udee0\ufe0f'; }\n  else if (serv.indexOf('gasfiter') >= 0 || serv.indexOf('tuber') >= 0){ iconoServicio = '\ud83d\udca7'; }\n  else if (serv.indexOf('instalac') >= 0)                             { iconoServicio = '\ud83d\udd27'; }\n\n  // T\u00edtulo del evento\n  var titulo = esVisita\n    ? '\ud83d\udc41\ufe0f Visita \u2014 ' + (item.cliente || 'Cliente')\n    : iconoServicio + ' ' + (item.servicio || 'Construcci\u00f3n') + ' \u2014 ' + (item.cliente || 'Cliente');\n\n  // Hora formateada\n  var horaStr = item.hora || '09:00';\n  var hNum = Number(h[0]), mNum = Number(h[1] || 0);\n  var ampm = hNum >= 12 ? 'PM' : 'AM';\n  var h12 = hNum > 12 ? hNum - 12 : (hNum === 0 ? 12 : hNum);\n  var horaFmt = h12 + ':' + (mNum < 10 ? '0' : '') + mNum + ' ' + ampm;\n\n  // Descripci\u00f3n con \u00edconos por campo\n  var desc = '';\n  if (item.cliente)   { desc += '\ud83d\udc64 ' + item.cliente + '\\n'; }\n  if (!esVisita && item.servicio) { desc += iconoServicio + ' ' + item.servicio + '\\n'; }\n  if (!esVisita && item.precio)   { desc += '\ud83d\udcb0 S/ ' + toNum(item.precio).toFixed(2) + '\\n'; }\n  if (item.ubicacion) { desc += '\ud83d\udccd ' + item.ubicacion + '\\n'; }\n  if (item.hora)      { desc += '\ud83d\udd50 ' + horaFmt + '\\n'; }\n  if (item.telefono)  { desc += '\ud83d\udcde ' + item.telefono + '\\n'; }\n  if (item.notas)     { desc += '\ud83d\udcdd ' + item.notas + '\\n'; }\n  if (esVisita)       { desc += '\\n\u26a0\ufe0f Visita \u2014 pendiente confirmar trabajo'; }\n\n  var ev = cal.createEvent(titulo, inicio, fin, {\n    description: desc.trim(),\n    location: item.ubicacion || ''\n  });\n  return ev.getId();\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// HOJA 2 \u2014 MOVIMIENTOS NEGOCIO\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction initMovNegocio(sh) {\n  if (sh.getLastRow() > 0) { return; }\n  var headers = ['  Fecha', '  Tipo', '  Categor\u00eda / Servicio', '  Cliente', '  Descripci\u00f3n', '  Monto S/.', '  Ubicaci\u00f3n'];\n  sh.appendRow(headers);\n  aplicarEstiloNotion(sh, TEMAS['Movimientos Negocio'], 7);\n  sh.setColumnWidth(1, 110); sh.setColumnWidth(2, 100);\n  sh.setColumnWidth(3, 180); sh.setColumnWidth(4, 160);\n  sh.setColumnWidth(5, 200); sh.setColumnWidth(6, 120); sh.setColumnWidth(7, 140);\n}\n\nfunction handleTx(ss, data) {\n  var tx = data.tx; if (!tx) { return; }\n  var neg = data.modo === 'negocio';\n  var esIng = tx.type === 'ingreso';\n  var monto = toNum(tx.amount);\n\n  if (neg) {\n    var sh = getOrCreate(ss, 'Movimientos Negocio');\n    initMovNegocio(sh);\n    var row = sh.getLastRow() + 1;\n    sh.appendRow(['  '+fmtDate(tx.date), esIng?'Ingreso':'Egreso', '  '+(tx.category||'-'), '  '+(tx.cliente||'-'), '  '+(tx.description||'-'), monto, '  '+(tx.ubicacion||'-')]);\n    aplicarFilaNotion(sh, row, 7, '#FAFAFA');\n    badgeCell(sh, row, 2, esIng ? '\u2191 Ingreso' : '\u2193 Egreso', esIng ? '#E8F5E9' : '#FCE4EC', esIng ? '#2E7D32' : '#C62828');\n    sh.getRange(row, 6).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor(esIng ? '#2E7D32' : '#C62828');\n  } else {\n    handleMovimientoPersonal(ss, data);\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// HOJA 3 \u2014 DEUDAS Y MOVIMIENTOS\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction initDeudasSheet(sh) {\n  if (sh.getLastRow() > 0) { return; }\n  var headers = ['  Fecha', '  Tipo', '  Descripci\u00f3n / Entidad', '  Monto S/.', '  Cuotas', '  Saldo Pendiente', '  Estado', '  Inter\u00e9s'];\n  sh.appendRow(headers);\n  aplicarEstiloNotion(sh, TEMAS['Deudas y Movimientos'], 8);\n  sh.setColumnWidth(1, 110); sh.setColumnWidth(2, 120);\n  sh.setColumnWidth(3, 200); sh.setColumnWidth(4, 120);\n  sh.setColumnWidth(5, 160); sh.setColumnWidth(6, 140);\n  sh.setColumnWidth(7, 130); sh.setColumnWidth(8, 110);\n}\n\nfunction handleMovimientoPersonal(ss, data) {\n  var tx = data.tx; if (!tx) { return; }\n  var sh = getOrCreate(ss, 'Deudas y Movimientos');\n  initDeudasSheet(sh);\n  var esIng = tx.type === 'ingreso';\n  var row = sh.getLastRow() + 1;\n  sh.appendRow(['  '+fmtDate(tx.date), esIng?'Ingreso':'Egreso', '  '+(tx.description||tx.category||'-'), toNum(tx.amount), '-', '-', '-', '-']);\n  aplicarFilaNotion(sh, row, 8, '#FAFAFA');\n  badgeCell(sh, row, 2, esIng ? '\u2191 Ingreso' : '\u2193 Egreso', esIng ? '#E8F5E9' : '#FCE4EC', esIng ? '#2E7D32' : '#C62828');\n  sh.getRange(row, 4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor(esIng ? '#2E7D32' : '#C62828');\n}\n\nfunction handleDeuda(ss, data) {\n  var d = data.item; if (!d) { return; }\n  var sh = getOrCreate(ss, 'Deudas y Movimientos');\n  initDeudasSheet(sh);\n  var nc = toNum(d.cuotasTotales), np = toNum(d.cuotasPagadas);\n  var total = toNum(d.totalAmount) || (toNum(d.cuotaMonto) * nc);\n  var saldo = toNum(d.cuotaMonto) * (nc - np);\n  var interes = total > (toNum(d.cuotaMonto) * nc) ? total - (toNum(d.cuotaMonto) * nc) : 0;\n  var pct = nc > 0 ? Math.round(np/nc*100) : 0;\n\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i,1).getNote() === (d.id||d.name)) { foundRow = i; break; }\n  }\n  var valores = ['  '+fmtDate(new Date().toISOString().split('T')[0]), 'Deuda', '  '+(d.name||'-'), total, np+'/'+nc+' cuotas \u00b7 S/ '+toNum(d.cuotaMonto).toFixed(2)+' c/u', saldo, pct+'% pagado', interes > 0 ? interes : '-'];\n  if (foundRow > 0) {\n    sh.getRange(foundRow, 1, 1, 8).setValues([valores]);\n    _formatDeudasRow(sh, foundRow);\n  } else {\n    var row = sh.getLastRow() + 1;\n    sh.appendRow(valores);\n    aplicarFilaNotion(sh, row, 8, '#FAFAFA');\n    sh.getRange(row, 1).setNote(d.id||d.name||'');\n    _formatDeudasRow(sh, row);\n  }\n}\n\nfunction _formatDeudasRow(sh, row) {\n  badgeCell(sh, row, 2, '\u26a1 Deuda', '#EDE7F6', '#4527A0');\n  sh.getRange(row, 4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#C62828');\n  sh.getRange(row, 6).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#E65100');\n  if (typeof sh.getRange(row, 8).getValue() === 'number') {\n    sh.getRange(row, 8).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right');\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// OTRAS SECCIONES\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction handleServicio(ss, data) {\n  var s = data.item; if (!s) { return; }\n  var sh = getOrCreate(ss, 'Servicios Fijos');\n  if (sh.getLastRow() === 0) {\n    sh.appendRow(['  Servicio', '  Monto Mensual S/.', '  D\u00eda Vencimiento', '  Estado', '  Actualizado']);\n    aplicarEstiloNotion(sh, { header: '#1C1C1C' }, 5);\n    sh.setColumnWidth(1,160);sh.setColumnWidth(2,150);sh.setColumnWidth(3,150);sh.setColumnWidth(4,120);sh.setColumnWidth(5,130);\n  }\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) { if (sh.getRange(i,1).getValue().toString().trim() === s.name) { foundRow=i; break; } }\n  var vals = ['  '+s.name, toNum(s.monto), 'D\u00eda '+s.venceDia, s.pagado?'Pagado':'No pagado', '  '+fmtDate(new Date().toISOString().split('T')[0])];\n  if (foundRow > 0) { sh.getRange(foundRow,1,1,5).setValues([vals]); }\n  else { sh.appendRow(vals); aplicarFilaNotion(sh, sh.getLastRow(), 5, '#FAFAFA'); }\n  var r = foundRow > 0 ? foundRow : sh.getLastRow();\n  sh.getRange(r,2).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold');\n  badgeCell(sh, r, 4, s.pagado?'\u2713 Pagado':'\u25cb Pendiente', s.pagado?'#E8F5E9':'#FFF8E1', s.pagado?'#2E7D32':'#F57F17');\n}\n\nfunction handleMeta(ss, data) {\n  var m = data.item; if (!m) { return; }\n  var sh = getOrCreate(ss, 'Metas de Ahorro');\n  if (sh.getLastRow() === 0) {\n    sh.appendRow(['  Meta','  Objetivo S/.','  Ahorrado S/.','  Pendiente S/.','  Progreso','  Fecha L\u00edmite']);\n    aplicarEstiloNotion(sh, {header:'#1C1C1C'}, 6);\n    sh.setColumnWidth(1,180);sh.setColumnWidth(2,130);sh.setColumnWidth(3,130);sh.setColumnWidth(4,130);sh.setColumnWidth(5,120);sh.setColumnWidth(6,130);\n  }\n  var obj=toNum(m.objetivo),aho=toNum(m.ahorrado),pct=obj>0?Math.round(aho/obj*100):0;\n  var foundRow=-1;\n  for(var i=2;i<=sh.getLastRow();i++){if(sh.getRange(i,1).getValue().toString().trim()===m.nombre){foundRow=i;break;}}\n  var vals=['  '+(m.nombre||'-'),obj,aho,obj-aho,pct+'%','  '+(m.fechaLimite||'-')];\n  if(foundRow>0){sh.getRange(foundRow,1,1,6).setValues([vals]);}\n  else{sh.appendRow(vals);aplicarFilaNotion(sh,sh.getLastRow(),6,'#FAFAFA');}\n  var r=foundRow>0?foundRow:sh.getLastRow();\n  sh.getRange(r,2).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right');\n  sh.getRange(r,3).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#2E7D32').setFontWeight('bold');\n  sh.getRange(r,4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#E65100');\n  badgeCell(sh,r,5,pct+'% logrado',pct>=100?'#E8F5E9':pct>=50?'#FFF8E1':'#FCE4EC',pct>=100?'#2E7D32':pct>=50?'#F57F17':'#C62828');\n}\n\nfunction handlePrestamo(ss, data) {\n  var p = data.item; if (!p) { return; }\n  var sh = getOrCreate(ss, 'Prestamos');\n  if (sh.getLastRow() === 0) {\n    sh.appendRow(['  Acreedor','  Tipo','  Capital S/.','  Pendiente S/.','  Tasa Mensual','  Inter\u00e9s Mensual S/.','  Fecha Inicio']);\n    aplicarEstiloNotion(sh, {header:'#1C1C1C'}, 7);\n    sh.setColumnWidth(1,160);sh.setColumnWidth(2,100);sh.setColumnWidth(3,130);sh.setColumnWidth(4,140);sh.setColumnWidth(5,120);sh.setColumnWidth(6,160);sh.setColumnWidth(7,130);\n  }\n  var intMes=toNum(p.capitalPendiente)*toNum(p.tasaMensual)/100;\n  var foundRow=-1;\n  for(var i=2;i<=sh.getLastRow();i++){if(sh.getRange(i,1).getValue().toString().trim()===(p.nombre||'')){foundRow=i;break;}}\n  var vals=['  '+(p.nombre||'-'),'  '+(p.tipo||'Persona'),toNum(p.capital),toNum(p.capitalPendiente),toNum(p.tasaMensual)+'%',intMes,'  '+fmtDate(p.fechaInicio)];\n  if(foundRow>0){sh.getRange(foundRow,1,1,7).setValues([vals]);}\n  else{sh.appendRow(vals);aplicarFilaNotion(sh,sh.getLastRow(),7,'#FAFAFA');}\n  var r=foundRow>0?foundRow:sh.getLastRow();\n  sh.getRange(r,3).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#C62828');\n  sh.getRange(r,4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#E65100');\n  sh.getRange(r,6).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right');\n}\n\nfunction handleNota(ss, data) {\n  var n = data.item; if (!n) { return; }\n  var sh = getOrCreate(ss, 'Notas');\n\n  if (sh.getLastRow() === 0) {\n    var headers = ['  Fecha', '  Tipo', '  T\u00edtulo', '  Contenido / \u00cdtems', '  Recordatorio', '  Estado'];\n    sh.appendRow(headers);\n    aplicarEstiloNotion(sh, {header:'#1C1C1C'}, 6);\n    sh.setColumnWidth(1, 110);\n    sh.setColumnWidth(2, 130);\n    sh.setColumnWidth(3, 200);\n    sh.setColumnWidth(4, 340);\n    sh.setColumnWidth(5, 150);\n    sh.setColumnWidth(6, 120);\n  }\n\n  // Contenido formateado\n  var contenido = '';\n  var totalItems = 0, hechos = 0;\n  if (n.tipo === 'lista' || n.tipo === 'recordatorio') {\n    var its = n.items || [];\n    totalItems = its.length;\n    for (var i = 0; i < its.length; i++) {\n      if (its[i].done) hechos++;\n      contenido += (its[i].done ? '\u2611 ' : '\u2610 ') + its[i].texto + '\\n';\n    }\n  } else {\n    contenido = n.texto || '';\n  }\n\n  // Badge tipo\n  var TIPO_LABELS = { lista:'\u2713 Lista', recordatorio:'\u23f0 Recordatorio', foto:'\ud83d\udcf7 Foto', texto:'\ud83d\udcdd Texto' };\n  var TIPO_BG     = { lista:'#FFF8E1', recordatorio:'#FCE4EC', foto:'#E8F5E9', texto:'#E3F2FD' };\n  var TIPO_COLOR  = { lista:'#F57F17', recordatorio:'#C62828', foto:'#2E7D32', texto:'#1565C0' };\n  var tipoLabel = TIPO_LABELS[n.tipo] || n.tipo;\n\n  // Estado para listas\n  var estadoLabel = '-';\n  if (totalItems > 0) {\n    estadoLabel = hechos + '/' + totalItems + ' hechos';\n  } else if (n.tipo === 'recordatorio' && n.recordatorio) {\n    estadoLabel = '\u23f0 ' + n.recordatorio;\n  }\n\n  var row = sh.getLastRow() + 1;\n  sh.appendRow([\n    '  ' + fmtDate(n.creado || new Date().toISOString()),\n    tipoLabel,\n    '  ' + (n.titulo || '-'),\n    '  ' + contenido.trim(),\n    '  ' + (n.recordatorio || '-'),\n    estadoLabel\n  ]);\n\n  aplicarFilaNotion(sh, row, 6, '#FAFAFA');\n  sh.getRange(row, 4).setWrap(true).setVerticalAlignment('top');\n  sh.setRowHeight(row, Math.max(32, Math.min(120, 20 + (contenido.split('\\n').length * 18))));\n\n  // Badge tipo con color\n  badgeCell(sh, row, 2, tipoLabel,\n    TIPO_BG[n.tipo] || '#F5F5F5',\n    TIPO_COLOR[n.tipo] || '#333333');\n\n  // Estado con color si es lista completa\n  if (totalItems > 0 && hechos === totalItems) {\n    sh.getRange(row, 6).setFontColor('#2E7D32').setFontWeight('bold');\n  } else if (totalItems > 0) {\n    sh.getRange(row, 6).setFontColor('#F57F17');\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// UTILIDADES\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction getOrCreate(ss, name) {\n  var sh = ss.getSheetByName(name);\n  if (!sh) { sh = ss.insertSheet(name); }\n  return sh;\n}\n\nfunction fmtDate(dateStr) {\n  if (!dateStr) { return '-'; }\n  try {\n    var d = new Date(dateStr.length === 10 ? dateStr + 'T12:00:00' : dateStr);\n    return Utilities.formatDate(d, 'America/Lima', 'dd/MM/yyyy');\n  } catch(e) { return dateStr; }\n}\n\nfunction toNum(v) { var n=Number(v); return isNaN(n)?0:n; }\n\nfunction jsonOk(obj) {\n  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);\n}\n";
+  const codigo="// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// MIS FINANZAS \u2014 Google Apps Script v6.4\n// Dise\u00f1o estilo Notion \u2014 limpio y moderno\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n// Hojas v\u00e1lidas \u2014 cualquier otra se elimina autom\u00e1ticamente\nvar HOJAS_VALIDAS = ['Construcciones y Visitas', 'Movimientos Negocio', 'Deudas y Movimientos', 'Servicios Fijos', 'Metas de Ahorro', 'Prestamos', 'Notas'];\n\nfunction autorizarCalendar() {\n  try {\n    var cal = CalendarApp.getDefaultCalendar();\n    Logger.log('Calendar autorizado OK: ' + cal.getName());\n    return 'OK: ' + cal.getName();\n  } catch (e) { return 'Error: ' + e.message; }\n}\n\nfunction probarCalendar() {\n  try {\n    var cal = CalendarApp.getDefaultCalendar();\n    var ahora = new Date();\n    var ev = cal.createEvent('TEST Mis Finanzas', ahora, new Date(ahora.getTime() + 3600000));\n    ev.deleteEvent();\n    return 'OK';\n  } catch (e) { return 'Error: ' + e.message; }\n}\n\nfunction inicializarHojas() {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sh1 = getOrCreate(ss, 'Construcciones y Visitas');\n  var sh2 = getOrCreate(ss, 'Movimientos Negocio');\n  var sh3 = getOrCreate(ss, 'Deudas y Movimientos');\n  var sh4 = getOrCreate(ss, 'Notas');\n  initConstrucciones(sh1);\n  initMovNegocio(sh2);\n  initDeudasSheet(sh3);\n  // Init Notas\n  if (sh4.getLastRow() === 0) {\n    sh4.appendRow(['  Fecha','  Tipo','  T\u00edtulo','  Contenido / \u00cdtems','  Recordatorio','  Estado']);\n    aplicarEstiloNotion(sh4, {header:'#1C1C1C'}, 6);\n    sh4.setColumnWidth(1,110);sh4.setColumnWidth(2,130);sh4.setColumnWidth(3,200);\n    sh4.setColumnWidth(4,340);sh4.setColumnWidth(5,150);sh4.setColumnWidth(6,120);\n  }\n  limpiarHojasViejas();\n  Logger.log('Hojas inicializadas correctamente');\n}\n\nfunction limpiarHojasViejas() {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var hojas = ss.getSheets();\n  for (var i = hojas.length - 1; i >= 0; i--) {\n    var nombre = hojas[i].getName();\n    var esValida = false;\n    for (var j = 0; j < HOJAS_VALIDAS.length; j++) {\n      if (nombre === HOJAS_VALIDAS[j]) { esValida = true; break; }\n    }\n    if (!esValida && ss.getSheets().length > 1) {\n      try { ss.deleteSheet(hojas[i]); } catch(e) {}\n    }\n  }\n}\n\n// \u2605 Anti-duplicado via PropertiesService \u2014 ver doGet\n\nfunction doGet(e) {\n  try {\n    var raw = e && e.parameter && e.parameter.data ? e.parameter.data : null;\n    if (!raw) return ContentService.createTextOutput('Mis Finanzas v6.4 activo');\n    var data = JSON.parse(decodeURIComponent(raw));\n    if (data.test) return jsonOk({ ok: true, version: '6.4' });\n\n    // Sin anti-duplicado \u2014 cada request se procesa siempre\n\n    var ss = SpreadsheetApp.getActiveSpreadsheet();\n\n    if      (data.type === 'agenda')            { handleAgenda(ss, data); }\n    else if (data.type === 'agenda_estado')     { handleAgendaEstado(ss, data); }\n    else if (data.type === 'agenda_delete')     { handleAgendaDelete(ss, data); }\n    else if (data.type === 'agenda_conversion') { handleAgendaConversion(ss, data); }\n    else if (data.type === 'tx')                { handleTx(ss, data); }\n    else if (data.type === 'deuda')             { handleDeuda(ss, data); }\n    else if (data.type === 'servicio')          { handleServicio(ss, data); }\n    else if (data.type === 'meta')              { handleMeta(ss, data); }\n    else if (data.type === 'prestamo')          { handlePrestamo(ss, data); }\n    else if (data.type === 'nota')              { handleNota(ss, data); }\n\n    return jsonOk({ ok: true });\n  } catch (err) {\n    Logger.log('Error: ' + err.message);\n    return jsonOk({ ok: false, error: err.message });\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// DISE\u00d1O NOTION \u2014 funciones de estilo\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n// Colores por hoja\nvar TEMAS = {\n  'Construcciones y Visitas': { header: '#1C1C1C', alt: '#FAFAFA', badge_a: '#FFF3E0', badge_b: '#E3F2FD', badge_ok: '#EBF1F5', badge_pen: '#FFF8E1' },\n  'Movimientos Negocio':      { header: '#1C1C1C', alt: '#FAFAFA', badge_ing: '#EBF1F5', badge_egr: '#FCE4EC' },\n  'Deudas y Movimientos':     { header: '#1C1C1C', alt: '#FAFAFA' }\n};\n\nfunction aplicarEstiloNotion(sh, tema, numCols) {\n  // Fila de encabezado\n  var hRange = sh.getRange(1, 1, 1, numCols);\n  hRange.setBackground(tema.header)\n        .setFontColor('#FFFFFF')\n        .setFontWeight('bold')\n        .setFontSize(11)\n        .setFontFamily('Arial')\n        .setHorizontalAlignment('left')\n        .setVerticalAlignment('middle')\n        .setBorder(false, false, false, false, false, false);\n  sh.setRowHeight(1, 36);\n  sh.setFrozenRows(1);\n\n  // Ocultar l\u00edneas de cuadr\u00edcula\n  sh.setHiddenGridlines(true);\n}\n\nfunction aplicarFilaNotion(sh, row, numCols, altBg) {\n  var bg = (row % 2 === 0) ? altBg : '#FFFFFF';\n  sh.getRange(row, 1, 1, numCols)\n    .setBackground(bg)\n    .setFontSize(10)\n    .setFontFamily('Arial')\n    .setVerticalAlignment('middle')\n    .setBorder(false, false, true, false, false, false, '#F0F0F0', SpreadsheetApp.BorderStyle.SOLID);\n  sh.setRowHeight(row, 32);\n}\n\nfunction badgeCell(sh, row, col, texto, bgColor, textColor) {\n  var cell = sh.getRange(row, col);\n  cell.setValue(texto);\n  cell.setBackground(bgColor || '#F5F5F5');\n  cell.setFontColor(textColor || '#333333');\n  cell.setFontWeight('bold');\n  cell.setFontSize(10);\n  cell.setHorizontalAlignment('center');\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// HOJA 1 \u2014 CONSTRUCCIONES Y VISITAS\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction initConstrucciones(sh) {\n  if (sh.getLastRow() > 0) { return; }\n  var headers = ['  Fecha', '  Hora', '  Tipo', '  Cliente', '  Servicio', '  Ubicaci\u00f3n', '  Precio S/.', '  Estado', '  Tel\u00e9fono', '  Notas', 'CalID'];\n  sh.appendRow(headers);\n  aplicarEstiloNotion(sh, TEMAS['Construcciones y Visitas'], 11);\n  // Anchos estilo Notion\n  sh.setColumnWidth(1, 110);  // Fecha\n  sh.setColumnWidth(2, 80);   // Hora\n  sh.setColumnWidth(3, 120);  // Tipo\n  sh.setColumnWidth(4, 160);  // Cliente\n  sh.setColumnWidth(5, 170);  // Servicio\n  sh.setColumnWidth(6, 140);  // Ubicaci\u00f3n\n  sh.setColumnWidth(7, 110);  // Precio\n  sh.setColumnWidth(8, 120);  // Estado\n  sh.setColumnWidth(9, 120);  // Tel\u00e9fono\n  sh.setColumnWidth(10, 200); // Notas\n  sh.setColumnWidth(11, 20);  // CalID oculto\n  sh.hideColumns(11);\n}\n\nfunction handleAgenda(ss, data) {\n  var item = data.item || data.agenda;\n  if (!item) { return; }\n  var sh = getOrCreate(ss, 'Construcciones y Visitas');\n  initConstrucciones(sh);\n\n  var esVisita = item.tipo === 'visita';\n\n  // Buscar fila existente por ID\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === item.id) { foundRow = i; break; }\n  }\n\n  var calId = '-';\n  if (foundRow > 0) {\n    // Edici\u00f3n \u2014 conservar CalID existente\n    calId = sh.getRange(foundRow, 11).getValue() || '-';\n    // Actualizar Calendar si existe\n    try {\n      if (calId && calId !== '-') {\n        var ev = CalendarApp.getEventById(calId);\n        if (ev) {\n          var p2 = item.fecha.split('-'), h2 = (item.hora||'09:00').split(':');\n          var inicio2 = new Date(Number(p2[0]),Number(p2[1])-1,Number(p2[2]),Number(h2[0]),Number(h2[1]||0),0);\n          ev.setTime(inicio2, new Date(inicio2.getTime()+7200000));\n          if (!esVisita && item.servicio) ev.setTitle(item.servicio+' \u2014 '+(item.cliente||'Cliente'));\n          if (item.ubicacion) ev.setLocation(item.ubicacion);\n        }\n      }\n    } catch(e) {}\n  } else {\n    // Nuevo \u2014 crear evento Calendar\n    try { calId = crearEventoCalendar(item) || '-'; } catch(e) {}\n  }\n\n  var valores = [\n    '  ' + fmtDate(item.fecha),\n    '  ' + (item.hora || '-'),\n    esVisita ? 'Visita' : 'Construcci\u00f3n',\n    '  ' + (item.cliente || '-'),\n    '  ' + (esVisita ? '-' : (item.servicio || '-')),\n    '  ' + (item.ubicacion || '-'),\n    esVisita ? '-' : (item.precio ? toNum(item.precio) : '-'),\n    item.estado === 'completado' ? 'Completado' : 'Pendiente',\n    '  ' + (item.telefono || '-'),\n    '  ' + (item.notas || '-'),\n    calId\n  ];\n\n  if (foundRow > 0) {\n    sh.getRange(foundRow, 1, 1, 11).setValues([valores]);\n    aplicarFilaNotion(sh, foundRow, 11, '#FAFAFA');\n    var row = foundRow;\n  } else {\n    sh.appendRow(valores);\n    var row = sh.getLastRow();\n    sh.getRange(row, 1).setNote(item.id || '');\n  }\n\n  if (esVisita) {\n    badgeCell(sh, row, 3, 'Visita', '#E3F2FD', '#1565C0');\n  } else {\n    badgeCell(sh, row, 3, 'Construcci\u00f3n', '#FFF3E0', '#E65100');\n  }\n  var esComp = item.estado === 'completado';\n  badgeCell(sh, row, 8, esComp ? '\u2713 Completado' : '\u25cb Pendiente', esComp ? '#EBF1F5' : '#FFF8E1', esComp ? '#2A4455' : '#F57F17');\n  if (!esVisita && item.precio) {\n    sh.getRange(row, 7).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#2A4455');\n  }\n}\n\nfunction handleAgendaEstado(ss, data) {\n  var ae = data.agenda_estado; if (!ae) { return; }\n  var sh = ss.getSheetByName('Construcciones y Visitas'); if (!sh) { return; }\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === ae.id) {\n      var esComp = ae.estado === 'completado';\n      badgeCell(sh, i, 8, esComp ? '\u2713 Completado' : '\u25cb Pendiente', esComp ? '#EBF1F5' : '#FFF8E1', esComp ? '#2A4455' : '#F57F17');\n      try {\n        var calId = sh.getRange(i, 11).getValue();\n        if (calId && calId !== '-') {\n          var ev = CalendarApp.getEventById(calId);\n          if (ev) {\n            var t = ev.getTitle();\n            if (esComp) { if (t.indexOf('[OK] ') < 0) ev.setTitle('[OK] ' + t); }\n            else { ev.setTitle(t.replace('[OK] ', '')); }\n          }\n        }\n      } catch(e) {}\n      break;\n    }\n  }\n}\n\nfunction handleAgendaDelete(ss, data) {\n  if (!data.id) { return; }\n  var sh = ss.getSheetByName('Construcciones y Visitas'); if (!sh) { return; }\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === data.id) {\n      try {\n        var calId = sh.getRange(i, 11).getValue();\n        if (calId && calId !== '-') { var ev = CalendarApp.getEventById(calId); if (ev) ev.deleteEvent(); }\n      } catch(e) {}\n      badgeCell(sh, i, 8, '\u2717 Eliminado', '#F5F5F5', '#9E9E9E');\n      sh.getRange(i, 1, 1, 11).setBackground('#F9F9F9').setFontColor('#BDBDBD');\n      break;\n    }\n  }\n}\n\nfunction handleAgendaConversion(ss, data) {\n  var item = data.item;\n  if (!item || !data.id) { return; }\n  var sh = ss.getSheetByName('Construcciones y Visitas');\n  if (!sh) { handleAgenda(ss, data); return; } // si no existe la hoja, crear normal\n\n  // Buscar la fila por id (guardado en nota de celda A)\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i, 1).getNote() === data.id) { foundRow = i; break; }\n  }\n\n  var fechaConv = fmtDate(new Date().toISOString().split('T')[0]);\n\n  if (foundRow > 0) {\n    // Actualizar fila existente\n    sh.getRange(foundRow, 1, 1, 10).setValues([[\n      '  ' + fmtDate(item.fecha),\n      '  ' + (item.hora || '-'),\n      'Construcci\u00f3n',\n      '  ' + (item.cliente || '-'),\n      '  ' + (item.servicio || '-'),\n      '  ' + (item.ubicacion || '-'),\n      item.precio ? toNum(item.precio) : '-',\n      '\u25cb Pendiente',\n      '  ' + (item.telefono || '-'),\n      '  Convertido de Visita el ' + fechaConv + (item.fechaVisitaOriginal ? ' (visita: ' + fmtDate(item.fechaVisitaOriginal) + ')' : '')\n    ]]);\n    aplicarFilaNotion(sh, foundRow, 11, '#FAFAFA');\n    badgeCell(sh, foundRow, 3, 'Construcci\u00f3n', '#FFF3E0', '#E65100');\n    badgeCell(sh, foundRow, 8, '\u25cb Pendiente', '#FFF8E1', '#F57F17');\n    if (item.precio) {\n      sh.getRange(foundRow, 7).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#2A4455');\n    }\n    // Actualizar Calendar si existe\n    try {\n      var calId = sh.getRange(foundRow, 11).getValue();\n      if (calId && calId !== '-') {\n        var ev = CalendarApp.getEventById(calId);\n        if (ev) {\n          var iconoConv = '\ud83d\udd27';\n          var servConv = (item.servicio || '').toLowerCase();\n          if (servConv.indexOf('terma') >= 0 || servConv.indexOf('calef') >= 0)       { iconoConv = '\ud83d\udebf'; }\n          else if (servConv.indexOf('cocina') >= 0 || servConv.indexOf('horno') >= 0) { iconoConv = '\ud83c\udf73'; }\n          else if (servConv.indexOf('parrilla') >= 0)                                 { iconoConv = '\ud83d\udd25'; }\n          else if (servConv.indexOf('punto') >= 0 || servConv.indexOf('conexi') >= 0) { iconoConv = '\u26a1'; }\n          else if (servConv.indexOf('modific') >= 0 || servConv.indexOf('red') >= 0)  { iconoConv = '\ud83d\udd29'; }\n          else if (servConv.indexOf('reparac') >= 0)                                  { iconoConv = '\ud83d\udee0\ufe0f'; }\n          else if (servConv.indexOf('gasfiter') >= 0)                                 { iconoConv = '\ud83d\udca7'; }\n          ev.setTitle(iconoConv + ' ' + (item.servicio || 'Construcci\u00f3n') + ' \u2014 ' + (item.cliente || 'Cliente'));\n          var p2 = item.fecha.split('-'), h2 = (item.hora || '09:00').split(':');\n          var inicio2 = new Date(Number(p2[0]), Number(p2[1])-1, Number(p2[2]), Number(h2[0]), Number(h2[1]||0), 0);\n          ev.setTime(inicio2, new Date(inicio2.getTime() + 7200000));\n          var desc2 = '\ud83d\udc64 ' + (item.cliente||'-') + '\\n' +\n                      iconoConv + ' ' + (item.servicio||'-') + '\\n' +\n                      (item.precio ? '\ud83d\udcb0 S/ ' + toNum(item.precio).toFixed(2) + '\\n' : '') +\n                      (item.ubicacion ? '\ud83d\udccd ' + item.ubicacion + '\\n' : '') +\n                      (item.hora ? '\ud83d\udd50 ' + item.hora + '\\n' : '') +\n                      (item.telefono ? '\ud83d\udcde ' + item.telefono + '\\n' : '') +\n                      '\ud83d\udd04 Convertido de Visita el ' + fechaConv;\n          ev.setDescription(desc2);\n        }\n      }\n    } catch(e) { Logger.log('Cal conversion error: ' + e.message); }\n  } else {\n    // No encontr\u00f3 la fila \u2014 crear como nueva construcci\u00f3n\n    handleAgenda(ss, data);\n  }\n}\n\nfunction crearEventoCalendar(item) {\n  var cal = CalendarApp.getDefaultCalendar();\n  if (!item.fecha) { return null; }\n  var p = item.fecha.split('-'), h = (item.hora || '09:00').split(':');\n  var inicio = new Date(Number(p[0]), Number(p[1])-1, Number(p[2]), Number(h[0]), Number(h[1]||0), 0);\n  var fin = new Date(inicio.getTime() + 7200000);\n  var esVisita = item.tipo === 'visita';\n\n  // \u00cdcono seg\u00fan servicio\n  var iconoServicio = '\ud83d\udd27';\n  var serv = (item.servicio || '').toLowerCase();\n  if (serv.indexOf('terma') >= 0 || serv.indexOf('calef') >= 0)      { iconoServicio = '\ud83d\udebf'; }\n  else if (serv.indexOf('cocina') >= 0 || serv.indexOf('horno') >= 0) { iconoServicio = '\ud83c\udf73'; }\n  else if (serv.indexOf('parrilla') >= 0)                             { iconoServicio = '\ud83d\udd25'; }\n  else if (serv.indexOf('secadora') >= 0)                             { iconoServicio = '\ud83c\udf00'; }\n  else if (serv.indexOf('punto') >= 0 || serv.indexOf('conexi') >= 0) { iconoServicio = '\u26a1'; }\n  else if (serv.indexOf('document') >= 0)                             { iconoServicio = '\ud83d\udccb'; }\n  else if (serv.indexOf('modific') >= 0 || serv.indexOf('red') >= 0)  { iconoServicio = '\ud83d\udd29'; }\n  else if (serv.indexOf('reparac') >= 0)                              { iconoServicio = '\ud83d\udee0\ufe0f'; }\n  else if (serv.indexOf('gasfiter') >= 0 || serv.indexOf('tuber') >= 0){ iconoServicio = '\ud83d\udca7'; }\n  else if (serv.indexOf('instalac') >= 0)                             { iconoServicio = '\ud83d\udd27'; }\n\n  // T\u00edtulo del evento\n  var titulo = esVisita\n    ? '\ud83d\udc41\ufe0f Visita \u2014 ' + (item.cliente || 'Cliente')\n    : iconoServicio + ' ' + (item.servicio || 'Construcci\u00f3n') + ' \u2014 ' + (item.cliente || 'Cliente');\n\n  // Hora formateada\n  var horaStr = item.hora || '09:00';\n  var hNum = Number(h[0]), mNum = Number(h[1] || 0);\n  var ampm = hNum >= 12 ? 'PM' : 'AM';\n  var h12 = hNum > 12 ? hNum - 12 : (hNum === 0 ? 12 : hNum);\n  var horaFmt = h12 + ':' + (mNum < 10 ? '0' : '') + mNum + ' ' + ampm;\n\n  // Descripci\u00f3n con \u00edconos por campo\n  var desc = '';\n  if (item.cliente)   { desc += '\ud83d\udc64 ' + item.cliente + '\\n'; }\n  if (!esVisita && item.servicio) { desc += iconoServicio + ' ' + item.servicio + '\\n'; }\n  if (!esVisita && item.precio)   { desc += '\ud83d\udcb0 S/ ' + toNum(item.precio).toFixed(2) + '\\n'; }\n  if (item.ubicacion) { desc += '\ud83d\udccd ' + item.ubicacion + '\\n'; }\n  if (item.hora)      { desc += '\ud83d\udd50 ' + horaFmt + '\\n'; }\n  if (item.telefono)  { desc += '\ud83d\udcde ' + item.telefono + '\\n'; }\n  if (item.notas)     { desc += '\ud83d\udcdd ' + item.notas + '\\n'; }\n  if (esVisita)       { desc += '\\n\u26a0\ufe0f Visita \u2014 pendiente confirmar trabajo'; }\n\n  var ev = cal.createEvent(titulo, inicio, fin, {\n    description: desc.trim(),\n    location: item.ubicacion || ''\n  });\n  return ev.getId();\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// HOJA 2 \u2014 MOVIMIENTOS NEGOCIO\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction initMovNegocio(sh) {\n  if (sh.getLastRow() > 0) { return; }\n  var headers = ['  Fecha', '  Tipo', '  Categor\u00eda / Servicio', '  Cliente', '  Descripci\u00f3n', '  Monto S/.', '  Ubicaci\u00f3n'];\n  sh.appendRow(headers);\n  aplicarEstiloNotion(sh, TEMAS['Movimientos Negocio'], 7);\n  sh.setColumnWidth(1, 110); sh.setColumnWidth(2, 100);\n  sh.setColumnWidth(3, 180); sh.setColumnWidth(4, 160);\n  sh.setColumnWidth(5, 200); sh.setColumnWidth(6, 120); sh.setColumnWidth(7, 140);\n}\n\nfunction handleTx(ss, data) {\n  var tx = data.tx; if (!tx) { return; }\n  var neg = data.modo === 'negocio';\n  var esIng = tx.type === 'ingreso';\n  var monto = toNum(tx.amount);\n\n  if (neg) {\n    var sh = getOrCreate(ss, 'Movimientos Negocio');\n    initMovNegocio(sh);\n    var row = sh.getLastRow() + 1;\n    sh.appendRow(['  '+fmtDate(tx.date), esIng?'Ingreso':'Egreso', '  '+(tx.category||'-'), '  '+(tx.cliente||'-'), '  '+(tx.description||'-'), monto, '  '+(tx.ubicacion||'-')]);\n    aplicarFilaNotion(sh, row, 7, '#FAFAFA');\n    badgeCell(sh, row, 2, esIng ? '\u2191 Ingreso' : '\u2193 Egreso', esIng ? '#EBF1F5' : '#FCE4EC', esIng ? '#2A4455' : '#C62828');\n    sh.getRange(row, 6).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor(esIng ? '#2A4455' : '#C62828');\n  } else {\n    handleMovimientoPersonal(ss, data);\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// HOJA 3 \u2014 DEUDAS Y MOVIMIENTOS\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction initDeudasSheet(sh) {\n  if (sh.getLastRow() > 0) { return; }\n  var headers = ['  Fecha', '  Tipo', '  Descripci\u00f3n / Entidad', '  Monto S/.', '  Cuotas', '  Saldo Pendiente', '  Estado', '  Inter\u00e9s'];\n  sh.appendRow(headers);\n  aplicarEstiloNotion(sh, TEMAS['Deudas y Movimientos'], 8);\n  sh.setColumnWidth(1, 110); sh.setColumnWidth(2, 120);\n  sh.setColumnWidth(3, 200); sh.setColumnWidth(4, 120);\n  sh.setColumnWidth(5, 160); sh.setColumnWidth(6, 140);\n  sh.setColumnWidth(7, 130); sh.setColumnWidth(8, 110);\n}\n\nfunction handleMovimientoPersonal(ss, data) {\n  var tx = data.tx; if (!tx) { return; }\n  var sh = getOrCreate(ss, 'Deudas y Movimientos');\n  initDeudasSheet(sh);\n  var esIng = tx.type === 'ingreso';\n  var row = sh.getLastRow() + 1;\n  sh.appendRow(['  '+fmtDate(tx.date), esIng?'Ingreso':'Egreso', '  '+(tx.description||tx.category||'-'), toNum(tx.amount), '-', '-', '-', '-']);\n  aplicarFilaNotion(sh, row, 8, '#FAFAFA');\n  badgeCell(sh, row, 2, esIng ? '\u2191 Ingreso' : '\u2193 Egreso', esIng ? '#EBF1F5' : '#FCE4EC', esIng ? '#2A4455' : '#C62828');\n  sh.getRange(row, 4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor(esIng ? '#2A4455' : '#C62828');\n}\n\nfunction handleDeuda(ss, data) {\n  var d = data.item; if (!d) { return; }\n  var sh = getOrCreate(ss, 'Deudas y Movimientos');\n  initDeudasSheet(sh);\n  var nc = toNum(d.cuotasTotales), np = toNum(d.cuotasPagadas);\n  var total = toNum(d.totalAmount) || (toNum(d.cuotaMonto) * nc);\n  var saldo = toNum(d.cuotaMonto) * (nc - np);\n  var interes = total > (toNum(d.cuotaMonto) * nc) ? total - (toNum(d.cuotaMonto) * nc) : 0;\n  var pct = nc > 0 ? Math.round(np/nc*100) : 0;\n\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) {\n    if (sh.getRange(i,1).getNote() === (d.id||d.name)) { foundRow = i; break; }\n  }\n  var valores = ['  '+fmtDate(new Date().toISOString().split('T')[0]), 'Deuda', '  '+(d.name||'-'), total, np+'/'+nc+' cuotas \u00b7 S/ '+toNum(d.cuotaMonto).toFixed(2)+' c/u', saldo, pct+'% pagado', interes > 0 ? interes : '-'];\n  if (foundRow > 0) {\n    sh.getRange(foundRow, 1, 1, 8).setValues([valores]);\n    _formatDeudasRow(sh, foundRow);\n  } else {\n    var row = sh.getLastRow() + 1;\n    sh.appendRow(valores);\n    aplicarFilaNotion(sh, row, 8, '#FAFAFA');\n    sh.getRange(row, 1).setNote(d.id||d.name||'');\n    _formatDeudasRow(sh, row);\n  }\n}\n\nfunction _formatDeudasRow(sh, row) {\n  badgeCell(sh, row, 2, '\u26a1 Deuda', '#EDE7F6', '#4527A0');\n  sh.getRange(row, 4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#C62828');\n  sh.getRange(row, 6).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#E65100');\n  if (typeof sh.getRange(row, 8).getValue() === 'number') {\n    sh.getRange(row, 8).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right');\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// OTRAS SECCIONES\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction handleServicio(ss, data) {\n  var s = data.item; if (!s) { return; }\n  var sh = getOrCreate(ss, 'Servicios Fijos');\n  if (sh.getLastRow() === 0) {\n    sh.appendRow(['  Servicio', '  Monto Mensual S/.', '  D\u00eda Vencimiento', '  Estado', '  Actualizado']);\n    aplicarEstiloNotion(sh, { header: '#1C1C1C' }, 5);\n    sh.setColumnWidth(1,160);sh.setColumnWidth(2,150);sh.setColumnWidth(3,150);sh.setColumnWidth(4,120);sh.setColumnWidth(5,130);\n  }\n  var foundRow = -1;\n  for (var i = 2; i <= sh.getLastRow(); i++) { if (sh.getRange(i,1).getValue().toString().trim() === s.name) { foundRow=i; break; } }\n  var vals = ['  '+s.name, toNum(s.monto), 'D\u00eda '+s.venceDia, s.pagado?'Pagado':'No pagado', '  '+fmtDate(new Date().toISOString().split('T')[0])];\n  if (foundRow > 0) { sh.getRange(foundRow,1,1,5).setValues([vals]); }\n  else { sh.appendRow(vals); aplicarFilaNotion(sh, sh.getLastRow(), 5, '#FAFAFA'); }\n  var r = foundRow > 0 ? foundRow : sh.getLastRow();\n  sh.getRange(r,2).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold');\n  badgeCell(sh, r, 4, s.pagado?'\u2713 Pagado':'\u25cb Pendiente', s.pagado?'#EBF1F5':'#FFF8E1', s.pagado?'#2A4455':'#F57F17');\n}\n\nfunction handleMeta(ss, data) {\n  var m = data.item; if (!m) { return; }\n  var sh = getOrCreate(ss, 'Metas de Ahorro');\n  if (sh.getLastRow() === 0) {\n    sh.appendRow(['  Meta','  Objetivo S/.','  Ahorrado S/.','  Pendiente S/.','  Progreso','  Fecha L\u00edmite']);\n    aplicarEstiloNotion(sh, {header:'#1C1C1C'}, 6);\n    sh.setColumnWidth(1,180);sh.setColumnWidth(2,130);sh.setColumnWidth(3,130);sh.setColumnWidth(4,130);sh.setColumnWidth(5,120);sh.setColumnWidth(6,130);\n  }\n  var obj=toNum(m.objetivo),aho=toNum(m.ahorrado),pct=obj>0?Math.round(aho/obj*100):0;\n  var foundRow=-1;\n  for(var i=2;i<=sh.getLastRow();i++){if(sh.getRange(i,1).getValue().toString().trim()===m.nombre){foundRow=i;break;}}\n  var vals=['  '+(m.nombre||'-'),obj,aho,obj-aho,pct+'%','  '+(m.fechaLimite||'-')];\n  if(foundRow>0){sh.getRange(foundRow,1,1,6).setValues([vals]);}\n  else{sh.appendRow(vals);aplicarFilaNotion(sh,sh.getLastRow(),6,'#FAFAFA');}\n  var r=foundRow>0?foundRow:sh.getLastRow();\n  sh.getRange(r,2).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right');\n  sh.getRange(r,3).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#2A4455').setFontWeight('bold');\n  sh.getRange(r,4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#E65100');\n  badgeCell(sh,r,5,pct+'% logrado',pct>=100?'#EBF1F5':pct>=50?'#FFF8E1':'#FCE4EC',pct>=100?'#2A4455':pct>=50?'#F57F17':'#C62828');\n}\n\nfunction handlePrestamo(ss, data) {\n  var p = data.item; if (!p) { return; }\n  var sh = getOrCreate(ss, 'Prestamos');\n  if (sh.getLastRow() === 0) {\n    sh.appendRow(['  Acreedor','  Tipo','  Capital S/.','  Pendiente S/.','  Tasa Mensual','  Inter\u00e9s Mensual S/.','  Fecha Inicio']);\n    aplicarEstiloNotion(sh, {header:'#1C1C1C'}, 7);\n    sh.setColumnWidth(1,160);sh.setColumnWidth(2,100);sh.setColumnWidth(3,130);sh.setColumnWidth(4,140);sh.setColumnWidth(5,120);sh.setColumnWidth(6,160);sh.setColumnWidth(7,130);\n  }\n  var intMes=toNum(p.capitalPendiente)*toNum(p.tasaMensual)/100;\n  var foundRow=-1;\n  for(var i=2;i<=sh.getLastRow();i++){if(sh.getRange(i,1).getValue().toString().trim()===(p.nombre||'')){foundRow=i;break;}}\n  var vals=['  '+(p.nombre||'-'),'  '+(p.tipo||'Persona'),toNum(p.capital),toNum(p.capitalPendiente),toNum(p.tasaMensual)+'%',intMes,'  '+fmtDate(p.fechaInicio)];\n  if(foundRow>0){sh.getRange(foundRow,1,1,7).setValues([vals]);}\n  else{sh.appendRow(vals);aplicarFilaNotion(sh,sh.getLastRow(),7,'#FAFAFA');}\n  var r=foundRow>0?foundRow:sh.getLastRow();\n  sh.getRange(r,3).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontWeight('bold').setFontColor('#C62828');\n  sh.getRange(r,4).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right').setFontColor('#E65100');\n  sh.getRange(r,6).setNumberFormat('\"S/ \"#,##0.00').setHorizontalAlignment('right');\n}\n\nfunction handleNota(ss, data) {\n  var n = data.item; if (!n) { return; }\n  var sh = getOrCreate(ss, 'Notas');\n\n  if (sh.getLastRow() === 0) {\n    var headers = ['  Fecha', '  Tipo', '  T\u00edtulo', '  Contenido / \u00cdtems', '  Recordatorio', '  Estado'];\n    sh.appendRow(headers);\n    aplicarEstiloNotion(sh, {header:'#1C1C1C'}, 6);\n    sh.setColumnWidth(1, 110);\n    sh.setColumnWidth(2, 130);\n    sh.setColumnWidth(3, 200);\n    sh.setColumnWidth(4, 340);\n    sh.setColumnWidth(5, 150);\n    sh.setColumnWidth(6, 120);\n  }\n\n  // Contenido formateado\n  var contenido = '';\n  var totalItems = 0, hechos = 0;\n  if (n.tipo === 'lista' || n.tipo === 'recordatorio') {\n    var its = n.items || [];\n    totalItems = its.length;\n    for (var i = 0; i < its.length; i++) {\n      if (its[i].done) hechos++;\n      contenido += (its[i].done ? '\u2611 ' : '\u2610 ') + its[i].texto + '\\n';\n    }\n  } else {\n    contenido = n.texto || '';\n  }\n\n  // Badge tipo\n  var TIPO_LABELS = { lista:'\u2713 Lista', recordatorio:'\u23f0 Recordatorio', foto:'\ud83d\udcf7 Foto', texto:'\ud83d\udcdd Texto' };\n  var TIPO_BG     = { lista:'#FFF8E1', recordatorio:'#FCE4EC', foto:'#EBF1F5', texto:'#E3F2FD' };\n  var TIPO_COLOR  = { lista:'#F57F17', recordatorio:'#C62828', foto:'#2A4455', texto:'#1565C0' };\n  var tipoLabel = TIPO_LABELS[n.tipo] || n.tipo;\n\n  // Estado para listas\n  var estadoLabel = '-';\n  if (totalItems > 0) {\n    estadoLabel = hechos + '/' + totalItems + ' hechos';\n  } else if (n.tipo === 'recordatorio' && n.recordatorio) {\n    estadoLabel = '\u23f0 ' + n.recordatorio;\n  }\n\n  var row = sh.getLastRow() + 1;\n  sh.appendRow([\n    '  ' + fmtDate(n.creado || new Date().toISOString()),\n    tipoLabel,\n    '  ' + (n.titulo || '-'),\n    '  ' + contenido.trim(),\n    '  ' + (n.recordatorio || '-'),\n    estadoLabel\n  ]);\n\n  aplicarFilaNotion(sh, row, 6, '#FAFAFA');\n  sh.getRange(row, 4).setWrap(true).setVerticalAlignment('top');\n  sh.setRowHeight(row, Math.max(32, Math.min(120, 20 + (contenido.split('\\n').length * 18))));\n\n  // Badge tipo con color\n  badgeCell(sh, row, 2, tipoLabel,\n    TIPO_BG[n.tipo] || '#F5F5F5',\n    TIPO_COLOR[n.tipo] || '#333333');\n\n  // Estado con color si es lista completa\n  if (totalItems > 0 && hechos === totalItems) {\n    sh.getRange(row, 6).setFontColor('#2A4455').setFontWeight('bold');\n  } else if (totalItems > 0) {\n    sh.getRange(row, 6).setFontColor('#F57F17');\n  }\n}\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// UTILIDADES\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nfunction getOrCreate(ss, name) {\n  var sh = ss.getSheetByName(name);\n  if (!sh) { sh = ss.insertSheet(name); }\n  return sh;\n}\n\nfunction fmtDate(dateStr) {\n  if (!dateStr) { return '-'; }\n  try {\n    var d = new Date(dateStr.length === 10 ? dateStr + 'T12:00:00' : dateStr);\n    return Utilities.formatDate(d, 'America/Lima', 'dd/MM/yyyy');\n  } catch(e) { return dateStr; }\n}\n\nfunction toNum(v) { var n=Number(v); return isNaN(n)?0:n; }\n\nfunction jsonOk(obj) {\n  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);\n}\n";
   const blob=new Blob([codigo],{type:'text/plain'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -8540,7 +8579,7 @@ function abrirEditorNotaBloque(editId){
       <div class="pnt-sep"></div>
       <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#C62828')" style="color:#C62828;font-weight:900" title="Rojo">A</button>
       <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#1565C0')" style="color:#1565C0;font-weight:900" title="Azul">A</button>
-      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#2E7D32')" style="color:#2E7D32;font-weight:900" title="Verde">A</button>
+      <button class="pnt-btn" onmousedown="event.preventDefault();pnedTextColor('#2A4455')" style="color:#2A4455;font-weight:900" title="Verde">A</button>
       <button class="pnt-btn" onmousedown="event.preventDefault();pnedMark()" style="background:#FFF9C4;color:#92700A;font-weight:700;font-size:11px;border-radius:5px" title="Resaltar">Aa</button>
       <div class="pnt-sep"></div>
       ${colorDots}
@@ -8781,7 +8820,7 @@ function pnedMkTable(b){
               }, 0);
               row[keys[ci]] = sum.toFixed(2);
               td.textContent = sum.toFixed(2);
-              td.style.color = '#2E7D32';
+              td.style.color = '#2A4455';
               td.style.fontWeight = '700';
               td.title = '=SUMA';
               window._pnedDirty = true;
@@ -8891,7 +8930,7 @@ function pnedMkTable(b){
               }, 0);
               row[keys[ci]] = sum.toFixed(2);
               td.textContent = sum.toFixed(2);
-              td.style.color = '#0F6E56';
+              td.style.color = '#546878';
               td.style.fontWeight = '700';
               td.title = '=SUBTOTAL';
               window._pnedDirty = true;
@@ -8905,7 +8944,7 @@ function pnedMkTable(b){
               }, 0);
               row[keys[ci]] = sum.toFixed(2);
               td.textContent = sum.toFixed(2);
-              td.style.color = '#2E7D32';
+              td.style.color = '#2A4455';
               td.style.fontWeight = '700';
               td.title = '=TOTAL';
               window._pnedDirty = true;
@@ -8955,7 +8994,7 @@ function pnedMkTable(b){
               
               row[keys[ci]] = result.toFixed(2);
               td.textContent = result.toFixed(2);
-              td.style.color = '#639922';
+              td.style.color = 'var(--gold)';
               td.style.fontWeight = '700';
               td.title = '=' + formula;
               window._pnedDirty = true;
@@ -9173,7 +9212,7 @@ function pnApplyAiSuggestion(type, ci){
     
     if(_pnCurrentCell){
       _pnCurrentCell.textContent = sum.toFixed(2);
-      _pnCurrentCell.style.color = '#2E7D32';
+      _pnCurrentCell.style.color = '#2A4455';
       _pnCurrentCell.style.fontWeight = '700';
     }
     window._pnedDirty = true;
@@ -9235,7 +9274,7 @@ function pnApplyOp(op){
     }, 0);
     row[keys[ci]] = sum.toFixed(2);
     _pnCurrentCell.textContent = sum.toFixed(2);
-    _pnCurrentCell.style.color = '#2E7D32';
+    _pnCurrentCell.style.color = '#2A4455';
     _pnCurrentCell.style.fontWeight = '700';
     _pnCurrentCell.title = 'Suma columna';
     toast('✅ Suma: ' + sum.toFixed(2), 'success');
@@ -9517,8 +9556,8 @@ function pnedShowCustomTableModal(){
       </div>
     </div>
     
-    <div style="background:#E8F5E9;border-radius:12px;padding:16px;margin-bottom:20px">
-      <div style="font-size:13px;color:#2E7D32;margin-bottom:8px">
+    <div style="background:#EBF1F5;border-radius:12px;padding:16px;margin-bottom:20px">
+      <div style="font-size:13px;color:#2A4455;margin-bottom:8px">
         <strong>Personalizar Bordes</strong>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -9919,7 +9958,7 @@ function notaAgregarVozGemini(notaId){
       <button id="pn-mic-btn" onclick="pnMicToggle()" style="width:100%;background:linear-gradient(135deg,#5D4037,#8D6E63);color:#fff;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;margin-bottom:8px">🎙 Empezar</button>
       <div style="display:flex;gap:8px">
         <button onclick="pnMicClose()" style="flex:1;background:transparent;border:1px solid #D7CCC8;border-radius:12px;padding:11px;font-family:'DM Sans',sans-serif;color:#8D6E63;cursor:pointer;font-size:13px">Cancelar</button>
-        <button id="pn-mic-save" onclick="pnMicSave('${notaId}')" style="flex:2;background:#4CAF85;color:#fff;border:none;border-radius:12px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;font-size:13px;display:none">✓ Agregar a nota</button>
+        <button id="pn-mic-save" onclick="pnMicSave('${notaId}')" style="flex:2;background:var(--gold);color:#fff;border:none;border-radius:12px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;font-size:13px;display:none">✓ Agregar a nota</button>
       </div>
     </div>`;
   document.body.appendChild(ov);
@@ -10059,9 +10098,9 @@ let toastTimer;
 function toast(msg,type='success'){
   const el=document.getElementById('toast');
   el.textContent=msg;
-  const bg=type==='error'?'#FEF2F2':type==='info'?'#EFF6FF':'#F0FDF4';
-  const border=type==='error'?'#E0525255':type==='info'?'#378ADD55':'#4CAF8555';
-  const color=type==='error'?'var(--red)':type==='info'?'#185FA5':'var(--green)';
+  const bg=type==='error'?'#FEF2F2':type==='info'?'#EFF6FF':'#EBF1F5';
+  const border=type==='error'?'#E0525255':type==='info'?'#378ADD55':'var(--gold)55';
+  const color=type==='error'?'var(--red)':type==='info'?'#185FA5':'var(--gold)';
   el.style.cssText=`display:block;background:${bg};border:1px solid ${border};color:${color};bottom:90px;left:50%;transform:translateX(-50%);z-index:200;padding:11px 22px;border-radius:30px;font-size:13px;font-weight:500;white-space:nowrap;animation:fadeUp .3s ease;pointer-events:none;position:fixed`;
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>el.style.display='none',3000);
@@ -10076,7 +10115,7 @@ function render(){
   const bal=balance();
   document.getElementById('header-date').textContent=MONTHS_FULL[new Date().getMonth()]+' '+new Date().getFullYear();
   const hb=document.getElementById('header-balance');
-  hb.textContent=fmtSign(bal);hb.style.color=bal>=0?'var(--green)':'var(--red)';
+  hb.textContent=fmtSign(bal);hb.style.color=bal>=0?'var(--gold)':'var(--red)';
   switch(state.page){
     case 'dashboard':content.innerHTML=renderDashboard();break;
     case 'movimientos':content.innerHTML=renderMovimientos();break;
@@ -11334,7 +11373,7 @@ const MIC_CONTEXTS = {
   },
   nota: {
     icon: '📝', title: 'Nota', sub: 'Di: tipo de nota (lista, recordatorio, texto)',
-    color: '#2E7D32', bg: '#1B5E20',
+    color: '#2A4455', bg: '#1B5E20',
     fields: [
       {id:'tipo',      icon:'📝', label:'Tipo',      req:true},
       {id:'titulo',    icon:'📌', label:'Título',    req:true},
@@ -11439,7 +11478,7 @@ function updateMissingFields(ctx) {
   const cont = document.getElementById('micMissingFields'); if(!cont) return;
   const faltantes = def.fields.filter(f=>f.req && !_ghostData[f.id]);
   if(faltantes.length===0){
-    cont.innerHTML='<span style="font-size:11px;color:#4CAF85;font-weight:600">✓ Listo para guardar</span>';
+    cont.innerHTML='<span style="font-size:11px;color:var(--gold);font-weight:600">✓ Listo para guardar</span>';
   } else {
     cont.innerHTML = faltantes.map(f=>
       `<span style="font-size:10px;background:#FEF9EE;border:1px solid #C9A84C33;border-radius:6px;padding:2px 8px;color:#92400E">${f.icon} Falta: ${f.label}</span>`
@@ -11670,7 +11709,7 @@ function startListening() {
   startListeningHandlers(recognition);
   recognition.onstart = () => {
     document.getElementById('micText').textContent='🎙 Habla ahora...';
-    document.getElementById('micText').style.color='#2E7D32';
+    document.getElementById('micText').style.color='#2A4455';
   };
   recognition.start();
 }
@@ -11844,7 +11883,7 @@ function stopListening() {
   const micTxt  = document.getElementById('micBtnTxt');
   const micHint = document.getElementById('micHint');
   const micFab  = document.getElementById('micFab');
-  if(micBtn)  micBtn.style.background = 'linear-gradient(135deg,#3A7D44,#52A85A)';
+  if(micBtn)  micBtn.style.background = 'linear-gradient(135deg,var(--gold),#6A8494)';
   if(micIcon) micIcon.textContent = '🎙';
   if(micTxt)  micTxt.textContent  = 'Escuchar de nuevo';
   if(micFab)  micFab.classList.remove('listening');
@@ -11886,7 +11925,7 @@ function abrirEditorNota(editId){
       <span id="ned-status" style="font-size:11px;color:${nc.footer};flex:1"></span>
       <button onclick="nedAddPhoto()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 6px;opacity:.75" title="Foto">📷</button>
       <button id="ned-rec-btn" onclick="nedEditReminder()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 6px;opacity:${_nedRecordatorio?1:.5}" title="Recordatorio">⏰</button>
-      <button onclick="nedSave(true)" style="background:#3A7D44;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0">Guardar</button>
+      <button onclick="nedSave(true)" style="background:var(--gold);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0">Guardar</button>
     </div>
 
     <div id="ned-rem" style="display:${_nedRecordatorio?'flex':'none'};align-items:center;gap:8px;padding:7px 20px;background:#FEF2F2;border-bottom:1px solid #FECACA;flex-shrink:0;font-size:12px;color:#DC2626">
@@ -12064,7 +12103,7 @@ function nedAddTable(){
   // Init check visual
   setTimeout(()=>{
     const chk = document.getElementById('nt-total-check');
-    if(chk){ chk.style.background='#3A7D44'; chk.style.borderColor='#3A7D44'; chk.textContent='✓'; chk.style.color='#fff'; }
+    if(chk){ chk.style.background='var(--gold)'; chk.style.borderColor='var(--gold)'; chk.textContent='✓'; chk.style.color='#fff'; }
   }, 30);
 
   const rowsEl = document.getElementById('nt-cols');
@@ -12077,8 +12116,8 @@ function _ntToggleTotal(row){
   _ntHasTotal = !_ntHasTotal;
   const chk = document.getElementById('nt-total-check');
   if(chk){
-    chk.style.background = _ntHasTotal ? '#3A7D44' : '#fff';
-    chk.style.borderColor = _ntHasTotal ? '#3A7D44' : '#CBD5E1';
+    chk.style.background = _ntHasTotal ? 'var(--gold)' : '#fff';
+    chk.style.borderColor = _ntHasTotal ? 'var(--gold)' : '#CBD5E1';
     chk.textContent = _ntHasTotal ? '✓' : '';
     chk.style.color = '#fff';
   }
@@ -12603,10 +12642,10 @@ function abrirModoLista(tipo, tituloInicial){
 
       <!-- Botones -->
       <div style="display:flex;gap:8px">
-        <button id="lista-mic-btn" style="flex:1;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
+        <button id="lista-mic-btn" style="flex:1;background:linear-gradient(135deg,#546878,#6A8494);color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
           🎙 Dictar
         </button>
-        <button id="lista-guardar-btn" style="flex:1;background:#3A7D44;color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
+        <button id="lista-guardar-btn" style="flex:1;background:var(--gold);color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
           ✓ Guardar
         </button>
       </div>
@@ -12655,7 +12694,7 @@ function renderListaItems(){
   el.innerHTML = listaItems.map((item,i) => {
     if(item.tipo === 'subtotal'){
       return `<div style="border-top:2px dashed #F9A825;margin:8px 0 4px;padding:8px 0;display:flex;justify-content:space-between;font-weight:700;color:#5D4037;font-size:14px">
-        <span>${item.texto}</span><span style="color:#3A7D44">S/ ${item.valor.toFixed(2)}</span>
+        <span>${item.texto}</span><span style="color:var(--gold)">S/ ${item.valor.toFixed(2)}</span>
       </div>`;
     }
     const precioStr = item.precio ? 'S/ '+item.precio.toFixed(2) : '';
@@ -13015,7 +13054,7 @@ Respondé SOLO con JSON válido, sin explicaciones ni markdown:
     window._listaGuardarTimer=setTimeout(()=>guardarListaFinal(),800);
   }
 
-  if(btn){ btn.disabled = false; btn.textContent = '✓ Guardar lista'; btn.style.background='#3A7D44'; }
+  if(btn){ btn.disabled = false; btn.textContent = '✓ Guardar lista'; btn.style.background='var(--gold)'; }
 }
 
 function pararListaMicDefinitivo(){
@@ -13184,7 +13223,7 @@ function generarNotaJPG(nota){
       ctx.fillRect(PAD - 4, y - 22, W - PAD * 2 + 8, 28);
 
       ctx.font = 'bold 15px Georgia, serif';
-      ctx.fillStyle = '#2E7D32';
+      ctx.fillStyle = '#2A4455';
       ctx.fillText(item.texto || 'Total', PAD + 4, y);
 
       const val = item.valor || 0;
@@ -13601,7 +13640,7 @@ function _mostrarResumenAgendaEnMic(data, rawText, tipo){
         Cancelar
       </button>
       <button onclick="_agendaMicGuardarDirecto()"
-        style="flex:2;background:linear-gradient(135deg,#2d7a57,#4CAF85);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
+        style="flex:2;background:linear-gradient(135deg,#3D5F70,var(--gold));color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
         ✓ Guardar así
       </button>
     </div>`;
@@ -13763,7 +13802,7 @@ Responde obligatoriamente siguiendo esta estructura JSON (asegúrate de que sea 
       const faltantes = ['cliente','fecha','servicio'].filter(k=>!_agendaMicData[k] && (tipoDetectado==='trabajo' && k==='servicio' || k!=='servicio'));
       st.style.animation='none';
       if(faltantes.length===0){
-        st.style.background='#F0FDF4'; st.style.color='#166534';
+        st.style.background='#EBF1F5'; st.style.color='#2A4455';
         st.innerHTML='<span>✓</span> Datos verificados por IA';
       } else {
         st.style.background='#FEF9EC'; st.style.color='#92400E';
@@ -13923,11 +13962,11 @@ function processVoiceResultManual(text) {
   const saveBtn = document.getElementById('micSaveBtn');
 
   document.getElementById('pvType').textContent = parsed.type==='ingreso' ? '↑ Ingreso' : '↓ Egreso';
-  document.getElementById('pvType').style.color = parsed.type==='ingreso' ? '#4CAF85' : '#E05252';
+  document.getElementById('pvType').style.color = parsed.type==='ingreso' ? 'var(--gold)' : '#E05252';
   document.getElementById('pvCat').textContent = parsed.cat ? `${parsed.cat.icon} ${parsed.cat.name}` : '❓ Sin categoría';
   document.getElementById('pvDesc').textContent = parsed.desc || '';
   document.getElementById('pvAmt').textContent = parsed.amount ? `S/ ${parsed.amount.toFixed(2)}` : '⚠ Monto no detectado';
-  document.getElementById('pvAmt').style.color = parsed.type==='ingreso' ? '#4CAF85' : '#E05252';
+  document.getElementById('pvAmt').style.color = parsed.type==='ingreso' ? 'var(--gold)' : '#E05252';
   document.getElementById('pvDateLbl').textContent = '📅 ' + fmtDateLabel(parsed.date);
 
   // Cliente detectado
@@ -14124,7 +14163,7 @@ function updateCatSelect(type, selectedId) {
     const pvType = document.getElementById('pvType');
     if(pvType){
       pvType.textContent = this.value==='ingreso'?'↑ Ingreso':'↓ Egreso';
-      pvType.style.color = this.value==='ingreso'?'#4CAF85':'#E05252';
+      pvType.style.color = this.value==='ingreso'?'var(--gold)':'#E05252';
     }
   };
 }
@@ -14367,7 +14406,7 @@ function openNegocioModal() {
   const totalIn  = ingresos.reduce((s,t)=>s+t.amount,0);
   const totalEx  = egresos.reduce((s,t)=>s+t.amount,0);
   const balNeg   = totalIn - totalEx;
-  const balColor = balNeg>=0?'#4CAF85':'#E05252';
+  const balColor = balNeg>=0?'var(--gold)':'#E05252';
 
   const rowIn = (t) => `
     <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F1F5F9">
@@ -14377,7 +14416,7 @@ function openNegocioModal() {
         ${t.cliente?`<div style="font-size:11px;color:#2E86AB;margin-top:1px">👤 ${t.cliente}</div>`:''}
         <div style="font-size:11px;color:#94A3B8;margin-top:1px">📅 ${t.date}</div>
       </div>
-      <div style="font-family:'Playfair Display',serif;font-size:15px;color:#4CAF85;flex-shrink:0">+${fmt(t.amount)}</div>
+      <div style="font-family:'Playfair Display',serif;font-size:15px;color:var(--gold);flex-shrink:0">+${fmt(t.amount)}</div>
     </div>`;
 
   const rowEx = (t) => {
@@ -14400,7 +14439,7 @@ function openNegocioModal() {
       <div style="font-size:11px;color:#1565C088;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Balance Mi Negocio · ${MONTHS_FULL[state.filterMonth]}</div>
       <div style="font-family:'Playfair Display',serif;font-size:32px;color:${balColor}">${fmtSign(balNeg)}</div>
       <div style="display:flex;justify-content:center;gap:24px;margin-top:12px">
-        <div><div style="font-size:10px;color:#94A3B8;text-transform:uppercase">Ingresos</div><div style="color:#4CAF85;font-weight:700;font-size:14px">+${fmt(totalIn)}</div></div>
+        <div><div style="font-size:10px;color:#94A3B8;text-transform:uppercase">Ingresos</div><div style="color:var(--gold);font-weight:700;font-size:14px">+${fmt(totalIn)}</div></div>
         <div style="width:1px;background:#E2E8F0"></div>
         <div><div style="font-size:10px;color:#94A3B8;text-transform:uppercase">Egresos</div><div style="color:#E05252;font-weight:700;font-size:14px">-${fmt(totalEx)}</div></div>
       </div>
@@ -14470,7 +14509,7 @@ function closeNegocioModal() {
       <div style="font-size:22px;color:#94A3B8">→</div>
       <div style="text-align:center">
         <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;margin-bottom:4px">Hacia</div>
-        <div id="tf-hacia-label" style="font-size:14px;font-weight:700;color:#4CAF85">👤 Personal</div>
+        <div id="tf-hacia-label" style="font-size:14px;font-weight:700;color:var(--gold)">👤 Personal</div>
       </div>
     </div>
 
@@ -14565,7 +14604,7 @@ function closeNegocioModal() {
     </div>
 
     <!-- Preview resultado final (igual que antes) -->
-    <div id="micPreview" style="display:none;background:#F0FDF4;border:1px solid #4CAF8533;border-radius:12px;padding:14px;margin-bottom:12px">
+    <div id="micPreview" style="display:none;background:#EBF1F5;border:1px solid #54687833;border-radius:12px;padding:14px;margin-bottom:12px">
       <div style="font-size:11px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Interpreté esto:</div>
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div>
@@ -14615,7 +14654,7 @@ function closeNegocioModal() {
 
     <!-- Botones -->
     <div style="display:flex;gap:10px;margin-bottom:10px">
-      <button id="micBtn" onclick="toggleListening()" style="flex:1;background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0D0D0F;border:none;border-radius:12px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s">
+      <button id="micBtn" onclick="toggleListening()" style="flex:1;background:linear-gradient(135deg,#546878,#6A8494);color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s">
         <span id="micBtnIcon">🎙</span> <span id="micBtnTxt">Escuchar</span>
       </button>
     </div>
@@ -15584,7 +15623,7 @@ function abrirEditorPlano(notaId){
       <button class="fp-tbtn" onclick="pRedo()">↪</button>
       <button class="fp-tbtn" onclick="pClearCanvas()">🗑 Limpiar</button>
       <button class="fp-tbtn" onclick="pExportPNG()">⬇ PNG</button>
-      <button class="fp-tbtn" style="color:#2A7A44;border-color:#C0DD97" onclick="pGeminiDescribe()">✨ IA</button>
+      <button class="fp-tbtn" style="color:#546878;border-color:#A8BCC9" onclick="pGeminiDescribe()">✨ IA</button>
       <button class="fp-tbtn save" onclick="guardarPlano()">💾 Guardar</button>
     </div>
     <div id="fp-main">
@@ -15903,17 +15942,17 @@ function abrirEditorPlano(notaId){
     }
     // Chain point indicators
     _PS.chain.forEach((p,i)=>{
-      ctx.save();ctx.fillStyle=i===0?'#2A7A44':'#185FA5';ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill();ctx.restore();
+      ctx.save();ctx.fillStyle=i===0?'#546878':'#185FA5';ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill();ctx.restore();
     });
     // Wall preview from last chain point to cursor
     if(_PS.tool==='wall'&&_PS.chain.length>0&&_PS.snapPt){
       const last=_PS.chain[_PS.chain.length-1];
       const sp=_PS.closeSnap?_PS.chain[0]:_PS.snapPt;
-      dWall(ctx,{type:'wall',x1:last.x,y1:last.y,x2:sp.x,y2:sp.y,thick:_PS.wallThick,color:_PS.closeSnap?'#2A7A44':'#185FA5',sw:1.5,fill:_PS.closeSnap?'rgba(42,122,68,.15)':'rgba(24,95,165,.12)'},0.7);
+      dWall(ctx,{type:'wall',x1:last.x,y1:last.y,x2:sp.x,y2:sp.y,thick:_PS.wallThick,color:_PS.closeSnap?'#546878':'#185FA5',sw:1.5,fill:_PS.closeSnap?'rgba(42,122,68,.15)':'rgba(24,95,165,.12)'},0.7);
     }
     // Close-snap ring
     if(_PS.closeSnap&&_PS.chain.length>0){
-      ctx.save();ctx.strokeStyle='#2A7A44';ctx.lineWidth=2;ctx.fillStyle='rgba(42,122,68,.18)';
+      ctx.save();ctx.strokeStyle='#546878';ctx.lineWidth=2;ctx.fillStyle='rgba(42,122,68,.18)';
       ctx.beginPath();ctx.arc(_PS.chain[0].x,_PS.chain[0].y,CLOSE_R,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
     }
     // Dim preview
@@ -16284,7 +16323,7 @@ function abrirEditorTabla(notaId){
       <div class="ttool-sep"></div>
       <button class="ttool" onclick="tBg('bg-yellow')" style="background:#FEFCE8">■ Amarillo</button>
       <button class="ttool" onclick="tBg('bg-blue')" style="background:#EFF6FF">■ Azul</button>
-      <button class="ttool" onclick="tBg('bg-green')" style="background:#F0FDF4">■ Verde</button>
+      <button class="ttool" onclick="tBg('bg-green')" style="background:#EBF1F5">■ Verde</button>
       <button class="ttool" onclick="tBg('bg-red')" style="background:#FEF2F2">■ Rojo</button>
       <button class="ttool" onclick="tBg('')">✕ Vaciar color</button>
       <div class="ttool-sep"></div>
@@ -16467,7 +16506,7 @@ async function exportarNotaA4WhatsApp(notaId){
 
     // Header con color de la nota
     const nc=(NOTA_COLORES&&NOTA_COLORES[nota.colorHoja])||NOTA_COLORES.amarillo;
-    ctx.fillStyle=nc.border||'#3A7D44';ctx.fillRect(20,20,W-40,56);
+    ctx.fillStyle=nc.border||'var(--gold)';ctx.fillRect(20,20,W-40,56);
 
     // Título
     ctx.font='700 22px DM Sans, Arial, sans-serif';ctx.fillStyle='#FFFFFF';
@@ -16480,7 +16519,7 @@ async function exportarNotaA4WhatsApp(notaId){
     ctx.fillText(`${tipoLbl} • ${fecha}`,40,76);
 
     // Línea separadora
-    ctx.strokeStyle=nc.border||'#3A7D44';ctx.lineWidth=2;
+    ctx.strokeStyle=nc.border||'var(--gold)';ctx.lineWidth=2;
     ctx.beginPath();ctx.moveTo(20,76);ctx.lineTo(W-20,76);ctx.stroke();
 
     let yPos=110;const pad=40;const maxW=W-2*pad;
