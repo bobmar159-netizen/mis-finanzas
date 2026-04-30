@@ -5463,26 +5463,32 @@ async function _pushToNotion(item, cobroObj) {
   if (item.telefono) setProp(findCol('contacto', 'telefono', 'teléfono', 'tel', 'phone'), item.telefono);
   setProp(findCol('distrito', 'ubicacion', 'ubicación', 'zona'), item.ubicacion);
 
+  // Nombres exactos de Notion: SERVICIO 1, 1 PRECIO DEL SERVICIO, 1 MATERIALES
   for (let i = 1; i <= 3; i++) {
     const s = cobroObj['svc' + i];
     const p = cobroObj['precio' + i] || 0;
     const m = cobroObj['materiales' + i] || 0;
-    if (s) setProp(findCol('servicio ' + i, 'servicio' + i), s);
-    if (p > 0) setProp(findCol('precio ' + i, 'precio' + i), p);
-    if (m > 0) setProp(findCol(i + ' materiales', 'materiales ' + i, 'materiales' + i), m);
+    if (s) setProp(findCol('servicio ' + i, 'svc ' + i, 'servicio' + i), s);
+    if (p > 0) setProp(findCol(i + ' precio del servicio', 'precio del servicio ' + i, 'precio ' + i, i + ' precio'), p);
+    if (m > 0) setProp(findCol(i + ' materiales', 'materiales ' + i, i + ' material'), m);
   }
 
-  const pagosMap = {
-    'Efectivo': cobroObj.pagoEfectivo || 0,
-    'Yape': cobroObj.pagoYape || 0,
-    'Plin': cobroObj.pagoPlin || 0,
-    'Transferencia': cobroObj.pagoTransf || 0,
-    'A Cuenta': cobroObj.pagoAcuenta || 0
-  };
-  Object.entries(pagosMap).forEach(([method, amt]) => {
-    if (amt > 0) setProp(findCol(method), amt);
-  });
+  // Formas de pago: encontrar cuáles métodos se usaron y mapearlos a col 1 y 2
+  const pagosMethods = [
+    { name:'Efectivo',      val: cobroObj.pagoEfectivo || 0 },
+    { name:'Yape',          val: cobroObj.pagoYape || 0 },
+    { name:'Plin',          val: cobroObj.pagoPlin || 0 },
+    { name:'Transferencia', val: cobroObj.pagoTransf || 0 },
+    { name:'A Cuenta',      val: cobroObj.pagoAcuenta || 0 }
+  ].filter(p => p.val > 0);
+  // Columnas "1 Forma Pago" / "2 Forma Pago"  
+  // Nombres exactos Notion: "1 FORMA DE PAGO", "2 FORMA DE PAGO"
+  const fPago1Col = findCol('1 forma de pago','forma de pago 1','1 forma pago','forma pago 1','pago 1');
+  const fPago2Col = findCol('2 forma de pago','forma de pago 2','2 forma pago','forma pago 2','pago 2');
+  if (pagosMethods[0]) setProp(fPago1Col, pagosMethods[0].name);
+  if (pagosMethods[1]) setProp(fPago2Col, pagosMethods[1].name);
 
+  // GANANCIA en Notion es una fórmula — NO se escribe desde la app
   if ((cobroObj.movilidad || 0) > 0) setProp(findCol('movilidad', 'pasajes', 'gasolina'), cobroObj.movilidad);
   if ((cobroObj.otros || 0) > 0)     setProp(findCol('agregados', 'otros', 'extra'), cobroObj.otros);
   if ((cobroObj.meta || 0) > 0)      setProp(findCol('meta', 'objetivo', 'goal'), cobroObj.meta);
@@ -7938,15 +7944,32 @@ async function guardarFinalizacion(id){
   const agDesc = (cobroObj.svc1 || item.servicio || 'Servicio') + ' — ' + (item.cliente || '');
   const baseTx = { date: item.fecha, cliente: item.cliente||'', ubicacion: item.ubicacion, negocio: true, _notionRowId: notionRowId };
 
+  // Transacciones de INGRESO por SERVICIO (no por método de pago)
+  const servicios = [
+    { svc: cobroObj.svc1, precio: cobroObj.precio1, key: 'svc1' },
+    { svc: cobroObj.svc2, precio: cobroObj.precio2, key: 'svc2' },
+    { svc: cobroObj.svc3, precio: cobroObj.precio3, key: 'svc3' }
+  ];
+  servicios.forEach((s, i) => {
+    if (s.svc && s.precio > 0) {
+      state.transactions.unshift({
+        id: rowId + '-svc' + (i+1),
+        type: 'ingreso',
+        amount: s.precio,
+        category: s.svc,
+        description: s.svc + ' — ' + (item.cliente||''),
+        formaPago: cobroObj.pagoYape > 0 ? 'Yape' : cobroObj.pagoPlin > 0 ? 'Plin' : cobroObj.pagoTransf > 0 ? 'Transferencia' : 'Efectivo',
+        ...baseTx
+      });
+    }
+  });
+  // Referencias de pago para syncSheets
   const pagos = [
     { name:'Efectivo',      val: cobroObj.pagoEfectivo },
     { name:'Yape',          val: cobroObj.pagoYape },
     { name:'Plin',          val: cobroObj.pagoPlin },
     { name:'Transferencia', val: cobroObj.pagoTransf }
   ];
-  pagos.forEach(p => {
-    if (p.val > 0) state.transactions.unshift({ id: rowId + '-' + p.name.toLowerCase(), type:'ingreso', amount:p.val, category: cobroObj.svc1||'Servicio', description: agDesc + ' (' + p.name + ')', formaPago: p.name, ...baseTx });
-  });
   if (cobroObj.movilidad > 0) state.transactions.unshift({ id: rowId+'-mov', type:'egreso', amount:cobroObj.movilidad, category:'Movilidad', description:'Movilidad · '+agDesc, ...baseTx });
   if (totalMat > 0)           state.transactions.unshift({ id: rowId+'-mat', type:'egreso', amount:totalMat, category:'Materiales', description:'Materiales · '+agDesc, ...baseTx });
   if (cobroObj.otros > 0)     state.transactions.unshift({ id: rowId+'-otr', type:'egreso', amount:cobroObj.otros, category:'Mantenimiento o Rep', description:'Otros · '+agDesc, ...baseTx });
