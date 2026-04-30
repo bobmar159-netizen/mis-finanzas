@@ -7786,12 +7786,33 @@ function _aplicarEstadoAgenda(id, estado){
   toast('Estado: '+(AGENDA_ESTADOS[estado]?.label||estado));
 }
 
-function abrirModalCobro(id){
-  window._cobroAgendaId = id;
-  window._matUsadosTemp = [];
+
+window._saveCobroStateToItem = function(id) {
   const item = (state.agenda||[]).find(x => x.id === id);
   if(!item) return;
-  const precio = item.precio || 0;
+  [1,2,3].forEach(i => {
+    item['servicio'+i] = document.getElementById('cobro-svc'+i)?.value||item['servicio'+i]||'';
+    item['precio'+i] = parseFloat(document.getElementById('cobro-precio'+i)?.value)||item['precio'+i]||0;
+    item['materiales'+i] = parseFloat(document.getElementById('cobro-mat'+i)?.value)||item['materiales'+i]||0;
+  });
+  item.movilidad = parseFloat(document.getElementById('cobro-movilidad')?.value)||item.movilidad||0;
+  item.agregados = parseFloat(document.getElementById('cobro-otros')?.value)||item.agregados||0;
+  item.meta = parseFloat(document.getElementById('cobro-meta')?.value)||item.meta||0;
+  item.ubicacion = document.getElementById('cobro-distrito')?.value||item.ubicacion||'';
+};
+
+function abrirModalCobro(id){
+  window._cobroAgendaId = id;
+  const item = (state.agenda||[]).find(x => x.id === id);
+  if(!item) return;
+
+  const getVal = (key, i) => item[key+i] || (i===1 ? item.servicio||'' : '');
+  const getNum = (key, i) => {
+    if (item[key+i]) return item[key+i];
+    if (i===1 && key==='precio' && item.precio) return item.precio;
+    return '';
+  };
+
   const svcOpts = (presel='') => '<option value="">-- ninguno --</option>' +
     AGENDA_SERVICIOS.map(s => '<option value="' + s + '" ' + (s === presel ? 'selected' : '') + '>' + s + '</option>').join('');
 
@@ -7799,7 +7820,7 @@ function abrirModalCobro(id){
     <div class="modal-title" style="color:#2A4455">✓ Finalizar y Liquidar</div>
     <div style="background:linear-gradient(135deg,#F3F0FF,#E8E5FE);border-radius:14px;padding:12px 16px;margin-bottom:14px">
       <div style="font-weight:700;color:#3C3489;font-size:15px">${item.cliente||'Cliente'}</div>
-      <div style="color:#6C3483;font-size:13px;margin-top:3px">Acordado: <strong>${fmt(precio)}</strong></div>
+      <div style="color:#6C3483;font-size:13px;margin-top:3px">Acordado: <strong>${fmt(item.precio||0)}</strong></div>
     </div>
 
     <div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:14px;margin-bottom:12px">
@@ -7809,13 +7830,17 @@ function abrirModalCobro(id){
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
             <span style="width:19px;height:19px;border-radius:50%;background:#F1F5F9;color:#64748B;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center">${i}</span>
             <select id="cobro-svc${i}" onchange="updateCobroTotals()" style="flex:1;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:12px;font-family:inherit">
-              ${svcOpts(i===1?(item.servicio||''):'')}</select>
+              ${svcOpts(getVal('servicio', i))}</select>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding-left:25px">
             <div><label style="font-size:10px;color:#94A3B8;font-weight:700;display:block;margin-bottom:2px">Precio S/</label>
-              <input id="cobro-precio${i}" type="number" inputmode="decimal" placeholder="0.00" value="${i===1?precio:''}" oninput="updateCobroTotals()" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:600"></div>
-            <div><label style="font-size:10px;color:#94A3B8;font-weight:700;display:block;margin-bottom:2px">Materiales S/</label>
-              <input id="cobro-mat${i}" type="number" inputmode="decimal" placeholder="0.00" oninput="updateCobroTotals()" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:13px"></div>
+              <input id="cobro-precio${i}" type="number" inputmode="decimal" placeholder="0.00" value="${getNum('precio', i)}" oninput="updateCobroTotals()" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:600"></div>
+            <div>
+              <label style="font-size:10px;color:#94A3B8;font-weight:700;display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+                Materiales S/ 
+                <span onclick="_saveCobroStateToItem('${id}'); openMatUsadosForm('${id}', ${i})" style="color:#0EA5E9;cursor:pointer;background:#E0F2FE;padding:2px 6px;border-radius:6px;font-size:9px">📦 STOCK</span>
+              </label>
+              <input id="cobro-mat${i}" type="number" inputmode="decimal" placeholder="0.00" value="${getNum('materiales', i)}" oninput="updateCobroTotals()" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:13px"></div>
           </div>
         </div>
       `).join('')}
@@ -7843,21 +7868,21 @@ function abrirModalCobro(id){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div style="background:#FFF7ED;border:1px solid #FFEDD5;border-radius:12px;padding:10px">
         <label style="font-size:10px;color:#9A3412;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">🚗 Movilidad</label>
-        <input id="cobro-movilidad" type="number" inputmode="decimal" placeholder="0.00" style="width:100%;border:1px solid #FED7AA;border-radius:8px;padding:6px 8px;font-size:13px"></div>
+        <input id="cobro-movilidad" type="number" inputmode="decimal" placeholder="0.00" value="${item.movilidad||''}" style="width:100%;border:1px solid #FED7AA;border-radius:8px;padding:6px 8px;font-size:13px"></div>
       <div style="background:#FFF7ED;border:1px solid #FFEDD5;border-radius:12px;padding:10px">
         <label style="font-size:10px;color:#9A3412;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">➕ Agregados</label>
-        <input id="cobro-otros" type="number" inputmode="decimal" placeholder="0.00" style="width:100%;border:1px solid #FED7AA;border-radius:8px;padding:6px 8px;font-size:13px"></div>
+        <input id="cobro-otros" type="number" inputmode="decimal" placeholder="0.00" value="${item.agregados||''}" style="width:100%;border:1px solid #FED7AA;border-radius:8px;padding:6px 8px;font-size:13px"></div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div><label style="font-size:10px;color:#64748B;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">📍 Distrito</label>
         <input id="cobro-distrito" type="text" value="${item.ubicacion||''}" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:12px"></div>
       <div><label style="font-size:10px;color:#64748B;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">🎯 Meta S/</label>
-        <input id="cobro-meta" type="number" inputmode="decimal" placeholder="0.00" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:13px"></div>
+        <input id="cobro-meta" type="number" inputmode="decimal" placeholder="0.00" value="${item.meta||''}" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:13px"></div>
     </div>
     <div style="margin-bottom:16px">
       <label style="font-size:10px;color:#64748B;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">📝 Observaciones</label>
-      <textarea id="cobro-notas" placeholder="Notas..." style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:7px 8px;font-size:12px;min-height:44px;font-family:inherit;resize:none"></textarea>
+      <textarea id="cobro-notas" placeholder="Notas..." style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:7px 8px;font-size:12px;min-height:44px;font-family:inherit;resize:none">${item.notas||''}</textarea>
     </div>
 
     <div class="btn-row" style="margin-top:0">
@@ -16753,18 +16778,16 @@ function getPlantillaPorTipo(tipoServicio){
 }
 
 // ── FASE 3-7: Formulario de materiales usados ───────────────────────
-function openMatUsadosForm(agendaId){
+function openMatUsadosForm(agendaId, slot = 1){
+  window._currentMatSlot = slot;
   const item = (state.agenda||[]).find(x=>x.id===agendaId);
-  const tipoServicio = item?.servicio || '';
+  const tipoServicio = document.getElementById('cobro-svc'+slot)?.value || item?.['servicio'+slot] || item?.servicio || '';
   const plantilla = getPlantillaPorTipo(tipoServicio);
 
-  // Si no hay sesión temp, inicializarla desde plantilla
-  if(!window._matUsadosTemp || !window._matUsadosTemp.length){
-    window._matUsadosTemp = plantilla.map(p=>{
-      const mat = getMaterialById(p.material_id);
-      return { material_id:p.material_id, nombre:mat?.nombre||p.material, unidad:mat?.unidad||'unidad', cantidad:p.cantidad_default, costo:mat?.costo_actual||0, stock:mat?.stock_actual||0 };
-    });
-  }
+  window._matUsadosTemp = plantilla.map(p=>{
+    const mat = getMaterialById(p.material_id);
+    return { material_id:p.material_id, nombre:mat?.nombre||p.material, unidad:mat?.unidad||'unidad', cantidad:p.cantidad_default, costo:mat?.costo_actual||0, stock:mat?.stock_actual||0 };
+  });
 
   _renderMatUsadosForm(agendaId, tipoServicio);
 }
@@ -16828,7 +16851,7 @@ function _renderMatUsadosForm(agendaId, tipoServicio){
       ${rows.some(r=>r.cantidad>r.stock)?'disabled style="opacity:0.5;cursor:not-allowed"':''}>
       ✅ Confirmar y descontar stock
     </button>
-    <button onclick="closeModal()" style="width:100%;background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:14px;padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">Cancelar</button>`;
+    <button onclick="abrirModalCobro(\'${agendaId}\')" style="width:100%;background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:14px;padding:13px;font-weight:700;font-family:inherit;font-size:14px;cursor:pointer">Volver al cobro</button>`;
   showModal();
 }
 
