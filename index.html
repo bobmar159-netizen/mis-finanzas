@@ -921,6 +921,7 @@ table.nt th[contenteditable=true]:focus,table.nt td[contenteditable=true]:focus{
 <div class="toast" id="toast" style="display:none"></div>
 
 <script>
+
 const GEMINI_URL = k => `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${k}`;
 
 // ── Colores de hoja de nota ──
@@ -3299,39 +3300,43 @@ function enviarTodoASheets() {
   if (!confirm(`¿Enviar TODO a Sheets?\n\n· ${txsNormales.length} movimientos libres\n· ${trabajos.length} trabajos (Reporte Diario)\n· ${agenda.length} elementos de agenda\n· ${deudas.length} deudas\n\nLos registros de Notion se enviarán unidos al Reporte Diario.`)) return;
 
   const status = document.getElementById('sheets-sync-status');
-  
-  const payload = {
-    type: 'batch',
-    items: []
-  };
+  let enviados = 0;
+  const todos = [];
+
+  // Función para encolar
+  const add = (payload) => todos.push(async () => {
+    try {
+      await fetch(url+'?data='+encodeURIComponent(JSON.stringify(payload)), {method:'GET',mode:'no-cors'});
+    } catch(e) {
+      console.error(e);
+    }
+    enviados++;
+    if(status) status.textContent = `⬆ Enviando... ${enviados}/${totalReal}`;
+  });
 
   // 1. Trabajos (Agrupados para Reporte Diario)
-  trabajos.forEach(trabajo => payload.items.push({ type:'trabajo', item: trabajo, timestamp:'tbj_'+trabajo.id+'_'+Date.now() }));
+  trabajos.forEach(trabajo => add({ type:'trabajo', item: trabajo, timestamp:'tbj_'+trabajo.id+'_'+Date.now() }));
 
   // 2. Movimientos (No Notion o transacciones libres)
-  txsNormales.forEach(tx => payload.items.push({ type:'tx', modo: tx.negocio?'negocio':'personal', timestamp:'tx_'+tx.id+'_'+Date.now(), tx }));
+  txsNormales.forEach(tx => add({ type:'tx', modo: tx.negocio?'negocio':'personal', timestamp:'tx_'+tx.id+'_'+Date.now(), tx }));
 
   // 3. Agenda
-  agenda.forEach(item => payload.items.push({ type:'agenda', item, modo:'negocio', timestamp:'ag_'+item.id+'_'+Date.now() }));
+  agenda.forEach(item => add({ type:'agenda', item, modo:'negocio', timestamp:'ag_'+item.id+'_'+Date.now() }));
 
   // 4. Deudas
-  deudas.forEach(d => payload.items.push({ type:'deuda', item:d, modo:'negocio', timestamp:'deu_'+d.id+'_'+Date.now() }));
+  deudas.forEach(d => add({ type:'deuda', item:d, modo:'negocio', timestamp:'deu_'+d.id+'_'+Date.now() }));
 
-  if(status) status.textContent = `⬆ Enviando ${totalReal} registros en un solo lote seguro...`;
+  if(status) status.textContent = `⬆ Iniciando envío de ${totalReal} paquetes... (Puede tomar un minuto)`;
 
-  // Enviar como POST para evitar límites de longitud de URL y procesar todo junto
-  fetch(url, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify(payload)
-  }).then(() => {
-    if(status) status.textContent = `✓ ${totalReal} registros enviados a Sheets (Batch)`;
+  // Ejecutar secuencialmente para no saturar Apps Script ni perder datos
+  setTimeout(async () => {
+    for (const fn of todos) {
+      await fn();
+      await new Promise(r => setTimeout(r, 150)); // Pequeña pausa entre envíos para evitar race conditions
+    }
+    if(status) status.textContent = `✓ ${totalReal} registros enviados a Sheets`;
     toast(`✓ Todo enviado a Sheets — ${trabajos.length} al Reporte Diario · ${txsNormales.length} libres`);
-  }).catch(e => {
-    if(status) status.textContent = `⚠ Error al enviar: ` + e.message;
-    toast('Error enviando a Sheets', 'error');
-  });
+  }, 10);
 }
 
 // ══════════════════════════════════════════════════════
@@ -5421,31 +5426,14 @@ async function _fetchNotionSchema(token, dbId) {
   return db.properties;
 }
 
-async function _pushToNotion(item, cobrado) {
+async function _pushToNotion(item, cobroObj) {
   const token = localStorage.getItem('fnz_notion_token');
   const dbId  = localStorage.getItem('fnz_notion_dbid');
   if (!token || !dbId) throw new Error('Notion no configurado');
 
-  // Extraer campos extendidos de cobrado
-  const ingreso    = typeof cobrado === 'object' ? (cobrado.ingreso    || 0) : (cobrado || 0);
-  const movilidad  = typeof cobrado === 'object' ? (cobrado.movilidad  || 0) : 0;
-  const materiales = typeof cobrado === 'object' ? (cobrado.materiales || 0) : 0;
-  const otros      = typeof cobrado === 'object' ? (cobrado.otros      || 0) : 0;
-  const meta       = typeof cobrado === 'object' ? (cobrado.meta       || 0) : 0;
-  const formaPago  = typeof cobrado === 'object' ? (cobrado.formaPago  || '') : '';
-  const observaciones = typeof cobrado === 'object' ? (cobrado.observaciones || '') : '';
-  const svc1 = typeof cobrado === 'object' ? (cobrado.svc1 || item.servicio || '') : (item.servicio || '');
-  const svc2 = typeof cobrado === 'object' ? (cobrado.svc2 || '') : '';
-  const svc3 = typeof cobrado === 'object' ? (cobrado.svc3 || '') : '';
-  const svc4 = typeof cobrado === 'object' ? (cobrado.svc4 || '') : '';
-
   const props = await _fetchNotionSchema(token, dbId);
-  const payload = {
-    parent: { database_id: dbId },
-    properties: {}
-  };
+  const payload = { parent: { database_id: dbId }, properties: {} };
 
-  // Helper para encontrar el nombre exacto de la columna en Notion basado en nombres probables
   const findCol = (...names) => {
     for (const n of names) {
       const match = Object.keys(props).find(k => k.toLowerCase() === n.toLowerCase());
@@ -5454,92 +5442,61 @@ async function _pushToNotion(item, cobrado) {
     return null;
   };
 
-  // ── Helper para set de propiedades según tipo de columna Notion ──
   const setProp = (col, value) => {
     if (!col || value === null || value === undefined || value === '') return;
-    if (col.type === 'title')        payload.properties[col.name] = { title: [{ text: { content: String(value) } }] };
+    if (col.type === 'title')          payload.properties[col.name] = { title: [{ text: { content: String(value) } }] };
     else if (col.type === 'rich_text') payload.properties[col.name] = { rich_text: [{ text: { content: String(value) } }] };
-    else if (col.type === 'number')  payload.properties[col.name] = { number: parseFloat(value) || 0 };
-    else if (col.type === 'select')  payload.properties[col.name] = { select: { name: String(value) } };
-    else if (col.type === 'date')    payload.properties[col.name] = { date: { start: String(value) } };
+    else if (col.type === 'number')    payload.properties[col.name] = { number: parseFloat(value) || 0 };
+    else if (col.type === 'select')    payload.properties[col.name] = { select: { name: String(value) } };
+    else if (col.type === 'date')      payload.properties[col.name] = { date: { start: String(value) } };
     else if (col.type === 'phone_number') payload.properties[col.name] = { phone_number: String(value) };
     else if (col.type === 'multi_select') payload.properties[col.name] = { multi_select: [{ name: String(value) }] };
-    else if (col.type === 'url')     payload.properties[col.name] = { url: String(value) };
+    else if (col.type === 'url')       payload.properties[col.name] = { url: String(value) };
   };
 
-  // ── CLIENTE (título de la página) + columna rich_text si existe por separado ──
   const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
   if (pTitle) payload.properties[pTitle] = { title: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
-  // Si hay una columna 'Cliente' de tipo rich_text separada, también la llenamos
-  const pCliente = findCol('cliente','name','nombre');
-  if (pCliente && pCliente.type !== 'title') setProp(pCliente, item.cliente || '(Sin cliente)');
 
-  // ── FECHA + HORA ──
-  const fullIso = (item.fecha||todayStr()) + (item.hora ? 'T'+item.hora+':00' : 'T09:00:00') + '-05:00';
-  setProp(findCol('fecha','date','día','dia'), fullIso);
+  const fullIso = (item.fecha || todayStr()) + (item.hora ? 'T' + item.hora + ':00' : 'T09:00:00') + '-05:00';
+  setProp(findCol('fecha', 'date', 'día', 'dia'), fullIso);
 
-  // ── CONTACTO / TELÉFONO ──
-  if (item.telefono) {
-    const pCon = findCol('contacto','telefono','teléfono','tel','phone');
-    if (pCon?.type === 'phone_number') payload.properties[pCon.name] = { phone_number: item.telefono };
-    else setProp(pCon, item.telefono);
+  if (item.telefono) setProp(findCol('contacto', 'telefono', 'teléfono', 'tel', 'phone'), item.telefono);
+  setProp(findCol('distrito', 'ubicacion', 'ubicación', 'zona'), item.ubicacion);
+
+  for (let i = 1; i <= 3; i++) {
+    const s = cobroObj['svc' + i];
+    const p = cobroObj['precio' + i] || 0;
+    const m = cobroObj['materiales' + i] || 0;
+    if (s) setProp(findCol('servicio ' + i, 'servicio' + i), s);
+    if (p > 0) setProp(findCol('precio ' + i, 'precio' + i), p);
+    if (m > 0) setProp(findCol(i + ' materiales', 'materiales ' + i, 'materiales' + i), m);
   }
 
-  // ── SERVICIOS 1-4 ──
-  const svcCols = [
-    findCol('servicio 1','servicio1','servicio','tipo','categoria','category'),
-    findCol('servicio 2','servicio2'),
-    findCol('servicio 3','servicio3'),
-    findCol('servicio 4','servicio4')
-  ];
-  [svc1,svc2,svc3,svc4].forEach((s,i) => { if(s) setProp(svcCols[i], s); });
+  const pagosMap = {
+    'Efectivo': cobroObj.pagoEfectivo || 0,
+    'Yape': cobroObj.pagoYape || 0,
+    'Plin': cobroObj.pagoPlin || 0,
+    'Transferencia': cobroObj.pagoTransf || 0,
+    'A Cuenta': cobroObj.pagoAcuenta || 0
+  };
+  Object.entries(pagosMap).forEach(([method, amt]) => {
+    if (amt > 0) setProp(findCol(method), amt);
+  });
 
-  // ── DISTRITO ──
-  if (item.ubicacion) setProp(findCol('distrito','ubicacion','ubicación','zona'), item.ubicacion);
-
-  // ── FORMA DE PAGO ──
-  if (formaPago) setProp(findCol('forma de pago','forma','pago','payment','método de pago'), formaPago);
-
-  // ── MOVILIDAD ──
-  if (movilidad > 0) setProp(findCol('movilidad','pasajes','gasolina','combustible','transporte'), movilidad);
-
-  // ── MATERIALES ──
-  if (materiales > 0) setProp(findCol('materiales','material','insumos','compras'), materiales);
-
-  // ── OTROS ──
-  if (otros > 0) setProp(findCol('otros','otros gastos','gastos extra','extra'), otros);
-
-  // ── META ──
-  if (meta > 0) setProp(findCol('meta','objetivo','goal','target'), meta);
-
-  // ── PRECIO DEL SERVICIO ──
-  setProp(findCol('precio del servicio','precio','monto','importe','total','amount'), ingreso);
-
-  // ── OBSERVACIONES ──
-  const extrasObs = [];
-  if (item.precio && item.precio !== ingreso) extrasObs.push(`(Precio acordado: S/${item.precio})`);
-  const notasFinal = [observaciones, ...extrasObs, item.notas||''].filter(Boolean).join(' · ');
-  if (notasFinal) setProp(findCol('observaciones','nota','notas','descripcion','descripción','notes'), notasFinal);
+  if ((cobroObj.movilidad || 0) > 0) setProp(findCol('movilidad', 'pasajes', 'gasolina'), cobroObj.movilidad);
+  if ((cobroObj.otros || 0) > 0)     setProp(findCol('agregados', 'otros', 'extra'), cobroObj.otros);
+  if ((cobroObj.meta || 0) > 0)      setProp(findCol('meta', 'objetivo', 'goal'), cobroObj.meta);
+  if (cobroObj.observaciones)        setProp(findCol('observaciones', 'nota', 'notas'), cobroObj.observaciones);
 
   const notionUrl = 'https://api.notion.com/v1/pages';
   const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
-  
   const res = await fetch(proxyUrl, {
     method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Notion-Version': '2022-06-28',
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Authorization': 'Bearer ' + token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
-
-  if (!res.ok) {
-    const errorText = await res.text().catch(()=>'');
-    throw new Error('HTTP ' + res.status + ' - ' + errorText);
-  }
-
-  return await res.json(); // Retorna la página creada, donde podremos extraer el id
+  if (!res.ok) throw new Error('Error Notion: ' + res.status);
+  return await res.json();
 }
 
 async function _updateNotionPage(pageId, updatedTx) {
@@ -7826,242 +7783,201 @@ function _aplicarEstadoAgenda(id, estado){
 function abrirModalCobro(id){
   window._cobroAgendaId = id;
   window._matUsadosTemp = [];
-  const item=(state.agenda||[]).find(x=>x.id===id);
+  const item = (state.agenda||[]).find(x => x.id === id);
   if(!item) return;
-  const precio=item.precio||0;
+  const precio = item.precio || 0;
   const svcOpts = (presel='') => '<option value="">-- ninguno --</option>' +
-    AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${s===presel?'selected':''}>${s}</option>`).join('');
+    AGENDA_SERVICIOS.map(s => '<option value="' + s + '" ' + (s === presel ? 'selected' : '') + '>' + s + '</option>').join('');
 
-  document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title" style="color:#2A4455">✓ Finalizar trabajo</div>
-    <div style="background:linear-gradient(135deg,#F3F0FF,#E8E5FE);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px">
-      <div style="font-weight:700;color:#3C3489">${item.cliente||'Cliente'}</div>
-      <div style="color:#6C3483;margin-top:2px;font-size:12px">${item.servicio||'Sin servicio'} · Precio acordado: <strong>${fmt(precio)}</strong></div>
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title" style="color:#2A4455">✓ Finalizar y Liquidar</div>
+    <div style="background:linear-gradient(135deg,#F3F0FF,#E8E5FE);border-radius:14px;padding:12px 16px;margin-bottom:14px">
+      <div style="font-weight:700;color:#3C3489;font-size:15px">${item.cliente||'Cliente'}</div>
+      <div style="color:#6C3483;font-size:13px;margin-top:3px">Acordado: <strong>${fmt(precio)}</strong></div>
     </div>
 
-    <!-- INGRESO -->
-    <div style="background:#EBF1F5;border:1px solid #54687833;border-radius:12px;padding:12px;margin-bottom:8px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#2A4455;margin-bottom:10px">💰 Ingreso del servicio</div>
-      <div class="field" style="margin-bottom:10px">
-        <label class="field-label" style="color:#2A4455;font-weight:700">¿Cuánto cobró? (S/)</label>
-        <div style="display:flex;gap:8px">
-          <input id="cobro-monto" type="number" inputmode="decimal" placeholder="0.00" value="${precio}" style="font-size:18px;font-weight:700;flex:2;color:#2A4455">
-          <button onclick="setCobro(${precio})" style="flex:1;background:#EBF1F5;border:1px solid #54687844;color:#2A4455;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">Todo</button>
-          <button onclick="setCobro(0)" style="flex:1;background:#FCEBEB;border:1px solid #E24B4A44;color:#791F1F;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">Nada</button>
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:14px;margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#64748B;margin-bottom:10px">🔧 Servicios y Costos</div>
+      ${[1,2,3].map(i => `
+        <div style="margin-bottom:${i<3?10:0}px;padding-bottom:${i<3?10:0}px;border-bottom:${i<3?'1px dashed #F1F5F9':'none'}">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+            <span style="width:19px;height:19px;border-radius:50%;background:#F1F5F9;color:#64748B;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center">${i}</span>
+            <select id="cobro-svc${i}" onchange="updateCobroTotals()" style="flex:1;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:12px;font-family:inherit">
+              ${svcOpts(i===1?(item.servicio||''):'')}</select>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding-left:25px">
+            <div><label style="font-size:10px;color:#94A3B8;font-weight:700;display:block;margin-bottom:2px">Precio S/</label>
+              <input id="cobro-precio${i}" type="number" inputmode="decimal" placeholder="0.00" value="${i===1?precio:''}" oninput="updateCobroTotals()" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:600"></div>
+            <div><label style="font-size:10px;color:#94A3B8;font-weight:700;display:block;margin-bottom:2px">Materiales S/</label>
+              <input id="cobro-mat${i}" type="number" inputmode="decimal" placeholder="0.00" oninput="updateCobroTotals()" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:13px"></div>
+          </div>
         </div>
-      </div>
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#334155;margin-bottom:6px">🔧 Servicios realizados</div>
-      <div style="display:flex;flex-direction:column;gap:5px">
-        <div style="display:flex;align-items:center;gap:6px">
-          <div style="width:20px;height:20px;border-radius:6px;background:#3C3489;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div>
-          <select id="cobro-svc1" style="flex:1;background:#fff;border:1px solid #C7B9F8;border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">${svcOpts(item.servicio||'')}</select>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <div style="width:20px;height:20px;border-radius:6px;background:#94A3B8;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div>
-          <select id="cobro-svc2" style="flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">${svcOpts()}</select>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <div style="width:20px;height:20px;border-radius:6px;background:#94A3B8;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div>
-          <select id="cobro-svc3" style="flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">${svcOpts()}</select>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <div style="width:20px;height:20px;border-radius:6px;background:#94A3B8;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">4</div>
-          <select id="cobro-svc4" style="flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">${svcOpts()}</select>
-        </div>
-      </div>
+      `).join('')}
     </div>
 
-    <!-- EGRESOS -->
-    <div style="background:#FEF2F2;border:1px solid #E0525233;border-radius:12px;padding:12px;margin-bottom:8px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#791F1F;margin-bottom:10px">📦 Egresos del trabajo</div>
+    <div style="background:#F0FDFA;border:1px solid #5EEAD444;border-radius:14px;padding:14px;margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#0F766E;margin-bottom:10px;display:flex;justify-content:space-between">
+        <span>💰 Liquidación</span>
+        <span>Falta: <strong id="cobro-falta-monto" style="color:#E05252">S/ 0.00</strong></span>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div class="field"><label class="field-label" style="font-size:11px">🚗 Movilidad/Gasolina</label>
-          <input id="cobro-movilidad" type="number" inputmode="decimal" placeholder="0.00" style="font-size:14px">
-        </div>
-        <div class="field"><label class="field-label" style="font-size:11px">🛒 Materiales</label>
-          <input id="cobro-materiales" type="text" readonly placeholder="Toca para agregar materiales" onclick="openMatUsadosForm(window._cobroAgendaId||'')" style="font-size:14px;cursor:pointer;background:#F8FAFC" value="">
-        </div>
-      </div>
-      <div class="field" style="margin-top:8px"><label class="field-label" style="font-size:11px">📦 Otros gastos (peajes, almuerzo, etc.)</label>
-        <input id="cobro-otros" type="number" inputmode="decimal" placeholder="0.00" style="font-size:14px">
-      </div>
-    </div>
-
-    <!-- DATOS EXTRA → NOTION -->
-    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:12px;margin-bottom:14px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748B;margin-bottom:10px">📋 Datos adicionales → Notion</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div class="field"><label class="field-label" style="font-size:11px">💳 Forma de pago</label>
-          <select id="cobro-forma-pago" style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:9px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
-            <option value="Efectivo">💵 Efectivo</option>
-            <option value="Yape">💜 Yape</option>
-            <option value="Plin">💙 Plin</option>
-            <option value="Transferencia">🏦 Transferencia</option>
-            <option value="A cuenta">📆 A cuenta</option>
-          </select>
-        </div>
-        <div class="field"><label class="field-label" style="font-size:11px">🎯 Meta (S/)</label>
-          <input id="cobro-meta" type="number" inputmode="decimal" placeholder="0.00" style="font-size:14px">
-        </div>
-      </div>
-      <!-- Distrito editable con combobox inteligente -->
-      <div class="field" style="margin-bottom:8px">
-        <label class="field-label" style="font-size:11px">📍 Distrito</label>
-        <div style="position:relative">
-          <input id="cobro-distrito"
-            type="text"
-            placeholder="Escribí el distrito..."
-            value="${item.ubicacion||''}"
-            autocomplete="off"
-            style="font-size:13px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:9px 10px;width:100%"
-            oninput="distritoComboShow('cobro-distrito','cobro-dist-dd')"
-            onfocus="distritoComboShow('cobro-distrito','cobro-dist-dd')"
-            onblur="setTimeout(()=>{const d=document.getElementById('cobro-dist-dd');if(d)d.style.display='none';},200)"
-            onkeydown="distritoComboKey(event,'cobro-distrito','cobro-dist-dd')">
-          <div id="cobro-dist-dd" style="display:none;position:absolute;z-index:999;width:100%;max-height:200px;overflow-y:auto;background:#fff;border:1px solid #C7D5E8;border-radius:10px;box-shadow:0 8px 24px #0002;top:calc(100% + 4px);left:0"></div>
-        </div>
-      </div>
-      <div class="field"><label class="field-label" style="font-size:11px">📝 Observaciones</label>
-        <textarea id="cobro-notas" placeholder="Ej: Se cambió válvula adicional..." style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:9px;font-size:13px;width:100%;min-height:52px;font-family:inherit;resize:vertical"></textarea>
+        <div><label style="font-size:10px;color:#0D9488;font-weight:700;display:block;margin-bottom:2px">💵 Efectivo</label>
+          <input id="pago-efectivo" type="number" inputmode="decimal" placeholder="0.00" oninput="updateCobroTotals()" style="width:100%;border:1px solid #99F6E4;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:700;color:#0F766E"></div>
+        <div><label style="font-size:10px;color:#0D9488;font-weight:700;display:block;margin-bottom:2px">💜 Yape</label>
+          <input id="pago-yape" type="number" inputmode="decimal" placeholder="0.00" oninput="updateCobroTotals()" style="width:100%;border:1px solid #99F6E4;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:700;color:#0F766E"></div>
+        <div><label style="font-size:10px;color:#0D9488;font-weight:700;display:block;margin-bottom:2px">💙 Plin</label>
+          <input id="pago-plin" type="number" inputmode="decimal" placeholder="0.00" oninput="updateCobroTotals()" style="width:100%;border:1px solid #99F6E4;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:700;color:#0F766E"></div>
+        <div><label style="font-size:10px;color:#0D9488;font-weight:700;display:block;margin-bottom:2px">🏦 Transf.</label>
+          <input id="pago-transferencia" type="number" inputmode="decimal" placeholder="0.00" oninput="updateCobroTotals()" style="width:100%;border:1px solid #99F6E4;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:700;color:#0F766E"></div>
+        <div style="grid-column:span 2"><label style="font-size:10px;color:#0D9488;font-weight:700;display:block;margin-bottom:2px">📆 A Cuenta</label>
+          <input id="pago-acuenta" type="number" inputmode="decimal" placeholder="0.00" oninput="updateCobroTotals()" style="width:100%;border:1px solid #99F6E4;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:700;color:#0F766E"></div>
       </div>
     </div>
 
-    <div class="btn-row">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div style="background:#FFF7ED;border:1px solid #FFEDD5;border-radius:12px;padding:10px">
+        <label style="font-size:10px;color:#9A3412;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">🚗 Movilidad</label>
+        <input id="cobro-movilidad" type="number" inputmode="decimal" placeholder="0.00" style="width:100%;border:1px solid #FED7AA;border-radius:8px;padding:6px 8px;font-size:13px"></div>
+      <div style="background:#FFF7ED;border:1px solid #FFEDD5;border-radius:12px;padding:10px">
+        <label style="font-size:10px;color:#9A3412;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">➕ Agregados</label>
+        <input id="cobro-otros" type="number" inputmode="decimal" placeholder="0.00" style="width:100%;border:1px solid #FED7AA;border-radius:8px;padding:6px 8px;font-size:13px"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div><label style="font-size:10px;color:#64748B;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">📍 Distrito</label>
+        <input id="cobro-distrito" type="text" value="${item.ubicacion||''}" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:12px"></div>
+      <div><label style="font-size:10px;color:#64748B;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">🎯 Meta S/</label>
+        <input id="cobro-meta" type="number" inputmode="decimal" placeholder="0.00" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:13px"></div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:10px;color:#64748B;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">📝 Observaciones</label>
+      <textarea id="cobro-notas" placeholder="Notas..." style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:7px 8px;font-size:12px;min-height:44px;font-family:inherit;resize:none"></textarea>
+    </div>
+
+    <div class="btn-row" style="margin-top:0">
       <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button style="flex:2;background:linear-gradient(135deg,#3D5F70,#546878);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="guardarFinalizacion('${id}')">
-        ✓ Guardar &amp; Enviar a Notion
+      <button style="flex:2;background:linear-gradient(135deg,#2A4455,#3D5F70);color:#fff;border:none;border-radius:12px;padding:13px;font-weight:800;font-family:inherit;font-size:14px;cursor:pointer" onclick="guardarFinalizacion('${id}')">
+        🚀 Finalizar y Sincronizar
       </button>
-    </div>`;
+    </div>
+  `;
   showModal();
+  updateCobroTotals();
+}
+
+window.updateCobroTotals = function() {
+  const p1 = parseFloat(document.getElementById('cobro-precio1')?.value)||0;
+  const p2 = parseFloat(document.getElementById('cobro-precio2')?.value)||0;
+  const p3 = parseFloat(document.getElementById('cobro-precio3')?.value)||0;
+  const totalPrecio = p1 + p2 + p3;
+  const ids = ['pago-efectivo','pago-yape','pago-plin','pago-transferencia','pago-acuenta'];
+  const totalPagado = ids.reduce((s, id) => s + (parseFloat(document.getElementById(id)?.value)||0), 0);
+  const falta = totalPrecio - totalPagado;
+  const el = document.getElementById('cobro-falta-monto');
+  if (el) { el.textContent = 'S/ ' + falta.toFixed(2); el.style.color = falta > 0 ? '#E05252' : falta < 0 ? '#1565C0' : '#0D9488'; }
 }
 
 function setCobro(v){ document.getElementById('cobro-monto').value=v; }
 
 async function guardarFinalizacion(id){
-  const item=(state.agenda||[]).find(x=>x.id===id);
+  const item = (state.agenda||[]).find(x => x.id === id);
   if(!item) return;
-  const cobrado    = parseFloat(document.getElementById('cobro-monto')?.value)||0;
-  const movilidad  = parseFloat(document.getElementById('cobro-movilidad')?.value)||0;
-  const materiales = parseFloat(document.getElementById('cobro-materiales')?.dataset?.total)||0;
-  const otros      = parseFloat(document.getElementById('cobro-otros')?.value)||0;
-  const meta       = parseFloat(document.getElementById('cobro-meta')?.value)||0;
-  const notas      = document.getElementById('cobro-notas')?.value.trim()||'';
-  const formaPago  = document.getElementById('cobro-forma-pago')?.value||'Efectivo';
-  const distrito   = document.getElementById('cobro-distrito')?.value.trim()||item.ubicacion||'';
-  const svc1 = document.getElementById('cobro-svc1')?.value||item.servicio||'';
-  const svc2 = document.getElementById('cobro-svc2')?.value||'';
-  const svc3 = document.getElementById('cobro-svc3')?.value||'';
-  const svc4 = document.getElementById('cobro-svc4')?.value||'';
-
-  const precio   = parseFloat(item.precio)||0;
-  const pendiente= parseFloat((precio-cobrado).toFixed(2));
-
-  item.estado    = 'se_finalizo';
-  item.montoPagado = cobrado;
-  item.montoPendienteCobro = Math.max(pendiente,0);
-
-  if(cobrado>=precio) item.estadoPago='completo';
-  else if(cobrado>0)  item.estadoPago='parcial';
-  else                item.estadoPago='sin_cobro';
-
-  if(notas) item.notas = (item.notas ? item.notas+' · ' : '')+notas;
-
-  // Guardar servicios en el item de agenda
-  item.servicio1 = svc1; item.servicio2 = svc2;
-  item.servicio3 = svc3; item.servicio4 = svc4;
-  item.formaPago = formaPago;
-  if(distrito) item.ubicacion = distrito; // actualizar si el usuario cambió el distrito
-
-  const agDesc = (svc1||item.servicio||'Servicio')+' — '+(item.cliente||'');
-  const baseTx = {category:svc1||item.servicio||'Servicio Gas', date:item.fecha,
-    description:agDesc, cliente:item.cliente||'', ubicacion:item.ubicacion||'', negocio:true};
-
-  const notionToken = localStorage.getItem('fnz_notion_token');
-  const dbidReporte = localStorage.getItem('fnz_notion_dbid');           // Reporte Diario
-  const dbidClientes= localStorage.getItem('fnz_notion_dbid_clientes'); // Clientes Potenciales
 
   const cobroObj = {
-    ingreso: cobrado, movilidad, materiales, otros, observaciones: notas,
-    formaPago, meta, svc1, svc2, svc3, svc4
+    svc1: document.getElementById('cobro-svc1')?.value||'',
+    precio1: parseFloat(document.getElementById('cobro-precio1')?.value)||0,
+    materiales1: parseFloat(document.getElementById('cobro-mat1')?.value)||0,
+    svc2: document.getElementById('cobro-svc2')?.value||'',
+    precio2: parseFloat(document.getElementById('cobro-precio2')?.value)||0,
+    materiales2: parseFloat(document.getElementById('cobro-mat2')?.value)||0,
+    svc3: document.getElementById('cobro-svc3')?.value||'',
+    precio3: parseFloat(document.getElementById('cobro-precio3')?.value)||0,
+    materiales3: parseFloat(document.getElementById('cobro-mat3')?.value)||0,
+    pagoEfectivo: parseFloat(document.getElementById('pago-efectivo')?.value)||0,
+    pagoYape: parseFloat(document.getElementById('pago-yape')?.value)||0,
+    pagoPlin: parseFloat(document.getElementById('pago-plin')?.value)||0,
+    pagoTransf: parseFloat(document.getElementById('pago-transferencia')?.value)||0,
+    pagoAcuenta: parseFloat(document.getElementById('pago-acuenta')?.value)||0,
+    movilidad: parseFloat(document.getElementById('cobro-movilidad')?.value)||0,
+    otros: parseFloat(document.getElementById('cobro-otros')?.value)||0,
+    meta: parseFloat(document.getElementById('cobro-meta')?.value)||0,
+    distrito: document.getElementById('cobro-distrito')?.value?.trim()||item.ubicacion||'',
+    observaciones: document.getElementById('cobro-notas')?.value?.trim()||''
   };
 
-  // ── 1. Reporte Diario (SIEMPRE, aunque sea sin cobro) ─────────────────────
-  if(notionToken && dbidReporte){
-    toast('⏳ Enviando a Notion Reporte Diario...','info');
-    try{
-      const notionRes = await _pushToNotion(item, cobroObj);
-      const notionId  = notionRes.id;
-      if(cobrado>0)    state.transactions.unshift({id:notionId+'-ing',type:'ingreso',amount:cobrado,...baseTx,_importadoDeNotion:true,_notionRowId:notionId});
-      if(movilidad>0)  state.transactions.unshift({id:notionId+'-mov',type:'egreso',amount:movilidad,...baseTx,category:'Movilidad',description:'Movilidad · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
-      if(materiales>0) state.transactions.unshift({id:notionId+'-mat',type:'egreso',amount:materiales,...baseTx,category:'Materiales',description:'Materiales · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
-      if(otros>0)      state.transactions.unshift({id:notionId+'-otr',type:'egreso',amount:otros,...baseTx,category:'Mantenimiento o Rep',description:'Otros Gastos · '+agDesc,_importadoDeNotion:true,_notionRowId:notionId});
-      toast('✓ Registrado en Reporte Diario','success');
-    } catch(err){
-      console.error('Error Notion Reporte Diario:',err);
-      toast('⚠ Error Reporte Diario — guardado localmente','error');
-      _guardarFinalizacionLocal(Date.now()+'_ag', cobrado, movilidad, materiales, otros, baseTx, agDesc);
+  const totalPrecio = cobroObj.precio1 + cobroObj.precio2 + cobroObj.precio3;
+  const totalMat    = cobroObj.materiales1 + cobroObj.materiales2 + cobroObj.materiales3;
+  const totalPagado = cobroObj.pagoEfectivo + cobroObj.pagoYape + cobroObj.pagoPlin + cobroObj.pagoTransf;
+
+  item.estado = 'se_finalizo';
+  item.montoPagado = totalPagado;
+  item.montoPendienteCobro = Math.max(totalPrecio - totalPagado, 0);
+  if (cobroObj.distrito) item.ubicacion = cobroObj.distrito;
+  if (cobroObj.observaciones) item.notas = (item.notas ? item.notas + ' · ' : '') + cobroObj.observaciones;
+
+  if (totalPagado >= totalPrecio) item.estadoPago = 'completo';
+  else if (totalPagado > 0)       item.estadoPago = 'parcial';
+  else                             item.estadoPago = 'sin_cobro';
+
+  let notionRowId = null;
+  const token = localStorage.getItem('fnz_notion_token');
+  const dbId  = localStorage.getItem('fnz_notion_dbid');
+  if (token && dbId) {
+    toast('⏳ Sincronizando Notion...', 'info');
+    try {
+      const r = await _pushToNotion(item, cobroObj);
+      notionRowId = r.id;
+      toast('✓ Registrado en Notion', 'success');
+    } catch(e) {
+      console.error(e);
+      toast('⚠ Error Notion — guardado local', 'error');
     }
-  } else {
-    _guardarFinalizacionLocal(Date.now()+'_ag', cobrado, movilidad, materiales, otros, baseTx, agDesc);
   }
 
-  // ── 2. Actualizar Clientes Potenciales en Notion → estado se_finalizo ──────
-  if(notionToken && dbidClientes && item._notionRowId){
-    _pushToNotionClientes({
-      ...item,
-      estado:     'se_finalizo',
-      estadoPago: item.estadoPago,
-      montoPagado: cobrado
-    }).catch(e=>console.warn('Clientes Potenciales Notion (no crítico):', e.message));
-  }
+  const rowId  = notionRowId || Date.now();
+  const agDesc = (cobroObj.svc1 || item.servicio || 'Servicio') + ' — ' + (item.cliente || '');
+  const baseTx = { date: item.fecha, cliente: item.cliente||'', ubicacion: item.ubicacion, negocio: true, _notionRowId: notionRowId };
 
-  if(item.estadoPago==='parcial'&&pendiente>0){
-    const deudaAuto={id:Date.now()+'_dag',name:'Saldo pendiente — '+(item.cliente||''),
-      totalAmount:pendiente,cuotaMonto:pendiente,cuotasTotales:1,cuotasPagadas:0,categoria:'Servicio',color:'#9B59B6'};
-    if(!state.debts) state.debts=[];
+  const pagos = [
+    { name:'Efectivo',      val: cobroObj.pagoEfectivo },
+    { name:'Yape',          val: cobroObj.pagoYape },
+    { name:'Plin',          val: cobroObj.pagoPlin },
+    { name:'Transferencia', val: cobroObj.pagoTransf }
+  ];
+  pagos.forEach(p => {
+    if (p.val > 0) state.transactions.unshift({ id: rowId + '-' + p.name.toLowerCase(), type:'ingreso', amount:p.val, category: cobroObj.svc1||'Servicio', description: agDesc + ' (' + p.name + ')', formaPago: p.name, ...baseTx });
+  });
+  if (cobroObj.movilidad > 0) state.transactions.unshift({ id: rowId+'-mov', type:'egreso', amount:cobroObj.movilidad, category:'Movilidad', description:'Movilidad · '+agDesc, ...baseTx });
+  if (totalMat > 0)           state.transactions.unshift({ id: rowId+'-mat', type:'egreso', amount:totalMat, category:'Materiales', description:'Materiales · '+agDesc, ...baseTx });
+  if (cobroObj.otros > 0)     state.transactions.unshift({ id: rowId+'-otr', type:'egreso', amount:cobroObj.otros, category:'Mantenimiento o Rep', description:'Otros · '+agDesc, ...baseTx });
+
+  if (item.estadoPago === 'parcial' && cobroObj.pagoAcuenta > 0) {
+    const deudaAuto = { id: Date.now()+'_dag', name:'Saldo pendiente — '+(item.cliente||''), totalAmount: cobroObj.pagoAcuenta, cuotaMonto: cobroObj.pagoAcuenta, cuotasTotales:1, cuotasPagadas:0, categoria:'Servicio', color:'#9B59B6' };
+    if (!state.debts) state.debts = [];
     state.debts.push(deudaAuto);
-    syncSeccionToSheets('deuda',deudaAuto);
-    toast('⚠ Cobro parcial · Deuda de '+fmt(pendiente)+' creada automáticamente','info');
+    syncSeccionToSheets('deuda', deudaAuto);
+    toast('⚠ A cuenta: ' + fmt(cobroObj.pagoAcuenta) + ' registrado como deuda', 'info');
   }
 
-  save('fnz_agenda',state.agenda); saveAll();
-  // ── Sheets: 1) Escribir en Reporte Diario (tipo 'trabajo') ──────────────
-  const urlSh = localStorage.getItem('fnz_sheets_url')||'';
-  if(urlSh){
-    const itemTrabajo = {
-      id:           item.id,
-      fecha:        item.fecha,
-      cliente:      item.cliente,
-      telefono:     item.telefono,
-      servicio1:    svc1 || item.servicio || item.servicio1,
-      servicio2:    svc2 || item.servicio2,
-      servicio3:    svc3 || item.servicio3,
-      servicio4:    svc4 || item.servicio4,
-      ubicacion:    distrito || item.ubicacion,
-      formaPago,
-      ingreso:      cobrado,
-      movilidad,
-      materiales,
-      otros,
-      meta,
-      observaciones: notas || item.notas || '',
-    };
-    _sendToSheets(urlSh, { type:'trabajo', item: itemTrabajo, modo: state.modo });
-
-    // 2) Actualizar estado en Clientes Potenciales ─────────────────────────
-    syncAgendaToSheets({ ...item, estado: 'se_finalizo', montoPagado: cobrado, estadoPago: item.estadoPago });
-
-    // 3) Enviar los movimientos (ingresos y egresos) al histórico de Sheets ──
-    setTimeout(() => {
-      if(cobrado > 0)    _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_ing', amount: cobrado, type: 'ingreso' }, modo: 'negocio' });
-      if(movilidad > 0)  _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_mov', amount: movilidad, type: 'egreso', category: 'Movilidad', description: 'Movilidad · '+agDesc }, modo: 'negocio' });
-      if(materiales > 0) _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_mat', amount: materiales, type: 'egreso', category: 'Materiales', description: 'Materiales · '+agDesc }, modo: 'negocio' });
-      if(otros > 0)      _sendToSheets(urlSh, { type:'tx', tx: { ...baseTx, id: item.id+'_otr', amount: otros, type: 'egreso', category: 'Mantenimiento o Rep', description: 'Otros Gastos · '+agDesc }, modo: 'negocio' });
-    }, 500);
+  const urlSh = localStorage.getItem('fnz_sheets_url');
+  if (urlSh) {
+    const tp = pagos.filter(p => p.val > 0).slice(0, 2);
+    _sendToSheets(urlSh, { type:'trabajo', item:{
+      id: item.id, fecha: item.fecha, cliente: item.cliente, telefono: item.telefono, ubicacion: item.ubicacion,
+      servicio1: cobroObj.svc1, precio1: cobroObj.precio1, materiales1: cobroObj.materiales1,
+      servicio2: cobroObj.svc2, precio2: cobroObj.precio2, materiales2: cobroObj.materiales2,
+      servicio3: cobroObj.svc3, precio3: cobroObj.precio3, materiales3: cobroObj.materiales3,
+      formaPago1: tp[0]?tp[0].name:'', formaPago2: tp[1]?tp[1].name:'',
+      movilidad: cobroObj.movilidad, agregados: cobroObj.otros, meta: cobroObj.meta, observaciones: cobroObj.observaciones
+    }, modo: state.modo });
+    syncAgendaToSheets({ ...item, estado:'se_finalizo', montoPagado:totalPagado, estadoPago:item.estadoPago });
   }
-  closeModal(); render();
-  if(item.estadoPago==='completo') toast('✓ Trabajo finalizado · '+fmt(cobrado)+' cobrado');
-  else if(item.estadoPago==='sin_cobro') toast('Trabajo finalizado · Sin cobro registrado');
+
+  save('fnz_agenda', state.agenda);
+  saveAll();
+  closeModal();
+  render();
+  toast('✓ Trabajo finalizado correctamente');
 }
 
 function _guardarFinalizacionLocal(lId, cobrado, movilidad, materiales, otros, baseTx, agDesc){
@@ -14526,203 +14442,8 @@ function closeNegocioModal() {
   document.getElementById('negocioModal').style.display='none';
 }
 
-</script>
 
-<!-- ── MI NEGOCIO MODAL ── -->
-<div class="overlay" id="negocioModal" style="display:none" onclick="if(event.target===this)closeNegocioModal()">
-  <div class="modal" onclick="event.stopPropagation()" style="background:#FFFFFF;padding-bottom:20px">
-    <div style="font-family:'Playfair Display',serif;font-size:20px;color:#1565C0;margin-bottom:16px;text-align:center">🔵 Mi Negocio</div>
-    <div id="negocioModalContent"></div>
-  </div>
-</div>
 
-<!-- ── TRANSFER MODAL ── -->
-<div class="overlay" id="transferModal" style="display:none" onclick="if(event.target===this)closeTransferModal()">
-  <div class="modal" onclick="event.stopPropagation()" style="background:#FFFFFF;padding-bottom:30px">
-
-    <div style="font-family:'Playfair Display',serif;font-size:19px;color:#1565C0;margin-bottom:6px">⇄ Transferir entre cuentas</div>
-    <div style="font-size:12px;color:#94A3B8;margin-bottom:18px">El dinero se registra en ambas cuentas automáticamente</div>
-
-    <!-- Tipo de operación -->
-    <div style="display:flex;gap:8px;margin-bottom:16px">
-      <button id="tf-btn-transfer" onclick="document.getElementById('tf-tipo').value='transferencia';updateTransferUI();this.style.background='#1565C0';this.style.color='#fff';document.getElementById('tf-btn-retiro').style.background='#F1F5F9';document.getElementById('tf-btn-retiro').style.color='#94A3B8';"
-        style="flex:1;padding:9px;border-radius:10px;border:none;background:#1565C0;color:#fff;font-weight:700;font-size:12px;cursor:pointer">
-        ⇄ Transferencia
-      </button>
-      <div id="tf-retiro-row" style="flex:1">
-      <button id="tf-btn-retiro" onclick="document.getElementById('tf-tipo').value='retiro';updateTransferUI();this.style.background='#C9A84C';this.style.color='#0D0D0F';document.getElementById('tf-btn-transfer').style.background='#F1F5F9';document.getElementById('tf-btn-transfer').style.color='#94A3B8';"
-        style="width:100%;padding:9px;border-radius:10px;border:none;background:#F1F5F9;color:#94A3B8;font-weight:700;font-size:12px;cursor:pointer">
-        💼 Retiro personal
-      </button>
-      </div>
-    </div>
-    <input type="hidden" id="tf-tipo" value="transferencia">
-
-    <!-- Desde → Hacia -->
-    <div style="display:flex;align-items:center;justify-content:center;gap:10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:16px">
-      <div style="text-align:center">
-        <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;margin-bottom:4px">Desde</div>
-        <div id="tf-desde-label" style="font-size:14px;font-weight:700;color:#1565C0">🔵 Mi Negocio</div>
-      </div>
-      <div style="font-size:22px;color:#94A3B8">→</div>
-      <div style="text-align:center">
-        <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;margin-bottom:4px">Hacia</div>
-        <div id="tf-hacia-label" style="font-size:14px;font-weight:700;color:var(--gold)">👤 Personal</div>
-      </div>
-    </div>
-
-    <!-- Monto -->
-    <div class="field" style="margin-bottom:12px">
-      <label class="field-label">Monto (S/)</label>
-      <input id="tf-amount" type="number" inputmode="decimal" placeholder="0.00"
-        style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:12px 14px;color:#1E293B;font-family:'DM Sans',sans-serif;font-size:16px;width:100%">
-    </div>
-
-    <!-- Descripción -->
-    <div class="field" style="margin-bottom:12px">
-      <label class="field-label">Descripción (opcional)</label>
-      <input id="tf-desc" type="text" placeholder="Ej: Para pagar servicios del mes"
-        style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:12px 14px;color:#1E293B;font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-    </div>
-
-    <!-- Fecha -->
-    <div class="field" style="margin-bottom:14px">
-      <label class="field-label">📅 Fecha</label>
-      <input id="tf-date" type="date"
-        style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:12px 14px;color:#1E293B;font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-    </div>
-
-    <!-- Nota informativa -->
-    <div id="tf-nota" style="background:#EFF6FF;border:1px solid #1565C033;border-radius:10px;padding:10px 14px;font-size:12px;color:#1565C0;margin-bottom:16px">
-      ⚡ Se registrará automáticamente en ambas cuentas.
-    </div>
-
-    <!-- Botones -->
-    <div style="display:flex;gap:8px">
-      <button class="btn-ghost" onclick="closeTransferModal()" style="flex:1">Cancelar</button>
-      <button onclick="ejecutarTransferencia()" style="flex:2;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
-        ✓ Confirmar transferencia
-      </button>
-    </div>
-
-  </div>
-</div>
-
-<!-- ── MIC FAB ── -->
-<button id="micFab" onclick="openMicModal()" title="Registrar por voz">
-  <span id="micFabIcon">🎙</span>
-</button>
-
-<!-- ── MIC MODAL ── -->
-<div class="overlay" id="micModal" style="display:none" onclick="closeMicModal(event)">
-  <div class="modal" id="micBox" onclick="event.stopPropagation()" style="padding-bottom:24px;transition:background .3s">
-
-    <!-- Header dinámico -->
-    <div id="micHeader" style="text-align:center;margin-bottom:14px;padding:14px 16px;border-radius:12px;background:#1E293B;transition:background .3s">
-      <div id="micContextIcon" style="font-size:28px;margin-bottom:4px">🎙</div>
-      <div id="micContextTitle" style="font-family:'Playfair Display',serif;font-size:17px;color:#fff;margin-bottom:2px">Registro por Voz</div>
-      <div id="micContextSub" style="font-size:11px;color:#ffffff88">Habla y detecto qué registrar</div>
-      <div id="micHint" style="font-size:11px;color:#ffffff88;display:none">Di algo como: <em id="micHintText">"Gasté 50 soles en comida"</em></div>
-    </div>
-
-    <!-- Visualizador de onda -->
-    <div id="micWave" style="display:flex;align-items:center;justify-content:center;gap:4px;height:36px;margin-bottom:10px">
-      <span class="wave-bar" style="--d:0s"></span>
-      <span class="wave-bar" style="--d:.1s"></span>
-      <span class="wave-bar" style="--d:.2s"></span>
-      <span class="wave-bar" style="--d:.05s"></span>
-      <span class="wave-bar" style="--d:.15s"></span>
-      <span class="wave-bar" style="--d:.25s"></span>
-      <span class="wave-bar" style="--d:.08s"></span>
-    </div>
-
-    <!-- Comandos rápidos -->
-    <div id="micChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94A3B8;width:100%;margin-bottom:2px">Comandos más usados:</div>
-      <button onclick="usarChip(this)" class="mic-chip">💰 Gasté ... soles</button>
-      <button onclick="usarChip(this)" class="mic-chip">📥 Cobré ... soles</button>
-      <button onclick="usarChip(this)" class="mic-chip">🔧 Hice un trabajo</button>
-      <button onclick="usarChip(this)" class="mic-chip">📅 Agenda trabajo</button>
-      <button onclick="usarChip(this)" class="mic-chip">📅 Visita mañana</button>
-      <button onclick="usarChip(this)" class="mic-chip">📋 Crea una lista</button>
-      <button onclick="usarChip(this)" class="mic-chip">📝 Crea una nota</button>
-    </div>
-
-    <!-- Texto reconocido en tiempo real -->
-    <div id="micText" style="min-height:44px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:12px 14px;font-size:13px;color:#94A3B8;text-align:center;margin-bottom:12px;line-height:1.5">
-      Presiona el micrófono y habla...
-    </div>
-
-    <!-- ★ FORMULARIO FANTASMA — campos en gris, se llenan en tiempo real -->
-    <div id="micGhostForm" style="display:none;margin-bottom:12px">
-      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#94A3B8;margin-bottom:8px">📋 Datos detectados</div>
-      <div id="micGhostFields" style="display:flex;flex-direction:column;gap:6px"></div>
-      <!-- Campos faltantes -->
-      <div id="micMissingFields" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px"></div>
-    </div>
-
-    <!-- Preview resultado final (igual que antes) -->
-    <div id="micPreview" style="display:none;background:#EBF1F5;border:1px solid #54687833;border-radius:12px;padding:14px;margin-bottom:12px">
-      <div style="font-size:11px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Interpreté esto:</div>
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <div>
-          <div id="pvType" style="font-size:13px;font-weight:700"></div>
-          <div id="pvCat" style="font-size:12px;color:#94A3B8;margin-top:2px"></div>
-          <div id="pvDesc" style="font-size:12px;color:#64748B;margin-top:2px"></div>
-          <div id="pvDateLbl" style="font-size:12px;color:#2E86AB;margin-top:4px;font-weight:500"></div>
-          <div id="pvClienteBadge" style="display:none;margin-top:5px;background:#EFF6FF;border:1px solid #2E86AB44;border-radius:8px;padding:4px 10px;font-size:11px;color:#1565C0;font-weight:600"></div>
-          <div id="pvNegocioBadge" style="display:none;margin-top:5px;background:#FFF8E1;border:1px solid #C9A84C44;border-radius:8px;padding:4px 10px;font-size:11px;color:#E65100;font-weight:600"></div>
-          <div id="pvServiceBadge" style="display:none;margin-top:6px;background:#EFF6FF;border:1px solid #2E86AB33;border-radius:8px;padding:5px 10px;font-size:11px;color:#2E86AB;font-weight:600"></div>
-          <div id="pvAmbiguityRow" style="display:none;margin-top:10px;flex-direction:column;gap:6px">
-            <div style="font-size:11px;color:#E65100;font-weight:700;text-align:center">⚠ ¿Este gasto es para tu negocio o personal?</div>
-            <div style="display:flex;gap:8px">
-              <button onclick="confirmarNegocio(true)" style="flex:1;padding:10px;border-radius:10px;border:1px solid #1565C055;background:#EFF6FF;color:#1565C0;font-weight:700;font-size:13px;cursor:pointer">🏗️ Negocio</button>
-              <button onclick="confirmarNegocio(false)" style="flex:1;padding:10px;border-radius:10px;border:1px solid #60748B55;background:#F8FAFC;color:#607D8B;font-weight:700;font-size:13px;cursor:pointer">🏠 Personal</button>
-            </div>
-          </div>
-        </div>
-        <div id="pvAmt" style="font-family:'Playfair Display',serif;font-size:26px"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
-        <div>
-          <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;margin-bottom:4px">Monto</div>
-          <input id="pvAmtEdit" type="number" inputmode="decimal" placeholder="0.00" style="width:100%;background:#FFF;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:14px;color:#1E293B;font-family:'DM Sans',sans-serif">
-        </div>
-        <div>
-          <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;margin-bottom:4px">Tipo</div>
-          <select id="pvTypeEdit" style="width:100%;background:#FFF;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:14px;color:#1E293B;font-family:'DM Sans',sans-serif">
-            <option value="ingreso">↑ Ingreso</option>
-            <option value="egreso">↓ Egreso</option>
-          </select>
-        </div>
-        <div>
-          <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;margin-bottom:4px">Categoría</div>
-          <select id="pvCatEdit" style="width:100%;background:#FFF;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:14px;color:#1E293B;font-family:'DM Sans',sans-serif"></select>
-        </div>
-        <div>
-          <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;margin-bottom:4px">Descripción</div>
-          <input id="pvDescEdit" type="text" placeholder="Descripción opcional" style="width:100%;background:#FFF;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:14px;color:#1E293B;font-family:'DM Sans',sans-serif">
-        </div>
-        <div style="grid-column:1/-1">
-          <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;margin-bottom:4px">📅 Fecha</div>
-          <input id="pvDateEdit" type="date" style="width:100%;background:#FFF;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:14px;color:#1E293B;font-family:'DM Sans',sans-serif">
-        </div>
-      </div>
-    </div>
-
-    <!-- Botones -->
-    <div style="display:flex;gap:10px;margin-bottom:10px">
-      <button id="micBtn" onclick="toggleListening()" style="flex:1;background:linear-gradient(135deg,#546878,#6A8494);color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s">
-        <span id="micBtnIcon">🎙</span> <span id="micBtnTxt">Escuchar</span>
-      </button>
-    </div>
-    <div style="display:flex;gap:8px" id="micConfirmRow">
-      <button class="btn-ghost" onclick="closeMicModal()" style="flex:1">Cancelar</button>
-      <button id="micSaveBtn" class="btn-green" onclick="saveMicTx()" style="flex:2;display:none;font-size:15px;padding:14px;font-weight:700">✓ Guardar</button>
-    </div>
-  </div>
-</div>
-<script>
 // ═══════════════════════════════════════════════════════════════════
 // 🚀 NOTAS PREMIUM 5.0 - TODAS LAS NUEVAS FEATURES
 // ═══════════════════════════════════════════════════════════════════
@@ -17406,6 +17127,7 @@ function syncCompraToSheets(compra){
   const { imagen_boleta, ...sinImg } = compra;
   _sendToSheets(url, { type:'inventario_compra', item:sinImg });
 }
+
 
 
 
