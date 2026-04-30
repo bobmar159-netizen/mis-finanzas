@@ -3251,7 +3251,7 @@ function enviarTodoASheets() {
 
   if (!confirm(`¿Enviar TODO a Sheets?\n\n· ${txs.length} movimientos\n· ${agenda.length} elementos de agenda\n· ${deudas.length} deudas\n\nSi ya existen en Sheets se actualizarán, no se duplicarán.`)) return;
 
-  const status = document.getElementById('notion-sync-status');
+  const status = document.getElementById('sheets-sync-status');
   let enviados = 0;
   const todos = [];
 
@@ -6456,7 +6456,8 @@ function renderAjustes(){
         <button onclick="testSheetsSync()" style="flex:1;background:transparent;border:1px solid #1565C044;color:#1565C0;border-radius:10px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Probar</button>
       </div>
       <button onclick="reloadFromSheets()" style="width:100%;margin-top:8px;background:#EBF1F5;border:1px solid #54687844;color:var(--gold);border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">☁️ Restaurar datos desde Sheets</button>
-      <button onclick="syncAllTxToSheets(false)" style="width:100%;margin-top:6px;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">⬆ Enviar TODO a Sheets</button>
+      <button onclick="enviarTodoASheets()" style="width:100%;margin-top:6px;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">⬆ Enviar TODO a Sheets</button>
+      <div id="sheets-sync-status" style="margin-top:6px;font-size:11px;color:var(--muted);text-align:center"></div>
     `)}
 
     ${sec('notion','🔥','Notion','App → Notion (fuente de verdad)','#6B46C1',`
