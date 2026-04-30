@@ -5988,10 +5988,14 @@ async function notionCargarManual() {
       <div class="btn-row">
         <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
         <button style="flex:2;background:linear-gradient(135deg,#5B21B6,#7C3AED);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer"
-          onclick="notionConfirmarCarga(${JSON.stringify(soloNuevos.map(p=>p.id))}, ${JSON.stringify(posibleDup.map(d=>d.pageId))}, ${JSON.stringify(allResults.map(p=>p.id))})">
+          onclick="notionConfirmarCarga()">
           ✓ Importar ${soloNuevos.length} nuevos
         </button>
       </div>`;
+    // ★ Guardar en window para que notionConfirmarCarga() acceda sin re-fetch
+    window._notionPreviewSoloNuevos = soloNuevos;
+    window._notionPreviewPosibleDup = posibleDup;
+    window._notionPreviewAllResults = allResults;
     showModal();
 
   } catch(err) {
@@ -6001,77 +6005,68 @@ async function notionCargarManual() {
   }
 }
 
-async function notionConfirmarCarga(soloNuevosIds, posibleDupIds, allIds) {
-  const incluirDup = document.getElementById('incluir-posibles-dup')?.checked || false;
+async function notionConfirmarCarga() {
+  const soloNuevos  = window._notionPreviewSoloNuevos || [];
+  const posibleDup  = window._notionPreviewPosibleDup || [];
+  const allResults  = window._notionPreviewAllResults || [];
+  const incluirDup  = document.getElementById('incluir-posibles-dup')?.checked || false;
   closeModal();
-
-  const token = localStorage.getItem('fnz_notion_token');
-  const dbIdFinanzas = localStorage.getItem('fnz_notion_dbid');
-  const dbIdClientes = localStorage.getItem('fnz_notion_dbid_clientes');
-  const dbs = [dbIdFinanzas, dbIdClientes].filter(Boolean);
-
-  if (!token || dbs.length === 0) return;
 
   const statusEl = document.getElementById('notion-load-status');
   if (statusEl) statusEl.textContent = '⏳ Importando...';
   toast('⏳ Importando desde Notion...', 'info');
 
   try {
-    // Re-fetch solo los que necesitamos para no guardar referencias obsoletas
+    // Usar los resultados ya descargados en el preview (sin re-fetch)
     const idsAImportar = new Set([
-      ...soloNuevosIds,
-      ...(incluirDup ? posibleDupIds : [])
+      ...soloNuevos.map(p => p.id),
+      ...(incluirDup ? posibleDup.map(d => d.pageId) : [])
     ]);
+
     if (idsAImportar.size === 0) {
       toast('No hay registros nuevos para importar', 'info');
       if (statusEl) statusEl.textContent = '✓ Nada que importar';
       return;
     }
 
-    // ★ FIX: declarar allResults localmente (bug: antes usaba scope externo vacío)
-    let allResults = [];
+    // Filtrar los resultados ya en memoria
+    const aImportar = allResults.filter(p => idsAImportar.has(p.id));
 
-    // 1. Traer registros seleccionados de todas las bases de datos configuradas
-    for (const dbId of dbs) {
-      const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
-      const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
-      let cursor = undefined;
-      do {
-        const bodyObj = { page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) };
-        const res = await fetch(proxyUrl, {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer '+token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
-          body: JSON.stringify(bodyObj)
-        });
-        const data = await res.json();
-        // Filtrar solo los IDs que el usuario aceptó importar
-        if (data.results) {
-          allResults = allResults.concat(data.results.filter(p => idsAImportar.has(p.id)));
-        }
-        cursor = data.has_more ? data.next_cursor : undefined;
-      } while (cursor);
+    if (!aImportar.length) {
+      toast('No se encontraron registros para importar', 'error');
+      if (statusEl) statusEl.textContent = '⚠ Sin registros';
+      return;
     }
 
-    if (!allResults.length) {
-      toast('No se encontraron registros para importar', 'error'); return;
-    }
+    if (statusEl) statusEl.textContent = '⏳ Procesando ' + aImportar.length + ' registros...';
 
-    const csvText = _notionResultsToCSV(allResults);
+    const csvText = _notionResultsToCSV(aImportar);
     const result  = _procesarCsvNotionTexto(csvText, 'notion-load-status', false);
 
     if (result && result.ok) {
       localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
-      const msg = '✅ ' + (result.txImportadas||0) + ' registros importados desde Notion';
+      const msg = '✅ ' + (result.txImportadas || 0) + ' registros importados desde Notion';
       if (statusEl) statusEl.textContent = msg;
       toast(msg, 'success');
+      render();
+    } else {
+      const msg = '⚠ Importación completada con advertencias';
+      if (statusEl) statusEl.textContent = msg;
+      toast(msg, 'info');
     }
+
+    // Limpiar cache
+    window._notionPreviewSoloNuevos = null;
+    window._notionPreviewPosibleDup = null;
+    window._notionPreviewAllResults = null;
+
   } catch(err) {
     if (statusEl) statusEl.textContent = '⚠ Error: ' + err.message;
     toast('Error importando: ' + err.message.slice(0,80), 'error');
+    console.error('[Notion] notionConfirmarCarga error:', err);
   }
 }
 
-// ★ Forzar importación completa desde Notion (ignora filtro de fecha)
 async function notionApiTest(){
   const token = localStorage.getItem('fnz_notion_token');
   const dbId  = localStorage.getItem('fnz_notion_dbid');
