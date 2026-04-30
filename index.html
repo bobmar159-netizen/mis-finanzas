@@ -3290,9 +3290,7 @@ function enviarTodoASheets() {
   const trabajos = Object.values(notionRows);
   const totalReal = txsNormales.length + trabajos.length + agenda.length + deudas.length;
 
-  if (!confirm(`¿Enviar TODO a Sheets?\n\n· ${txsNormales.length} movimientos libres\n· ${trabajos.length} trabajos (Reporte Diario)\n· ${agenda.length} elementos de agenda\n· ${deudas.length} deudas\n\nLos registros de Notion se enviarán unidos al Reporte Diario.\`)) return;
-
-  const status = document.getElementById('sheets-sync-status');
+  if (!confirm(`¿Enviar TODO a Sheets?\n\n· ${txsNormales.length} movimientos libres\n· ${trabajos.length} trabajos (Reporte Diario)\n· ${agenda.length} elementos de agenda\n· ${deudas.length} deudas\n\nLos registros de Notion se enviarán unidos al Reporte Diario.`)) return;  const status = document.getElementById('sheets-sync-status');
   let enviados = 0;
   const todos = [];
 
