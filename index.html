@@ -3249,43 +3249,90 @@ function enviarTodoASheets() {
   const total = txs.length + agenda.length + deudas.length;
   if (total === 0) return toast('No hay datos para enviar', 'error');
 
-  if (!confirm(`¿Enviar TODO a Sheets?\n\n· ${txs.length} movimientos\n· ${agenda.length} elementos de agenda\n· ${deudas.length} deudas\n\nSi ya existen en Sheets se actualizarán, no se duplicarán.`)) return;
+  // ★ Agrupar transacciones de Notion en Trabajos (Reporte Diario)
+  const notionRows = {};
+  const txsNormales = [];
+  
+  txs.forEach(tx => {
+    if (tx._importadoDeNotion && tx._notionRowId) {
+      if (!notionRows[tx._notionRowId]) {
+        notionRows[tx._notionRowId] = {
+          id: tx._notionRowId.split('-')[0], // Base ID
+          fecha: tx.date,
+          cliente: tx.cliente || '(Sin cliente)',
+          telefono: tx.contacto || '',
+          ubicacion: tx.ubicacion || '',
+          formaPago: tx.formaPago || '',
+          ingreso: 0, movilidad: 0, materiales: 0, otros: 0, meta: 0,
+          servicio: '', observaciones: ''
+        };
+      }
+      const row = notionRows[tx._notionRowId];
+      const amt = parseFloat(tx.amount) || 0;
+      if (tx.type === 'ingreso') {
+        row.ingreso += amt;
+        row.servicio = tx.category;
+        row.observaciones = tx.description;
+      } else if (tx.id.endsWith('-mov') || tx.category === 'Movilidad') {
+        row.movilidad += amt;
+      } else if (tx.id.endsWith('-mat') || tx.category === 'Materiales') {
+        row.materiales += amt;
+      } else if (tx.id.endsWith('-otr') || tx.category === 'Mantenimiento o Reparaciones') {
+        row.otros += amt;
+      } else if (tx.id.endsWith('-met') || tx.category === 'Ahorro / Inversión') {
+        row.meta += amt;
+      }
+    } else {
+      txsNormales.push(tx);
+    }
+  });
+
+  const trabajos = Object.values(notionRows);
+  const totalReal = txsNormales.length + trabajos.length + agenda.length + deudas.length;
+
+  if (!confirm(`¿Enviar TODO a Sheets?\n\n· ${txsNormales.length} movimientos libres\n· ${trabajos.length} trabajos (Reporte Diario)\n· ${agenda.length} elementos de agenda\n· ${deudas.length} deudas\n\nLos registros de Notion se enviarán unidos al Reporte Diario.\`)) return;
 
   const status = document.getElementById('sheets-sync-status');
   let enviados = 0;
   const todos = [];
 
-  // Movimientos
-  txs.forEach(tx => todos.push({ delay: todos.length * 200, fn: () => {
-    const payload = { type:'tx', modo: tx.negocio?'negocio':'personal', timestamp:'tx_'+tx.id+'_'+Date.now(), tx };
+  // 1. Trabajos (Agrupados para Reporte Diario)
+  trabajos.forEach(trabajo => todos.push({ delay: todos.length * 200, fn: () => {
+    const payload = { type:'trabajo', item: trabajo, timestamp:'tbj_'+trabajo.id+'_'+Date.now() };
     fetch(url+'?data='+encodeURIComponent(JSON.stringify(payload)), {method:'GET',mode:'no-cors'})
-      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${total}`; if(enviados===total) done(); });
+      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${totalReal}`; if(enviados===totalReal) done(); });
   }}));
 
-  // Agenda
+  // 2. Movimientos (No Notion o transacciones libres)
+  txsNormales.forEach(tx => todos.push({ delay: todos.length * 200, fn: () => {
+    const payload = { type:'tx', modo: tx.negocio?'negocio':'personal', timestamp:'tx_'+tx.id+'_'+Date.now(), tx };
+    fetch(url+'?data='+encodeURIComponent(JSON.stringify(payload)), {method:'GET',mode:'no-cors'})
+      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${totalReal}`; if(enviados===totalReal) done(); });
+  }}));
+
+  // 3. Agenda
   agenda.forEach(item => todos.push({ delay: todos.length * 200, fn: () => {
     const payload = { type:'agenda', item, modo:'negocio', timestamp:'ag_'+item.id+'_'+Date.now() };
     fetch(url+'?data='+encodeURIComponent(JSON.stringify(payload)), {method:'GET',mode:'no-cors'})
-      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${total}`; if(enviados===total) done(); });
+      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${totalReal}`; if(enviados===totalReal) done(); });
   }}));
 
-  // Deudas
+  // 4. Deudas
   deudas.forEach(d => todos.push({ delay: todos.length * 200, fn: () => {
     const payload = { type:'deuda', item:d, modo:'negocio', timestamp:'deu_'+d.id+'_'+Date.now() };
     fetch(url+'?data='+encodeURIComponent(JSON.stringify(payload)), {method:'GET',mode:'no-cors'})
-      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${total}`; if(enviados===total) done(); });
+      .finally(() => { enviados++; if(status) status.textContent = `⬆ Enviando... ${enviados}/${totalReal}`; if(enviados===totalReal) done(); });
   }}));
 
   // Disparar con delay para no saturar
   todos.forEach(({delay, fn}) => setTimeout(fn, delay));
-  if(status) status.textContent = `⬆ Iniciando envío de ${total} registros...`;
+  if(status) status.textContent = `⬆ Iniciando envío de ${totalReal} paquetes...`;
 
   function done() {
-    if(status) status.textContent = `✓ ${total} registros enviados a Sheets`;
-    toast(`✓ Todo enviado a Sheets — ${txs.length} mov · ${agenda.length} agenda · ${deudas.length} deudas`);
+    if(status) status.textContent = `✓ ${totalReal} registros enviados a Sheets`;
+    toast(`✓ Todo enviado a Sheets — ${trabajos.length} al Reporte Diario · ${txsNormales.length} libres`);
   }
 }
-
 // ══════════════════════════════════════════════════════
 // IMPORTADOR DE NOTION CSV
 // Mapea columnas del CSV "Reporte Diario- Servicios Gas Natural"
