@@ -5493,7 +5493,8 @@ async function _pushToNotion(item, cobroObj) {
 
   // GANANCIA en Notion es una fórmula — NO se escribe desde la app
   if ((cobroObj.movilidad || 0) > 0) setProp(findCol('movilidad', 'pasajes', 'gasolina'), cobroObj.movilidad);
-  if ((cobroObj.otros || 0) > 0)     setProp(findCol('agregados', 'otros', 'extra'), cobroObj.otros);
+  if ((cobroObj.otros || 0) > 0)     setProp(findCol('agregados'), cobroObj.otros); // cobroObj.otros es Agregados
+  if ((cobroObj.otros_gastos || 0) > 0) setProp(findCol('otros', 'extra'), cobroObj.otros_gastos); // cobroObj.otros_gastos es Otros
   if ((cobroObj.meta || 0) > 0)      setProp(findCol('meta', 'objetivo', 'goal'), cobroObj.meta);
   if (cobroObj.observaciones)        setProp(findCol('observaciones', 'nota', 'notas'), cobroObj.observaciones);
 
@@ -7800,6 +7801,7 @@ window._saveCobroStateToItem = function(id) {
   });
   item.movilidad = parseFloat(document.getElementById('cobro-movilidad')?.value)||item.movilidad||0;
   item.agregados = parseFloat(document.getElementById('cobro-otros')?.value)||item.agregados||0;
+  item.otros = parseFloat(document.getElementById('cobro-otrosgastos')?.value)||item.otros||0;
   item.meta = parseFloat(document.getElementById('cobro-meta')?.value)||item.meta||0;
   item.ubicacion = document.getElementById('cobro-distrito')?.value||item.ubicacion||'';
 };
@@ -7868,13 +7870,16 @@ function abrirModalCobro(id){
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-      <div style="background:#FFF7ED;border:1px solid #FFEDD5;border-radius:12px;padding:10px">
-        <label style="font-size:10px;color:#9A3412;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">🚗 Movilidad</label>
-        <input id="cobro-movilidad" type="number" inputmode="decimal" placeholder="0.00" value="${item.movilidad||''}" style="width:100%;border:1px solid #FED7AA;border-radius:8px;padding:6px 8px;font-size:13px"></div>
-      <div style="background:#FFF7ED;border:1px solid #FFEDD5;border-radius:12px;padding:10px">
-        <label style="font-size:10px;color:#9A3412;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">➕ Agregados</label>
-        <input id="cobro-otros" type="number" inputmode="decimal" placeholder="0.00" value="${item.agregados||''}" style="width:100%;border:1px solid #FED7AA;border-radius:8px;padding:6px 8px;font-size:13px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="background:#FFF7ED;border:1px solid #FFEDD5;border-radius:12px;padding:8px">
+        <label style="font-size:9px;color:#9A3412;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">🚗 Movilidad</label>
+        <input id="cobro-movilidad" type="number" inputmode="decimal" placeholder="0.00" value="${item.movilidad||''}" oninput="updateCobroTotals()" style="width:100%;border:1px solid #FED7AA;border-radius:8px;padding:6px;font-size:12px"></div>
+      <div style="background:#FFF7ED;border:1px solid #FFEDD5;border-radius:12px;padding:8px">
+        <label style="font-size:9px;color:#9A3412;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">➕ Agregados</label>
+        <input id="cobro-otros" type="number" inputmode="decimal" placeholder="0.00" value="${item.agregados||''}" oninput="updateCobroTotals()" style="width:100%;border:1px solid #FED7AA;border-radius:8px;padding:6px;font-size:12px"></div>
+      <div style="background:#FFF7ED;border:1px solid #FFEDD5;border-radius:12px;padding:8px">
+        <label style="font-size:9px;color:#9A3412;font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px">➖ Otros</label>
+        <input id="cobro-otrosgastos" type="number" inputmode="decimal" placeholder="0.00" value="${item.otros||''}" oninput="updateCobroTotals()" style="width:100%;border:1px solid #FED7AA;border-radius:8px;padding:6px;font-size:12px"></div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
@@ -7918,6 +7923,7 @@ async function guardarFinalizacion(id){
   if(!item) return;
 
   const cobroObj = {
+    otros_gastos: parseFloat(document.getElementById('cobro-otrosgastos')?.value)||0,
     svc1: document.getElementById('cobro-svc1')?.value||'',
     precio1: parseFloat(document.getElementById('cobro-precio1')?.value)||0,
     materiales1: parseFloat(document.getElementById('cobro-mat1')?.value)||0,
@@ -7999,6 +8005,7 @@ async function guardarFinalizacion(id){
     { name:'Transferencia', val: cobroObj.pagoTransf }
   ];
   if (cobroObj.movilidad > 0) state.transactions.unshift({ id: rowId+'-mov', type:'egreso', amount:cobroObj.movilidad, category:'Movilidad', description:'Movilidad · '+agDesc, ...baseTx });
+  if (cobroObj.otros_gastos > 0) state.transactions.unshift({ id: rowId+'-otg', type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos · '+agDesc, ...baseTx });
   if (totalMat > 0)           state.transactions.unshift({ id: rowId+'-mat', type:'egreso', amount:totalMat, category:'Materiales', description:'Materiales · '+agDesc, ...baseTx });
   if (cobroObj.otros > 0)     state.transactions.unshift({ id: rowId+'-otr', type:'egreso', amount:cobroObj.otros, category:'Agregados', description:'Agregados · '+agDesc, ...baseTx });
 
