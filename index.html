@@ -6336,13 +6336,13 @@ function _notionResultsToCSV(results){
     const cliente = getProp(p,'Cliente','cliente','Nombre','nombre','Name','name') || getTitleProp(p);
 
     // Servicio: soportar nombre de columna "Servicio X", "servicio", "Tipo", "Categoría", "categoria", "Categoria", "Category"
-    const servicio1 = getProp(p,'Servicio 1','servicio 1','Servicio1','Servicio','servicio','Tipo','tipo','Categoría','Categoria','categoria','Category','category');
-    const servicio2 = getProp(p,'Servicio 2','servicio 2','Servicio2');
-    const servicio3 = getProp(p,'Servicio 3','servicio 3','Servicio3');
+    const servicio1 = getProp(p,'SERVICIO 1','Servicio 1','servicio 1','Servicio1','Servicio','servicio','Tipo','tipo','Categoría','Categoria','categoria','Category','category');
+    const servicio2 = getProp(p,'SERVICIO 2','Servicio 2','servicio 2','Servicio2');
+    const servicio3 = getProp(p,'SERVICIO 3','Servicio 3','servicio 3','Servicio3');
     const servicio4 = getProp(p,'Servicio 4','servicio 4','Servicio4');
 
     // Precio: soportar "Precio del servicio", "Precio", "precio", "Monto", "monto", "Importe", "Total"
-    const precio = getProp(p,'Precio del servicio','Precio del servicio','precio del servicio','Precio','precio','Monto','monto','Importe','importe','Total','total','Amount','amount');
+    const precio = getProp(p,'1 PRECIO DEL SERVICIO','Precio del servicio','precio del servicio','Precio','precio','Monto','monto','Importe','importe','Total','total','Amount','amount');
 
     const row = [
       getProp(p,'Fecha','fecha','Date','date') || (page.created_time||'').split('T')[0],
@@ -6350,12 +6350,12 @@ function _notionResultsToCSV(results){
       servicio1, servicio2, servicio3, servicio4,
       precio,
       getProp(p,'Movilidad','movilidad','Transporte','transporte'),
-      getProp(p,'Materiales','materiales','Material','material'),
-      getProp(p,'Otros','otros','Extra','extra','Adicional','adicional'),
-      getProp(p,'Distrito','distrito','Ubicacion','ubicacion','Ubicación','Zona','zona'),
-      getProp(p,'Forma de pago','forma de pago','Pago','pago','Payment','payment','Método de pago'),
+      getProp(p,'1 MATERIALES','Materiales','materiales','Material','material'),
+      getProp(p,'AGREGADOS','Otros','otros','Extra','extra','Adicional','adicional'),
+      getProp(p,'DISTRITO','Distrito','distrito','Ubicacion','ubicacion','Ubicación','Zona','zona'),
+      getProp(p,'1 FORMA DE PAGO','Forma de pago','forma de pago','Pago','pago','Payment','payment','Método de pago'),
       getProp(p,'Observaciones','observaciones','Nota','nota','Notas','notas','Notes','notes','Descripcion','Descripción','descripcion'),
-      getProp(p,'Contacto','contacto','Telefono','Teléfono','telefono','tel','Tel','Phone','phone'),
+      getProp(p,'CONTACTO','Contacto','contacto','Telefono','Teléfono','telefono','tel','Tel','Phone','phone'),
       page.id
     ].map(v => '"' + (v||'').replace(/"/g,'""') + '"');
     rows.push(row.join(','));
