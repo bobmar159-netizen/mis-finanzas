@@ -3284,7 +3284,7 @@ function enviarTodoASheets() {
         row.movilidad += amt;
       } else if (tx.id.endsWith('-mat') || tx.category === 'Materiales') {
         row.materiales += amt;
-      } else if (tx.id.endsWith('-otr') || tx.category === 'Mantenimiento o Reparaciones') {
+      } else if (tx.id.endsWith('-otr') || tx.category === 'Agregados') {
         row.otros += amt;
       } else if (tx.id.endsWith('-met') || tx.category === 'Ahorro / Inversión') {
         row.meta += amt;
@@ -5456,6 +5456,9 @@ async function _pushToNotion(item, cobroObj) {
 
   const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
   if (pTitle) payload.properties[pTitle] = { title: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
+  
+  // Si CLIENTE es una columna de texto aparte de la columna principal (Title):
+  setProp(findCol('cliente', 'nombre'), item.cliente);
 
   const fullIso = (item.fecha || todayStr()) + (item.hora ? 'T' + item.hora + ':00' : 'T09:00:00') + '-05:00';
   setProp(findCol('fecha', 'date', 'día', 'dia'), fullIso);
@@ -7997,7 +8000,7 @@ async function guardarFinalizacion(id){
   ];
   if (cobroObj.movilidad > 0) state.transactions.unshift({ id: rowId+'-mov', type:'egreso', amount:cobroObj.movilidad, category:'Movilidad', description:'Movilidad · '+agDesc, ...baseTx });
   if (totalMat > 0)           state.transactions.unshift({ id: rowId+'-mat', type:'egreso', amount:totalMat, category:'Materiales', description:'Materiales · '+agDesc, ...baseTx });
-  if (cobroObj.otros > 0)     state.transactions.unshift({ id: rowId+'-otr', type:'egreso', amount:cobroObj.otros, category:'Mantenimiento o Rep', description:'Otros · '+agDesc, ...baseTx });
+  if (cobroObj.otros > 0)     state.transactions.unshift({ id: rowId+'-otr', type:'egreso', amount:cobroObj.otros, category:'Agregados', description:'Agregados · '+agDesc, ...baseTx });
 
   if (item.estadoPago === 'parcial' && cobroObj.pagoAcuenta > 0) {
     const deudaAuto = { id: Date.now()+'_dag', name:'Saldo pendiente — '+(item.cliente||''), totalAmount: cobroObj.pagoAcuenta, cuotaMonto: cobroObj.pagoAcuenta, cuotasTotales:1, cuotasPagadas:0, categoria:'Servicio', color:'#9B59B6' };
@@ -8032,7 +8035,7 @@ function _guardarFinalizacionLocal(lId, cobrado, movilidad, materiales, otros, b
   if(cobrado>0)    state.transactions.unshift({id:lId,       type:'ingreso',amount:cobrado,...baseTx});
   if(movilidad>0)  state.transactions.unshift({id:lId+'_m',  type:'egreso', amount:movilidad,...baseTx,category:'Movilidad',description:'Movilidad · '+agDesc});
   if(materiales>0) state.transactions.unshift({id:lId+'_t',  type:'egreso', amount:materiales,...baseTx,category:'Materiales',description:'Materiales · '+agDesc});
-  if(otros>0)      state.transactions.unshift({id:lId+'_o',  type:'egreso', amount:otros,...baseTx,category:'Mantenimiento o Rep',description:'Otros Gastos · '+agDesc});
+  if(otros>0)      state.transactions.unshift({id:lId+'_o',  type:'egreso', amount:otros,...baseTx,category:'Agregados',description:'Otros Gastos · '+agDesc});
   syncToSheets({id:lId,type:'ingreso',amount:cobrado,...baseTx});
 }
 
