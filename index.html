@@ -2338,9 +2338,10 @@ function pagarPrestPers(id){
 
 function deletePrestPers(id){
   if(!confirm('¿Eliminar este préstamo?')) return;
+  const prestamo=state.prestamosPersonales.find(p=>p.id===id);
   state.prestamosPersonales=state.prestamosPersonales.filter(p=>p.id!==id);
   saveAll();
-  syncSeccionToSheets('prestamo_delete',{id});
+  syncSeccionToSheets('prestamo_delete',{id,nombre:prestamo?.nombre||''});
   render();toast('Eliminado');
 }
 
@@ -3060,8 +3061,7 @@ function _sendToSheets(url,payload){
   if(!url){ toast('⚠ URL de Sheets no configurada','error'); return; }
   _syncStatus='syncing';
   _updateSyncBadge();
-  const fullUrl = url+'?data='+encodeURIComponent(JSON.stringify(payload));
-  fetch(fullUrl, {method:'GET', mode:'no-cors'})
+  fetch(url, {method:'POST', mode:'no-cors', body:JSON.stringify(payload)})
     .then(()=>{
       _syncStatus='ok';_updateSyncBadge();
       setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},4000);
@@ -3107,8 +3107,7 @@ function syncAllTxToSheets(silencioso){
     }
     const tx=txs[idx++];
     const payload={type:'tx',modo:state.modo,timestamp:'tx_'+tx.id+'_'+Date.now(),tx};
-    const fullUrl=url+'?data='+encodeURIComponent(JSON.stringify(payload));
-    fetch(fullUrl,{method:'GET',mode:'no-cors'}).finally(()=>setTimeout(sendNext,120));
+    fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)}).finally(()=>setTimeout(sendNext,120));
   }
   sendNext();
 }
@@ -3222,9 +3221,8 @@ function testSheetsSync(){
     modo:'personal',
     timestamp:'test_'+Date.now()
   };
-  const fullUrl=url+'?data='+encodeURIComponent(JSON.stringify(payload));
   toast('↑ Enviando prueba de deuda...','info');
-  fetch(fullUrl,{method:'GET',mode:'no-cors'})
+  fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)})
     .then(()=>{ toast('✓ Enviado — verifica la hoja Deudas y Movimientos','success'); })
     .catch(()=>{ toast('✓ Enviado — verifica la hoja Deudas y Movimientos','success'); });
 }
@@ -3306,7 +3304,7 @@ function enviarTodoASheets() {
   // Función para encolar
   const add = (payload) => todos.push(async () => {
     try {
-      await fetch(url+'?data='+encodeURIComponent(JSON.stringify(payload)), {method:'GET',mode:'no-cors'});
+      await fetch(url, {method:'POST',mode:'no-cors',body:JSON.stringify(payload)});
     } catch(e) {
       console.error(e);
     }
@@ -3648,8 +3646,7 @@ function sincronizarNotionASheets() {
   txNotion.forEach((tx, idx) => {
     setTimeout(() => {
       const payload = { type: 'tx', modo: 'negocio', timestamp: 'tx_' + tx.id + '_' + Date.now(), tx };
-      const fullUrl = url + '?data=' + encodeURIComponent(JSON.stringify(payload));
-      fetch(fullUrl, { method: 'GET', mode: 'no-cors' })
+      fetch(url, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) })
         .then(() => {
           enviados++;
           if (status) status.textContent = `↑ Enviando... ${enviados}/${txNotion.length}`;
@@ -8025,7 +8022,7 @@ async function guardarFinalizacion(id){
   item.servicio2 = cobroObj.svc2 || '';
   item.servicio3 = cobroObj.svc3 || '';
   if (cobroObj.movilidad > 0) state.transactions.unshift({ id: rowId+'-mov', type:'egreso', amount:cobroObj.movilidad, category:'Movilidad', description:'Movilidad · '+agDesc, ...baseTx });
-  if (cobroObj.otros_gastos > 0) state.transactions.unshift({ id: rowId+'-otg', type:'egreso', amount:cobroObj.agregados_gastos, category:'Otros Egresos', description:'Otros Gastos · '+agDesc, ...baseTx });
+  if (cobroObj.otros_gastos > 0) state.transactions.unshift({ id: rowId+'-otg', type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos · '+agDesc, ...baseTx });
   if (cobroObj.materiales1 > 0) state.transactions.unshift({ id: rowId+'-mat1', type:'egreso', amount:cobroObj.materiales1, category:'Materiales', description:'Mat. '+(cobroObj.svc1||'Svc1')+' · '+(item.cliente||''), ...baseTx });
   if (cobroObj.materiales2 > 0) state.transactions.unshift({ id: rowId+'-mat2', type:'egreso', amount:cobroObj.materiales2, category:'Materiales', description:'Mat. '+(cobroObj.svc2||'Svc2')+' · '+(item.cliente||''), ...baseTx });
   if (cobroObj.materiales3 > 0) state.transactions.unshift({ id: rowId+'-mat3', type:'egreso', amount:cobroObj.materiales3, category:'Materiales', description:'Mat. '+(cobroObj.svc3||'Svc3')+' · '+(item.cliente||''), ...baseTx });
@@ -8048,7 +8045,7 @@ async function guardarFinalizacion(id){
       servicio2: cobroObj.svc2, precio2: cobroObj.precio2, materiales2: cobroObj.materiales2,
       servicio3: cobroObj.svc3, precio3: cobroObj.precio3, materiales3: cobroObj.materiales3,
       formaPago1: tp[0]?tp[0].name:'', formaPago2: tp[1]?tp[1].name:'',
-      movilidad: cobroObj.movilidad, agregados: cobroObj.otros, meta: cobroObj.meta, observaciones: cobroObj.observaciones
+      movilidad: cobroObj.movilidad, agregados: cobroObj.agregados, otros_gastos: cobroObj.otros_gastos, meta: cobroObj.meta, observaciones: cobroObj.observaciones
     }, modo: state.modo });
     syncAgendaToSheets({ ...item, estado:'se_finalizo', montoPagado:totalPagado, estadoPago:item.estadoPago });
   }
