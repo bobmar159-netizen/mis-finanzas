@@ -5431,12 +5431,17 @@ async function _pushToNotion(item, cobroObj) {
   const dbId  = localStorage.getItem('fnz_notion_dbid');
   if (!token || !dbId) throw new Error('Notion no configurado');
 
+  // Detectar si el ID es un UUID de Notion (8-4-4-4-12)
+  const isNotionGuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(id);
+  const pageId = isNotionGuid(item.id) ? item.id : null;
+
   const props = await _fetchNotionSchema(token, dbId);
-  const payload = { parent: { database_id: dbId }, properties: {} };
+  const payload = { properties: {} };
+  if (!pageId) payload.parent = { database_id: dbId };
 
   const findCol = (...names) => {
     for (const n of names) {
-      const match = Object.keys(props).find(k => k.toLowerCase() === n.toLowerCase());
+      const match = Object.keys(props).find(k => k.toLowerCase() === n.toLowerCase().trim());
       if (match) return { name: match, type: props[match].type };
     }
     return null;
@@ -5454,29 +5459,31 @@ async function _pushToNotion(item, cobroObj) {
     else if (col.type === 'url')       payload.properties[col.name] = { url: String(value) };
   };
 
+  // 1. Identificar columna de CLIENTE (preferencia a Title o columna 'Cliente')
   const pTitle = Object.entries(props).find(([,v]) => v.type === 'title')?.[0];
-  if (pTitle) payload.properties[pTitle] = { title: [{ text: { content: item.cliente || '(Sin cliente)' } }] };
+  const clienteCol = findCol('cliente', 'nombre', 'name', 'nombre cliente');
   
-  // Si CLIENTE es una columna de texto aparte de la columna principal (Title):
-  setProp(findCol('cliente', 'nombre'), item.cliente);
+  const nombreFinal = item.cliente || '(Sin cliente)';
+  if (pTitle) payload.properties[pTitle] = { title: [{ text: { content: nombreFinal } }] };
+  if (clienteCol && clienteCol.name !== pTitle) setProp(clienteCol, nombreFinal);
 
+  // 2. Fecha y Contacto
   const fullIso = (item.fecha || todayStr()) + (item.hora ? 'T' + item.hora + ':00' : 'T09:00:00') + '-05:00';
   setProp(findCol('fecha', 'date', 'día', 'dia'), fullIso);
-
   if (item.telefono) setProp(findCol('contacto', 'telefono', 'teléfono', 'tel', 'phone'), item.telefono);
   setProp(findCol('distrito', 'ubicacion', 'ubicación', 'zona'), item.ubicacion);
 
-  // Nombres exactos de Notion: SERVICIO 1, 1 PRECIO DEL SERVICIO, 1 MATERIALES
+  // 3. Servicios, Precios y Materiales
   for (let i = 1; i <= 3; i++) {
-    const s = cobroObj['svc' + i];
-    const p = cobroObj['precio' + i] || 0;
-    const m = cobroObj['materiales' + i] || 0;
+    const s = cobroObj['svc' + i] || item['servicio' + i];
+    const p = cobroObj['precio' + i] || item['precio' + i] || 0;
+    const m = cobroObj['materiales' + i] || item['materiales' + i] || 0;
     if (s) setProp(findCol('servicio ' + i, 'svc ' + i, 'servicio' + i), s);
-    if (p > 0) setProp(findCol(i + ' precio del servicio', 'precio del servicio ' + i, 'precio ' + i, i + ' precio'), p);
-    if (m > 0) setProp(findCol(i + ' materiales', 'materiales ' + i, i + ' material'), m);
+    if (p > 0) setProp(findCol(i + ' precio del servicio', 'precio del servicio ' + i, 'precio ' + i, i + ' precio', 'precio ' + i), p);
+    if (m > 0) setProp(findCol(i + ' materiales', 'materiales ' + i, i + ' material', 'material ' + i), m);
   }
 
-  // Formas de pago: encontrar cuáles métodos se usaron y mapearlos a col 1 y 2
+  // 4. Formas de pago
   const pagosMethods = [
     { name:'Efectivo',      val: cobroObj.pagoEfectivo || 0 },
     { name:'Yape',          val: cobroObj.pagoYape || 0 },
@@ -5484,28 +5491,35 @@ async function _pushToNotion(item, cobroObj) {
     { name:'Transferencia', val: cobroObj.pagoTransf || 0 },
     { name:'A Cuenta',      val: cobroObj.pagoAcuenta || 0 }
   ].filter(p => p.val > 0);
-  // Columnas "1 Forma Pago" / "2 Forma Pago"  
-  // Nombres exactos Notion: "1 FORMA DE PAGO", "2 FORMA DE PAGO"
-  const fPago1Col = findCol('1 forma de pago','forma de pago 1','1 forma pago','forma pago 1','pago 1');
-  const fPago2Col = findCol('2 forma de pago','forma de pago 2','2 forma pago','forma pago 2','pago 2');
+
+  const fPago1Col = findCol('1 forma de pago','forma de pago 1','1 forma pago','pago 1');
+  const fPago2Col = findCol('2 forma de pago','forma de pago 2','2 forma pago','pago 2');
   if (pagosMethods[0]) setProp(fPago1Col, pagosMethods[0].name);
   if (pagosMethods[1]) setProp(fPago2Col, pagosMethods[1].name);
 
-  // GANANCIA en Notion es una fórmula — NO se escribe desde la app
-  if ((cobroObj.movilidad || 0) > 0) setProp(findCol('movilidad', 'pasajes', 'gasolina'), cobroObj.movilidad);
-  if ((cobroObj.otros || 0) > 0)     setProp(findCol('agregados'), cobroObj.otros); // cobroObj.otros es Agregados
-  if ((cobroObj.otros_gastos || 0) > 0) setProp(findCol('otros', 'extra'), cobroObj.otros_gastos); // cobroObj.otros_gastos es Otros
-  if ((cobroObj.meta || 0) > 0)      setProp(findCol('meta', 'objetivo', 'goal'), cobroObj.meta);
-  if (cobroObj.observaciones)        setProp(findCol('observaciones', 'nota', 'notas'), cobroObj.observaciones);
+  // 5. Gastos extra
+  if (cobroObj.movilidad > 0) setProp(findCol('movilidad', 'pasajes', 'gasolina'), cobroObj.movilidad);
+  if (cobroObj.agregados > 0 || cobroObj.otros > 0) setProp(findCol('agregados'), cobroObj.agregados || cobroObj.otros);
+  if (cobroObj.otros_gastos > 0) setProp(findCol('otros', 'extra'), cobroObj.otros_gastos);
 
-  const notionUrl = 'https://api.notion.com/v1/pages';
+  // 6. Ejecutar Petición (POST para crear, PATCH para actualizar)
+  const notionUrl = pageId ? 'https://api.notion.com/v1/pages/' + pageId : 'https://api.notion.com/v1/pages';
   const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
+
   const res = await fetch(proxyUrl, {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + token, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    method: pageId ? 'PATCH' : 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json'
+    },
     body: JSON.stringify(payload)
   });
-  if (!res.ok) throw new Error('Error Notion: ' + res.status);
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.message || 'Error en Notion');
+  }
   return await res.json();
 }
 
@@ -7939,7 +7953,7 @@ async function guardarFinalizacion(id){
     pagoTransf: parseFloat(document.getElementById('pago-transferencia')?.value)||0,
     pagoAcuenta: parseFloat(document.getElementById('pago-acuenta')?.value)||0,
     movilidad: parseFloat(document.getElementById('cobro-movilidad')?.value)||0,
-    otros: parseFloat(document.getElementById('cobro-otros')?.value)||0,
+    agregados: parseFloat(document.getElementById('cobro-otros')?.value)||0,
     meta: parseFloat(document.getElementById('cobro-meta')?.value)||0,
     distrito: document.getElementById('cobro-distrito')?.value?.trim()||item.ubicacion||'',
     observaciones: document.getElementById('cobro-notas')?.value?.trim()||''
@@ -8004,10 +8018,18 @@ async function guardarFinalizacion(id){
     { name:'Plin',          val: cobroObj.pagoPlin },
     { name:'Transferencia', val: cobroObj.pagoTransf }
   ];
+  const pagosMethods = pagos.filter(p => p.val > 0).map(p => p.name);
+  item.formaPago1 = pagosMethods[0] || '';
+  item.formaPago2 = pagosMethods[1] || '';
+  item.servicio1 = cobroObj.svc1 || '';
+  item.servicio2 = cobroObj.svc2 || '';
+  item.servicio3 = cobroObj.svc3 || '';
   if (cobroObj.movilidad > 0) state.transactions.unshift({ id: rowId+'-mov', type:'egreso', amount:cobroObj.movilidad, category:'Movilidad', description:'Movilidad · '+agDesc, ...baseTx });
-  if (cobroObj.otros_gastos > 0) state.transactions.unshift({ id: rowId+'-otg', type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos · '+agDesc, ...baseTx });
-  if (totalMat > 0)           state.transactions.unshift({ id: rowId+'-mat', type:'egreso', amount:totalMat, category:'Materiales', description:'Materiales · '+agDesc, ...baseTx });
-  if (cobroObj.otros > 0)     state.transactions.unshift({ id: rowId+'-otr', type:'egreso', amount:cobroObj.otros, category:'Agregados', description:'Agregados · '+agDesc, ...baseTx });
+  if (cobroObj.otros_gastos > 0) state.transactions.unshift({ id: rowId+'-otg', type:'egreso', amount:cobroObj.agregados_gastos, category:'Otros Egresos', description:'Otros Gastos · '+agDesc, ...baseTx });
+  if (cobroObj.materiales1 > 0) state.transactions.unshift({ id: rowId+'-mat1', type:'egreso', amount:cobroObj.materiales1, category:'Materiales', description:'Mat. '+(cobroObj.svc1||'Svc1')+' · '+(item.cliente||''), ...baseTx });
+  if (cobroObj.materiales2 > 0) state.transactions.unshift({ id: rowId+'-mat2', type:'egreso', amount:cobroObj.materiales2, category:'Materiales', description:'Mat. '+(cobroObj.svc2||'Svc2')+' · '+(item.cliente||''), ...baseTx });
+  if (cobroObj.materiales3 > 0) state.transactions.unshift({ id: rowId+'-mat3', type:'egreso', amount:cobroObj.materiales3, category:'Materiales', description:'Mat. '+(cobroObj.svc3||'Svc3')+' · '+(item.cliente||''), ...baseTx });
+  if (cobroObj.agregados > 0)     state.transactions.unshift({ id: rowId+'-otr', type:'egreso', amount:cobroObj.agregados, category:'Agregados', description:'Agregados · '+agDesc, ...baseTx });
 
   if (item.estadoPago === 'parcial' && cobroObj.pagoAcuenta > 0) {
     const deudaAuto = { id: Date.now()+'_dag', name:'Saldo pendiente — '+(item.cliente||''), totalAmount: cobroObj.pagoAcuenta, cuotaMonto: cobroObj.pagoAcuenta, cuotasTotales:1, cuotasPagadas:0, categoria:'Servicio', color:'#9B59B6' };
@@ -16809,59 +16831,66 @@ function _renderMatUsadosForm(agendaId, tipoServicio){
   const totalCosto = rows.reduce((s,r)=>s+(r.cantidad*r.costo),0);
 
   document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title">🔧 Materiales Usados</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;background:#EBF1F5;border-radius:8px;padding:7px 10px">
-      ${tipoServicio?`Servicio: <strong>${tipoServicio}</strong>`:''} ${rows.length&&!tipoServicio?'Sin plantilla — agrega materiales manualmente':!rows.length&&tipoServicio?'Sin plantilla configurada para este servicio':''}
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--gold);margin-bottom:4px">📦 Materiales a Descontar</div>
+      <div style="font-size:12px;color:var(--muted)">${tipoServicio ? `Servicio: <strong>${tipoServicio}</strong>` : 'Configuración Manual'}</div>
     </div>
 
-    <div id="mat-rows-list">
+    ${rows.length===0 ? `<div style="text-align:center;padding:20px;color:var(--muted);background:#F8FAFC;border-radius:12px;margin-bottom:16px;border:1px dashed var(--border)">
+      <div style="font-size:24px;margin-bottom:8px">📭</div>
+      No se han agregado materiales
+    </div>` : ''}
+
+    <div id="mat-rows-list" style="margin-bottom:16px">
       ${rows.map((r,i)=>{
         const sinSt = r.stock<=0;
         const insuf = r.cantidad>r.stock;
         return `
-        <div style="background:${insuf?'#FEF2F2':'#F8FAFC'};border:1px solid ${insuf?'#E0525244':'var(--border)'};border-radius:12px;padding:10px 12px;margin-bottom:8px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <div style="font-weight:700;font-size:13px;color:var(--text)">${r.nombre}</div>
-            <button onclick="_removeMatRow(${i})" style="background:#FEF2F2;border:none;border-radius:8px;padding:4px 8px;font-size:11px;cursor:pointer;color:#C62828">✕</button>
+        <div style="background:${insuf?'#FEF2F2':'#FFFFFF'};border:1px solid ${insuf?'#E05252':'var(--border)'};border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 2px 4px rgba(0,0,0,0.02)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-weight:700;font-size:14px;color:var(--text)">${r.nombre}</div>
+            <button onclick="_removeMatRow(${i})" style="background:#FEF2F2;border:none;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;color:#C62828;transition:0.2s">✕</button>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:end">
             <div>
-              <div style="color:var(--muted)">Cantidad</div>
-              <input type="number" inputmode="decimal" step="0.01" value="${r.cantidad}" onchange="_updateMatRow(${i},'cantidad',this.value)" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px;font-weight:700">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Cantidad</div>
+              <input type="number" inputmode="decimal" step="0.01" value="${r.cantidad}" onchange="_updateMatRow(${i},'cantidad',this.value)" style="width:100%;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:14px;font-weight:700;text-align:center">
             </div>
-            <div>
-              <div style="color:var(--muted)">Stock disp.</div>
-              <div style="font-weight:700;color:${sinSt?'#C62828':insuf?'#D97706':'var(--gold)'};padding:6px 0">${(+r.stock).toFixed(2)} ${r.unidad}</div>
+            <div style="text-align:center;background:#F8FAFC;border-radius:8px;padding:8px">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:2px">Stock</div>
+              <div style="font-weight:800;font-size:13px;color:${sinSt?'#C62828':insuf?'#D97706':'var(--green)'}">${(+r.stock).toFixed(2)} ${r.unidad}</div>
             </div>
-            <div>
-              <div style="color:var(--muted)">Costo unit.</div>
-              <div style="font-weight:600;padding:6px 0">S/ ${(+r.costo).toFixed(2)}</div>
+            <div style="text-align:center;background:#F8FAFC;border-radius:8px;padding:8px">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:2px">Costo T.</div>
+              <div style="font-weight:800;font-size:13px;color:var(--gold)">S/ ${(r.cantidad*r.costo).toFixed(2)}</div>
             </div>
           </div>
-          ${insuf?`<div style="color:#C62828;font-size:11px;font-weight:700;margin-top:4px">⚠ Stock insuficiente (tienes ${(+r.stock).toFixed(2)} ${r.unidad})</div>`:''}
+          ${insuf?`<div style="color:#C62828;font-size:11px;font-weight:700;margin-top:8px;background:#FEF2F2;padding:6px;border-radius:6px;text-align:center">⚠ Stock insuficiente (tienes ${(+r.stock).toFixed(2)})</div>`:``}
         </div>`;
       }).join('')}
     </div>
 
     <!-- Agregar material -->
-    <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:12px">
-      <select id="new-mat-sel" style="background:#F5F8FA;border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:13px">
-        <option value="">-- Seleccionar material --</option>
-        ${inv.map(m=>`<option value="${m.id}">${m.nombre} (${m.stock_actual} ${m.unidad})</option>`).join('')}
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:20px;background:#F8FAFC;padding:10px;border-radius:14px;border:1px solid var(--border)">
+      <select id="new-mat-sel" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--text)">
+        <option value="">-- Añadir material del inventario --</option>
+        ${inv.map(m=>`<option value="${m.id}">${m.nombre} (${m.stock_actual} disp)</option>`).join('')}
       </select>
-      <button onclick="_addMatRow()" style="background:var(--gold);color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer">＋ Agregar</button>
+      <button onclick="_addMatRow()" style="background:var(--gold);color:#fff;border:none;border-radius:10px;padding:0 16px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 10px rgba(84,104,120,0.2)">＋</button>
     </div>
 
-    <div style="background:#EBF1F5;border-radius:12px;padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-weight:700;font-size:13px;color:var(--gold)">💰 Costo total materiales</span>
-      <span style="font-size:18px;font-weight:800;color:var(--gold)">S/ ${totalCosto.toFixed(2)}</span>
+    <div style="background:linear-gradient(135deg,var(--gold),var(--gold2));border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;color:#fff;box-shadow:0 4px 12px rgba(84,104,120,0.2)">
+      <div style="font-weight:600;font-size:13px;opacity:0.9">💰 Costo Materiales</div>
+      <div style="font-size:20px;font-weight:800">S/ ${totalCosto.toFixed(2)}</div>
     </div>
 
-    <button onclick="_confirmarMatUsados('${agendaId}')" class="btn-gold" style="width:100%;margin-bottom:8px"
-      ${rows.some(r=>r.cantidad>r.stock)?'disabled style="opacity:0.5;cursor:not-allowed"':''}>
-      ✅ Confirmar y descontar stock
-    </button>
-    <button onclick="abrirModalCobro(\'${agendaId}\')" style="width:100%;background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:14px;padding:13px;font-weight:700;font-family:inherit;font-size:14px;cursor:pointer">Volver al cobro</button>`;
+    <div style="display:flex;gap:10px">
+      <button onclick="abrirModalCobro('${agendaId}')" style="flex:1;background:#fff;border:1px solid var(--border);color:var(--muted);border-radius:14px;padding:14px;font-weight:700;font-family:inherit;font-size:13px;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.02)">🔙 Volver</button>
+      <button onclick="_confirmarMatUsados('${agendaId}')" style="flex:2;background:var(--green);color:#fff;border:none;border-radius:14px;padding:14px;font-weight:700;font-family:inherit;font-size:13px;cursor:pointer;box-shadow:0 4px 10px rgba(84,104,120,0.2)"
+        ${rows.some(r=>r.cantidad>r.stock)?'disabled style="opacity:0.5;cursor:not-allowed"':''}>
+        ✅ Descontar y Guardar
+      </button>
+    </div>`;
   showModal();
 }
 
@@ -16924,16 +16953,18 @@ function _confirmarMatUsados(agendaId){
     syncMovimientoToSheets(reg);
   });
 
-  // FASE 7: Actualizar campo materiales en cobro form
-  const campoMat = document.getElementById('cobro-materiales');
-  if(campoMat){
-    campoMat.value = `S/ ${totalCosto.toFixed(2)} (${rows.length} material${rows.length!==1?'es':''})`;
-    campoMat.dataset.total = totalCosto.toFixed(2);
-    campoMat.dataset.rows  = JSON.stringify(rows);
+  // FASE 7: Actualizar la agenda y volver al form de cobro
+  const item = (state.agenda||[]).find(x => x.id === agendaId);
+  if(item) {
+    const slot = window._currentMatSlot || 1;
+    item['materiales'+slot] = totalCosto;
+    saveAll();
+    // Volver a abrir el modal de cobro exactamente donde nos quedamos
+    abrirModalCobro(agendaId);
+  } else {
+    saveAll();
+    closeModal();
   }
-
-  saveAll();
-  closeModal();
   toast(`✅ ${rows.length} materiales descontados · S/ ${totalCosto.toFixed(2)}`);
 
   // Alertas de stock bajo
