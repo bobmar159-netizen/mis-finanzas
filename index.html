@@ -1607,6 +1607,47 @@ table.nt tbody tr:hover td,
   background:var(--surface);
 }
 
+.app-icon {
+  width:1.25em;
+  height:1.25em;
+  display:inline-block;
+  vertical-align:-0.18em;
+  color:currentColor;
+}
+
+.app-icon svg {
+  width:100%;
+  height:100%;
+  display:block;
+  overflow:visible;
+}
+
+.app-icon .accent {
+  color:var(--icon-accent,var(--blue));
+}
+
+.tab-icon .app-icon {
+  width:19px;
+  height:19px;
+}
+
+.service-icon .app-icon,
+.tx-icon .app-icon,
+.mv-icon-box .app-icon,
+.ag-card-icon .app-icon,
+.nc3-icon-box .app-icon,
+.cat-chip .app-icon {
+  width:23px;
+  height:23px;
+}
+
+#micFab .app-icon,
+#micBtnIcon .app-icon,
+.mic-head-icon .app-icon {
+  width:22px;
+  height:22px;
+}
+
 @media (min-width: 760px) {
   body {
     background:#F1F1EF !important;
@@ -1692,7 +1733,7 @@ table.nt tbody tr:hover td,
       <button class="tab" onclick="switchPage('categorias')" id="tab-categorias"><span class="tab-icon">🏷</span>Categ.</button>
       <button class="tab" onclick="switchPage('graficos')" id="tab-graficos"><span class="tab-icon">📊</span>Gráfic.</button>
       <button class="tab" onclick="switchPage('notas')" id="tab-notas"><span class="tab-icon">📝</span>Notas</button>
-      <button class="tab" onclick="switchPage('inventario')" id="tab-inventario"><svg width="22" height="22" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><rect x="8" y="4" width="20" height="28" rx="3" fill="#EBF1F5"/><rect x="12" y="2" width="12" height="6" rx="3" fill="#C9A84C"/><rect x="11" y="13" width="14" height="2" rx="1" fill="#94A3B8"/><rect x="11" y="18" width="14" height="2" rx="1" fill="#94A3B8"/><rect x="11" y="23" width="9" height="2" rx="1" fill="#C9A84C"/><circle cx="26" cy="27" r="6" fill="#22C55E"/><path d="M23 27 L25.5 29.5 L29 25" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>Stock</button>
+      <button class="tab" onclick="switchPage('inventario')" id="tab-inventario"><span class="tab-icon"></span>Stock</button>
     </div>
   </div>
   <div id="content"></div>
@@ -1937,13 +1978,128 @@ const EMOJI_GROUPS = [
 const CAT_COLORS=['var(--gold)','#2E86AB','#C9A84C','#E05252','#9B59B6','#E67E22','#1ABC9C','#E91E63','#FF9800','#607D8B','#795548','#3498DB','#F44336','#FF5722','#00BCD4'];
 
 // ── Iconos SVG personalizados para artefactos ──
+const APP_ICON_PATHS = {
+  home:'<path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1v-9.5Z"/><path class="accent" d="M9 21v-6h6v6"/>',
+  movement:'<path d="M7 7h13l-3-3"/><path d="M17 17H4l3 3"/><path class="accent" d="M20 7l-3 3M4 17l3-3"/>',
+  tag:'<path d="M4 5.5V12l7.5 7.5a2 2 0 0 0 2.8 0l5.2-5.2a2 2 0 0 0 0-2.8L12 4H5.5A1.5 1.5 0 0 0 4 5.5Z"/><circle class="accent" cx="8" cy="8" r="1.4"/>',
+  target:'<circle cx="12" cy="12" r="8"/><circle class="accent" cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+  clipboard:'<path d="M8 4h8l1 3h2v14H5V7h2l1-3Z"/><path class="accent" d="M9 12h6M9 16h4"/>',
+  note:'<path d="M6 4h9l3 3v13H6V4Z"/><path class="accent" d="M15 4v4h4M9 12h6M9 16h4"/>',
+  service:'<path d="M4 20h16M6 20V9l6-5 6 5v11"/><path class="accent" d="M10 20v-6h4v6"/>',
+  bank:'<path d="M4 9h16L12 4 4 9Z"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8M4 20h16"/><path class="accent" d="M12 6.5v0"/>',
+  calendar:'<path d="M5 5h14v15H5V5Z"/><path d="M8 3v4M16 3v4M5 9h14"/><path class="accent" d="M9 13h3v3H9z"/>',
+  chart:'<path d="M4 19h16"/><path d="M7 16v-5M12 16V7M17 16v-8"/><path class="accent" d="M7 11l5-4 5 1"/>',
+  stock:'<path d="M7 4h10v16H7V4Z"/><path d="M10 8h4M10 12h4M10 16h2"/><path class="accent" d="M15.5 17.5 18 20l3-4"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14.2 3h-4.4l-.4 2.7a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 2 1.2l.4 2.7h4.4l.4-2.7a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2Z"/>',
+  mic:'<path d="M9 5a3 3 0 0 1 6 0v6a3 3 0 0 1-6 0V5Z"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/><path class="accent" d="M9 22h6"/>',
+  search:'<circle cx="10.5" cy="10.5" r="6.5"/><path class="accent" d="m16 16 4 4"/>',
+  save:'<path d="M5 4h12l2 2v14H5V4Z"/><path d="M8 4v6h8V4"/><path class="accent" d="M8 20v-6h8v6"/>',
+  trash:'<path d="M5 7h14M9 7V4h6v3M8 10v9M12 10v9M16 10v9"/><path class="accent" d="M7 7l1 14h8l1-14"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  income:'<path d="M12 19V5"/><path class="accent" d="M6 11l6-6 6 6"/>',
+  expense:'<path d="M12 5v14"/><path class="accent" d="M6 13l6 6 6-6"/>',
+  food:'<path d="M7 4v16M4 4v5a3 3 0 0 0 6 0V4M16 4v16"/><path class="accent" d="M16 4c3 2 3 6 0 8"/>',
+  transport:'<path d="M5 14h14l-1.5-5h-11L5 14Z"/><path d="M7 14v3M17 14v3"/><circle class="accent" cx="8" cy="17" r="1.5"/><circle class="accent" cx="16" cy="17" r="1.5"/>',
+  health:'<path d="M12 20s-7-4-7-10a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 6-7 10-7 10Z"/><path class="accent" d="M12 9v5M9.5 11.5h5"/>',
+  book:'<path d="M5 5.5A3.5 3.5 0 0 1 8.5 4H19v15H8.5A3.5 3.5 0 0 0 5 20.5v-15Z"/><path class="accent" d="M5 5.5A3.5 3.5 0 0 1 8.5 7H19"/>',
+  play:'<rect x="4" y="5" width="16" height="14" rx="3"/><path class="accent" d="m10 9 5 3-5 3V9Z"/>',
+  light:'<path d="M9 18h6M10 21h4M8 10a4 4 0 1 1 8 0c0 2-1.5 3-2.2 4H10.2C9.5 13 8 12 8 10Z"/><path class="accent" d="M12 2v2M4 10h2M18 10h2"/>',
+  clothes:'<path d="m8 5 4 2 4-2 4 4-3 3v8H7v-8L4 9l4-4Z"/><path class="accent" d="M10 6c.5 1.2 3.5 1.2 4 0"/>',
+  rent:'<path d="M4 11 12 4l8 7"/><path d="M6 10v10h12V10"/><path class="accent" d="M10 20v-5h4v5"/>',
+  box:'<path d="m4 8 8-4 8 4-8 4-8-4Z"/><path d="M4 8v8l8 4 8-4V8"/><path class="accent" d="M12 12v8"/>',
+  transfer:'<path d="M7 8h11l-3-3M17 16H6l3 3"/><path class="accent" d="M18 8l-3 3M6 16l3-3"/>',
+  briefcase:'<path d="M4 8h16v11H4V8Z"/><path d="M9 8V5h6v3"/><path class="accent" d="M4 12h16"/>',
+  laptop:'<path d="M6 5h12v10H6V5Z"/><path class="accent" d="M3 19h18l-3-4H6l-3 4Z"/>',
+  store:'<path d="M5 10h14l-1-5H6l-1 5Z"/><path d="M7 10v10h10V10"/><path class="accent" d="M9 14h6"/>',
+  trend:'<path d="M4 17 9 12l4 3 7-8"/><path class="accent" d="M15 7h5v5"/>',
+  gift:'<path d="M4 9h16v11H4V9Z"/><path d="M12 9v11M4 13h16"/><path class="accent" d="M8 9a2 2 0 1 1 4 0 2 2 0 1 1 4 0"/>',
+  money:'<rect x="4" y="7" width="16" height="10" rx="2"/><circle class="accent" cx="12" cy="12" r="2.5"/><path d="M7 10v0M17 14v0"/>',
+  cart:'<path d="M4 5h2l2 10h9l2-7H7"/><circle class="accent" cx="9" cy="19" r="1.5"/><circle class="accent" cx="17" cy="19" r="1.5"/>',
+  fuel:'<path d="M7 4h8v16H7V4Z"/><path d="M15 8h2l2 2v7a2 2 0 0 1-4 0v-3"/><path class="accent" d="M9 7h4v4H9z"/>',
+  tool:'<path d="M14 5a4 4 0 0 0 5 5L10 19a3 3 0 0 1-4-4l9-9Z"/><path class="accent" d="M6 18l3-3"/>',
+  gas:'<path d="M12 21c-3 0-5-2-5-5 0-4 5-6 5-12 3 3 5 6 5 10 0 4-2 7-5 7Z"/><path class="accent" d="M12 18c-1.5 0-2.5-1-2.5-2.5 0-1.6 1.6-2.6 2.5-4 .9 1.3 2.5 2.4 2.5 4A2.5 2.5 0 0 1 12 18Z"/>',
+  water:'<path d="M12 21a6 6 0 0 1-6-6c0-4 6-11 6-11s6 7 6 11a6 6 0 0 1-6 6Z"/><path class="accent" d="M9 15a3 3 0 0 0 3 3"/>',
+  wifi:'<path d="M4 9a12 12 0 0 1 16 0M7 12a7.5 7.5 0 0 1 10 0M10 15a3 3 0 0 1 4 0"/><circle class="accent" cx="12" cy="18" r="1"/>',
+  phone:'<path d="M8 3h8v18H8V3Z"/><path class="accent" d="M11 18h2"/>',
+  document:'<path d="M6 4h8l4 4v12H6V4Z"/><path class="accent" d="M14 4v5h5M9 13h6M9 17h4"/>',
+  pipe:'<path d="M6 8h7a3 3 0 0 1 3 3v7"/><path d="M6 5v6M3 8h6M13 18h6"/><path class="accent" d="M16 13v5"/>',
+  appliance:'<rect x="6" y="4" width="12" height="16" rx="3"/><path d="M9 8h6M9 12h6"/><circle class="accent" cx="12" cy="16" r="2"/>'
+};
+
+function appIcon(name, extraClass=''){
+  const body=APP_ICON_PATHS[name]||APP_ICON_PATHS.box;
+  return `<span class="app-icon ${extraClass}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${body}</svg></span>`;
+}
+
+function iconKeyFromText(icon){
+  const raw=String(icon||'').toLowerCase();
+  if(raw.startsWith('img:')) return 'appliance';
+  if(/sueldo|brief|trabajo|💼/.test(raw)) return 'briefcase';
+  if(/freelance|laptop|💻/.test(raw)) return 'laptop';
+  if(/negocio|store|tienda|🏪/.test(raw)) return 'store';
+  if(/invers|📈|trend/.test(raw)) return 'trend';
+  if(/bono|gift|🎁/.test(raw)) return 'gift';
+  if(/dinero|money|💰|💵/.test(raw)) return 'money';
+  if(/transfer|⇄/.test(raw)) return 'transfer';
+  if(/aliment|comida|🍔|🍕|food/.test(raw)) return 'food';
+  if(/transporte|carro|taxi|🚗/.test(raw)) return 'transport';
+  if(/salud|hospital|🏥/.test(raw)) return 'health';
+  if(/educ|libro|📚/.test(raw)) return 'book';
+  if(/entre|ocio|cine|🎬/.test(raw)) return 'play';
+  if(/servicio|luz|💡|⚡/.test(raw)) return 'light';
+  if(/ropa|shirt|👕/.test(raw)) return 'clothes';
+  if(/arriendo|casa|🏠/.test(raw)) return 'rent';
+  if(/deuda|banco|🏦/.test(raw)) return 'bank';
+  if(/material|cart|🛒/.test(raw)) return 'cart';
+  if(/gnv|gasolina|fuel|⛽/.test(raw)) return 'fuel';
+  if(/herramienta|repar|🔧|🛠|🪠/.test(raw)) return 'tool';
+  if(/gas|🔥/.test(raw)) return 'gas';
+  if(/agua|💧/.test(raw)) return 'water';
+  if(/internet|📡|wifi/.test(raw)) return 'wifi';
+  if(/tel[eé]fono|m[oó]vil|📱/.test(raw)) return 'phone';
+  if(/document|📄/.test(raw)) return 'document';
+  if(/tuber|🚿/.test(raw)) return 'pipe';
+  if(/cocina|horno|terma|secadora|🍳/.test(raw)) return 'appliance';
+  return 'tag';
+}
+
+function appIconForPage(page){
+  return ({dashboard:'home',movimientos:'movement',categorias:'tag',metas:'target',presupuesto:'clipboard',notas:'note',servicios:'service',deudas:'bank',agenda:'calendar',graficos:'chart',inventario:'stock',ajustes:'settings'}[page]||'box');
+}
+
+function applyAppIcons(){
+  const tabs={
+    'tab-dashboard':'dashboard','tab-dashboard-n':'dashboard',
+    'tab-movimientos':'movimientos','tab-movimientos-n':'movimientos',
+    'tab-categorias-p':'categorias','tab-categorias':'categorias',
+    'tab-metas':'metas','tab-presupuesto':'presupuesto',
+    'tab-notas-p':'notas','tab-notas':'notas',
+    'tab-servicios-p':'servicios','tab-deudas':'deudas',
+    'tab-agenda':'agenda','tab-graficos':'graficos','tab-inventario':'inventario'
+  };
+  Object.entries(tabs).forEach(([id,page])=>{
+    const tab=document.getElementById(id);
+    const slot=tab?.querySelector('.tab-icon')||tab?.firstElementChild;
+    if(slot) slot.innerHTML=appIcon(appIconForPage(page));
+  });
+  const gear=document.getElementById('btn-gear');
+  if(gear) gear.innerHTML=appIcon('settings');
+  const micFab=document.getElementById('micFab');
+  if(micFab) micFab.innerHTML=appIcon('mic');
+  const micHead=document.getElementById('micContextIcon');
+  if(micHead) micHead.innerHTML=appIcon('mic');
+  const micBtnIcon=document.getElementById('micBtnIcon');
+  if(micBtnIcon && !micBtnIcon.dataset.lockIcon) micBtnIcon.innerHTML=appIcon('mic');
+}
+
 const APPLIANCE_SVG = {
   'IMG:cocina': `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><rect x="1" y="1" width="20" height="20" rx="2.5" fill="#78716C"/><rect x="2.5" y="2.5" width="17" height="17" rx="1.5" fill="#3D3D3D"/><circle cx="7" cy="7" r="3" fill="none" stroke="#9CA3AF" stroke-width="1.5"/><circle cx="15" cy="7" r="3" fill="none" stroke="#9CA3AF" stroke-width="1.5"/><circle cx="7" cy="15" r="3" fill="none" stroke="#9CA3AF" stroke-width="1.5"/><circle cx="15" cy="15" r="3" fill="none" stroke="#9CA3AF" stroke-width="1.5"/><circle cx="7" cy="7" r="1.1" fill="#6B7280"/><circle cx="15" cy="7" r="1.1" fill="#6B7280"/><circle cx="7" cy="15" r="1.1" fill="#6B7280"/><circle cx="15" cy="15" r="1.1" fill="#6B7280"/></svg>`,
   'IMG:horno': `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><rect x="1" y="2" width="20" height="19" rx="2" fill="#6B7280"/><rect x="2" y="3" width="18" height="4" rx="1" fill="#4B5563"/><circle cx="6" cy="5" r="1.3" fill="#D1D5DB"/><circle cx="11" cy="5" r="1.3" fill="#D1D5DB"/><circle cx="16" cy="5" r="1.3" fill="#D1D5DB"/><rect x="3" y="8" width="16" height="11" rx="1" fill="#374151"/><rect x="6" y="9" width="10" height="1.5" rx="0.75" fill="#9CA3AF"/><rect x="5" y="11" width="12" height="7" rx="1" fill="#1E3A5F"/><line x1="5" y1="14.5" x2="17" y2="14.5" stroke="#2563EB" stroke-width="0.6" opacity="0.5"/></svg>`,
   'IMG:terma': `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><rect x="8" y="1" width="2" height="3" rx="1" fill="#9CA3AF"/><rect x="12" y="1" width="2" height="3" rx="1" fill="#9CA3AF"/><rect x="5" y="3" width="12" height="15" rx="6" fill="#6B7280"/><rect x="6" y="4" width="10" height="13" rx="5" fill="#374151"/><circle cx="11" cy="10" r="2.8" fill="#0284C7"/><circle cx="11" cy="10" r="1.4" fill="#7DD3FC"/><rect x="9" y="18" width="4" height="2" rx="1" fill="#9CA3AF"/><rect x="7" y="19.5" width="8" height="1.5" rx="0.75" fill="#6B7280"/></svg>`,
   'IMG:secadora': `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><rect x="1" y="1" width="20" height="20" rx="2" fill="#6B7280"/><rect x="2" y="2" width="18" height="3.5" rx="0.5" fill="#4B5563"/><circle cx="16" cy="3.75" r="1.2" fill="#22C55E"/><circle cx="11" cy="13" r="7" fill="#374151"/><circle cx="11" cy="13" r="5.5" fill="#1E293B"/><circle cx="11" cy="13" r="4" fill="none" stroke="#60A5FA" stroke-width="1" stroke-dasharray="2.5 2"/><circle cx="11" cy="13" r="1.5" fill="#374151" stroke="#60A5FA" stroke-width="0.8"/></svg>`,
 };
-function iconHtml(icon){return APPLIANCE_SVG[icon]||icon;}
+function iconHtml(icon){return appIcon(iconKeyFromText(icon));}
+setTimeout(applyAppIcons,0);
 function iconLabel(icon){const m={'IMG:cocina':'[Cocina]','IMG:horno':'[Horno]','IMG:terma':'[Terma]','IMG:secadora':'[Secadora]'};return m[icon]||icon;}
 
 // ── Categorías NEGOCIO — ingresos (8 servicios) ──
@@ -2270,7 +2426,7 @@ function catSelectHtml(id, type, selected, selectedCatId){
       c.id === selected ||
       c.name === selected ||
       norm(c.name) === selNorm;
-    return `<option value="${c.id}" ${isSelected?'selected':''}>${c.icon||''} ${c.name}</option>`;
+    return `<option value="${c.id}" ${isSelected?'selected':''}>${c.name}</option>`;
   }).join('');
   return `<div class="cat-select-wrap"><select id="${id}" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">${opts}</select></div>`;
 }
@@ -3291,7 +3447,7 @@ function renderMetas(){
         return `<div class="card" style="margin-bottom:10px;opacity:${done?.8:1}">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
             <div>
-              <div style="font-family:'Playfair Display',serif;font-size:15px">${m.icon||'🎯'} ${m.nombre}</div>
+              <div style="font-family:Inter,Roboto,sans-serif;font-size:15px;display:flex;align-items:center;gap:8px">${iconHtml(m.icon||'target')} ${m.nombre}</div>
               <div style="font-size:11px;color:var(--muted);margin-top:2px">Fecha límite: ${m.fechaLimite||'—'}</div>
             </div>
             <div style="text-align:right">
@@ -3418,7 +3574,7 @@ function renderPresupuesto(){
     const over=gastado>p.limite;
     return `<div class="card" style="margin-bottom:8px;border-color:${over?'#E0525244':'var(--border)'}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="font-size:14px;font-weight:500">${p.icon||''} ${p.categoria}</div>
+        <div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px">${iconHtml(p.icon||'clipboard')} ${p.categoria}</div>
         <div style="text-align:right">
           <div style="font-size:13px;font-weight:600;color:${over?'var(--red)':'var(--text)'}">${fmt(gastado)} <span style="font-size:11px;color:var(--muted)">/ ${fmt(p.limite)}</span></div>
           ${over?`<div style="font-size:10px;color:var(--red)">⚠ Excedido por ${fmt(gastado-p.limite)}</div>`:`<div style="font-size:10px;color:var(--gold)">Disponible: ${fmt(disponible)}</div>`}
@@ -3444,7 +3600,7 @@ function renderPresupuesto(){
 
 function openAddPresup(){
   const allCats=[...state.catsEx].filter(c=>!['transfer_out','transfer_retiro','transfer_neg_out','transfer_neg_retiro_out'].includes(c.id));
-  const opts=allCats.map(c=>`<option value="${c.name}" data-icon="${c.icon}">${c.icon} ${c.name}</option>`).join('');
+  const opts=allCats.map(c=>`<option value="${c.name}" data-icon="${c.icon}">${c.name}</option>`).join('');
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:var(--gold)">Límite Semanal</div>
     <div class="field"><label class="field-label">Categoría</label><select id="ps-cat">${opts}</select></div>
@@ -11056,6 +11212,7 @@ function render(){
     case 'notas':content.innerHTML=renderNotas();break;
     case 'inventario':content.innerHTML=renderInventario();break;
   }
+  applyAppIcons();
   setTimeout(()=>{ renderSoundsList(); renderRemindersList(); checkNotifBtn(); },50);
 }
 
@@ -12337,7 +12494,7 @@ function setMicContext(ctx) {
   if(header) header.style.background = def.bg;
   if(box)    box.style.borderTop = '3px solid '+def.color;
 
-  document.getElementById('micContextIcon').textContent  = def.icon;
+  document.getElementById('micContextIcon').innerHTML  = appIcon(iconKeyFromText(def.title+' '+def.sub));
   document.getElementById('micContextTitle').textContent = def.title;
   document.getElementById('micContextSub').textContent   = def.sub;
 
@@ -12512,6 +12669,7 @@ function resetMicModal() {
   const title = document.getElementById('micContextTitle');
   const sub   = document.getElementById('micContextSub');
   if(icon)  icon.textContent  = '🎙';
+  if(icon)  icon.innerHTML  = appIcon('mic');
   if(title) title.textContent = 'Registro por Voz';
   if(sub)   sub.textContent   = 'Habla y detecto qué registrar';
   const gf = document.getElementById('micGhostForm');
@@ -12626,6 +12784,7 @@ function startListening() {
   micListening = true;
   document.getElementById('micBtn').style.background='linear-gradient(135deg,#E05252,#f87171)';
   document.getElementById('micBtnIcon').textContent='⏹';
+  document.getElementById('micBtnIcon').innerHTML=appIcon('box');
   document.getElementById('micBtnTxt').textContent='Detener';
   document.getElementById('micFab').classList.add('listening');
   document.querySelectorAll('.wave-bar').forEach(b=>b.classList.add('active'));
@@ -12812,6 +12971,7 @@ function stopListening() {
   const micFab  = document.getElementById('micFab');
   if(micBtn)  micBtn.style.background = 'linear-gradient(135deg,var(--gold),#6A8494)';
   if(micIcon) micIcon.textContent = '🎙';
+  if(micIcon) micIcon.innerHTML = appIcon('mic');
   if(micTxt)  micTxt.textContent  = 'Escuchar de nuevo';
   if(micFab)  micFab.classList.remove('listening');
   document.querySelectorAll('.wave-bar').forEach(b=>b.classList.remove('active'));
@@ -14890,7 +15050,7 @@ function processVoiceResultManual(text) {
 
   document.getElementById('pvType').textContent = parsed.type==='ingreso' ? '↑ Ingreso' : '↓ Egreso';
   document.getElementById('pvType').style.color = parsed.type==='ingreso' ? 'var(--gold)' : '#E05252';
-  document.getElementById('pvCat').textContent = parsed.cat ? `${parsed.cat.icon} ${parsed.cat.name}` : '❓ Sin categoría';
+  document.getElementById('pvCat').innerHTML = parsed.cat ? `${iconHtml(parsed.cat.icon)} ${parsed.cat.name}` : `${appIcon('tag')} Sin categoría`;
   document.getElementById('pvDesc').textContent = parsed.desc || '';
   document.getElementById('pvAmt').textContent = parsed.amount ? `S/ ${parsed.amount.toFixed(2)}` : '⚠ Monto no detectado';
   document.getElementById('pvAmt').style.color = parsed.type==='ingreso' ? 'var(--gold)' : '#E05252';
@@ -14907,7 +15067,7 @@ function processVoiceResultManual(text) {
       .replace(/^don\s+/i,'Sr. ')
       .trim();
     if(clienteLimpio){
-      clienteBadge.textContent = `👤 Cliente: ${clienteLimpio}`;
+      clienteBadge.textContent = `Cliente: ${clienteLimpio}`;
       clienteBadge.style.display = 'block';
     } else { clienteBadge.style.display = 'none'; }
   } else { clienteBadge.style.display = 'none'; }
@@ -14915,14 +15075,14 @@ function processVoiceResultManual(text) {
   // Servicio del negocio
   const negBadge = document.getElementById('pvNegocioBadge');
   if (parsed.servicioNeg) {
-    negBadge.textContent = `🔵 Servicio: ${parsed.servicioNeg.label}`;
+    negBadge.textContent = `Servicio: ${parsed.servicioNeg.label}`;
     negBadge.style.display = 'block';
   } else { negBadge.style.display = 'none'; }
 
   // Servicio de casa vinculado
   const svcBadge = document.getElementById('pvServiceBadge');
   if (parsed.serviceMatch) {
-    svcBadge.textContent = `🏠 Marcará "${parsed.serviceMatch.name}" como pagado`;
+    svcBadge.textContent = `Marcará "${parsed.serviceMatch.name}" como pagado`;
     svcBadge.style.display = 'block';
   } else { svcBadge.style.display = 'none'; }
 
@@ -15032,6 +15192,7 @@ function startListeningForField(campoId, onDone){
       const clienteBadge = document.getElementById('pvClienteBadge');
       if(clienteBadge){
         clienteBadge.textContent = '👤 Cliente: ' + texto;
+        clienteBadge.textContent = 'Cliente: ' + texto;
         clienteBadge.style.display = 'block';
       }
       document.getElementById('micText').textContent = '✓ Cliente: ' + texto;
@@ -15062,7 +15223,7 @@ function confirmarNegocio(esNegocio) {
     const newCat = state.catsEx.find(c=>c.id===newCatId) || micParsed.cat;
     micParsed.cat = newCat;
     micParsed.negocio = true;
-    document.getElementById('pvCat').textContent = `${newCat.icon} ${newCat.name}`;
+    document.getElementById('pvCat').innerHTML = `${iconHtml(newCat.icon)} ${newCat.name}`;
     updateCatSelect('egreso', newCat.id);
     document.getElementById('pvNegocioBadge').textContent = '🏗️ Registrado como gasto del negocio';
     document.getElementById('pvNegocioBadge').style.display = 'block';
@@ -15071,7 +15232,7 @@ function confirmarNegocio(esNegocio) {
     // Si era combustible sin negocio → Transporte personal
     const newCat = state.catsEx.find(c=>c.id==='ce2') || micParsed.cat;
     micParsed.cat = newCat;
-    document.getElementById('pvCat').textContent = `${newCat.icon} ${newCat.name}`;
+    document.getElementById('pvCat').innerHTML = `${iconHtml(newCat.icon)} ${newCat.name}`;
     updateCatSelect('egreso', newCat.id);
     document.getElementById('pvNegocioBadge').textContent = '🏠 Registrado como gasto personal';
     document.getElementById('pvNegocioBadge').style.display = 'block';
@@ -15083,7 +15244,7 @@ function updateCatSelect(type, selectedId) {
   const sel = document.getElementById('pvCatEdit');
   if(!sel) return; // ★ modal puede no estar en DOM todavía — no explotar
   const list = (type==='ingreso' ? state.catsIn : state.catsEx) || [];
-  sel.innerHTML = list.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${c.icon} ${c.name}</option>`).join('');
+  sel.innerHTML = list.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${c.name}</option>`).join('');
   const typeEdit = document.getElementById('pvTypeEdit');
   if(typeEdit) typeEdit.onchange = function(){
     updateCatSelect(this.value);
