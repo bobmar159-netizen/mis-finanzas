@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-<script id="chartjs-cdn" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
 <style>
 :root {
   --gold:#546878;--gold2:#6A8494;--red:#D94040;--green:#546878;--blue:#2E73AB;
@@ -1765,7 +1765,22 @@ table.nt tbody tr:hover td,
       <button class="tab" onclick="switchPage('notas')" id="tab-notas"><span class="tab-icon">📝</span>Notas</button>
     </div>
   </div>
-  <div id="content"></div>
+  <div id="content">
+    <div id="boot-skeleton" style="padding:16px 0 110px">
+      <div class="summary-card" style="background:var(--card);border:1.5px solid var(--border);text-align:center;margin-bottom:12px;box-shadow:0 2px 12px #00000008">
+        <div class="summary-label" style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.07em">Abriendo negocio</div>
+        <div class="summary-amount" style="color:var(--gold);font-size:34px;margin:8px 0">Cargando...</div>
+        <div style="height:10px;background:var(--bg);border-radius:999px;overflow:hidden;margin-top:14px">
+          <div class="pulse" style="height:100%;width:42%;background:var(--gold);border-radius:999px"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:10px">
+        <div style="height:14px;background:#EDF2F6;border-radius:8px;width:70%;margin-bottom:12px"></div>
+        <div style="height:11px;background:#F3F6F8;border-radius:8px;width:92%;margin-bottom:8px"></div>
+        <div style="height:11px;background:#F3F6F8;border-radius:8px;width:55%"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="overlay" id="modal" style="display:none" onclick="closeModal(event)">
@@ -2281,14 +2296,14 @@ function loadStateForModo(modo){
   state.prestamosPersonales = load(k.prestamosPersonales, []);
   state.metas               = load(k.metas, []);
   state.recordatorios       = load('fnz_recordatorios', []);
-  state.sonidos             = load('fnz_sonidos', {});
+  state.sonidos             = state._lazyLoaded?.sonidos ? load('fnz_sonidos', {}) : (state.sonidos || {});
   state.agenda              = load('fnz_agenda', []);
-  state.notas               = load('fnz_notas', []);
+  state.notas               = state._lazyLoaded?.notas ? load('fnz_notas', []) : (state.notas || []);
   state.presupuesto         = load(k.presupuesto, []);
-  state.inventario          = load('fnz_inventario', []);
-  state.plantillas          = load('fnz_plantillas', []);
-  state.movimientosMateriales = load('fnz_mov_mat', []);
-  state.comprasMateriales   = load('fnz_compras_mat', []);
+  state.inventario          = state._lazyLoaded?.inventario ? load('fnz_inventario', []) : (state.inventario || []);
+  state.plantillas          = state._lazyLoaded?.plantillas ? load('fnz_plantillas', []) : (state.plantillas || []);
+  state.movimientosMateriales = state._lazyLoaded?.movimientosMateriales ? load('fnz_mov_mat', []) : (state.movimientosMateriales || []);
+  state.comprasMateriales   = state._lazyLoaded?.comprasMateriales ? load('fnz_compras_mat', []) : (state.comprasMateriales || []);
   state.stockValorGeneral   = load('fnz_stock_valor_general', 0);
 
   syncDefaultCategoriesForMode(isNeg);
@@ -2306,14 +2321,14 @@ function saveAll(){
   save(k.prestamosPersonales, state.prestamosPersonales);
   save(k.metas,               state.metas);
   save('fnz_recordatorios',   state.recordatorios);
-  save('fnz_sonidos',         state.sonidos);
+  if(state._lazyLoaded?.sonidos) save('fnz_sonidos', state.sonidos);
   save('fnz_agenda',          state.agenda);
-  save('fnz_notas',           state.notas);
+  if(state._lazyLoaded?.notas) save('fnz_notas', state.notas);
   save(k.presupuesto,         state.presupuesto);
-  save('fnz_inventario',      state.inventario);
-  save('fnz_plantillas',      state.plantillas);
-  save('fnz_mov_mat',         state.movimientosMateriales);
-  save('fnz_compras_mat',     state.comprasMateriales);
+  if(state._lazyLoaded?.inventario) save('fnz_inventario', state.inventario);
+  if(state._lazyLoaded?.plantillas) save('fnz_plantillas', state.plantillas);
+  if(state._lazyLoaded?.movimientosMateriales) save('fnz_mov_mat', state.movimientosMateriales);
+  if(state._lazyLoaded?.comprasMateriales) save('fnz_compras_mat', state.comprasMateriales);
   save('fnz_stock_valor_general', state.stockValorGeneral||0);
   save('fnz_nombre_usuario',  state.nombreUsuario||'');
   // NO llamar syncToSheets() aquí — cada función llama su propio sync
@@ -2375,6 +2390,42 @@ function applyModoTheme(){
 function load(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch{return def;}}
 function save(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch{}}
 
+const LAZY_STATE_KEYS = {
+  notas: ['fnz_notas', []],
+  sonidos: ['fnz_sonidos', {}],
+  inventario: ['fnz_inventario', []],
+  plantillas: ['fnz_plantillas', []],
+  movimientosMateriales: ['fnz_mov_mat', []],
+  comprasMateriales: ['fnz_compras_mat', []]
+};
+
+function initLazyFlags(){
+  if(!state._lazyLoaded) state._lazyLoaded = {};
+  Object.keys(LAZY_STATE_KEYS).forEach(k=>{
+    if(state._lazyLoaded[k] !== true) state._lazyLoaded[k] = false;
+  });
+}
+
+function ensureLazyData(key){
+  if(!LAZY_STATE_KEYS[key]) return;
+  initLazyFlags();
+  if(state._lazyLoaded[key]) return;
+  const [storageKey, fallback] = LAZY_STATE_KEYS[key];
+  state[key] = load(storageKey, fallback);
+  state._lazyLoaded[key] = true;
+}
+
+function ensurePageData(page){
+  if(page === 'notas') ensureLazyData('notas');
+  if(page === 'inventario'){
+    ensureLazyData('inventario');
+    ensureLazyData('plantillas');
+    ensureLazyData('movimientosMateriales');
+    ensureLazyData('comprasMateriales');
+  }
+  if(page === 'ajustes') ensureLazyData('sonidos');
+}
+
 let state = {
   modo:         'negocio',
   nombreUsuario: load('fnz_nombre_usuario',''),
@@ -2403,6 +2454,7 @@ let state = {
   chartPie:     null,
   moneda:       load('fnz_moneda','PEN'),
   tipoCambio:   load('fnz_tipo_cambio', 3.75),
+  _lazyLoaded:  {}
 };
 // Cargar datos del modo guardado
 save('fnz_modo','negocio');
@@ -2437,6 +2489,7 @@ function ajustarStockValorGeneral(delta){
 }
 
 function registrarMovimientoStockValor(tipo, monto, data={}){
+  ensureLazyData('movimientosMateriales');
   const amount = moneyValue(monto);
   if(!amount) return;
   state.movimientosMateriales = state.movimientosMateriales || [];
@@ -7962,6 +8015,7 @@ function npNoteKind(n){
   return 'doc';
 }
 function npUpgradeNotas(){
+  ensureLazyData('notas');
   if(!state.notas) state.notas=[];
   let changed=false;
   state.notas.forEach(n=>{
@@ -8075,6 +8129,7 @@ function npRenderCard(n){
 }
 
 function npOpenNote(id){
+  ensureLazyData('notas');
   const n=(state.notas||[]).find(x=>String(x.id)===String(id));
   if(!n) return;
   const kind=npNoteKind(n);
@@ -8084,6 +8139,7 @@ function npOpenNote(id){
 }
 
 function npDeleteNote(id){
+  ensureLazyData('notas');
   if(!confirm('Eliminar esta nota?')) return;
   state.notas=(state.notas||[]).filter(n=>String(n.id)!==String(id));
   save('fnz_notas',state.notas);
@@ -8190,6 +8246,7 @@ function npSaveList(close){
 }
 
 function npOpenDoc(id,pre){
+  ensureLazyData('notas');
   npEnsureStyles();
   let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
   n=n?JSON.parse(JSON.stringify(n)):{id:null,npKind:'doc',tipo:'texto',titulo:pre?.titulo||'Nota nueva',texto:pre?.texto||'',creado:new Date().toISOString()};
@@ -8217,6 +8274,7 @@ function npSaveDoc(close){
 }
 
 function npOpenMeetingEditor(id,pre){
+  ensureLazyData('notas');
   npEnsureStyles();
   let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
   n=n?JSON.parse(JSON.stringify(n)):{id:null,npKind:'meeting',tipo:'audio',titulo:pre?.titulo||'Reunion con IA',transcript:pre?.transcript||'',resumen:pre?.resumen||'',acuerdos:pre?.acuerdos||[],tareas:pre?.tareas||[],gastos:pre?.gastos||[],creado:new Date().toISOString()};
@@ -8604,6 +8662,7 @@ function playSoundDefault(id){
 
 function playSound(id){
   if(!id) return;
+  ensureLazyData('sonidos');
   // Sonido predeterminado
   if(id.startsWith('default_')){ playSoundDefault(id); return; }
   // Sonido personalizado
@@ -12194,6 +12253,7 @@ function toast(msg,type='success'){
 // ─────────────────────────────────────────────
 function render(){
   applyModoTheme();
+  ensurePageData(state.page);
   const content=document.getElementById('content');
   const bal=balance();
   document.getElementById('header-date').textContent=MONTHS_FULL[new Date().getMonth()]+' '+new Date().getFullYear();
@@ -12229,7 +12289,7 @@ function loadFromSheets(forzar) {
 
   // Con forzar=false (arranque): siempre intentar, pero solo mostrar spinner si localStorage vacío
   const hayDatos = ['fnz_neg_tx','fnz_tx','fnz_agenda','fnz_notas','fnz_inventario','fnz_neg_debts','fnz_neg_services']
-    .some(k => (load(k, []) || []).length > 0);
+    .some(k => !!localStorage.getItem(k));
   const renderPendiente = (!hayDatos || forzar);
   const segundoPlano = (!forzar && hayDatos);
   if (segundoPlano) render();
@@ -12352,7 +12412,7 @@ function _mergeById(local, remote) {
 
 // ── Arranque: cargar desde Sheets si localStorage vacío ──
 loadSavedTheme();
-loadFromSheets(false);
+window._fnzBoot = () => loadFromSheets(false);
 
 // ── Auto-arranque Notion Sync ──────────────────────────────────────
 // Si el usuario configuró sus credenciales, el polling arranca SOLO
@@ -19597,6 +19657,7 @@ function npNormalizeItem(it){
 function npListTotal(items){ return (items||[]).reduce((s,i)=>s+npMoney(i.total),0); }
 
 function npUpgradeNotas(){
+  ensureLazyData('notas');
   if(!state.notas) state.notas=[];
   let changed=false;
   state.notas.forEach(n=>{
@@ -20055,6 +20116,7 @@ function npRenderParsedPreview(parsed,source){
 }
 
 function npMicCommit(){
+  ensureLazyData('notas');
   const m=window._npMic; if(!m) return;
   const raw=npCleanLongTranscript(m.segments.join(' '),0);
   const p=m.parsed||npParseSmartInput(raw,m.mode);
@@ -20124,6 +20186,7 @@ function npNoteText(n){
 }
 
 function npOpenShare(id){
+  ensureLazyData('notas');
   const n=(state.notas||[]).find(x=>String(x.id)===String(id)); if(!n) return;
   document.getElementById('modal-content').innerHTML=`<div class="modal-title" style="color:#172033">Compartir</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:14px">${npEsc(n.titulo||'Nota')}</div>
@@ -20159,6 +20222,14 @@ function abrirEditorNotaBloque(editId){ if(editId) npOpenNote(editId); else npOp
 function abrirEditorNota(editId){ if(editId) npOpenNote(editId); else npOpenDoc(null); }
 function openEditNotaLista(n){ npOpenSmartList((typeof n==='object'?n.id:n),(typeof n==='object'?n.listType:null)||'compras'); }
 function abrirModalCompartir(id){ npOpenShare(id); }
+
+setTimeout(()=>{
+  if(window._fnzBoot){
+    const boot = window._fnzBoot;
+    window._fnzBoot = null;
+    boot();
+  }
+}, 0);
 
 </script>
 </body>
