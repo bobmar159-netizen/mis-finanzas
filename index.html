@@ -7,8 +7,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#F7F7F5">
 <title>Mis Finanzas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script id="chartjs-cdn" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
 <style>
 :root {
   --gold:#546878;--gold2:#6A8494;--red:#D94040;--green:#546878;--blue:#2E73AB;
@@ -4906,7 +4908,37 @@ function _parseFechaNotion(str) {
 }
 
 
+let _chartLoaderPending = false;
+function ensureChartReady(callback){
+  if(window.Chart){ callback(); return; }
+  if(_chartLoaderPending){
+    setTimeout(()=>ensureChartReady(callback), 180);
+    return;
+  }
+  _chartLoaderPending = true;
+  let finished = false;
+  const finish = () => {
+    if(finished) return;
+    finished = true;
+    _chartLoaderPending = false;
+    if(window.Chart) callback();
+    else toast('No se pudieron cargar los gráficos. Revisa tu conexión.', 'error');
+  };
+  let script = document.getElementById('chartjs-cdn');
+  if(!script){
+    script = document.createElement('script');
+    script.id = 'chartjs-cdn';
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+    script.defer = true;
+    document.head.appendChild(script);
+  }
+  script.addEventListener('load', finish, {once:true});
+  script.addEventListener('error', finish, {once:true});
+  setTimeout(()=>{ if(window.Chart) finish(); }, 1600);
+}
+
 function buildCharts(){
+  if(!window.Chart){ ensureChartReady(buildCharts); return; }
   const bl=[],bi=[],be=[];
   for(let i=5;i>=0;i--){
     const d=new Date(state.filterYear,state.filterMonth-i,1);
@@ -12196,13 +12228,14 @@ function loadFromSheets(forzar) {
   if (!url) { render(); return; }
 
   // Con forzar=false (arranque): siempre intentar, pero solo mostrar spinner si localStorage vacío
-  const hayDatos = (
-    (load('fnz_neg_tx', []).length > 0) ||
-    (load('fnz_tx', []).length > 0)
-  );
+  const hayDatos = ['fnz_neg_tx','fnz_tx','fnz_agenda','fnz_notas','fnz_inventario','fnz_neg_debts','fnz_neg_services']
+    .some(k => (load(k, []) || []).length > 0);
+  const renderPendiente = (!hayDatos || forzar);
+  const segundoPlano = (!forzar && hayDatos);
+  if (segundoPlano) render();
 
   // Si no hay datos locales, mostrar pantalla de carga
-  if (!hayDatos || forzar) {
+  if (renderPendiente) {
     document.getElementById('content').innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;padding:20px">
         <div style="font-size:40px">☁️</div>
@@ -12216,15 +12249,17 @@ function loadFromSheets(forzar) {
   fetch(fullUrl, { method: 'GET' })
     .then(r => r.json())
     .then(data => {
-      if (!data || !data.ok) { render(); return; }
+      if (!data || !data.ok) { if(renderPendiente) render(); return; }
 
       let added = 0;
+      let changed = false;
 
       // Agenda
       if (data.agenda && data.agenda.length) {
-        const m = _mergeById(load('fnz_agenda',[]), data.agenda);
+        const local = load('fnz_agenda',[]);
+        const m = _mergeById(local, data.agenda);
+        if(m.length !== local.length){ changed = true; added += Math.max(0, m.length - local.length); }
         save('fnz_agenda', m); state.agenda = m;
-        added += data.agenda.length;
       }
 
       // Movimientos negocio — merge por ID Y huella (evita duplicados)
@@ -12247,6 +12282,7 @@ function loadFromSheets(forzar) {
           save('fnz_neg_tx', m);
           if (state.modo === 'negocio') state.transactions = m;
           added += toAdd.length;
+          changed = true;
         }
       }
 
@@ -12260,39 +12296,50 @@ function loadFromSheets(forzar) {
           save('fnz_tx',m);
           if(state.modo==='personal') state.transactions=m;
           added+=toAdd.length;
+          changed = true;
         }
       }
 
       // Deudas
       if (data.deudas && data.deudas.length) {
-        const m = _mergeById(load('fnz_neg_debts',[]), data.deudas);
+        const local = load('fnz_neg_debts',[]);
+        const m = _mergeById(local, data.deudas);
+        if(m.length !== local.length) changed = true;
         save('fnz_neg_debts', m);
         if (state.modo === 'negocio') state.debts = m;
       }
       // Servicios
       if (data.servicios && data.servicios.length) {
-        const m = _mergeById(load('fnz_neg_services',[]), data.servicios);
+        const local = load('fnz_neg_services',[]);
+        const m = _mergeById(local, data.servicios);
+        if(m.length !== local.length) changed = true;
         save('fnz_neg_services', m);
         if (state.modo === 'negocio') state.servicios = m;
       }
       // Metas
       if (data.metas && data.metas.length) {
-        const m = _mergeById(load('fnz_neg_metas',[]), data.metas);
+        const local = load('fnz_neg_metas',[]);
+        const m = _mergeById(local, data.metas);
+        if(m.length !== local.length) changed = true;
         save('fnz_neg_metas', m);
         if (state.modo === 'negocio') state.metas = m;
       }
       // Notas
       if (data.notas && data.notas.length) {
-        const m = _mergeById(load('fnz_notas',[]), data.notas);
+        const local = load('fnz_notas',[]);
+        const m = _mergeById(local, data.notas);
+        if(m.length !== local.length) changed = true;
         save('fnz_notas', m); state.notas = m;
       }
 
       save('fnz_last_load', new Date().toISOString());
-      loadStateForModo(state.modo);
+      if(changed || forzar || renderPendiente){
+        loadStateForModo(state.modo);
       if(added > 0 || forzar) toast('✓ Sheets: '+added+' registros nuevos cargados');
-      render();
+        render();
+      }
     })
-    .catch(() => render());
+    .catch(() => { if(renderPendiente) render(); });
 }
 
 // Merge por id: local tiene prioridad, agrega remote solo si id no existe
