@@ -2149,6 +2149,7 @@ const DEFAULT_CATS_NEG_IN = [
   {id:'cn5',name:'Conexion de artefactos',icon:'appliance',color:'#4F7EA8',type:'ingreso'},
   {id:'cn8',name:'Documentacion',icon:'document',color:'#77746D',type:'ingreso'},
   {id:'cn9',name:'Otros servicios',icon:'box',color:'#5A8E7A',type:'ingreso'},
+  {id:'cn_otro_ingreso',name:'Otros ingresos',icon:'money',color:'#6E8C7B',type:'ingreso'},
   {id:'transfer_neg_in',name:'Transferencia recibida',icon:'transfer',color:'var(--gold)',type:'ingreso',system:true,hidden:true},
   {id:'transfer_neg_retiro',name:'Retiro personal',icon:'briefcase',color:'#C9A84C',type:'ingreso',system:true,hidden:true},
 ];
@@ -2222,7 +2223,7 @@ function getKeys(modo){
   if(migrated) console.log('[MisFinanzas] Keys migrados a formato fnz_neg_*');
 })();
 
-const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_business_only_v2';
+const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_voice_local_v3';
 const CATEGORY_LEGACY_DEFAULT_IDS = {
   personal: {
     ingreso: ['ci1','ci2','ci3','ci4','ci5','ci6','transfer_in','transfer_retiro_in','cneg_svc'],
@@ -5164,7 +5165,7 @@ function openEditDebt(id){ openDebtModal(state.debts.find(d=>d.id===id)); }
 function openDebtModal(debt, preData){
   const pre = preData||{};
   const isEdit=!!debt;
-  const d=debt||{name:pre.name||'',totalAmount:pre.totalAmount||'',cuotaMonto:pre.cuotaMonto||'',cuotasTotales:pre.cuotasTotales||'',cuotasPagadas:0,categoria:pre.categoria||DEBT_CATS[0],color:DEBT_COLORS[0]};
+  const d=debt||{name:pre.name||'',totalAmount:pre.totalAmount||'',cuotaMonto:pre.cuotaMonto||'',cuotasTotales:pre.cuotasTotales||'',cuotasPagadas:0,categoria:pre.categoria||DEBT_CATS[0],tipo:pre.tipo||'Personal',color:pre.color||DEBT_COLORS[0]};
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:var(--blue)">${isEdit?'Editar':'Nueva'} Deuda</div>
     <div class="field"><label class="field-label">Nombre</label><input id="d-name" type="text" placeholder="Ej: BCP, Tarjeta Ripley" value="${d.name}"></div>
@@ -9570,6 +9571,7 @@ function normalizeServicioLabel(label){
 function parseAgendaVoz(text){
   // Limpiar palabras de activación que confunden al parser
   let text2 = text
+    .replace(/\balas\b/gi, 'a las')
     .replace(/\bcrea\s+(un|una)?\s*(evento|trabajo|visita)?\b/gi, '')
     .replace(/\bnuevo\s+(evento|trabajo|visita)\b/gi, '')
     .replace(/\b(agenda|agend[aá])\b/gi, '')
@@ -12040,11 +12042,12 @@ Object.assign(CAT_KEYWORDS, {
   cn5: ['conexion de artefactos','conexión de artefactos','conexion','conexión','coneccion','conectar','conecte','conecté'],
   cn8: ['documentacion','documentación','tramite','trámite','certificado','plano','expediente'],
   cn9: ['otros servicios','otro servicio','servicio gas','servicio de gas'],
+  cn_otro_ingreso: ['otros ingresos','otro ingreso','regalo','regalaron','me dieron','me dio','apoyo','aporte','ingreso extra','caja extra'],
 
   cne_operacion: ['operacion','operación','operativo','gasto operativo','mantenimiento negocio'],
   cne_personal: ['personal','ayudante','empleado','mano de obra','jornal','sueldo trabajador'],
-  cne_gaseosa: ['gaseosa','bebida','inca kola','coca cola','soda'],
-  cne_snack: ['snack','snacks','piqueo','papitas','galleta'],
+  cne_gaseosa: ['gaseosa','bebida','bebidas','inca kola','coca cola','soda','refresco'],
+  cne_snack: ['snack','snacks','snak','snaks','piqueo','papitas','galleta','galletas','golosina'],
   cne_menu: ['menu','menú','almuerzo','cena','desayuno','comida','restaurant','restaurante'],
   cne5: ['transporte','movilidad','taxi','uber','pasaje','flete'],
   cne_luz: ['luz','electricidad','enel','luz del sur'],
@@ -12073,6 +12076,12 @@ function extractAmount(text) {
   // FIX: normalizar punto de miles (1.500 → 1500) antes de parsear
   text = text.replace(/(\d+)\.(\d{3})(?!\d)/g, '$1$2');
   const t = text;
+  // 2 con 50 | 2 soles con 50
+  let dec = t.match(/\b(\d{1,5})\s*(?:soles?|sol)?\s+con\s+(\d{1,2})\b/i);
+  if (dec) {
+    const n = parseFloat(dec[1] + '.' + dec[2].padStart(2, '0'));
+    if(!isNaN(n)&&n>0) return n;
+  }
   // S/. 400 | S/ 400 | S/.400
   let m = t.match(/s\/\.?\s*(\d[\d.,]*)/i);
   if (m) { const n=parseFloat(m[1].replace(',','.')); if(!isNaN(n)&&n>0) return n; }
@@ -12087,6 +12096,12 @@ function extractAmount(text) {
   if (allNums.length) return allNums[allNums.length-1];
   // números en palabras
   const words = nrm(text).split(/\s+/);
+  const spokenDec = nrm(text).match(/\b([a-z]+)\s+con\s+([a-z]+)\b/);
+  if(spokenDec && NUM_WORDS[spokenDec[1]] !== undefined && NUM_WORDS[spokenDec[2]] !== undefined){
+    const soles = NUM_WORDS[spokenDec[1]];
+    const cents = NUM_WORDS[spokenDec[2]];
+    if(soles >= 0 && cents > 0 && cents < 100) return +(soles + cents / 100).toFixed(2);
+  }
   let total=0, last=0;
   for (const w of words) {
     if (NUM_WORDS[w]!==undefined) {
@@ -12098,6 +12113,45 @@ function extractAmount(text) {
   }
   if(last||total) return total+last;
   return null;
+}
+
+function extractPlazoMeses(text) {
+  const t = nrm(text);
+  let m = t.match(/\b(?:en|para|durante|a)\s+(\d{1,3})\s+mes(?:es)?\b/)
+       || t.match(/\b(\d{1,3})\s+cuotas?\b/);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    if (n > 0 && n <= 120) return n;
+  }
+  m = t.match(/\b(?:en|para|durante|a)\s+([a-z]+)\s+mes(?:es)?\b/)
+   || t.match(/\b([a-z]+)\s+cuotas?\b/);
+  if (m) {
+    const n = NUM_WORDS[m[1]];
+    if (n > 0 && n <= 120) return n;
+  }
+  return null;
+}
+
+function parsePrestamoVoz(text) {
+  const t = nrm(text);
+  const esPrestamoRecibido = /\b(me prestaron|me presto|me dieron prestado|me dieron un prestamo|prestamo recibido|recibi un prestamo|recibi prestamo|me hicieron un prestamo)\b/.test(t);
+  if (!esPrestamoRecibido) return null;
+
+  const total = extractAmount(text);
+  if (!total) return null;
+
+  const cuotas = extractPlazoMeses(text) || 1;
+  const cuotaMonto = +(total / cuotas).toFixed(2);
+  return {
+    name: 'Prestamo recibido',
+    totalAmount: total,
+    cuotaMonto,
+    cuotasTotales: cuotas,
+    cuotasPagadas: 0,
+    categoria: 'Prestamo personal',
+    tipo: 'Personal',
+    color: '#9B59B6',
+  };
 }
 
 // ── Detectar tipo ingreso / egreso ──
@@ -12698,7 +12752,9 @@ function parseVoiceCommand(text) {
         const nombre = nombres[servicioNeg.id];
         cat = state.catsIn.find(c=>c.name===nombre) || state.catsIn.find(c=>c.id==='cn9') || state.catsIn.filter(c=>!c.hidden&&!c.system).slice(-1)[0];
       } else {
-        cat = state.catsIn.find(c=>c.id==='cn9') || state.catsIn.filter(c=>!c.hidden&&!c.system).slice(-1)[0];
+        cat = state.catsIn.find(c=>c.id==='cn_otro_ingreso')
+           || state.catsIn.find(c=>c.id==='cn9')
+           || state.catsIn.filter(c=>!c.hidden&&!c.system).slice(-1)[0];
       }
     } else {
       // Egreso en modo negocio → clasificar por tipo
@@ -12708,6 +12764,12 @@ function parseVoiceCommand(text) {
         cat = state.catsEx.find(c=>c.id==='cne3') || state.catsEx[0];
       else if (/materiales?|insumos?/.test(t))
         cat = state.catsEx.find(c=>c.id==='cne1') || state.catsEx[0];
+      else if (/gaseosa|bebida|bebidas|inca kola|coca cola|soda|refresco/.test(t))
+        cat = state.catsEx.find(c=>c.id==='cne_gaseosa') || state.catsEx[0];
+      else if (/snack|snacks|snak|snaks|piqueo|papitas|galletas?|golosina/.test(t))
+        cat = state.catsEx.find(c=>c.id==='cne_snack') || state.catsEx[0];
+      else if (/menu|menu del dia|almuerzo|cena|desayuno|comida|restaurant|restaurante/.test(t))
+        cat = state.catsEx.find(c=>c.id==='cne_menu') || state.catsEx[0];
       else if (/luz|electricidad|enel/.test(t))
         cat = state.catsEx.find(c=>c.id==='cne_luz') || state.catsEx[0];
       else if (/agua|sedapal/.test(t))
@@ -12840,8 +12902,8 @@ function detectMicContext(text) {
   const t = text.toLowerCase();
   if(/agenda\s*(visita|cita|vista)/.test(t))       return 'agenda_visita';
   if(/agenda\s*(construc|trabajo|instal|servicio|obra)/.test(t)) return 'agenda_construccion';
-  if(/\b(gast[eé]|pagu[eé]|cobr[eé]|ingres|egres|compr[eé]|deposit|sueldo|bono|transfer)\b/.test(t)) return 'tx';
-  if(/\b(deuda|cuota|pr[eé]stamo|banco|tarjeta|debo|me cobran)\b/.test(t)) return 'deuda';
+  if(/\b(gast[eé]|pagu[eé]|cobr[eé]|ingres|egres|compr[eé]|deposit|sueldo|bono|transfer|me dieron|me regalaron)\b/.test(t)) return 'tx';
+  if(/\b(deuda|cuota|pr[eé]stamo|prestaron|me presto|banco|tarjeta|debo|me cobran)\b/.test(t)) return 'deuda';
   if(/\b(nota|lista|recordatorio|apunta|anota|no olvides)\b/.test(t)) return 'nota';
   return null;
 }
@@ -13144,7 +13206,7 @@ function startListening() {
   recognition = new SR();
   recognition.lang            = 'es-PE';
   recognition.interimResults  = true;
-  recognition.maxAlternatives = 3;
+  recognition.maxAlternatives = 1;
   recognition.continuous      = true;
 
   micListening = true;
@@ -13180,11 +13242,11 @@ function restartListening() {
     recognition = new SR();
     recognition.lang           = 'es-PE';
     recognition.interimResults = true;
-    recognition.maxAlternatives= 3;
+    recognition.maxAlternatives= 1;
     recognition.continuous     = true;
     startListeningHandlers(recognition);
     try { recognition.start(); } catch(e) {}
-  }, 150);
+  }, _rDelay);
 }
 
 function startListeningHandlers(rec) {
@@ -13221,7 +13283,7 @@ function startListeningHandlers(rec) {
     micFullTranscript = combinedFinal;
 
     const interimClean = sessionInterim.trim();
-    const display = (micFullTranscript + (micFullTranscript && interimClean ? ' ' : '') + interimClean).trim();
+    const display = _deduplicarTranscript((micFullTranscript + (micFullTranscript && interimClean ? ' ' : '') + interimClean).trim());
 
     document.getElementById('micText').textContent = display || '...';
 
@@ -13312,12 +13374,17 @@ function _actualizarContextoMic(texto){
     header.style.background='#1A2B3E';
     icon.textContent  = esVis ? '👁' : '🔧';
     title.textContent = esVis ? 'Agenda — Visita' : 'Agenda — Trabajo';
-    sub.textContent   = 'Gemini llenará los campos automáticamente';
-  } else if(/\b(gast[eé]|pagu[eé]|compr[eé]|recib[ií]|cobr[eé]|gan[eé])\b/.test(t)){
+    sub.textContent   = 'Parser local primero; Gemini solo verifica si esta activo';
+  } else if(/\b(prestamo|prestaron|me presto|deuda|cuota)\b/.test(t)){
+    header.style.background='#3B2A4A';
+    icon.textContent  = '🏦';
+    title.textContent = 'Registrar Deuda';
+    sub.textContent   = 'Se abrira la deuda prellenada para revisar';
+  } else if(/\b(gast[eé]|pagu[eé]|compr[eé]|recib[ií]|cobr[eé]|gan[eé]|me dieron|me regalaron|regalo)\b/.test(t)){
     header.style.background='#1E293B';
-    icon.textContent  = /\b(recib|cobr|gan)\b/.test(t) ? '↑' : '↓';
-    title.textContent = /\b(recib|cobr|gan)\b/.test(t) ? 'Registrar Ingreso' : 'Registrar Gasto';
-    sub.textContent   = 'Gemini analizará el monto y categoría';
+    icon.textContent  = /\b(recib|cobr|gan|me dieron|me regalaron|regalo)\b/.test(t) ? '↑' : '↓';
+    title.textContent = /\b(recib|cobr|gan|me dieron|me regalaron|regalo)\b/.test(t) ? 'Registrar Ingreso' : 'Registrar Gasto';
+    sub.textContent   = 'Parser local rapido para monto y categoria';
   }
 }
 
@@ -15057,6 +15124,14 @@ function _mostrarResumenAgendaEnMic(data, rawText, tipo){
     const h12 = h%12||12;
     return `${h12}:${mm} ${period}`;
   })() : '';
+  const hasGeminiAgenda = !!localStorage.getItem('fnz_gemini_key');
+  const agStatusHtml = hasGeminiAgenda
+    ? `<div id="ag-mic-status" style="font-size:11px;color:#7C3AED;text-align:center;padding:7px;background:#F5F3FF;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:6px;animation:pulse 1.2s infinite">
+      <span>✨</span> Gemini verificando datos...
+    </div>`
+    : `<div id="ag-mic-status" style="font-size:11px;color:#64748B;text-align:center;padding:7px;background:#F8FAFC;border-radius:8px;margin-bottom:12px">
+      Parser local listo. Puedes guardar o abrir el formulario.
+    </div>`;
 
   box.innerHTML = `
     <!-- Header tipo agenda -->
@@ -15076,10 +15151,8 @@ function _mostrarResumenAgendaEnMic(data, rawText, tipo){
       ${campo('Ubicación', data.ubicacion, true)}
     </div>
 
-    <!-- Estado Gemini -->
-    <div id="ag-mic-status" style="font-size:11px;color:#7C3AED;text-align:center;padding:7px;background:#F5F3FF;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:6px;animation:pulse 1.2s infinite">
-      <span>✨</span> Gemini verificando datos...
-    </div>
+    <!-- Estado parser -->
+    ${agStatusHtml}
 
     <!-- Botones -->
     <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -15311,7 +15384,12 @@ function _rellenarFormularioAgenda(p){
 // ── Eliminar repeticiones de texto por reinicios del mic ──
 function _deduplicarTranscript(text){
   if(!text) return '';
-  let words = text.trim().split(/\s+/);
+  text = String(text)
+    .replace(/([a-zA-Z])\1{3,}/g, '$1$1')
+    .replace(/\balas\b/gi, 'a las')
+    .replace(/\s+/g, ' ')
+    .trim();
+  let words = text.split(/\s+/);
   if(words.length < 2) return text;
 
   // En Android Chrome (continuous=true), a veces el texto se repite.
@@ -15332,9 +15410,9 @@ function _deduplicarTranscript(text){
     }
   }
 
-  // Límite duro de palabras para evitar que la cadena enorme rompa el JSON en Gemini
-  if(words.length > 150) {
-    words = words.slice(0, 150);
+  // Limite duro: los comandos por voz son cortos; esto corta repeticiones largas de Android.
+  if(words.length > 80) {
+    words = words.slice(0, 80);
   }
 
   const result = words.join(' ');
@@ -15380,14 +15458,7 @@ function processVoiceResult(text) {
     return;
   }
 
-  // ── Si Gemini está configurado, usar IA ──
-  const geminiKey = localStorage.getItem('fnz_gemini_key');
-  if(geminiKey){
-    processVoiceWithGemini(text);
-    return;
-  }
-
-  // Fallback: parser manual
+  // Parser local primero: responde rapido y evita depender de Gemini para comandos simples.
   processVoiceResultManual(text);
 }
 
@@ -15406,6 +15477,15 @@ function processVoiceResultManual(text) {
     const tipoF = p ? p.tipo : (esVis ? 'visita' : 'trabajo');
     const localData = p ? {...p, tipo: tipoF} : {tipo: tipoF};
     _mostrarResumenAgendaEnMic(localData, text, tipoF);
+    if(localStorage.getItem('fnz_gemini_key')) rellenarAgendaConGemini(text, tipoF, localData);
+    return;
+  }
+  const prestamoLocal = parsePrestamoVoz(text);
+  if(prestamoLocal){
+    processVoiceResult._busy = false;
+    document.getElementById('micModal').style.display='none';
+    openAddDebt(prestamoLocal);
+    toast('Prestamo detectado - revisa y guarda la deuda', 'info');
     return;
   }
   const parsed = parseVoiceCommand(text);
@@ -15647,8 +15727,20 @@ function saveMicTx() {
     catId,
     cliente:      micParsed?.cliente      ||null,
     servicioTipo: micParsed?.servicioNeg?.label||null,
-    negocio:      !!(micParsed?.negocio),
+    negocio:      state.modo === 'negocio' || !!(micParsed?.negocio),
   };
+  const entraAStockValor = tx.type === 'egreso' && state.modo === 'negocio' && isMaterialesCategory(tx.catId, tx.category);
+  if(entraAStockValor){
+    tx.afectaStockValor = true;
+    tx.stockOperacion = 'entrada_valor';
+    ajustarStockValorGeneral(tx.amount);
+    registrarMovimientoStockValor('entrada_valor', tx.amount, {
+      fecha: tx.date,
+      descripcion: tx.description,
+      cliente: tx.cliente || '',
+      txId: tx.id
+    });
+  }
   state.transactions.push(tx);
   let servicioMarcado=null;
   if(micParsed&&micParsed.serviceMatch){
