@@ -12544,6 +12544,12 @@ function extractUbicacion(text){
   const norm = text.toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
+  // Speech-to-text a veces corta o cambia el plural de distritos con articulo.
+  if(/\b(?:en|por|hacia|queda en|vive en|domicilio en|ubicado en)\s+(?:los?\s+)?oliv[oa]s?\b/.test(norm)
+     || /\blos?\s+olibos?\b/.test(norm)){
+    return 'Los Olivos';
+  }
+
   // Ordenar distritos de mayor a menor longitud para que "San Juan de Miraflores"
   // tenga prioridad sobre "Miraflores" o "San Juan de Lurigancho"
   const distritosOrdenados = [...DISTRITOS_LIMA].sort((a,b)=>b.length-a.length);
@@ -12563,10 +12569,11 @@ function extractUbicacion(text){
     const m = norm.match(p);
     if(m){
       const candidate = m[1].trim();
+      const candidatePlural = candidate.endsWith('s') ? candidate : candidate + 's';
       // Buscar el distrito más largo que sea substring del candidato
       for(const d of distritosOrdenados){
         const dn = d.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        if(candidate.includes(dn) || dn.includes(candidate)) return d;
+        if(candidate.includes(dn) || dn.includes(candidate) || dn.includes(candidatePlural)) return d;
       }
     }
   }
@@ -15294,15 +15301,15 @@ Responde obligatoriamente siguiendo esta estructura JSON (asegúrate de que sea 
 
     parsed.tipo = tipoDetectado;
 
-    // ★ Gemini tiene la última palabra absoluta, reemplazamos el parser local que falla a menudo.
+    // Gemini completa/corrige, pero no borra valores locales confiables como distritos.
     Object.keys(parsed).forEach(k => {
       const geminiVal = parsed[k];
       if(geminiVal !== null && geminiVal !== undefined && geminiVal !== ''){
         _agendaMicData[k] = geminiVal;
-      } else if (['cliente','hora','precio','servicio','ubicacion'].includes(k)) {
-        // En caso de que Gemini devuelva null, limpiamos los falsos positivos del local (ej. señor jueves)
-        // Solo la fecha permitimos que el local la sobreviva por si a Gemini se le escapó.
-        if (k !== 'fecha') _agendaMicData[k] = null;
+      } else if (k === 'cliente') {
+        const localCliente = nrm(_agendaMicData[k] || '');
+        const pareceDia = /\b(sr|sra|senor|senora|don|dona)?\s*(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\b/.test(localCliente);
+        if(pareceDia) _agendaMicData[k] = null;
       }
     });
 
