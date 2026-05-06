@@ -7800,6 +7800,677 @@ function saveNotionConfig(){
 
 
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// NOTAS PREMIUM 2026 - flujo nuevo, sin depender de los editores antiguos
+// ═══════════════════════════════════════════════════════════════════════════════
+let _npFilter = 'todas';
+let _npSearch = '';
+
+function npEsc(v){
+  return String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function npPlain(v){
+  return String(v ?? '').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+}
+function npMoney(n){
+  const v = parseFloat(n);
+  return Number.isFinite(v) ? v : 0;
+}
+function npFmt(n){
+  return 'S/ ' + npMoney(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function npId(){
+  return 'np_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+}
+
+function npEnsureStyles(){
+  if(document.getElementById('np-premium-styles')) return;
+  const st=document.createElement('style');
+  st.id='np-premium-styles';
+  st.textContent=`
+  .np-page{padding:2px 0 112px;color:var(--text)}
+  .np-hero{background:linear-gradient(180deg,#FFFFFF,#F8FAFC);border:1px solid #E8EDF2;border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:0 10px 30px rgba(15,23,42,.05)}
+  .np-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748B;font-weight:800;margin-bottom:5px}
+  .np-title{font-size:23px;font-weight:800;letter-spacing:0;color:#172033;margin-bottom:4px}
+  .np-sub{font-size:12px;color:#64748B;line-height:1.45}
+  .np-quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}
+  .np-q{border:1px solid #E6EBF0;background:#fff;border-radius:14px;padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer;min-height:62px;box-shadow:0 6px 18px rgba(15,23,42,.035)}
+  .np-q:active{transform:scale(.99)}
+  .np-q-ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#2F5F56;background:#EDF7F2;flex:0 0 auto}
+  .np-q:nth-child(2) .np-q-ic{background:#EFF6FF;color:#1F5C99}
+  .np-q:nth-child(3) .np-q-ic{background:#FFF7ED;color:#9A5415}
+  .np-q:nth-child(4) .np-q-ic{background:#F5F3FF;color:#6D46A5}
+  .np-q b{display:block;font-size:13px;color:#172033;margin-bottom:2px}
+  .np-q span{display:block;font-size:10px;color:#64748B;line-height:1.2}
+  .np-search{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E6EBF0;border-radius:14px;padding:10px 12px;margin:12px 0}
+  .np-search input{border:none;outline:none;flex:1;font-family:Inter,'DM Sans',sans-serif;font-size:14px;background:transparent;color:#172033}
+  .np-filters{display:flex;gap:7px;overflow:auto;padding-bottom:5px;margin-bottom:10px}
+  .np-pill{border:1px solid #E6EBF0;background:#fff;border-radius:999px;padding:7px 11px;font-size:11px;font-weight:700;color:#64748B;white-space:nowrap;cursor:pointer}
+  .np-pill.on{background:#172033;color:#fff;border-color:#172033}
+  .np-grid{display:grid;gap:10px}
+  .np-card{background:#fff;border:1px solid #E6EBF0;border-radius:16px;padding:13px;box-shadow:0 8px 24px rgba(15,23,42,.04)}
+  .np-card-top{display:flex;align-items:flex-start;gap:11px}
+  .np-card-ic{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#F4F8F6;color:#2F5F56;flex:0 0 auto}
+  .np-card-main{min-width:0;flex:1}
+  .np-card-title{font-size:15px;font-weight:800;color:#172033;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .np-card-meta{display:flex;gap:6px;flex-wrap:wrap;font-size:10px;color:#64748B;margin-bottom:8px}
+  .np-tag{background:#F3F6F8;border:1px solid #E6EBF0;border-radius:999px;padding:2px 7px;font-weight:700}
+  .np-prev{font-size:12px;color:#475569;line-height:1.45}
+  .np-mini-list{display:grid;gap:5px;margin-top:5px}
+  .np-mini-row{display:flex;align-items:center;gap:8px;font-size:12px;color:#334155}
+  .np-mini-check{width:14px;height:14px;border:1.5px solid #CBD5E1;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff}
+  .np-mini-row.done{opacity:.5;text-decoration:line-through}
+  .np-total{display:flex;align-items:center;justify-content:space-between;margin-top:10px;border-top:1px solid #EEF2F6;padding-top:9px;font-size:12px;color:#64748B}
+  .np-total b{font-size:15px;color:#172033}
+  .np-card-actions{display:flex;gap:6px;margin-top:11px}
+  .np-act{flex:1;border:1px solid #E6EBF0;background:#FAFBFC;border-radius:10px;padding:8px;font-size:11px;font-weight:800;color:#475569;cursor:pointer}
+  .np-empty{padding:28px 16px;text-align:center;color:#64748B;background:#fff;border:1px dashed #CBD5E1;border-radius:18px}
+  .np-ov{position:fixed;inset:0;background:#F7F8FA;z-index:520;display:flex;flex-direction:column;color:#172033}
+  .np-ed-top{height:58px;display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FFFFFFE8;backdrop-filter:blur(12px);border-bottom:1px solid #E6EBF0}
+  .np-icon-btn{width:38px;height:38px;border-radius:11px;border:1px solid #E6EBF0;background:#fff;display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer}
+  .np-save{border:none;background:#172033;color:#fff;border-radius:11px;padding:10px 13px;font-size:12px;font-weight:800;cursor:pointer}
+  .np-ed-body{flex:1;overflow:auto;padding:14px 14px 120px;max-width:760px;width:100%;margin:0 auto}
+  .np-ed-title{width:100%;border:none;outline:none;background:transparent;font-size:25px;font-weight:850;color:#172033;margin:8px 0 10px;font-family:Inter,'DM Sans',sans-serif}
+  .np-sheet{background:#fff;border:1px solid #E6EBF0;border-radius:18px;padding:13px;box-shadow:0 12px 30px rgba(15,23,42,.045)}
+  .np-type-row{display:flex;gap:7px;overflow:auto;margin-bottom:12px}
+  .np-type{border:1px solid #E6EBF0;background:#FAFBFC;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:800;color:#64748B;white-space:nowrap;cursor:pointer}
+  .np-type.on{background:#EAF6F0;color:#2F5F56;border-color:#BFDCCE}
+  .np-row{display:grid;grid-template-columns:26px minmax(0,1fr) 70px 28px;gap:7px;align-items:center;border-bottom:1px solid #EEF2F6;padding:8px 0}
+  .np-row:last-child{border-bottom:none}
+  .np-row input[type=text],.np-row input[type=number]{width:100%;border:1px solid #E6EBF0;background:#FAFBFC;border-radius:10px;padding:9px 10px;font-family:Inter,'DM Sans',sans-serif;font-size:13px;color:#172033;outline:none}
+  .np-row input[type=checkbox]{width:18px;height:18px;accent-color:#2F7D64}
+  .np-del{border:none;background:#FEF2F2;color:#C44B4B;border-radius:9px;height:32px;cursor:pointer}
+  .np-editor-total{display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:4px}
+  .np-editor-total span{font-size:12px;color:#64748B}
+  .np-editor-total b{font-size:22px;color:#172033}
+  .np-bottom{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:780px;background:#FFFFFFE8;backdrop-filter:blur(12px);border-top:1px solid #E6EBF0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:530}
+  .np-tool{flex:1;border:1px solid #E6EBF0;background:#fff;border-radius:12px;padding:11px 8px;font-size:11px;font-weight:850;color:#475569;cursor:pointer}
+  .np-tool.primary{background:#172033;color:#fff;border-color:#172033}
+  .np-textarea{width:100%;min-height:48vh;border:none;outline:none;resize:vertical;background:transparent;font-family:Inter,'DM Sans',sans-serif;font-size:15px;line-height:1.65;color:#172033}
+  .np-meeting-box{display:grid;gap:10px}
+  .np-section{background:#FAFBFC;border:1px solid #E6EBF0;border-radius:14px;padding:12px}
+  .np-section h4{margin:0 0 7px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#64748B}
+  .np-mic-box{background:#fff;border:1px solid #E6EBF0;border-radius:20px;margin:auto 14px;padding:18px;box-shadow:0 18px 50px rgba(15,23,42,.14);max-width:520px}
+  .np-mic-title{font-size:20px;font-weight:850;margin-bottom:5px}
+  .np-mic-sub{font-size:12px;color:#64748B;line-height:1.45;margin-bottom:12px}
+  .np-mic-tabs{display:flex;gap:7px;margin:10px 0}
+  .np-mic-tabs button{flex:1;border:1px solid #E6EBF0;background:#FAFBFC;border-radius:11px;padding:9px;font-size:11px;font-weight:800;color:#64748B}
+  .np-mic-tabs button.on{background:#172033;color:#fff;border-color:#172033}
+  .np-timer{font-size:34px;font-weight:900;letter-spacing:.04em;text-align:center;margin:12px 0;color:#172033}
+  .np-transcript{min-height:92px;max-height:150px;overflow:auto;background:#F8FAFC;border:1px solid #E6EBF0;border-radius:14px;padding:12px;font-size:13px;line-height:1.55;color:#334155}
+  .np-preview{background:#F4F8F6;border:1px solid #CFE5DA;border-radius:14px;padding:11px;margin-top:10px;font-size:12px;color:#2F5F56;display:none}
+  .np-mic-actions{display:flex;gap:8px;margin-top:12px}
+  .np-mic-actions button{flex:1;border:1px solid #E6EBF0;background:#fff;border-radius:13px;padding:12px;font-size:12px;font-weight:850;color:#475569}
+  .np-mic-actions button.primary{background:#172033;color:#fff;border-color:#172033}
+  `;
+  document.head.appendChild(st);
+}
+
+function npNormalizeItem(it){
+  if(typeof it === 'string') return {id:npId(),texto:it,cantidad:1,precio:0,total:0,done:false};
+  const cantidad=npMoney(it.cantidad || it.qty || 1) || 1;
+  const precio=npMoney(it.precio ?? it.price ?? it.monto ?? 0);
+  const total=npMoney(it.total || precio);
+  return {
+    id: it.id || npId(),
+    texto: it.texto || it.text || it.nombre || it.content || '',
+    cantidad,
+    precio,
+    total,
+    done: !!it.done,
+    categoria: it.categoria || it.category || ''
+  };
+}
+function npListTotal(items){ return (items||[]).reduce((s,i)=>s+npMoney(i.total || i.precio),0); }
+function npNoteKind(n){
+  if(n?.npKind) return n.npKind;
+  if(n?.tipo==='audio') return 'meeting';
+  if(n?.tipo==='tabla') return 'table';
+  if(n?.tipo==='lista') return 'smart_list';
+  return 'doc';
+}
+function npUpgradeNotas(){
+  if(!state.notas) state.notas=[];
+  let changed=false;
+  state.notas.forEach(n=>{
+    if(!n.id){ n.id=Date.now()+Math.random()+''; changed=true; }
+    if(!n.npKind){
+      n.npKind=npNoteKind(n);
+      changed=true;
+    }
+    if(n.npKind==='smart_list'){
+      n.tipo='lista';
+      n.items=(n.items||[]).map(npNormalizeItem);
+      n.listType=n.listType || 'compras';
+    }
+    if(n.npKind==='meeting'){
+      n.tipo='audio';
+      n.transcript=n.transcript || npPlain(n.texto||'');
+      n.resumen=n.resumen || '';
+      n.acuerdos=n.acuerdos || [];
+      n.tareas=n.tareas || [];
+    }
+    if(n.npKind==='doc'){
+      n.tipo='texto';
+      n.texto=n.texto || '';
+    }
+  });
+  if(changed) save('fnz_notas',state.notas);
+}
+
+function renderNotas(){
+  npEnsureStyles();
+  npUpgradeNotas();
+  const q=(_npSearch||'').toLowerCase().trim();
+  const all=[...(state.notas||[])].sort((a,b)=>(b.modificado||b.creado||'').localeCompare(a.modificado||a.creado||''));
+  let notes=all.filter(n=>{
+    const kind=npNoteKind(n);
+    if(_npFilter!=='todas' && _npFilter!==kind && !(_npFilter==='listas'&&kind==='smart_list')) return false;
+    if(!q) return true;
+    const text=[n.titulo,n.texto,n.transcript,n.resumen,(n.items||[]).map(i=>i.texto).join(' '),(n.tags||[]).join(' ')].join(' ').toLowerCase();
+    return text.includes(q);
+  });
+  const pendientes=all.reduce((s,n)=>s+(n.items||[]).filter(i=>!i.done).length,0);
+  const totalListas=all.reduce((s,n)=>s+(npNoteKind(n)==='smart_list'?npListTotal(n.items):0),0);
+  const counts={
+    todas:all.length,
+    listas:all.filter(n=>npNoteKind(n)==='smart_list').length,
+    meeting:all.filter(n=>npNoteKind(n)==='meeting').length,
+    doc:all.filter(n=>npNoteKind(n)==='doc').length,
+    table:all.filter(n=>npNoteKind(n)==='table').length
+  };
+  const pill=(k,l)=>`<button class="np-pill ${_npFilter===k?'on':''}" onclick="npSetFilter('${k}')">${l} ${counts[k]||0}</button>`;
+  return `<div class="np-page">
+    <div class="np-hero">
+      <div class="np-kicker">Cuaderno inteligente</div>
+      <div class="np-title">Notas</div>
+      <div class="np-sub">Listas con precios, reuniones con resumen IA, cuadros de gastos y exportacion limpia para compartir.</div>
+      <div class="np-quick">
+        <div class="np-q" onclick="npOpenVoiceCapture('list')"><div class="np-q-ic">${appIcon('mic')}</div><div><b>Lista por voz</b><span>Detecta items, precios y total</span></div></div>
+        <div class="np-q" onclick="npOpenVoiceCapture('meeting')"><div class="np-q-ic">${appIcon('note')}</div><div><b>Reunion IA</b><span>Transcribe y resume al final</span></div></div>
+        <div class="np-q" onclick="npOpenSmartList(null,'gastos')"><div class="np-q-ic">${appIcon('chart')}</div><div><b>Cuadro gastos</b><span>Filas editables y suma</span></div></div>
+        <div class="np-q" onclick="npShowTemplates()"><div class="np-q-ic">${appIcon('clipboard')}</div><div><b>Plantillas</b><span>Mercado, compras, cotizacion</span></div></div>
+      </div>
+    </div>
+    <div class="np-card" style="margin-bottom:12px">
+      <div class="np-total" style="border-top:none;margin-top:0;padding-top:0">
+        <span>${all.length} notas · ${pendientes} pendientes</span><b>${npFmt(totalListas)}</b>
+      </div>
+    </div>
+    <div class="np-search">${appIcon('search')}<input value="${npEsc(_npSearch)}" placeholder="Buscar notas, listas o reuniones..." oninput="_npSearch=this.value;render()">${_npSearch?`<button class="np-icon-btn" onclick="_npSearch='';render()" style="width:30px;height:30px">x</button>`:''}</div>
+    <div class="np-filters">${pill('todas','Todas')}${pill('listas','Listas')}${pill('meeting','Reuniones')}${pill('doc','Notas')}${pill('table','Cuadros')}</div>
+    <div class="np-grid">${notes.length?notes.map(npRenderCard).join(''):`<div class="np-empty"><b>Sin notas todavia</b><br><span>Empieza con una lista por voz o una plantilla.</span></div>`}</div>
+  </div>`;
+}
+
+function npSetFilter(f){ _npFilter=f; render(); }
+
+function npRenderCard(n){
+  const kind=npNoteKind(n);
+  const conf={
+    smart_list:{label:n.listType==='gastos'?'Cuadro gastos':'Lista',icon:'clipboard',color:'#2F5F56',bg:'#EDF7F2'},
+    meeting:{label:'Reunion IA',icon:'note',color:'#1F5C99',bg:'#EFF6FF'},
+    table:{label:'Cuadro',icon:'chart',color:'#6D46A5',bg:'#F5F3FF'},
+    doc:{label:'Nota',icon:'note',color:'#475569',bg:'#F8FAFC'}
+  }[kind] || {label:'Nota',icon:'note',color:'#475569',bg:'#F8FAFC'};
+  const date=n.modificado||n.creado?new Date(n.modificado||n.creado).toLocaleDateString('es-PE',{day:'numeric',month:'short'}):'';
+  let preview='';
+  if(kind==='smart_list'){
+    const items=(n.items||[]).slice(0,4);
+    preview=`<div class="np-mini-list">${items.map(i=>`<div class="np-mini-row ${i.done?'done':''}"><span class="np-mini-check" style="${i.done?'background:#2F7D64;border-color:#2F7D64':''}">${i.done?'✓':''}</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${npEsc(i.texto)}</span>${npMoney(i.total||i.precio)?`<b>${npFmt(i.total||i.precio)}</b>`:''}</div>`).join('')}</div>
+      <div class="np-total"><span>${(n.items||[]).length} items</span><b>${npFmt(npListTotal(n.items))}</b></div>`;
+  } else if(kind==='meeting'){
+    preview=`<div class="np-prev">${npEsc(n.resumen || npPlain(n.transcript||n.texto||'Reunion sin resumen aun').substring(0,130))}</div>`;
+  } else {
+    preview=`<div class="np-prev">${npEsc(npPlain(n.texto||'').substring(0,140) || 'Nota sin contenido')}</div>`;
+  }
+  return `<div class="np-card">
+    <div class="np-card-top" onclick="npOpenNote('${n.id}')">
+      <div class="np-card-ic" style="background:${conf.bg};color:${conf.color}">${appIcon(conf.icon)}</div>
+      <div class="np-card-main">
+        <div class="np-card-title">${npEsc(n.titulo||'Sin titulo')}</div>
+        <div class="np-card-meta"><span class="np-tag">${conf.label}</span>${date?`<span>${date}</span>`:''}${n.tags?.length?`<span>${npEsc(n.tags[0])}</span>`:''}</div>
+        ${preview}
+      </div>
+    </div>
+    <div class="np-card-actions">
+      <button class="np-act" onclick="npOpenNote('${n.id}')">Editar</button>
+      <button class="np-act" onclick="npOpenVoiceCapture('${kind==='meeting'?'meeting':'list'}','${n.id}')">Mic</button>
+      <button class="np-act" onclick="npOpenShare('${n.id}')">Compartir</button>
+      <button class="np-act" onclick="npDeleteNote('${n.id}')">Eliminar</button>
+    </div>
+  </div>`;
+}
+
+function npOpenNote(id){
+  const n=(state.notas||[]).find(x=>String(x.id)===String(id));
+  if(!n) return;
+  const kind=npNoteKind(n);
+  if(kind==='smart_list') return npOpenSmartList(n.id,n.listType||'compras');
+  if(kind==='meeting') return npOpenMeetingEditor(n.id);
+  return npOpenDoc(n.id);
+}
+
+function npDeleteNote(id){
+  if(!confirm('Eliminar esta nota?')) return;
+  state.notas=(state.notas||[]).filter(n=>String(n.id)!==String(id));
+  save('fnz_notas',state.notas);
+  render();
+  toast('Nota eliminada');
+}
+
+function npBlankList(kind,title){
+  return {id:null,npKind:'smart_list',tipo:'lista',listType:kind||'compras',titulo:title||npTitleForKind(kind),items:[],creado:new Date().toISOString(),modificado:new Date().toISOString()};
+}
+function npTitleForKind(kind){
+  if(kind==='gastos') return 'Cuadro de gastos';
+  if(kind==='materiales') return 'Lista de materiales';
+  if(kind==='mercado') return 'Lista de mercado';
+  return 'Lista de compras';
+}
+function npOpenSmartList(id,kind,pre){
+  npEnsureStyles();
+  npUpgradeNotas();
+  let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
+  n=n?JSON.parse(JSON.stringify(n)):npBlankList(kind,pre?.titulo);
+  n.npKind='smart_list'; n.tipo='lista'; n.listType=kind||n.listType||'compras';
+  n.items=(pre?.items||n.items||[]).map(npNormalizeItem);
+  window._npEditor={mode:'list',note:n,isNew:!id};
+  document.body.style.overflow='hidden';
+  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-editor">
+    <div class="np-ed-top"><button class="np-icon-btn" onclick="npCloseEditor()">${appIcon('plus')}</button><div style="flex:1;font-size:12px;font-weight:850;color:#64748B">Lista inteligente</div><button class="np-save" onclick="npSaveList(true)">Guardar</button></div>
+    <div class="np-ed-body">
+      <input class="np-ed-title" id="np-title" value="${npEsc(n.titulo||'')}" placeholder="Titulo">
+      <div class="np-sheet">
+        <div class="np-type-row">
+          ${['compras','mercado','materiales','gastos','tareas'].map(k=>`<button class="np-type ${n.listType===k?'on':''}" onclick="npSetListType('${k}')">${k.charAt(0).toUpperCase()+k.slice(1)}</button>`).join('')}
+        </div>
+        <div id="np-list-rows"></div>
+        <div class="np-editor-total"><span>Total de la lista</span><b id="np-list-total">S/ 0.00</b></div>
+      </div>
+    </div>
+    <div class="np-bottom">
+      <button class="np-tool" onclick="npAddListItem()">+ Item</button>
+      <button class="np-tool" onclick="npOpenVoiceCapture('list','__editor')">Mic</button>
+      <button class="np-tool" onclick="npImproveCurrentList()">IA ordenar</button>
+      <button class="np-tool primary" onclick="npOpenShareFromEditor()">Exportar</button>
+    </div>
+  </div>`);
+  npRenderListRows();
+}
+function npSetListType(k){
+  if(!window._npEditor) return;
+  npCollectListRows();
+  window._npEditor.note.listType=k;
+  document.querySelectorAll('.np-type').forEach(b=>b.classList.remove('on'));
+  event?.target?.classList.add('on');
+}
+function npRenderListRows(){
+  const ed=window._npEditor;if(!ed)return;
+  const box=document.getElementById('np-list-rows');if(!box)return;
+  if(!ed.note.items.length) ed.note.items.push(npNormalizeItem({texto:'',precio:0}));
+  box.innerHTML=ed.note.items.map((it,i)=>`<div class="np-row" data-np-row="${i}">
+    <input type="checkbox" ${it.done?'checked':''} onchange="npListRecalc()">
+    <input type="text" value="${npEsc(it.texto)}" placeholder="Item, tarea o concepto" oninput="npListRecalc()">
+    <input type="number" inputmode="decimal" step="0.01" value="${npMoney(it.total||it.precio)||''}" placeholder="S/ 0" oninput="npListRecalc()">
+    <button class="np-del" onclick="npDelListItem(${i})">x</button>
+  </div>`).join('');
+  npListRecalc();
+}
+function npCollectListRows(){
+  const ed=window._npEditor;if(!ed||ed.mode!=='list')return [];
+  const rows=[...document.querySelectorAll('[data-np-row]')].map(r=>{
+    const els=r.querySelectorAll('input');
+    return npNormalizeItem({done:els[0]?.checked,texto:els[1]?.value.trim(),precio:npMoney(els[2]?.value),total:npMoney(els[2]?.value)});
+  }).filter(i=>i.texto||i.total);
+  ed.note.items=rows;
+  return rows;
+}
+function npListRecalc(){
+  const rows=npCollectListRows();
+  const el=document.getElementById('np-list-total');
+  if(el) el.textContent=npFmt(npListTotal(rows));
+}
+function npAddListItem(){
+  const ed=window._npEditor;if(!ed)return;
+  npCollectListRows();
+  ed.note.items.push(npNormalizeItem({texto:'',precio:0}));
+  npRenderListRows();
+}
+function npDelListItem(i){
+  const ed=window._npEditor;if(!ed)return;
+  npCollectListRows();
+  ed.note.items.splice(i,1);
+  npRenderListRows();
+}
+function npSaveList(close){
+  const ed=window._npEditor;if(!ed)return null;
+  const n=ed.note;
+  n.titulo=document.getElementById('np-title')?.value.trim()||npTitleForKind(n.listType);
+  n.items=npCollectListRows();
+  n.texto=n.items.map(i=>`${i.done?'✓':'○'} ${i.texto}${npMoney(i.total||i.precio)?' - '+npFmt(i.total||i.precio):''}`).join('<br>');
+  n.modificado=new Date().toISOString();
+  if(!n.id){ n.id=Date.now()+''; n.creado=n.modificado; state.notas.unshift(n); }
+  else state.notas=state.notas.map(x=>String(x.id)===String(n.id)?n:x);
+  save('fnz_notas',state.notas);
+  if(close){ npCloseEditor(); render(); toast('Lista guardada'); }
+  return n;
+}
+
+function npOpenDoc(id,pre){
+  npEnsureStyles();
+  let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
+  n=n?JSON.parse(JSON.stringify(n)):{id:null,npKind:'doc',tipo:'texto',titulo:pre?.titulo||'Nota nueva',texto:pre?.texto||'',creado:new Date().toISOString()};
+  window._npEditor={mode:'doc',note:n};
+  document.body.style.overflow='hidden';
+  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-editor">
+    <div class="np-ed-top"><button class="np-icon-btn" onclick="npCloseEditor()">x</button><div style="flex:1;font-size:12px;font-weight:850;color:#64748B">Documento</div><button class="np-save" onclick="npSaveDoc(true)">Guardar</button></div>
+    <div class="np-ed-body"><input class="np-ed-title" id="np-title" value="${npEsc(n.titulo||'')}" placeholder="Titulo"><div class="np-sheet"><textarea class="np-textarea" id="np-doc-text" placeholder="Escribe o dicta aqui...">${npEsc(npPlain(n.texto||''))}</textarea></div></div>
+    <div class="np-bottom"><button class="np-tool" onclick="npOpenVoiceCapture('text','${n.id||''}')">Mic</button><button class="np-tool" onclick="npDocImprove()">IA mejorar</button><button class="np-tool primary" onclick="npOpenShareFromEditor()">Exportar</button></div>
+  </div>`);
+}
+function npSaveDoc(close){
+  const ed=window._npEditor;if(!ed)return null;
+  const n=ed.note;
+  n.npKind='doc'; n.tipo='texto';
+  n.titulo=document.getElementById('np-title')?.value.trim()||'Nota';
+  const txt=document.getElementById('np-doc-text')?.value||'';
+  n.texto=txt.replace(/\n/g,'<br>');
+  n.modificado=new Date().toISOString();
+  if(!n.id){n.id=Date.now()+'';n.creado=n.modificado;state.notas.unshift(n);}
+  else state.notas=state.notas.map(x=>String(x.id)===String(n.id)?n:x);
+  save('fnz_notas',state.notas);
+  if(close){npCloseEditor();render();toast('Nota guardada');}
+  return n;
+}
+
+function npOpenMeetingEditor(id,pre){
+  npEnsureStyles();
+  let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
+  n=n?JSON.parse(JSON.stringify(n)):{id:null,npKind:'meeting',tipo:'audio',titulo:pre?.titulo||'Reunion con IA',transcript:pre?.transcript||'',resumen:pre?.resumen||'',acuerdos:pre?.acuerdos||[],tareas:pre?.tareas||[],gastos:pre?.gastos||[],creado:new Date().toISOString()};
+  window._npEditor={mode:'meeting',note:n};
+  document.body.style.overflow='hidden';
+  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-editor">
+    <div class="np-ed-top"><button class="np-icon-btn" onclick="npCloseEditor()">x</button><div style="flex:1;font-size:12px;font-weight:850;color:#64748B">Reunion inteligente</div><button class="np-save" onclick="npSaveMeeting(true)">Guardar</button></div>
+    <div class="np-ed-body">
+      <input class="np-ed-title" id="np-title" value="${npEsc(n.titulo||'')}" placeholder="Titulo de reunion">
+      <div class="np-meeting-box">
+        <div class="np-section"><h4>Resumen</h4><textarea class="np-textarea" id="np-meet-resumen" style="min-height:100px">${npEsc(n.resumen||'')}</textarea></div>
+        <div class="np-section"><h4>Acuerdos</h4><textarea class="np-textarea" id="np-meet-acuerdos" style="min-height:90px">${npEsc((n.acuerdos||[]).join('\n'))}</textarea></div>
+        <div class="np-section"><h4>Pendientes</h4><textarea class="np-textarea" id="np-meet-tareas" style="min-height:90px">${npEsc((n.tareas||[]).join('\n'))}</textarea></div>
+        <div class="np-section"><h4>Transcripcion</h4><textarea class="np-textarea" id="np-meet-transcript">${npEsc(n.transcript||'')}</textarea></div>
+      </div>
+    </div>
+    <div class="np-bottom"><button class="np-tool" onclick="npOpenVoiceCapture('meeting','${n.id||''}')">Grabar</button><button class="np-tool" onclick="npMeetingSummarize()">IA resumen</button><button class="np-tool primary" onclick="npOpenShareFromEditor()">Exportar</button></div>
+  </div>`);
+}
+function npSaveMeeting(close){
+  const ed=window._npEditor;if(!ed)return null;
+  const n=ed.note;
+  n.npKind='meeting'; n.tipo='audio';
+  n.titulo=document.getElementById('np-title')?.value.trim()||'Reunion con IA';
+  n.resumen=document.getElementById('np-meet-resumen')?.value.trim()||'';
+  n.acuerdos=(document.getElementById('np-meet-acuerdos')?.value||'').split('\n').map(x=>x.trim()).filter(Boolean);
+  n.tareas=(document.getElementById('np-meet-tareas')?.value||'').split('\n').map(x=>x.trim()).filter(Boolean);
+  n.transcript=document.getElementById('np-meet-transcript')?.value.trim()||'';
+  n.texto=[n.resumen,n.acuerdos.join('\n'),n.tareas.join('\n')].filter(Boolean).join('<br>');
+  n.modificado=new Date().toISOString();
+  if(!n.id){n.id=Date.now()+'';n.creado=n.modificado;state.notas.unshift(n);}
+  else state.notas=state.notas.map(x=>String(x.id)===String(n.id)?n:x);
+  save('fnz_notas',state.notas);
+  if(close){npCloseEditor();render();toast('Reunion guardada');}
+  return n;
+}
+function npCloseEditor(){ document.getElementById('np-editor')?.remove(); document.body.style.overflow=''; window._npEditor=null; }
+
+function npShowTemplates(){
+  const html=`<div class="modal-title" style="color:#172033">Plantillas premium</div>
+    <div style="display:grid;gap:9px">
+      <button class="share-btn" onclick="closeModal();npCreateTemplate('mercado')"><div class="share-icon whatsapp">${appIcon('cart')}</div><div class="share-label"><b>Lista de mercado</b><div class="share-desc">Items con precios y total</div></div></button>
+      <button class="share-btn" onclick="closeModal();npCreateTemplate('materiales')"><div class="share-icon excel">${appIcon('stock')}</div><div class="share-label"><b>Compra de materiales</b><div class="share-desc">Para obra o servicio</div></div></button>
+      <button class="share-btn" onclick="closeModal();npCreateTemplate('gastos')"><div class="share-icon pdf">${appIcon('chart')}</div><div class="share-label"><b>Cuadro de gastos</b><div class="share-desc">Operacion, transporte, comida, otros</div></div></button>
+      <button class="share-btn" onclick="closeModal();npOpenVoiceCapture('meeting')"><div class="share-icon copy">${appIcon('mic')}</div><div class="share-label"><b>Reunion con IA</b><div class="share-desc">Escuchar, resumir y sacar tareas</div></div></button>
+    </div>`;
+  document.getElementById('modal-content').innerHTML=html;
+  showModal();
+}
+function npCreateTemplate(kind){
+  if(kind==='mercado') return npOpenSmartList(null,'mercado',{titulo:'Lista de mercado',items:['Verduras','Gaseosa','Menu'].map(t=>npNormalizeItem(t))});
+  if(kind==='materiales') return npOpenSmartList(null,'materiales',{titulo:'Compra de materiales',items:['Tuberia','Codos','Valvulas'].map(t=>npNormalizeItem(t))});
+  return npOpenSmartList(null,'gastos',{titulo:'Cuadro de gastos',items:['Movilidad','Snack / bebida','Materiales'].map(t=>npNormalizeItem(t))});
+}
+
+function npParseSmartInput(text,mode){
+  const t=nrm(text);
+  const kind = mode==='meeting'||/\b(reunion|cliente dijo|acuerdos|agenda de reunion|acta)\b/.test(t) ? 'meeting'
+    : mode==='text' ? 'doc' : 'smart_list';
+  if(kind==='meeting') return {kind:'meeting',titulo:'Reunion '+new Date().toLocaleDateString('es-PE'),transcript:text,resumen:'',acuerdos:[],tareas:[],confidence:.55};
+  if(kind==='doc') return {kind:'doc',titulo:'Nota dictada',texto:text,confidence:.7};
+  const listType=/material/.test(t)?'materiales':/mercado|super/.test(t)?'mercado':/gasto|egreso/.test(t)?'gastos':/tarea|pendiente/.test(t)?'tareas':'compras';
+  let clean=text.replace(/\b(crea|crear|haz|hacer|anota|apunta|agrega|lista de|lista|compras|mercado|gastos|materiales|tareas)\b/gi,' ');
+  clean=clean.replace(/\s+(tambien|también|luego|ademas|además|despues|después)\s+/gi, ', ');
+  clean=clean.replace(/\s+y\s+/gi, ', ');
+  const parts=clean.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
+  const items=parts.map(part=>{
+    const amount=extractAmount(part)||0;
+    let label=part
+      .replace(/s\/\.?\s*\d+(?:[.,]\d+)?/gi,' ')
+      .replace(/\d+(?:[.,]\d+)?\s*(soles?|sol)?/gi,' ')
+      .replace(/\b\w+\s+con\s+\w+\b/gi,' ')
+      .replace(/\b(con|por|precio|cuesta|vale|de|en|a)\b\s*$/gi,' ')
+      .replace(/\s+/g,' ').trim();
+    label=label.replace(/^(compre|compré|comprar|compra|gaste|gasté|necesito|quiero|agrega|anota)\s+/i,'').trim();
+    if(!label && amount) label='Item';
+    return npNormalizeItem({texto:label,precio:amount,total:amount});
+  }).filter(i=>i.texto);
+  return {kind:'smart_list',titulo:npTitleForKind(listType),listType,items,confidence:(items.length>=2||npListTotal(items)>0)?.85:.45};
+}
+
+async function npGeminiOrganize(text,mode,local){
+  const key=localStorage.getItem('fnz_gemini_key');
+  if(!key) return local;
+  const prompt=`Eres asistente de notas para una app financiera en Peru. Organiza el dictado en JSON valido.
+Modo solicitado: ${mode}.
+Si es lista, detecta tipo compras|mercado|materiales|gastos|tareas e items con precio en soles cuando exista.
+Si es reunion, resume y extrae acuerdos, pendientes, fechas y gastos mencionados.
+Formato:
+{"kind":"smart_list|meeting|doc","titulo":"...","listType":"compras","items":[{"texto":"...","cantidad":1,"precio":0,"total":0,"done":false}],"transcript":"...","resumen":"...","acuerdos":["..."],"tareas":["..."],"gastos":["..."],"texto":"..."}
+Dictado: """${text}"""`;
+  try{
+    const r=await fetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:.1,maxOutputTokens:900,responseMimeType:'application/json'}})});
+    const d=await r.json();
+    const raw=(d?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```json|```/g,'').trim();
+    const p=JSON.parse(raw);
+    if(p.kind==='smart_list'||p.items?.length){
+      return {kind:'smart_list',titulo:p.titulo||local.titulo||'Lista',listType:p.listType||local.listType||'compras',items:(p.items||local.items||[]).map(npNormalizeItem),confidence:.95};
+    }
+    if(p.kind==='meeting'||p.resumen){
+      return {kind:'meeting',titulo:p.titulo||local.titulo||'Reunion con IA',transcript:p.transcript||text,resumen:p.resumen||'',acuerdos:p.acuerdos||[],tareas:p.tareas||[],gastos:p.gastos||[],confidence:.95};
+    }
+    return {kind:'doc',titulo:p.titulo||'Nota dictada',texto:p.texto||text,confidence:.9};
+  }catch(e){
+    console.warn('Notas Gemini fallo:',e);
+    return local;
+  }
+}
+
+function npOpenVoiceCapture(mode='auto',targetId=''){
+  npEnsureStyles();
+  document.body.style.overflow='hidden';
+  window._npMic={mode,targetId,recording:false,segments:[],seconds:0,parsed:null};
+  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-mic">
+    <div class="np-mic-box">
+      <div class="np-mic-title">Microfono inteligente</div>
+      <div class="np-mic-sub">Local primero para listas y precios. Gemini se usa para reuniones, textos largos o cuando la lista necesita organizarse mejor.</div>
+      <div class="np-mic-tabs">
+        ${['auto','list','meeting','text'].map(k=>`<button class="${mode===k?'on':''}" onclick="npMicMode('${k}')">${k==='auto'?'Auto':k==='list'?'Lista':k==='meeting'?'Reunion':'Texto'}</button>`).join('')}
+      </div>
+      <div class="np-timer" id="np-mic-timer">00:00</div>
+      <div class="np-transcript" id="np-mic-text">Toca iniciar y dicta. Ej: gaseosa 2 con 50, snacks 3, materiales 67.</div>
+      <div class="np-preview" id="np-mic-preview"></div>
+      <div class="np-mic-actions">
+        <button onclick="npCloseMic()">Cancelar</button>
+        <button class="primary" id="np-mic-main" onclick="npMicToggle()">Iniciar</button>
+      </div>
+      <div class="np-mic-actions">
+        <button onclick="npMicProcess(true)">Mejorar con IA</button>
+        <button class="primary" id="np-mic-save" onclick="npMicCommit()" style="display:none">Crear nota</button>
+      </div>
+    </div>
+  </div>`);
+}
+function npMicMode(m){ if(window._npMic) window._npMic.mode=m; document.querySelectorAll('.np-mic-tabs button').forEach(b=>b.classList.remove('on')); event?.target?.classList.add('on'); }
+function npMicToggle(){ window._npMic?.recording ? npMicStop() : npMicStart(); }
+function npMicStart(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('Necesitas Chrome para usar microfono','error');return;}
+  const m=window._npMic;if(!m)return;
+  m.recording=true;m.segments=[];m.seconds=0;m.parsed=null;
+  document.getElementById('np-mic-main').textContent='Detener';
+  m.timer=setInterval(()=>{m.seconds++;const mm=String(Math.floor(m.seconds/60)).padStart(2,'0');const ss=String(m.seconds%60).padStart(2,'0');const el=document.getElementById('np-mic-timer');if(el)el.textContent=mm+':'+ss;},1000);
+  const rec=new SR();m.rec=rec;rec.lang='es-PE';rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
+  rec.onresult=e=>{
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const seg=_deduplicarTranscript((e.results[i][0].transcript||'').trim());
+      if(!seg) continue;
+      if(e.results[i].isFinal){
+        const last=nrm(m.segments[m.segments.length-1]||'');
+        const now=nrm(seg);
+        if(now && now!==last && !last.includes(now)) m.segments.push(seg);
+      } else interim += ' ' + seg;
+    }
+    const display=_deduplicarTranscript([...m.segments.slice(-4),interim].join(' '));
+    const el=document.getElementById('np-mic-text');
+    if(el){el.textContent=display||'Escuchando...';el.scrollTop=el.scrollHeight;}
+  };
+  rec.onerror=e=>{ if(e.error!=='no-speech'&&e.error!=='aborted') npMicStop(); };
+  rec.onend=()=>{ if(m.recording) setTimeout(()=>{try{rec.start();}catch(e){}},250); };
+  try{rec.start();}catch(e){}
+}
+function npMicStop(){
+  const m=window._npMic;if(!m)return;
+  m.recording=false;clearInterval(m.timer);if(m.rec)try{m.rec.stop();}catch(e){}
+  const btn=document.getElementById('np-mic-main');if(btn)btn.textContent='Grabar mas';
+  npMicProcess(false);
+}
+async function npMicProcess(forceGemini){
+  const m=window._npMic;if(!m)return;
+  const text=_deduplicarTranscript(m.segments.join(' ')).trim();
+  if(!text){toast('No hay texto grabado','error');return;}
+  let local=npParseSmartInput(text,m.mode);
+  const needsGemini=forceGemini || local.kind==='meeting' || local.confidence<.7;
+  const prev=document.getElementById('np-mic-preview');
+  if(prev){prev.style.display='block';prev.textContent='Organizando...';}
+  const parsed=needsGemini?await npGeminiOrganize(text,m.mode,local):local;
+  m.parsed=parsed;
+  if(prev){
+    if(parsed.kind==='smart_list') prev.innerHTML=`<b>${npEsc(parsed.titulo)}</b><br>${parsed.items.map(i=>`${npEsc(i.texto)} ${npMoney(i.total||i.precio)?npFmt(i.total||i.precio):''}`).join('<br>')}<br><b>Total: ${npFmt(npListTotal(parsed.items))}</b>`;
+    else if(parsed.kind==='meeting') prev.innerHTML=`<b>${npEsc(parsed.titulo)}</b><br>${npEsc(parsed.resumen||'Transcripcion lista para resumir.')}`;
+    else prev.textContent=parsed.texto||text;
+  }
+  const save=document.getElementById('np-mic-save');if(save)save.style.display='block';
+}
+function npMicCommit(){
+  const m=window._npMic;if(!m)return;
+  const p=m.parsed||npParseSmartInput(m.segments.join(' '),m.mode);
+  let note=null;
+  if(p.kind==='smart_list'){
+    if(m.targetId){
+      note=(state.notas||[]).find(n=>String(n.id)===String(m.targetId));
+      if(note){ note.npKind='smart_list'; note.tipo='lista'; note.items=[...(note.items||[]).map(npNormalizeItem),...(p.items||[])]; note.listType=note.listType||p.listType; note.modificado=new Date().toISOString(); }
+    }
+    if(!note){ note=npBlankList(p.listType,p.titulo); note.id=Date.now()+''; note.items=(p.items||[]).map(npNormalizeItem); note.creado=note.modificado=new Date().toISOString(); state.notas.unshift(note); }
+  } else if(p.kind==='meeting'){
+    note={id:Date.now()+'',npKind:'meeting',tipo:'audio',titulo:p.titulo||'Reunion con IA',transcript:p.transcript||m.segments.join(' '),resumen:p.resumen||'',acuerdos:p.acuerdos||[],tareas:p.tareas||[],gastos:p.gastos||[],texto:p.resumen||'',creado:new Date().toISOString(),modificado:new Date().toISOString()};
+    state.notas.unshift(note);
+  } else {
+    note={id:Date.now()+'',npKind:'doc',tipo:'texto',titulo:p.titulo||'Nota dictada',texto:(p.texto||m.segments.join(' ')).replace(/\n/g,'<br>'),creado:new Date().toISOString(),modificado:new Date().toISOString()};
+    state.notas.unshift(note);
+  }
+  save('fnz_notas',state.notas);
+  npCloseMic();render();toast('Nota creada');
+  if(note) setTimeout(()=>npOpenNote(note.id),120);
+}
+function npCloseMic(){ const m=window._npMic;if(m?.recording)npMicStop();clearInterval(m?.timer);document.getElementById('np-mic')?.remove();document.body.style.overflow='';window._npMic=null; }
+
+async function npImproveCurrentList(){
+  const ed=window._npEditor;if(!ed||ed.mode!=='list')return;
+  npCollectListRows();
+  const text=ed.note.items.map(i=>`${i.texto} ${i.total||i.precio||''}`).join(', ');
+  const p=await npGeminiOrganize(text,'list',{kind:'smart_list',titulo:ed.note.titulo,listType:ed.note.listType,items:ed.note.items,confidence:.6});
+  if(p.kind==='smart_list'){ed.note.titulo=p.titulo||ed.note.titulo;ed.note.listType=p.listType||ed.note.listType;ed.note.items=p.items.map(npNormalizeItem);document.getElementById('np-title').value=ed.note.titulo;npRenderListRows();toast('Lista ordenada con IA');}
+}
+async function npMeetingSummarize(){
+  const ed=window._npEditor;if(!ed||ed.mode!=='meeting')return;
+  const transcript=document.getElementById('np-meet-transcript')?.value||'';
+  const p=await npGeminiOrganize(transcript,'meeting',{kind:'meeting',transcript,confidence:.4});
+  if(p.kind==='meeting'){
+    document.getElementById('np-title').value=p.titulo||document.getElementById('np-title').value;
+    document.getElementById('np-meet-resumen').value=p.resumen||'';
+    document.getElementById('np-meet-acuerdos').value=(p.acuerdos||[]).join('\n');
+    document.getElementById('np-meet-tareas').value=(p.tareas||[]).join('\n');
+    toast('Resumen generado');
+  }
+}
+async function npDocImprove(){
+  const ed=window._npEditor;if(!ed||ed.mode!=='doc')return;
+  const txt=document.getElementById('np-doc-text')?.value||'';
+  const p=await npGeminiOrganize(txt,'text',{kind:'doc',texto:txt,confidence:.4});
+  if(p.texto){document.getElementById('np-doc-text').value=p.texto;toast('Texto mejorado');}
+}
+
+function npOpenShareFromEditor(){
+  let n=null;
+  if(window._npEditor?.mode==='list') n=npSaveList(false);
+  else if(window._npEditor?.mode==='meeting') n=npSaveMeeting(false);
+  else if(window._npEditor?.mode==='doc') n=npSaveDoc(false);
+  if(n) npOpenShare(n.id);
+}
+function npNoteText(n){
+  const kind=npNoteKind(n);
+  let text=(n.titulo||'Nota')+'\n\n';
+  if(kind==='smart_list'){
+    text+=(n.items||[]).map(i=>`${i.done?'✓':'○'} ${i.texto}${npMoney(i.total||i.precio)?' - '+npFmt(i.total||i.precio):''}`).join('\n');
+    text+='\n\nTotal: '+npFmt(npListTotal(n.items));
+  } else if(kind==='meeting'){
+    text+='Resumen:\n'+(n.resumen||'')+'\n\nAcuerdos:\n'+(n.acuerdos||[]).map(x=>'- '+x).join('\n')+'\n\nPendientes:\n'+(n.tareas||[]).map(x=>'- '+x).join('\n');
+  } else text+=npPlain(n.texto||'');
+  return text.trim();
+}
+function npOpenShare(id){
+  const n=(state.notas||[]).find(x=>String(x.id)===String(id));if(!n)return;
+  document.getElementById('modal-content').innerHTML=`<div class="modal-title" style="color:#172033">Compartir</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px">${npEsc(n.titulo||'Nota')}</div>
+    <div style="display:grid;gap:9px">
+      <button class="share-btn" onclick="npShareWhatsApp('${id}')"><div class="share-icon whatsapp">${appIcon('phone')}</div><div class="share-label"><b>WhatsApp texto</b><div class="share-desc">Enviar lista o resumen</div></div></button>
+      <button class="share-btn" onclick="npShareEmail('${id}')"><div class="share-icon copy">${appIcon('document')}</div><div class="share-label"><b>Correo</b><div class="share-desc">Abrir email con contenido</div></div></button>
+      <button class="share-btn" onclick="npExportPDF('${id}')"><div class="share-icon pdf">${appIcon('document')}</div><div class="share-label"><b>PDF</b><div class="share-desc">Vista imprimible premium</div></div></button>
+      <button class="share-btn" onclick="closeModal();exportarNotaA4WhatsApp('${id}')"><div class="share-icon excel">${appIcon('image')}</div><div class="share-label"><b>JPG A4 / compartir</b><div class="share-desc">Hoja visual para WhatsApp</div></div></button>
+    </div>`;
+  showModal();
+}
+function npShareWhatsApp(id){const n=state.notas.find(x=>String(x.id)===String(id));if(!n)return;window.open('https://wa.me/?text='+encodeURIComponent(npNoteText(n)),'_blank');closeModal();}
+function npShareEmail(id){const n=state.notas.find(x=>String(x.id)===String(id));if(!n)return;location.href='mailto:?subject='+encodeURIComponent(n.titulo||'Nota')+'&body='+encodeURIComponent(npNoteText(n));closeModal();}
+function npExportPDF(id){
+  const n=state.notas.find(x=>String(x.id)===String(id));if(!n)return;
+  const body=npNoteText(n).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])).replace(/\n/g,'<br>');
+  const win=window.open('','_blank');if(!win){toast('Permite ventanas emergentes','error');return;}
+  win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+npEsc(n.titulo||'Nota')+'</title><style>body{font-family:Inter,Arial,sans-serif;background:#f7f8fa;margin:0;padding:28px}.page{background:white;max-width:760px;margin:auto;padding:36px;border-radius:18px;box-shadow:0 20px 60px rgba(15,23,42,.12)}h1{font-size:28px;margin:0 0 18px;color:#172033}.body{font-size:15px;line-height:1.7;color:#263244}.foot{margin-top:28px;border-top:1px solid #e5e7eb;padding-top:12px;font-size:11px;color:#64748B}@media print{body{background:#fff;padding:0}.page{box-shadow:none;border-radius:0}}</style></head><body><div class="page"><h1>'+npEsc(n.titulo||'Nota')+'</h1><div class="body">'+body+'</div><div class="foot">Mis Finanzas App · '+new Date().toLocaleString('es-PE')+'</div></div><script>setTimeout(()=>window.print(),300)<\\/script></body></html>');
+  win.document.close();closeModal();
+}
+
+// Entradas antiguas redirigidas al flujo nuevo para evitar contaminacion.
+function abrirNotaTypeMenu(){ npShowTemplates(); }
+function abrirModoLista(tipo,tituloInicial){ npOpenSmartList(null,/mercado/i.test(tituloInicial||'')?'mercado':'compras',{titulo:tituloInicial||'Lista inteligente'}); }
+function abrirGrabarAudio(){ npOpenVoiceCapture('auto'); }
+function notaAgregarVoz(notaId){ npOpenVoiceCapture('auto',notaId); }
+function notaAgregarVozGemini(notaId){ npOpenVoiceCapture('auto',notaId); }
+function abrirEditorNotaBloque(editId){ if(editId) npOpenNote(editId); else npOpenDoc(null); }
+function abrirEditorNota(editId){ if(editId) npOpenNote(editId); else npOpenDoc(null); }
+function openEditNotaLista(n){ npOpenSmartList((typeof n==='object'?n.id:n),'compras'); }
+function abrirModalCompartir(id){ npOpenShare(id); }
+
 // ═══════════════════════════════════════════════
 // SONIDOS Y RECORDATORIOS
 // ═══════════════════════════════════════════════
@@ -18746,6 +19417,701 @@ function syncCompraToSheets(compra){
 
 
 
+
+// ======================================================================
+// NOTAS PREMIUM FINAL - reemplaza las entradas antiguas declaradas abajo
+// ======================================================================
+function npEnsureStyles(){
+  let st=document.getElementById('np-premium-styles');
+  if(!st){ st=document.createElement('style'); st.id='np-premium-styles'; document.head.appendChild(st); }
+  st.textContent=`
+  .np-page{padding:2px 0 112px;color:var(--text);font-family:Inter,'DM Sans',sans-serif}
+  .np-hero{background:linear-gradient(180deg,#FFFFFF,#F8FAFC);border:1px solid #E8EDF2;border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:0 10px 30px rgba(15,23,42,.05)}
+  .np-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748B;font-weight:850;margin-bottom:5px}
+  .np-title{font-size:23px;font-weight:850;letter-spacing:0;color:#172033;margin-bottom:4px}
+  .np-sub{font-size:12px;color:#64748B;line-height:1.45;max-width:680px}
+  .np-quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}
+  .np-q{border:1px solid #E6EBF0;background:#fff;border-radius:14px;padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer;min-height:64px;box-shadow:0 6px 18px rgba(15,23,42,.035)}
+  .np-q:active{transform:scale(.99)}
+  .np-q-ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#2F5F56;background:#EDF7F2;flex:0 0 auto}
+  .np-q:nth-child(2) .np-q-ic{background:#EFF6FF;color:#1F5C99}
+  .np-q:nth-child(3) .np-q-ic{background:#FFF7ED;color:#9A5415}
+  .np-q:nth-child(4) .np-q-ic{background:#F5F3FF;color:#6D46A5}
+  .np-q b{display:block;font-size:13px;color:#172033;margin-bottom:2px}
+  .np-q span{display:block;font-size:10.5px;color:#64748B;line-height:1.25}
+  .np-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+  .np-stat{background:#fff;border:1px solid #E6EBF0;border-radius:14px;padding:10px 11px;box-shadow:0 7px 20px rgba(15,23,42,.035)}
+  .np-stat span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#64748B;font-weight:850;margin-bottom:4px}
+  .np-stat b{display:block;font-size:16px;color:#172033}
+  .np-search{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E6EBF0;border-radius:14px;padding:10px 12px;margin:12px 0}
+  .np-search input{border:none;outline:none;flex:1;font-family:Inter,'DM Sans',sans-serif;font-size:14px;background:transparent;color:#172033;min-width:0}
+  .np-filters{display:flex;gap:7px;overflow:auto;padding-bottom:5px;margin-bottom:10px}
+  .np-pill{border:1px solid #E6EBF0;background:#fff;border-radius:999px;padding:7px 11px;font-size:11px;font-weight:800;color:#64748B;white-space:nowrap;cursor:pointer}
+  .np-pill.on{background:#172033;color:#fff;border-color:#172033}
+  .np-grid{display:grid;gap:10px}
+  .np-card{background:#fff;border:1px solid #E6EBF0;border-radius:16px;padding:13px;box-shadow:0 8px 24px rgba(15,23,42,.04)}
+  .np-card-top{display:flex;align-items:flex-start;gap:11px;cursor:pointer}
+  .np-card-ic{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#F4F8F6;color:#2F5F56;flex:0 0 auto}
+  .np-card-main{min-width:0;flex:1}
+  .np-card-title{font-size:15px;font-weight:850;color:#172033;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .np-card-meta{display:flex;gap:6px;flex-wrap:wrap;font-size:10px;color:#64748B;margin-bottom:8px}
+  .np-tag{background:#F3F6F8;border:1px solid #E6EBF0;border-radius:999px;padding:2px 7px;font-weight:800}
+  .np-prev{font-size:12px;color:#475569;line-height:1.45}
+  .np-mini-list{display:grid;gap:5px;margin-top:5px}
+  .np-mini-row{display:flex;align-items:center;gap:8px;font-size:12px;color:#334155}
+  .np-mini-check{width:14px;height:14px;border:1.5px solid #CBD5E1;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex:0 0 auto}
+  .np-mini-row.done{opacity:.55;text-decoration:line-through}
+  .np-total{display:flex;align-items:center;justify-content:space-between;margin-top:10px;border-top:1px solid #EEF2F6;padding-top:9px;font-size:12px;color:#64748B}
+  .np-total b{font-size:15px;color:#172033}
+  .np-card-actions{display:flex;gap:6px;margin-top:11px}
+  .np-act{flex:1;border:1px solid #E6EBF0;background:#FAFBFC;border-radius:10px;padding:8px;font-size:11px;font-weight:850;color:#475569;cursor:pointer}
+  .np-empty{padding:28px 16px;text-align:center;color:#64748B;background:#fff;border:1px dashed #CBD5E1;border-radius:18px}
+  .np-ov{position:fixed;inset:0;background:#F7F8FA;z-index:520;display:flex;flex-direction:column;color:#172033;font-family:Inter,'DM Sans',sans-serif}
+  .np-ed-top{height:58px;display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FFFFFFE8;backdrop-filter:blur(12px);border-bottom:1px solid #E6EBF0}
+  .np-icon-btn{width:38px;height:38px;border-radius:11px;border:1px solid #E6EBF0;background:#fff;display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer}
+  .np-save{border:none;background:#172033;color:#fff;border-radius:11px;padding:10px 13px;font-size:12px;font-weight:850;cursor:pointer}
+  .np-ed-body{flex:1;overflow:auto;padding:14px 14px 120px;max-width:780px;width:100%;margin:0 auto}
+  .np-ed-title{width:100%;border:none;outline:none;background:transparent;font-size:25px;font-weight:850;color:#172033;margin:8px 0 10px;font-family:Inter,'DM Sans',sans-serif}
+  .np-sheet{background:#fff;border:1px solid #E6EBF0;border-radius:18px;padding:13px;box-shadow:0 12px 30px rgba(15,23,42,.045)}
+  .np-type-row{display:flex;gap:7px;overflow:auto;margin-bottom:12px}
+  .np-type{border:1px solid #E6EBF0;background:#FAFBFC;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:850;color:#64748B;white-space:nowrap;cursor:pointer}
+  .np-type.on{background:#EAF6F0;color:#2F5F56;border-color:#BFDCCE}
+  .np-row{display:grid;grid-template-columns:26px minmax(0,1fr) 30px;gap:8px;align-items:start;border-bottom:1px solid #EEF2F6;padding:10px 0}
+  .np-row:last-child{border-bottom:none}
+  .np-row input[type=text],.np-row input[type=number],.np-row select{width:100%;border:1px solid #E6EBF0;background:#FAFBFC;border-radius:10px;padding:9px 10px;font-family:Inter,'DM Sans',sans-serif;font-size:13px;color:#172033;outline:none}
+  .np-row input[type=checkbox]{width:18px;height:18px;accent-color:#2F7D64;margin-top:9px}
+  .np-row-main{display:grid;gap:7px;min-width:0}
+  .np-money-grid{display:grid;grid-template-columns:62px 82px 88px;gap:7px}
+  .np-field-label{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#94A3B8;font-weight:850;margin:0 0 4px 2px}
+  .np-del{border:none;background:#FEF2F2;color:#C44B4B;border-radius:9px;height:34px;cursor:pointer;margin-top:27px}
+  .np-editor-total{display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:4px}
+  .np-editor-total span{font-size:12px;color:#64748B}
+  .np-editor-total b{font-size:22px;color:#172033}
+  .np-bottom{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:780px;background:#FFFFFFE8;backdrop-filter:blur(12px);border-top:1px solid #E6EBF0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:530}
+  .np-tool{flex:1;border:1px solid #E6EBF0;background:#fff;border-radius:12px;padding:11px 8px;font-size:11px;font-weight:850;color:#475569;cursor:pointer}
+  .np-tool.primary{background:#172033;color:#fff;border-color:#172033}
+  .np-textarea{width:100%;min-height:48vh;border:none;outline:none;resize:vertical;background:transparent;font-family:Inter,'DM Sans',sans-serif;font-size:15px;line-height:1.65;color:#172033}
+  .np-meeting-box{display:grid;gap:10px}
+  .np-section{background:#FAFBFC;border:1px solid #E6EBF0;border-radius:14px;padding:12px}
+  .np-section h4{margin:0 0 7px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#64748B}
+  .np-mic-box{background:#fff;border:1px solid #E6EBF0;border-radius:20px;margin:auto 14px;padding:18px;box-shadow:0 18px 50px rgba(15,23,42,.14);max-width:560px;max-height:92vh;overflow:auto}
+  .np-mic-title{font-size:20px;font-weight:850;margin-bottom:5px}
+  .np-mic-sub{font-size:12px;color:#64748B;line-height:1.45;margin-bottom:12px}
+  .np-mic-tabs{display:flex;gap:7px;margin:10px 0}
+  .np-mic-tabs button{flex:1;border:1px solid #E6EBF0;background:#FAFBFC;border-radius:11px;padding:9px;font-size:11px;font-weight:850;color:#64748B}
+  .np-mic-tabs button.on{background:#172033;color:#fff;border-color:#172033}
+  .np-timer{font-size:34px;font-weight:900;letter-spacing:.04em;text-align:center;margin:12px 0;color:#172033}
+  .np-transcript{min-height:100px;max-height:170px;overflow:auto;background:#F8FAFC;border:1px solid #E6EBF0;border-radius:14px;padding:12px;font-size:13px;line-height:1.55;color:#334155;white-space:pre-wrap}
+  .np-preview{background:#F4F8F6;border:1px solid #CFE5DA;border-radius:14px;padding:11px;margin-top:10px;font-size:12px;color:#2F5F56;display:none;line-height:1.55}
+  .np-mic-actions{display:flex;gap:8px;margin-top:12px}
+  .np-mic-actions button{flex:1;border:1px solid #E6EBF0;background:#fff;border-radius:13px;padding:12px;font-size:12px;font-weight:850;color:#475569}
+  .np-mic-actions button.primary{background:#172033;color:#fff;border-color:#172033}
+  @media(max-width:420px){.np-quick,.np-stats{grid-template-columns:1fr 1fr}.np-money-grid{grid-template-columns:1fr 1fr 1fr}.np-card-actions{overflow:auto}.np-act{min-width:74px}}
+  `;
+}
+
+function npSaveNoteToCloud(n){
+  try{ save('fnz_notas',state.notas||[]); }catch(e){}
+  try{ if(typeof syncSeccionToSheets==='function' && n?.id) syncSeccionToSheets('nota', n); }catch(e){}
+}
+
+function npGuessListType(text){
+  const t=nrm(text||'');
+  if(/\b(material|materiales|tubo|tuberia|codo|valvula|teflon|pegamento|regulador|manguera|abrazadera|niple|union|reduccion)\b/.test(t)) return 'materiales';
+  if(/\b(lista de compras|compras|compra general)\b/.test(t)) return 'compras';
+  if(/\b(mercado|super|supermercado|abarrotes|verdura|fruta|pollo|carne|arroz|azucar|aceite)\b/.test(t)) return 'mercado';
+  if(/\b(gasto|gastos|egreso|egresos|movilidad|snack|snacks|gaseosa|menu|peaje|pasaje)\b/.test(t)) return 'gastos';
+  if(/\b(tarea|tareas|pendiente|pendientes|hacer|llamar|comprar|revisar)\b/.test(t)) return 'tareas';
+  return 'compras';
+}
+
+function npTitleForKind(kind){
+  const map={compras:'Lista de compras',mercado:'Lista de mercado',materiales:'Lista de materiales',gastos:'Cuadro de gastos',tareas:'Tareas'};
+  return map[kind]||'Lista inteligente';
+}
+
+function npNormalizeItem(it){
+  if(typeof it==='string') it={texto:it};
+  it=it||{};
+  const cantidad=Math.max(npMoney(it.cantidad ?? it.qty ?? 1)||1,0.01);
+  const precio=npMoney(it.precio ?? it.price ?? it.monto ?? 0);
+  const total=npMoney(it.total ?? (precio?precio*cantidad:0));
+  return {
+    id:it.id||npId(),
+    texto:String(it.texto||it.text||it.nombre||it.content||'').trim(),
+    cantidad,
+    precio,
+    total,
+    done:!!it.done,
+    categoria:it.categoria||it.category||''
+  };
+}
+
+function npListTotal(items){ return (items||[]).reduce((s,i)=>s+npMoney(i.total),0); }
+
+function npUpgradeNotas(){
+  if(!state.notas) state.notas=[];
+  let changed=false;
+  state.notas.forEach(n=>{
+    if(!n.id){ n.id=npId(); changed=true; }
+    if(!n.npKind){
+      n.npKind=n.tipo==='audio'?'meeting':n.tipo==='tabla'?'table':n.tipo==='lista'?'smart_list':'doc';
+      changed=true;
+    }
+    if(n.npKind==='smart_list'){
+      n.tipo='lista';
+      n.listType=n.listType||npGuessListType([n.titulo,n.texto,(n.items||[]).map(i=>i.texto).join(' ')].join(' '));
+      n.items=(n.items||[]).map(npNormalizeItem);
+      n.totalLista=npListTotal(n.items);
+    }
+    if(n.npKind==='meeting'){
+      n.tipo='audio';
+      n.transcript=n.transcript||npPlain(n.texto||'');
+      n.resumen=n.resumen||'';
+      n.acuerdos=n.acuerdos||[];
+      n.tareas=n.tareas||[];
+      n.gastos=n.gastos||n.gastosDetectados||[];
+    }
+    if(n.npKind==='doc'){ n.tipo='texto'; n.texto=n.texto||''; }
+  });
+  if(changed) npSaveNoteToCloud();
+}
+
+function renderNotas(){
+  npEnsureStyles(); npUpgradeNotas();
+  const q=(_npSearch||'').toLowerCase().trim();
+  const all=[...(state.notas||[])].sort((a,b)=>(b.modificado||b.creado||'').localeCompare(a.modificado||a.creado||''));
+  const filtered=all.filter(n=>{
+    const kind=npNoteKind(n);
+    const filterOk=_npFilter==='todas'||_npFilter===kind||(_npFilter==='listas'&&kind==='smart_list')||(_npFilter==='meeting'&&kind==='meeting');
+    if(!filterOk) return false;
+    if(!q) return true;
+    const hay=[n.titulo,n.texto,n.transcript,n.resumen,(n.items||[]).map(i=>i.texto).join(' '),(n.tags||[]).join(' ')].join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+  const pendientes=all.reduce((s,n)=>s+(n.items||[]).filter(i=>!i.done).length,0);
+  const totalListas=all.reduce((s,n)=>s+(npNoteKind(n)==='smart_list'?npListTotal(n.items):0),0);
+  const counts={
+    todas:all.length,
+    listas:all.filter(n=>npNoteKind(n)==='smart_list').length,
+    meeting:all.filter(n=>npNoteKind(n)==='meeting').length,
+    doc:all.filter(n=>npNoteKind(n)==='doc').length,
+    table:all.filter(n=>npNoteKind(n)==='table').length
+  };
+  const pill=(k,l)=>`<button class="np-pill ${_npFilter===k?'on':''}" onclick="npSetFilter('${k}')">${l} ${counts[k]||0}</button>`;
+  return `<div class="np-page">
+    <div class="np-hero">
+      <div class="np-kicker">Cuaderno inteligente</div>
+      <div class="np-title">Notas</div>
+      <div class="np-sub">Listas con precios y total, reuniones largas con resumen IA, cuadros simples de gastos y exportacion lista para WhatsApp, correo, JPG o PDF.</div>
+      <div class="np-quick">
+        <div class="np-q" onclick="npOpenVoiceCapture('list')"><div class="np-q-ic">${appIcon('mic')}</div><div><b>Lista por voz</b><span>Items separados, precios y suma</span></div></div>
+        <div class="np-q" onclick="npOpenVoiceCapture('meeting')"><div class="np-q-ic">${appIcon('note')}</div><div><b>Reunion IA</b><span>Escucha largo y resume</span></div></div>
+        <div class="np-q" onclick="npOpenSmartList(null,'gastos')"><div class="np-q-ic">${appIcon('chart')}</div><div><b>Cuadro gastos</b><span>Conceptos, cantidad y total</span></div></div>
+        <div class="np-q" onclick="npShowTemplates()"><div class="np-q-ic">${appIcon('clipboard')}</div><div><b>Plantillas</b><span>Mercado, materiales, tareas</span></div></div>
+      </div>
+    </div>
+    <div class="np-stats">
+      <div class="np-stat"><span>Notas</span><b>${all.length}</b></div>
+      <div class="np-stat"><span>Pendientes</span><b>${pendientes}</b></div>
+      <div class="np-stat"><span>Total listas</span><b>${npFmt(totalListas)}</b></div>
+    </div>
+    <div class="np-search">${appIcon('search')}<input value="${npEsc(_npSearch)}" placeholder="Buscar notas, listas o reuniones..." oninput="_npSearch=this.value;render()">${_npSearch?`<button class="np-icon-btn" onclick="_npSearch='';render()" style="width:30px;height:30px">x</button>`:''}</div>
+    <div class="np-filters">${pill('todas','Todas')}${pill('listas','Listas')}${pill('meeting','Reuniones')}${pill('doc','Notas')}${pill('table','Cuadros')}</div>
+    <div class="np-grid">${filtered.length?filtered.map(npRenderCard).join(''):`<div class="np-empty"><b>Sin notas todavia</b><br><span>Empieza con una lista por voz o una plantilla.</span></div>`}</div>
+  </div>`;
+}
+
+function npRenderCard(n){
+  const kind=npNoteKind(n);
+  const conf={
+    smart_list:{label:n.listType==='gastos'?'Cuadro gastos':npTitleForKind(n.listType),icon:n.listType==='materiales'?'cart':'clipboard',color:'#2F5F56',bg:'#EDF7F2'},
+    meeting:{label:'Reunion IA',icon:'note',color:'#1F5C99',bg:'#EFF6FF'},
+    table:{label:'Cuadro',icon:'chart',color:'#6D46A5',bg:'#F5F3FF'},
+    doc:{label:'Nota',icon:'note',color:'#475569',bg:'#F8FAFC'}
+  }[kind]||{label:'Nota',icon:'note',color:'#475569',bg:'#F8FAFC'};
+  const date=n.modificado||n.creado?new Date(n.modificado||n.creado).toLocaleDateString('es-PE',{day:'numeric',month:'short'}):'';
+  let preview='';
+  if(kind==='smart_list'){
+    const items=(n.items||[]).slice(0,4);
+    preview=`<div class="np-mini-list">${items.map(i=>`<div class="np-mini-row ${i.done?'done':''}"><span class="np-mini-check" style="${i.done?'background:#2F7D64;border-color:#2F7D64':''}">${i.done?'✓':''}</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${npEsc(i.texto)}</span>${npMoney(i.total)?`<b>${npFmt(i.total)}</b>`:''}</div>`).join('')}</div>
+      <div class="np-total"><span>${(n.items||[]).length} items</span><b>${npFmt(npListTotal(n.items))}</b></div>`;
+  }else if(kind==='meeting'){
+    const gastos=(n.gastos||[]).length?`<br><b>${(n.gastos||[]).length} gasto(s) detectado(s)</b>`:'';
+    preview=`<div class="np-prev">${npEsc(n.resumen||npPlain(n.transcript||n.texto||'Reunion sin resumen aun').substring(0,140))}${gastos}</div>`;
+  }else{
+    preview=`<div class="np-prev">${npEsc(npPlain(n.texto||'').substring(0,150)||'Nota sin contenido')}</div>`;
+  }
+  return `<div class="np-card">
+    <div class="np-card-top" onclick="npOpenNote('${n.id}')">
+      <div class="np-card-ic" style="background:${conf.bg};color:${conf.color}">${appIcon(conf.icon)}</div>
+      <div class="np-card-main">
+        <div class="np-card-title">${npEsc(n.titulo||'Sin titulo')}</div>
+        <div class="np-card-meta"><span class="np-tag">${conf.label}</span>${date?`<span>${date}</span>`:''}</div>
+        ${preview}
+      </div>
+    </div>
+    <div class="np-card-actions">
+      <button class="np-act" onclick="npOpenNote('${n.id}')">Editar</button>
+      <button class="np-act" onclick="npOpenVoiceCapture('${kind==='meeting'?'meeting':'list'}','${n.id}')">Mic</button>
+      <button class="np-act" onclick="npOpenShare('${n.id}')">Compartir</button>
+      <button class="np-act" onclick="npDeleteNote('${n.id}')">Eliminar</button>
+    </div>
+  </div>`;
+}
+
+function npOpenSmartList(id,kind,pre){
+  npEnsureStyles(); npUpgradeNotas();
+  let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
+  n=n?JSON.parse(JSON.stringify(n)):npBlankList(kind||pre?.listType,pre?.titulo);
+  n.npKind='smart_list'; n.tipo='lista'; n.listType=kind||n.listType||pre?.listType||'compras';
+  n.items=(pre?.items||n.items||[]).map(npNormalizeItem);
+  window._npEditor={mode:'list',note:n,isNew:!id};
+  document.getElementById('np-editor')?.remove();
+  document.body.style.overflow='hidden';
+  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-editor">
+    <div class="np-ed-top"><button class="np-icon-btn" onclick="npCloseEditor()">x</button><div style="flex:1;font-size:12px;font-weight:850;color:#64748B">Lista inteligente</div><button class="np-save" onclick="npSaveList(true)">Guardar</button></div>
+    <div class="np-ed-body">
+      <input class="np-ed-title" id="np-title" value="${npEsc(n.titulo||'')}" placeholder="Titulo">
+      <div class="np-sheet">
+        <div class="np-type-row">
+          ${['compras','mercado','materiales','gastos','tareas'].map(k=>`<button class="np-type ${n.listType===k?'on':''}" onclick="npSetListType('${k}',this)">${k.charAt(0).toUpperCase()+k.slice(1)}</button>`).join('')}
+        </div>
+        <div id="np-list-rows"></div>
+        <div class="np-editor-total"><span>Total de la lista</span><b id="np-list-total">S/ 0.00</b></div>
+      </div>
+    </div>
+    <div class="np-bottom">
+      <button class="np-tool" onclick="npAddListItem()">+ Item</button>
+      <button class="np-tool" onclick="npOpenVoiceCapture('list','${n.id||''}')">Mic</button>
+      <button class="np-tool" onclick="npImproveCurrentList()">IA ordenar</button>
+      <button class="np-tool primary" onclick="npOpenShareFromEditor()">Exportar</button>
+    </div>
+  </div>`);
+  npRenderListRows();
+}
+
+function npSetListType(k,btn){
+  if(!window._npEditor) return;
+  npCollectListRows();
+  window._npEditor.note.listType=k;
+  document.querySelectorAll('.np-type').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  const title=document.getElementById('np-title');
+  if(title && (!title.value.trim() || /lista|cuadro|tareas/i.test(title.value.trim()))) title.value=npTitleForKind(k);
+}
+
+function npRenderListRows(){
+  const ed=window._npEditor; if(!ed||ed.mode!=='list') return;
+  const box=document.getElementById('np-list-rows'); if(!box) return;
+  if(!ed.note.items.length) ed.note.items.push(npNormalizeItem({texto:'',precio:0,total:0}));
+  box.innerHTML=ed.note.items.map((it,i)=>`<div class="np-row" data-np-row="${i}">
+    <input type="checkbox" ${it.done?'checked':''} onchange="npListRecalc()">
+    <div class="np-row-main">
+      <input type="text" value="${npEsc(it.texto)}" placeholder="Item, tarea o concepto" oninput="npListRecalc()">
+      <div class="np-money-grid">
+        <div><div class="np-field-label">Cant.</div><input type="number" inputmode="decimal" step="0.01" value="${npMoney(it.cantidad)||1}" oninput="npListRecalc()"></div>
+        <div><div class="np-field-label">Precio</div><input type="number" inputmode="decimal" step="0.01" value="${npMoney(it.precio)||''}" placeholder="S/ 0" oninput="npListRecalc('price',${i})"></div>
+        <div><div class="np-field-label">Total</div><input type="number" inputmode="decimal" step="0.01" value="${npMoney(it.total)||''}" placeholder="S/ 0" oninput="npListRecalc()"></div>
+      </div>
+    </div>
+    <button class="np-del" onclick="npDelListItem(${i})">x</button>
+  </div>`).join('');
+  npListRecalc();
+}
+
+function npCollectListRows(){
+  const ed=window._npEditor; if(!ed||ed.mode!=='list') return [];
+  const rows=[...document.querySelectorAll('[data-np-row]')].map(r=>{
+    const inputs=r.querySelectorAll('input');
+    const cantidad=npMoney(inputs[2]?.value)||1;
+    const precio=npMoney(inputs[3]?.value)||0;
+    const total=npMoney(inputs[4]?.value)||+(cantidad*precio).toFixed(2)||0;
+    return npNormalizeItem({done:inputs[0]?.checked,texto:inputs[1]?.value.trim(),cantidad,precio,total});
+  }).filter(i=>i.texto||i.total);
+  ed.note.items=rows;
+  return rows;
+}
+
+function npListRecalc(mode,rowIndex){
+  if(mode==='price'){
+    const row=document.querySelector(`[data-np-row="${rowIndex}"]`);
+    if(row){
+      const inputs=row.querySelectorAll('input');
+      const cantidad=npMoney(inputs[2]?.value)||1;
+      const precio=npMoney(inputs[3]?.value)||0;
+      if(inputs[4]) inputs[4].value=precio?+(cantidad*precio).toFixed(2):'';
+    }
+  }
+  const rows=npCollectListRows();
+  const el=document.getElementById('np-list-total');
+  if(el) el.textContent=npFmt(npListTotal(rows));
+}
+
+function npSaveList(close){
+  const ed=window._npEditor; if(!ed) return null;
+  const n=ed.note;
+  n.titulo=document.getElementById('np-title')?.value.trim()||npTitleForKind(n.listType);
+  n.items=npCollectListRows();
+  n.totalLista=npListTotal(n.items);
+  n.texto=n.items.map(i=>`${i.done?'✓':'○'} ${i.texto}${i.cantidad&&i.cantidad!==1?' x'+i.cantidad:''}${npMoney(i.total)?' - '+npFmt(i.total):''}`).join('<br>');
+  n.modificado=new Date().toISOString();
+  if(!n.id){ n.id=npId(); n.creado=n.modificado; state.notas.unshift(n); }
+  else state.notas=state.notas.map(x=>String(x.id)===String(n.id)?n:x);
+  npSaveNoteToCloud(n);
+  if(close){ npCloseEditor(); render(); toast('Lista guardada'); }
+  return n;
+}
+
+function npCleanVoicePiece(text){
+  return String(text||'').replace(/([a-zA-Z])\1{3,}/g,'$1$1').replace(/\balas\b/gi,'a las').replace(/\s+/g,' ').trim();
+}
+function npVoiceNorm(text){ return nrm(npCleanVoicePiece(text)); }
+function npAppendVoiceSegment(m,seg){
+  seg=npCleanVoicePiece(seg);
+  const now=npVoiceNorm(seg);
+  if(!now) return;
+  const last=npVoiceNorm(m.segments[m.segments.length-1]||'');
+  if(now===last || last.includes(now)) return;
+  if(now.includes(last) && last.length>12) m.segments[m.segments.length-1]=seg;
+  else if(!m.norms.has(now)){ m.segments.push(seg); m.norms.add(now); }
+}
+function npCleanLongTranscript(text,maxWords){
+  let words=npCleanVoicePiece(text).split(/\s+/).filter(Boolean);
+  for(let n=1;n<=Math.min(18,Math.floor(words.length/2));n++){
+    let i=0;
+    while(i<=words.length-2*n){
+      const a=words.slice(i,i+n).join(' ').toLowerCase();
+      const b=words.slice(i+n,i+2*n).join(' ').toLowerCase();
+      if(a===b) words.splice(i,n); else i++;
+    }
+  }
+  if(maxWords && words.length>maxWords) words=words.slice(-maxWords);
+  return words.join(' ');
+}
+
+function npSplitListText(text){
+  let s=String(text||'')
+    .replace(/\s+(tambien|tambien compre|luego|ademas|despues|otra cosa|y tambien)\s+/gi, ', ')
+    .replace(/\s+y\s+(?=[^,;\n]{0,55}?(?:s\/|\d+(?:[.,]\d+)?\s*(?:soles?|sol\b)|\d+\s+con\s+\d+))/gi, ', ');
+  let parts=s.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
+  if(parts.length<=1){
+    const rx=/([^,;\n]{2,80}?(?:s\/\.?\s*\d[\d.,]*|\d+(?:[.,]\d+)?\s*(?:soles?|sol\b)|\d+\s+con\s+\d{1,2}|[a-z]+\s+con\s+[a-z]+))/gi;
+    const found=[...s.matchAll(rx)].map(m=>m[1].trim());
+    if(found.length>1) parts=found;
+  }
+  return parts;
+}
+
+function npExtractQuantity(part,amount){
+  const p=nrm(part);
+  if(/^\d+\s+con\s+\d+/.test(p)) return 1;
+  const m=p.match(/\b(\d+(?:[.,]\d+)?)\s*(?:und|unidad(?:es)?|kg|kilos?|metros?|mts?|m\b|bolsas?|tubos?|codos?|valvulas?|rollos?|paquetes?|piezas?)\b/);
+  if(m) return npMoney(m[1])||1;
+  const lead=p.match(/^(\d+(?:[.,]\d+)?)\s+(?!sol|soles|con\b)([a-z]{3,})/);
+  if(lead && npMoney(lead[1])!==amount) return npMoney(lead[1])||1;
+  return 1;
+}
+
+function npLabelFromSegment(part){
+  let label=String(part||'')
+    .replace(/s\/\.?\s*\d[\d.,]*/gi,' ')
+    .replace(/\b\d+(?:[.,]\d+)?\s*(?:soles?|sol\b|nuevos?\s*soles?)\b/gi,' ')
+    .replace(/\b\d+\s*(?:soles?|sol)?\s+con\s+\d{1,2}\b/gi,' ')
+    .replace(/\b[a-z]+\s+con\s+[a-z]+\b/gi,' ')
+    .replace(/\b(cada\s+uno|cada\s+una|por\s+unidad|precio|cuesta|vale|costo|costa|total|por|cada|c\/u|unitario|soles|sol)\b/gi,' ')
+    .replace(/\b(crea|crear|haz|hacer|anota|apunta|agrega|agregar|lista|compras|mercado|gastos|materiales|tareas|compre|compre|comprar|compra|gaste|gaste|necesito|quiero|pon|mete)\b/gi,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+  label=label.replace(/^\d+(?:[.,]\d+)?\s+/i,'').trim();
+  label=label.replace(/^(en|de|del|la|el|los|las|un|una)\s+/i,'').trim();
+  label=label.replace(/\s+\b(a|de|en|por|uno|una)\b$/i,'').trim();
+  return label||'Item';
+}
+
+function npParseSmartListLocal(text){
+  const listType=npGuessListType(text);
+  const parts=npSplitListText(text.replace(/\b(crea|crear|haz|hacer)\s+(una\s+)?lista\s+(de\s+)?/gi,' '));
+  const items=parts.map(part=>{
+    const amount=extractAmount(part)||0;
+    const qty=npExtractQuantity(part,amount);
+    const unitCue=/\b(cada|c\/u|unitario|por unidad|a\s+s\/|a\s+\d)/i.test(part);
+    const total=amount ? +(unitCue && qty>1 ? qty*amount : amount).toFixed(2) : 0;
+    const price=amount ? +(unitCue ? amount : (qty>1 && total?total/qty:amount)).toFixed(2) : 0;
+    return npNormalizeItem({texto:npLabelFromSegment(part),cantidad:qty,precio:price,total});
+  }).filter(i=>i.texto && (i.texto!=='Item'||i.total));
+  const moneyCount=items.filter(i=>i.total>0).length;
+  const confidence=(items.length>=2?0.75:0.45)+(moneyCount?0.15:0)+(listType!=='compras'?0.05:0);
+  return {kind:'smart_list',titulo:npTitleForKind(listType),listType,items,confidence:Math.min(confidence,0.94)};
+}
+
+function npParseMeetingLocal(text){
+  const transcript=npCleanLongTranscript(text);
+  const sentences=transcript.split(/(?<=[.!?])\s+|\s+(?:y luego|ademas|tambien)\s+/i).map(x=>x.trim()).filter(Boolean);
+  const gastos=npParseSmartListLocal(transcript).items.filter(i=>i.total>0).slice(0,12);
+  const tareas=sentences.filter(s=>/\b(hay que|pendiente|falta|llamar|comprar|revisar|hacer|enviar|coordinar)\b/i.test(s)).slice(0,8);
+  const acuerdos=sentences.filter(s=>/\b(acordamos|queda|se va|vamos a|cliente acepta|aprobado|confirmo)\b/i.test(s)).slice(0,8);
+  return {
+    kind:'meeting',
+    titulo:'Reunion '+new Date().toLocaleDateString('es-PE'),
+    transcript,
+    resumen:sentences.slice(0,3).join('. '),
+    acuerdos,
+    tareas,
+    gastos:gastos.map(i=>`${i.texto} - ${npFmt(i.total)}`),
+    confidence:.55
+  };
+}
+
+function npParseSmartInput(text,mode){
+  const t=nrm(text), words=t.split(/\s+/).filter(Boolean).length;
+  const listSignal=/\b(lista|compras|mercado|materiales|gastos|tareas|compre|comprar|gaste|snack|gaseosa|menu|precio|soles?|s\/)\b/.test(t);
+  const meetingSignal=/\b(reunion|reunirse|acta|resumen|acuerdos|pendientes|cliente dijo|minuta|conversacion larga)\b/.test(t);
+  if(mode==='meeting' || meetingSignal || (words>90 && !listSignal)) return npParseMeetingLocal(text);
+  if(mode==='text') return {kind:'doc',titulo:'Nota dictada',texto:npCleanLongTranscript(text),confidence:.75};
+  if(mode==='list' || listSignal) return npParseSmartListLocal(text);
+  return {kind:'doc',titulo:'Nota dictada',texto:npCleanLongTranscript(text),confidence:.55};
+}
+
+async function npGeminiOrganize(text,mode,local){
+  const key=localStorage.getItem('fnz_gemini_key');
+  if(!key) return local;
+  const prompt=`Eres asistente de notas para una app financiera de un negocio de gas natural en Peru. Responde solo JSON valido.
+Modo: ${mode}
+Reglas:
+- Si el dictado es lista o compras, devuelve items separados. Detecta tipo: compras, mercado, materiales, gastos o tareas.
+- Si escuchas precios, usa soles. Si hay cantidad y precio unitario, calcula total.
+- Si es reunion larga, resume, extrae acuerdos, pendientes y gastos mencionados.
+- No inventes precios ni items.
+Formato exacto:
+{"kind":"smart_list|meeting|doc","titulo":"...","listType":"compras|mercado|materiales|gastos|tareas","items":[{"texto":"...","cantidad":1,"precio":0,"total":0,"done":false,"categoria":""}],"transcript":"...","resumen":"...","acuerdos":["..."],"tareas":["..."],"gastos":["..."],"texto":"..."}
+Dictado: ${JSON.stringify(text)}`;
+  try{
+    const r=await fetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:.08,maxOutputTokens:1600,responseMimeType:'application/json'}})});
+    const d=await r.json();
+    const raw=(d?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```json|```/g,'').trim();
+    const p=JSON.parse(raw);
+    if(p.kind==='smart_list'||p.items?.length){
+      const listType=p.listType||local.listType||npGuessListType(text);
+      return {kind:'smart_list',titulo:p.titulo||npTitleForKind(listType),listType,items:(p.items||local.items||[]).map(npNormalizeItem),confidence:.96};
+    }
+    if(p.kind==='meeting'||p.resumen){
+      return {kind:'meeting',titulo:p.titulo||local.titulo||'Reunion con IA',transcript:p.transcript||text,resumen:p.resumen||local.resumen||'',acuerdos:p.acuerdos||local.acuerdos||[],tareas:p.tareas||local.tareas||[],gastos:p.gastos||local.gastos||[],confidence:.96};
+    }
+    return {kind:'doc',titulo:p.titulo||'Nota dictada',texto:p.texto||text,confidence:.9};
+  }catch(e){
+    console.warn('Notas Gemini fallo:',e);
+    return local;
+  }
+}
+
+function npOpenVoiceCapture(mode='auto',targetId=''){
+  npEnsureStyles();
+  document.getElementById('np-mic')?.remove();
+  document.body.style.overflow='hidden';
+  window._npMic={mode,targetId,recording:false,segments:[],norms:new Set(),seconds:0,parsed:null,interim:''};
+  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-mic">
+    <div class="np-mic-box">
+      <div class="np-mic-title">Microfono inteligente</div>
+      <div class="np-mic-sub">Listas y precios se procesan localmente. Reuniones largas o dictados ambiguos usan Gemini cuando hay API configurada.</div>
+      <div class="np-mic-tabs">
+        ${['auto','list','meeting','text'].map(k=>`<button class="${mode===k?'on':''}" onclick="npMicMode('${k}',this)">${k==='auto'?'Auto':k==='list'?'Lista':k==='meeting'?'Reunion':'Texto'}</button>`).join('')}
+      </div>
+      <div class="np-timer" id="np-mic-timer">00:00</div>
+      <div class="np-transcript" id="np-mic-text">Toca iniciar y dicta. Ej: gaseosa 2 con 50, snacks 3 soles, 2 tubos a 8 soles cada uno.</div>
+      <div class="np-preview" id="np-mic-preview"></div>
+      <div class="np-mic-actions">
+        <button onclick="npCloseMic()">Cancelar</button>
+        <button class="primary" id="np-mic-main" onclick="npMicToggle()">Iniciar</button>
+      </div>
+      <div class="np-mic-actions">
+        <button onclick="npMicProcess(true)">Procesar con IA</button>
+        <button class="primary" id="np-mic-save" onclick="npMicCommit()" style="display:none">Crear nota</button>
+      </div>
+    </div>
+  </div>`);
+}
+
+function npMicMode(m,btn){
+  const mic=window._npMic; if(mic) mic.mode=m;
+  document.querySelectorAll('.np-mic-tabs button').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+}
+
+function npMicToggle(){ window._npMic?.recording ? npMicStop() : npMicStart(); }
+
+function npMicStart(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ toast('Necesitas Chrome para usar microfono','error'); return; }
+  const m=window._npMic; if(!m) return;
+  m.recording=true; m.parsed=null; m.interim='';
+  document.getElementById('np-mic-main').textContent='Detener';
+  m.timer=setInterval(()=>{
+    m.seconds++;
+    const mm=String(Math.floor(m.seconds/60)).padStart(2,'0'), ss=String(m.seconds%60).padStart(2,'0');
+    const el=document.getElementById('np-mic-timer'); if(el) el.textContent=mm+':'+ss;
+  },1000);
+  const rec=new SR(); m.rec=rec;
+  rec.lang='es-PE'; rec.continuous=true; rec.interimResults=true; rec.maxAlternatives=1;
+  rec.onresult=e=>{
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const seg=npCleanVoicePiece(e.results[i][0].transcript||'');
+      if(!seg) continue;
+      if(e.results[i].isFinal) npAppendVoiceSegment(m,seg);
+      else interim+=' '+seg;
+    }
+    m.interim=npCleanVoicePiece(interim);
+    const stored=npCleanLongTranscript(m.segments.join(' '),m.mode==='meeting'?0:90);
+    const display=npCleanLongTranscript([stored,m.interim].filter(Boolean).join(' '),m.mode==='meeting'?140:90);
+    const el=document.getElementById('np-mic-text');
+    if(el){ el.textContent=display||'Escuchando...'; el.scrollTop=el.scrollHeight; }
+  };
+  rec.onerror=e=>{ if(e.error!=='no-speech'&&e.error!=='aborted') npMicStop(); };
+  rec.onend=()=>{ if(m.recording) setTimeout(()=>{try{rec.start();}catch(e){}},250); };
+  try{ rec.start(); }catch(e){ toast('No pude iniciar el microfono','error'); }
+}
+
+function npMicStop(){
+  const m=window._npMic; if(!m) return;
+  m.recording=false; clearInterval(m.timer);
+  if(m.rec) try{ m.rec.stop(); }catch(e){}
+  const btn=document.getElementById('np-mic-main'); if(btn) btn.textContent='Grabar mas';
+  npMicProcess(false);
+}
+
+async function npMicProcess(forceGemini){
+  const m=window._npMic; if(!m) return;
+  const raw=npCleanLongTranscript(m.segments.join(' '),0).trim();
+  if(!raw){ toast('No hay texto grabado','error'); return; }
+  const local=npParseSmartInput(raw,m.mode);
+  const words=nrm(raw).split(/\s+/).filter(Boolean).length;
+  const hasKey=!!localStorage.getItem('fnz_gemini_key');
+  const needsGemini=hasKey&&(forceGemini||local.kind==='meeting'||local.confidence<.72||words>70);
+  const prev=document.getElementById('np-mic-preview');
+  if(prev){ prev.style.display='block'; prev.textContent=needsGemini?'Organizando con IA...':'Organizando localmente...'; }
+  const parsed=needsGemini?await npGeminiOrganize(raw,m.mode,local):local;
+  m.parsed=parsed;
+  npRenderParsedPreview(parsed, needsGemini?'Gemini':'Local');
+  const saveBtn=document.getElementById('np-mic-save'); if(saveBtn) saveBtn.style.display='block';
+}
+
+function npRenderParsedPreview(parsed,source){
+  const prev=document.getElementById('np-mic-preview'); if(!prev||!parsed) return;
+  if(parsed.kind==='smart_list'){
+    prev.innerHTML=`<b>${npEsc(parsed.titulo||'Lista')}</b><br><span>${source} · ${parsed.items.length} item(s)</span><br>${(parsed.items||[]).map(i=>`${npEsc(i.texto)}${i.cantidad&&i.cantidad!==1?' x'+i.cantidad:''}${npMoney(i.total)?' - '+npFmt(i.total):''}`).join('<br>')}<br><b>Total: ${npFmt(npListTotal(parsed.items))}</b>`;
+  }else if(parsed.kind==='meeting'){
+    prev.innerHTML=`<b>${npEsc(parsed.titulo||'Reunion')}</b><br><span>${source} · ${(parsed.transcript||'').split(/\s+/).length} palabras</span><br>${npEsc(parsed.resumen||'Transcripcion lista para resumir.')}`;
+  }else{
+    prev.innerHTML=`<b>${npEsc(parsed.titulo||'Nota')}</b><br>${npEsc((parsed.texto||'').substring(0,260))}`;
+  }
+}
+
+function npMicCommit(){
+  const m=window._npMic; if(!m) return;
+  const raw=npCleanLongTranscript(m.segments.join(' '),0);
+  const p=m.parsed||npParseSmartInput(raw,m.mode);
+  let note=null;
+  if(p.kind==='smart_list'){
+    if(m.targetId==='__editor' && window._npEditor?.mode==='list'){
+      npCollectListRows();
+      const ed=window._npEditor;
+      ed.note.listType=ed.note.listType||p.listType||npGuessListType(p.titulo);
+      ed.note.items=[...(ed.note.items||[]).map(npNormalizeItem),...(p.items||[]).map(npNormalizeItem)];
+      if(document.getElementById('np-title') && (!document.getElementById('np-title').value.trim() || /lista|cuadro/i.test(document.getElementById('np-title').value))) document.getElementById('np-title').value=p.titulo||npTitleForKind(ed.note.listType);
+      npCloseMic();
+      npRenderListRows();
+      toast('Items agregados');
+      return;
+    }
+    if(m.targetId){
+      note=(state.notas||[]).find(n=>String(n.id)===String(m.targetId));
+      if(note){
+        note.npKind='smart_list'; note.tipo='lista';
+        note.listType=note.listType||p.listType||npGuessListType(p.titulo);
+        note.items=[...(note.items||[]).map(npNormalizeItem),...(p.items||[]).map(npNormalizeItem)];
+        note.totalLista=npListTotal(note.items);
+        note.modificado=new Date().toISOString();
+      }
+    }
+    if(!note){
+      note=npBlankList(p.listType,p.titulo);
+      note.id=npId(); note.items=(p.items||[]).map(npNormalizeItem);
+      note.totalLista=npListTotal(note.items);
+      note.creado=note.modificado=new Date().toISOString();
+      state.notas.unshift(note);
+    }
+  }else if(p.kind==='meeting'){
+    note={id:npId(),npKind:'meeting',tipo:'audio',titulo:p.titulo||'Reunion con IA',transcript:p.transcript||raw,resumen:p.resumen||'',acuerdos:p.acuerdos||[],tareas:p.tareas||[],gastos:p.gastos||[],texto:p.resumen||'',creado:new Date().toISOString(),modificado:new Date().toISOString()};
+    state.notas.unshift(note);
+  }else{
+    note={id:npId(),npKind:'doc',tipo:'texto',titulo:p.titulo||'Nota dictada',texto:(p.texto||raw).replace(/\n/g,'<br>'),creado:new Date().toISOString(),modificado:new Date().toISOString()};
+    state.notas.unshift(note);
+  }
+  npSaveNoteToCloud(note);
+  npCloseMic(); render(); toast('Nota creada');
+  if(note) setTimeout(()=>npOpenNote(note.id),120);
+}
+
+function npCloseMic(){
+  const m=window._npMic;
+  if(m?.recording){ m.recording=false; if(m.rec) try{m.rec.stop();}catch(e){} }
+  clearInterval(m?.timer);
+  document.getElementById('np-mic')?.remove();
+  document.body.style.overflow='';
+  window._npMic=null;
+}
+
+function npNoteText(n){
+  const kind=npNoteKind(n);
+  let text=(n.titulo||'Nota')+'\n\n';
+  if(kind==='smart_list'){
+    text+=(n.items||[]).map(i=>`${i.done?'✓':'○'} ${i.texto}${i.cantidad&&i.cantidad!==1?' x'+i.cantidad:''}${npMoney(i.total)?' - '+npFmt(i.total):''}`).join('\n');
+    text+='\n\nTotal: '+npFmt(npListTotal(n.items));
+  }else if(kind==='meeting'){
+    text+='Resumen:\n'+(n.resumen||'')+'\n\nAcuerdos:\n'+(n.acuerdos||[]).map(x=>'- '+x).join('\n')+'\n\nPendientes:\n'+(n.tareas||[]).map(x=>'- '+x).join('\n');
+    if((n.gastos||[]).length) text+='\n\nGastos detectados:\n'+(n.gastos||[]).map(x=>'- '+x).join('\n');
+    if(n.transcript) text+='\n\nTranscripcion:\n'+n.transcript;
+  }else text+=npPlain(n.texto||'');
+  return text.trim();
+}
+
+function npOpenShare(id){
+  const n=(state.notas||[]).find(x=>String(x.id)===String(id)); if(!n) return;
+  document.getElementById('modal-content').innerHTML=`<div class="modal-title" style="color:#172033">Compartir</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px">${npEsc(n.titulo||'Nota')}</div>
+    <div style="display:grid;gap:9px">
+      <button class="share-btn" onclick="npShareWhatsApp('${id}')"><div class="share-icon whatsapp">${appIcon('phone')}</div><div class="share-label"><b>WhatsApp texto</b><div class="share-desc">Enviar lista o resumen</div></div></button>
+      <button class="share-btn" onclick="npShareEmail('${id}')"><div class="share-icon copy">${appIcon('document')}</div><div class="share-label"><b>Correo</b><div class="share-desc">Abrir email con contenido</div></div></button>
+      <button class="share-btn" onclick="npCopyText('${id}')"><div class="share-icon copy">${appIcon('clipboard')}</div><div class="share-label"><b>Copiar</b><div class="share-desc">Copiar texto completo</div></div></button>
+      <button class="share-btn" onclick="npExportPDF('${id}')"><div class="share-icon pdf">${appIcon('document')}</div><div class="share-label"><b>PDF</b><div class="share-desc">Vista imprimible premium</div></div></button>
+      <button class="share-btn" onclick="closeModal();exportarNotaA4WhatsApp('${id}')"><div class="share-icon excel">${appIcon('chart')}</div><div class="share-label"><b>JPG A4</b><div class="share-desc">Hoja visual para compartir</div></div></button>
+    </div>`;
+  showModal();
+}
+function npShareWhatsApp(id){const n=state.notas.find(x=>String(x.id)===String(id));if(!n)return;window.open('https://wa.me/?text='+encodeURIComponent(npNoteText(n)),'_blank');closeModal();}
+function npShareEmail(id){const n=state.notas.find(x=>String(x.id)===String(id));if(!n)return;location.href='mailto:?subject='+encodeURIComponent(n.titulo||'Nota')+'&body='+encodeURIComponent(npNoteText(n));closeModal();}
+function npCopyText(id){const n=state.notas.find(x=>String(x.id)===String(id));if(!n)return;navigator.clipboard.writeText(npNoteText(n)).then(()=>toast('Copiado')).catch(()=>toast('No se pudo copiar','error'));closeModal();}
+function npExportPDF(id){
+  const n=state.notas.find(x=>String(x.id)===String(id)); if(!n) return;
+  const body=npEsc(npNoteText(n)).replace(/\n/g,'<br>');
+  const win=window.open('','_blank'); if(!win){ toast('Permite ventanas emergentes','error'); return; }
+  win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+npEsc(n.titulo||'Nota')+'</title><style>body{font-family:Inter,Arial,sans-serif;background:#f7f8fa;margin:0;padding:28px}.page{background:white;max-width:760px;margin:auto;padding:36px;border-radius:18px;box-shadow:0 20px 60px rgba(15,23,42,.12)}h1{font-size:28px;margin:0 0 18px;color:#172033}.body{font-size:15px;line-height:1.7;color:#263244}.foot{margin-top:28px;border-top:1px solid #e5e7eb;padding-top:12px;font-size:11px;color:#64748B}@media print{body{background:#fff;padding:0}.page{box-shadow:none;border-radius:0}}</style></head><body><div class="page"><h1>'+npEsc(n.titulo||'Nota')+'</h1><div class="body">'+body+'</div><div class="foot">Mis Finanzas App · '+new Date().toLocaleString('es-PE')+'</div></div><script>setTimeout(()=>window.print(),300)<\\/script></body></html>');
+  win.document.close(); closeModal();
+}
+
+// Redirecciones finales: estas ganan sobre las funciones antiguas.
+function renderNotaCard(n){ return npRenderCard(n); }
+function renderNotaCard3(n){ return npRenderCard(n); }
+function abrirNotaTypeMenu(){ npShowTemplates(); }
+function abrirModoLista(tipo,tituloInicial){ const txt=[tipo,tituloInicial].filter(Boolean).join(' '); npOpenSmartList(null,npGuessListType(txt),{titulo:tituloInicial||npTitleForKind(npGuessListType(txt))}); }
+function abrirGrabarAudio(){ npOpenVoiceCapture('auto'); }
+function notaAgregarVoz(notaId){ npOpenVoiceCapture('auto',notaId); }
+function notaAgregarVozGemini(notaId){ npOpenVoiceCapture('auto',notaId); }
+function abrirEditorNotaBloque(editId){ if(editId) npOpenNote(editId); else npOpenDoc(null); }
+function abrirEditorNota(editId){ if(editId) npOpenNote(editId); else npOpenDoc(null); }
+function openEditNotaLista(n){ npOpenSmartList((typeof n==='object'?n.id:n),(typeof n==='object'?n.listType:null)||'compras'); }
+function abrirModalCompartir(id){ npOpenShare(id); }
 
 </script>
 </body>
