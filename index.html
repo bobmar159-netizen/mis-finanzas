@@ -2482,7 +2482,11 @@ function isMaterialesCategory(catId, category){
 }
 
 function isStockValueTx(t){
-  return !!(t && t.type === 'egreso' && (t.ocultarEnMovimientos || t.afectaStockValor || t.stockOperacion === 'entrada_valor' || isMaterialesCategory(t.catId, t.category)));
+  return !!(t && t.type === 'egreso' && (t.ocultarEnMovimientos || t.afectaStockValor || t.stockOperacion === 'entrada_valor' || t.stockValorOnly || t.stockCompraId));
+}
+
+function isCashFlowTx(t){
+  return !(t && t.noCashFlow);
 }
 
 function isComidaCategory(catId, category, description=''){
@@ -2512,8 +2516,64 @@ function registrarMovimientoStockValor(tipo, monto, data={}){
     id_servicio: data.id_servicio || '',
     cliente: data.cliente || '',
     txId: data.txId || '',
+    compraId: data.compraId || '',
     saldo: moneyValue(state.stockValorGeneral)
   });
+}
+
+function isCompraStockValorTx(t){
+  return !!(t && t.type === 'egreso' && (t.afectaStockValor || t.stockOperacion === 'entrada_valor' || t.stockValorOnly || t.stockCompraId));
+}
+
+function upsertCompraStockValorFromTx(tx, original=null){
+  if(!tx) return null;
+  ensureLazyData('comprasMateriales');
+  state.comprasMateriales = state.comprasMateriales || [];
+  const compraId = tx.stockCompraId || original?.stockCompraId || ('cmpv_' + tx.id);
+  const amount = moneyValue(tx.amount);
+  const desc = (tx.description || tx.category || 'Materiales').trim();
+  const compra = {
+    id: compraId,
+    fecha: tx.date || todayStr(),
+    material_id: 'stock_valor',
+    material: desc || 'Materiales',
+    descripcion: desc || 'Materiales',
+    cantidad: 1,
+    precio_unitario: amount,
+    total: amount,
+    compra_valor: true,
+    txId: tx.id,
+    origen: 'movimiento_materiales'
+  };
+  const idx = state.comprasMateriales.findIndex(c=>String(c.id)===String(compraId) || String(c.txId||'')===String(tx.id));
+  if(idx >= 0) state.comprasMateriales[idx] = {...state.comprasMateriales[idx], ...compra};
+  else state.comprasMateriales.push(compra);
+  tx.stockCompraId = compraId;
+  return compra;
+}
+
+function removeCompraStockValorByTx(tx){
+  if(!tx) return;
+  ensureLazyData('comprasMateriales');
+  const ids = new Set([String(tx.stockCompraId||''), String(tx.id||'')]);
+  state.comprasMateriales = (state.comprasMateriales || []).filter(c=>{
+    if(c.compra_valor || c.material_id === 'stock_valor'){
+      return !(ids.has(String(c.id||'')) || ids.has(String(c.txId||'')));
+    }
+    return true;
+  });
+}
+
+function syncComprasStockValorDesdeTx(){
+  ensureLazyData('comprasMateriales');
+  const beforeCompras = JSON.stringify(state.comprasMateriales || []);
+  const beforeTx = JSON.stringify((state.transactions || []).map(t=>({id:t.id, stockCompraId:t.stockCompraId})));
+  (state.transactions || []).forEach(tx=>{
+    if(isCompraStockValorTx(tx)) upsertCompraStockValorFromTx(tx);
+  });
+  const afterCompras = JSON.stringify(state.comprasMateriales || []);
+  const afterTx = JSON.stringify((state.transactions || []).map(t=>({id:t.id, stockCompraId:t.stockCompraId})));
+  if(beforeCompras !== afterCompras || beforeTx !== afterTx) saveAll();
 }
 
 function getCatById(id){
@@ -2535,8 +2595,9 @@ function filteredTx(){
 function visibleTx(){
   return filteredTx().filter(t=>!isStockValueTx(t));
 }
-const totalIncome=()=>filteredTx().filter(t=>t.type==='ingreso').reduce((s,t)=>s+t.amount,0);
-const totalExpense=()=>filteredTx().filter(t=>t.type==='egreso').reduce((s,t)=>s+t.amount,0);
+const totalIncome=()=>filteredTx().filter(t=>t.type==='ingreso' && isCashFlowTx(t)).reduce((s,t)=>s+t.amount,0);
+const totalExpense=()=>filteredTx().filter(t=>t.type==='egreso' && isCashFlowTx(t)).reduce((s,t)=>s+t.amount,0);
+
 const balance=()=>totalIncome()-totalExpense();
 const daysUntil=day=>{const now=new Date();let t=new Date(now.getFullYear(),now.getMonth(),day);if(t<now)t=new Date(now.getFullYear(),now.getMonth()+1,day);return Math.ceil((t-now)/(864e5));};
 const pendingDebts=()=>state.debts.filter(d=>d.cuotasPagadas<d.cuotasTotales);
@@ -4750,7 +4811,7 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
       });
 
       const mat=mat1+mat2+mat3;
-      if(mat>0){ nuevasTx.push({id:nId+'-mat',type:'egreso',amount:mat,category:'Materiales',catId:'cne1',description:'Materiales - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMat++; }
+      if(mat>0){ nuevasTx.push({id:nId+'-mat',type:'egreso',amount:mat,category:'Materiales',catId:'cne1',description:'Materiales usados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',origenServicioMaterial:true,materialUsoServicio:true,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMat++; }
       if(comida>0){ nuevasTx.push({id:nId+'-com',type:'egreso',amount:comida,category:'Comida',catId:'cne_menu',description:'Comida - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosCom++; }
       if(otros>0){ nuevasTx.push({id:nId+'-otr',type:'egreso',amount:otros,category:'Otros gastos de negocio',catId:'cne6',description:'Otros gastos - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosOtros++; }
       if(agregados>0){ nuevasTx.push({id:nId+'-agr',type:'egreso',amount:agregados,category:'Agregados',catId:'cne_agregados',description:'Agregados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosAgr++; }
@@ -5216,6 +5277,9 @@ async function saveTx(editId){
     delete item.stockValorOnly;
   }
 
+  const compraStockValor = item.afectaStockValor ? upsertCompraStockValorFromTx(item, original) : null;
+  if(!item.afectaStockValor && original?.afectaStockValor) removeCompraStockValorByTx(original);
+
   const stockAnterior = original?.afectaStockValor ? moneyValue(original.amount) : 0;
   const stockNuevo = item.afectaStockValor ? moneyValue(item.amount) : 0;
   const stockDelta = +(stockNuevo - stockAnterior).toFixed(2);
@@ -5225,7 +5289,8 @@ async function saveTx(editId){
       fecha: item.date,
       descripcion: item.description,
       cliente: item.cliente,
-      txId: item.id
+      txId: item.id,
+      compraId: item.stockCompraId || original?.stockCompraId || ''
     });
   }
 
@@ -5252,6 +5317,7 @@ async function saveTx(editId){
   }
   saveAll();
   syncToSheets(item);
+  if(compraStockValor) syncCompraToSheets(compraStockValor);
   closeModal(); render();
   if(!original || (!original._importadoDeNotion)) toast(editId ? 'Movimiento actualizado ✓' : 'Movimiento guardado ✓');
 }
@@ -5265,8 +5331,10 @@ function deleteTx(id){
       fecha: tx.date,
       descripcion: tx.description || tx.category,
       cliente: tx.cliente || '',
-      txId: tx.id
+      txId: tx.id,
+      compraId: tx.stockCompraId || ''
     });
+    removeCompraStockValorByTx(tx);
   }
   state.transactions=state.transactions.filter(t=>t.id!==id);
   saveAll();
@@ -9413,8 +9481,10 @@ async function guardarFinalizacion(id){
   if (crearMovimientosCierre && cobroObj.movilidad > 0) { const txId=rowId+'-mov'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.movilidad, category:'Movilidad', description:'Movilidad - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.comida_manual > 0) { const txId=rowId+'-com'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.comida_manual, category:'Comida', catId:'cne_menu', description:'Comida - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.otros_gastos > 0) { const txId=rowId+'-otg'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
-  // Materiales no crean egreso aquí: ya salieron de caja cuando se compraron y ahora solo consumen stock valorizado.
-  if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', description:'Agregados · '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
+  // Materiales usados en el servicio: se ven en Movimientos como costo del servicio,
+  // pero no vuelven a descontar caja porque la compra ya afecto el balance al entrar al stock.
+  if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if(crearMovimientosCierre) item.cierreTxIds = nuevosCierreTxIds;
 
   if (item.estadoPago === 'parcial' && item.montoPendienteCobro > 0) {
@@ -12134,7 +12204,7 @@ Object.assign(CAT_KEYWORDS, {
   cne_personal: ['personal','ayudante','empleado','mano de obra','jornal','sueldo trabajador'],
   cne_gaseosa: ['gaseosa','bebida','bebidas','inca kola','coca cola','soda','refresco'],
   cne_snack: ['snack','snacks','snak','snaks','piqueo','papitas','galleta','galletas','golosina'],
-  cne_menu: ['menu','menú','almuerzo','cena','desayuno','comida','restaurant','restaurante'],
+  cne_menu: ['menu','menú','almuerzo','cena','desayuno','comida','restaurant','restaurante','alimentacion','alimento','alimentos'],
   cne5: ['transporte','movilidad','taxi','uber','pasaje','flete'],
   cne_luz: ['luz','electricidad','enel','luz del sur'],
   cne_agua: ['agua','sedapal','recibo de agua'],
@@ -12142,7 +12212,7 @@ Object.assign(CAT_KEYWORDS, {
   cne_internet_movil: ['internet movil','internet móvil','datos moviles','datos móviles','celular','plan movil','plan móvil'],
   cne1: ['material','materiales','insumo','insumos','tubo','tuberia','tubería','acople'],
   cne3: ['gasolina','combustible','grifo','repsol','primax'],
-  cne2: ['gnv','gas natural vehicular'],
+  cne2: ['gnv','gas natural vehicular','g n v','g ene ve','ge ene ve','je ene ve','geneve','genuve','gnuve','genv'],
   cne7: ['reparacion de auto','reparación de auto','auto','carro','vehiculo','vehículo','taller','llanta','aceite'],
   cne_agregados: ['agregado','agregados','arena','piedra','cemento'],
   cne_documentacion: ['documentacion','documentación','papeles','certificado','tramite','trámite'],
@@ -12157,32 +12227,53 @@ function nrm(s) {
     .replace(/\s+/g,' ').trim();
 }
 
-// ── Extraer monto (robusto) ──
+function isGnvVoice(text){
+  const t = nrm(text);
+  return /\b(gnv|g n v|g ene ve|ge ene ve|je ene ve|g ene v|ge n v|j n v|geneve|genuve|gnuve|genv)\b/.test(t);
+}
+
 function extractAmount(text) {
-  // FIX: normalizar punto de miles (1.500 → 1500) antes de parsear
-  text = text.replace(/(\d+)\.(\d{3})(?!\d)/g, '$1$2');
+  text = String(text || '').replace(/(\d+)\.(\d{3})(?!\d)/g, '$1$2');
   const t = text;
-  // 2 con 50 | 2 soles con 50
+  const tn = nrm(text);
+
+  // 2 con 50 | 2 soles con 50 | 3 con 5
   let dec = t.match(/\b(\d{1,5})\s*(?:soles?|sol)?\s+con\s+(\d{1,2})\b/i);
   if (dec) {
-    const n = parseFloat(dec[1] + '.' + dec[2].padStart(2, '0'));
+    const cents = dec[2].length === 1 ? dec[2].padEnd(2, '0') : dec[2].padStart(2, '0');
+    const n = parseFloat(dec[1] + '.' + cents);
     if(!isNaN(n)&&n>0) return n;
   }
+
+  // 3 con cincuenta | 3 soles con ochenta
+  let decMixed = tn.match(/\b(\d{1,5})\s*(?:soles?|sol)?\s+con\s+([a-z]+)\b/);
+  if(decMixed && NUM_WORDS[decMixed[2]] !== undefined){
+    const cents = NUM_WORDS[decMixed[2]];
+    if(cents > 0 && cents < 100) return +(Number(decMixed[1]) + cents / 100).toFixed(2);
+  }
+
+  // quince con 80
+  decMixed = tn.match(/\b([a-z]+)\s+con\s+(\d{1,2})\b/);
+  if(decMixed && NUM_WORDS[decMixed[1]] !== undefined){
+    const cents = decMixed[2].length === 1 ? Number(decMixed[2]) * 10 : Number(decMixed[2]);
+    if(cents > 0 && cents < 100) return +(NUM_WORDS[decMixed[1]] + cents / 100).toFixed(2);
+  }
+
   // S/. 400 | S/ 400 | S/.400
   let m = t.match(/s\/\.?\s*(\d[\d.,]*)/i);
   if (m) { const n=parseFloat(m[1].replace(',','.')); if(!isNaN(n)&&n>0) return n; }
   // 400 soles | 400.50 soles
   m = t.match(/(\d[\d.,]*)\s*(?:soles?|sol\b|nuevos?\s*soles?)/i);
   if (m) { const n=parseFloat(m[1].replace(',','.')); if(!isNaN(n)&&n>0) return n; }
-  // número con decimales: 400.50 | 400,50
+  // numero con decimales: 400.50 | 400,50
   m = t.match(/\b(\d{1,6}[.,]\d{1,2})\b/);
   if (m) { const n=parseFloat(m[1].replace(',','.')); if(!isNaN(n)&&n>0) return n; }
-  // número entero de 2+ dígitos (toma el último encontrado en el texto)
+  // numero entero de 2+ digitos (toma el ultimo encontrado en el texto)
   const allNums = [...t.matchAll(/\b(\d{2,7})\b/g)].map(x=>parseFloat(x[1])).filter(x=>x>0&&x<9999999);
   if (allNums.length) return allNums[allNums.length-1];
-  // números en palabras
-  const words = nrm(text).split(/\s+/);
-  const spokenDec = nrm(text).match(/\b([a-z]+)\s+con\s+([a-z]+)\b/);
+  // numeros en palabras
+  const words = tn.split(/\s+/);
+  const spokenDec = tn.match(/\b([a-z]+)\s+con\s+([a-z]+)\b/);
   if(spokenDec && NUM_WORDS[spokenDec[1]] !== undefined && NUM_WORDS[spokenDec[2]] !== undefined){
     const soles = NUM_WORDS[spokenDec[1]];
     const cents = NUM_WORDS[spokenDec[2]];
@@ -12438,6 +12529,8 @@ function fmtDateLabel(ds) {
 // ── Extraer descripción limpia ──
 function extractDescription(text) {
   let t = text;
+  const numWordsForMoney = 'cero|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieciseis|diecisiete|dieciocho|diecinueve|veinte|veintiuno|veintidos|veintitres|veinticuatro|veinticinco|veintiseis|veintisiete|veintiocho|veintinueve|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa';
+  t = t.replace(new RegExp('\\b(?:\\d{1,5}|'+numWordsForMoney+')\\s*(?:soles?|sol)?\\s+con\\s+(?:\\d{1,2}|'+numWordsForMoney+')\\b','gi'),' ');
   // Quitar referencias temporales
   t = t.replace(/\b(pasado mañana|antes de ayer|anteayer|antier|mañana|ayer|hoy)\b/gi,'');
   t = t.replace(/\b(el\s+)?(lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\b/gi,'');
@@ -12461,7 +12554,7 @@ function isContextGasolinaAuto(text) {
     'puse gas','puse gasolina','llene el tanque','llene el carro',
     'llene el auto','llene la moto','llene el vehiculo',
     'gas del carro','gas del auto','gas de la moto','gas del vehiculo',
-    'gasolina','combustible','petroleo','gnv','glp',
+    'gasolina','combustible','petroleo','gnv','g n v','ge ene ve','g ene ve','je ene ve','geneve','genuve','gnuve','genv','glp',
     'grifo','repsol','primax','pecsa','petroperu','petroperú'
   ];
   for (const p of autoPatterns) if (t.includes(nrm(p))) return true;
@@ -12764,7 +12857,7 @@ function detectNegocioAmbiguidad(text, catId) {
   if (isContextoPersonalClear(text)) return false;
   // Solo ambiguo si menciona materiales o combustible sin contexto
   const t = nrm(text);
-  const ambWords = ['materiales','material','gasolina','gnv','combustible',
+  const ambWords = ['materiales','material','gasolina','gnv','g n v','ge ene ve','g ene ve','je ene ve','geneve','genuve','gnuve','genv','combustible',
     'meti gas','cargue gas','llene','insumos','herramientas'];
   return ambWords.some(w => t.includes(nrm(w)));
 }
@@ -12851,7 +12944,7 @@ function parseVoiceCommand(text) {
       }
     } else {
       // Egreso en modo negocio → clasificar por tipo
-      if (/\bgnv\b/.test(t))
+      if (isGnvVoice(text))
         cat = state.catsEx.find(c=>c.id==='cne2') || state.catsEx[0];
       else if (/gasolina|combustible|meti gas|cargue gas|llene/.test(t))
         cat = state.catsEx.find(c=>c.id==='cne3') || state.catsEx[0];
@@ -12861,7 +12954,7 @@ function parseVoiceCommand(text) {
         cat = state.catsEx.find(c=>c.id==='cne_gaseosa') || state.catsEx[0];
       else if (/snack|snacks|snak|snaks|piqueo|papitas|galletas?|golosina/.test(t))
         cat = state.catsEx.find(c=>c.id==='cne_snack') || state.catsEx[0];
-      else if (/menu|menu del dia|almuerzo|cena|desayuno|comida|restaurant|restaurante/.test(t))
+      else if (/menu|menu del dia|almuerzo|cena|desayuno|comida|alimentacion|alimentos?|restaurant|restaurante/.test(t))
         cat = state.catsEx.find(c=>c.id==='cne_menu') || state.catsEx[0];
       else if (/luz|electricidad|enel/.test(t))
         cat = state.catsEx.find(c=>c.id==='cne_luz') || state.catsEx[0];
@@ -12892,7 +12985,7 @@ function parseVoiceCommand(text) {
       cat = state.catsIn.find(c=>c.id==='ci_comisiones') || detectCategory(text, type);
     } else if (/\bmateriales?\b|\binsumos?\b/.test(t) && isContextoNegocioClear(text)) {
       cat = state.catsEx.find(c=>c.id==='ce10') || detectCategory(text, type);
-    } else if (/\bgnv\b/.test(t)) {
+    } else if (isGnvVoice(text)) {
       cat = detectCategory(text, type);
     } else if (isContextGasolinaAuto(text) && isContextoNegocioClear(text)) {
       cat = detectCategory(text, type);
@@ -15760,7 +15853,7 @@ function confirmarNegocio(esNegocio) {
     // Reasignar categoría correcta según qué era
     const t = nrm(micParsed.raw);
     let newCatId;
-    if (/\bgnv\b/.test(t))                          newCatId = 'cneg_gnv';
+    if (isGnvVoice(micParsed.raw))                    newCatId = 'cneg_gnv';
     else if (/\bmateriales?\b|\binsumos?\b/.test(t)) newCatId = 'cneg_mat';
     else                                              newCatId = 'cneg_gas';
     const newCat = state.catsEx.find(c=>c.id===newCatId) || micParsed.cat;
@@ -15830,13 +15923,18 @@ function saveMicTx() {
   if(entraAStockValor){
     tx.afectaStockValor = true;
     tx.stockOperacion = 'entrada_valor';
+    tx.ocultarEnMovimientos = true;
+    tx.stockValorOnly = true;
+    const compraStockValor = upsertCompraStockValorFromTx(tx);
     ajustarStockValorGeneral(tx.amount);
     registrarMovimientoStockValor('entrada_valor', tx.amount, {
       fecha: tx.date,
       descripcion: tx.description,
       cliente: tx.cliente || '',
-      txId: tx.id
+      txId: tx.id,
+      compraId: tx.stockCompraId || ''
     });
+    if(compraStockValor) syncCompraToSheets(compraStockValor);
   }
   state.transactions.push(tx);
   let servicioMarcado=null;
@@ -18118,6 +18216,7 @@ const TIPOS_SERVICIO_GAS = [
 
 // ── FASE 1: Render principal de Inventario ──────────────────────────
 function renderInventario(){
+  syncComprasStockValorDesdeTx();
   const inv = state.inventario || [];
   const bajos   = inv.filter(m => m.stock_actual > 0 && m.stock_actual <= m.stock_minimo);
   const sinStock = inv.filter(m => m.stock_actual <= 0);
@@ -18248,28 +18347,187 @@ function renderSubPlantillas(){
 
 // ── Historial de compras ─────────────────────────────────────────────
 function renderSubCompras(compras){
+  const lista = [...(compras || [])].sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||''))).reverse();
   return `
-  <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-    <button onclick="openRegistrarCompra()" style="background:#F47C3C;color:#fff;border:none;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">🛒 Registrar Compra</button>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px">
+    <div style="font-size:12px;color:var(--muted);line-height:1.35">Aqui puedes corregir compras de materiales. Las compras valorizadas vienen del microfono y alimentan el stock general.</div>
+    <button onclick="openRegistrarCompra()" style="background:#F47C3C;color:#fff;border:none;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap">Registrar</button>
   </div>
-  ${compras.length===0?`<div style="text-align:center;padding:40px 20px;color:var(--muted)"><div style="font-size:36px;margin-bottom:10px">🧾</div><div>Sin compras registradas</div></div>`
-  : [...compras].reverse().map(c=>`
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px 16px;margin-bottom:10px;box-shadow:0 3px 12px rgba(26,44,53,0.05)">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <div style="font-weight:700;font-size:14px">${c.material}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:3px">📅 ${c.fecha} · 📦 ${c.cantidad} ${getMaterialById(c.material_id)?.unidad||''}</div>
-          <div style="font-size:12px;color:var(--gold);font-weight:600;margin-top:2px">S/ ${(+c.precio_unitario).toFixed(2)} / ${getMaterialById(c.material_id)?.unidad||'u'}</div>
+  ${lista.length===0?`<div style="text-align:center;padding:40px 20px;color:var(--muted);background:#fff;border:1px dashed var(--border);border-radius:18px"><div style="font-size:34px;margin-bottom:10px">+</div><div>Sin compras registradas</div></div>`
+  : lista.map(c=>{
+    const isValor = c.compra_valor || c.material_id === 'stock_valor';
+    const mat = isValor ? null : getMaterialById(c.material_id);
+    const cantidad = moneyValue(c.cantidad || 0);
+    const precio = moneyValue(c.precio_unitario || 0);
+    const total = moneyValue(c.total || (cantidad * precio));
+    const unidad = isValor ? 'stock' : (mat?.unidad || 'u');
+    const id = String(c.id || '');
+    const jsId = id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `
+    <div style="background:var(--card);border:1px solid ${isValor?'#C9A84C55':'var(--border)'};border-radius:16px;padding:14px 16px;margin-bottom:10px;box-shadow:0 3px 12px rgba(26,44,53,0.05)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+        <div style="min-width:0;flex:1">
+          <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:4px">
+            <div style="font-weight:800;font-size:14px;color:var(--text)">${esc(c.material || (isValor?'Materiales en soles':'Material'))}</div>
+            ${isValor?`<span style="background:#FFF8E6;color:#9A6B00;border:1px solid #E9D8A655;border-radius:999px;padding:2px 7px;font-size:10px;font-weight:850">Stock valorizado</span>`:''}
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(c.fecha || '-')} · ${isValor?'1 entrada':cantidad+' '+unidad}</div>
+          ${isValor && c.descripcion?`<div style="font-size:12px;color:var(--muted);margin-top:4px;line-height:1.35">${esc(c.descripcion)}</div>`:`<div style="font-size:12px;color:var(--gold);font-weight:700;margin-top:2px">S/ ${precio.toFixed(2)} / ${unidad}</div>`}
         </div>
-        <div style="text-align:right">
-          <div style="font-size:16px;font-weight:800;color:var(--gold)">S/ ${((+c.cantidad)*(+c.precio_unitario)).toFixed(2)}</div>
-          ${c.imagen_boleta?`<button onclick="verBoleta('${c.id}')" style="background:#EBF1F5;border:none;border-radius:8px;padding:4px 8px;font-size:11px;cursor:pointer;margin-top:4px;color:var(--gold)">📷 Ver boleta</button>`:''}
+        <div style="text-align:right;flex:0 0 auto">
+          <div style="font-size:17px;font-weight:850;color:var(--gold)">S/ ${total.toFixed(2)}</div>
+          ${c.imagen_boleta?`<button onclick="verBoleta('${jsId}')" style="background:#EBF1F5;border:none;border-radius:8px;padding:4px 8px;font-size:11px;cursor:pointer;margin-top:5px;color:var(--gold)">Boleta</button>`:''}
         </div>
       </div>
-    </div>`).join('')}`;
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button onclick="openEditarCompra('${jsId}')" style="flex:1;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-size:12px;font-weight:800;color:var(--text);cursor:pointer">Editar</button>
+        <button onclick="deleteCompraMaterial('${jsId}')" style="background:#FEF2F2;border:1px solid #E0525233;border-radius:10px;padding:9px 12px;font-size:12px;font-weight:800;color:#C62828;cursor:pointer">Borrar</button>
+      </div>
+    </div>`;
+  }).join('')}`;
 }
 
-// ── Historial de uso de materiales ──────────────────────────────────
+function openEditarCompra(id){
+  ensureLazyData('comprasMateriales');
+  const c = (state.comprasMateriales || []).find(x=>String(x.id)===String(id));
+  if(!c) return toast('Compra no encontrada','error');
+  const isValor = c.compra_valor || c.material_id === 'stock_valor';
+  if(isValor){
+    document.getElementById('modal-content').innerHTML = `
+      <div class="modal-title">Editar compra valorizada</div>
+      <div style="font-size:12px;color:var(--muted);margin:-4px 0 12px;line-height:1.35">Corrige este gasto de materiales. Se actualiza el stock valorizado y el balance.</div>
+      <div class="field"><label class="field-label">Fecha</label><input id="cmpv-fecha" type="date" value="${esc(c.fecha || todayStr())}"></div>
+      <div class="field"><label class="field-label">Descripcion</label><input id="cmpv-desc" type="text" value="${esc(c.descripcion || c.material || 'Materiales')}" placeholder="Ej: Materiales para stock"></div>
+      <div class="field"><label class="field-label">Monto (S/)</label><input id="cmpv-monto" type="number" step="0.01" inputmode="decimal" value="${moneyValue(c.total || c.precio_unitario).toFixed(2)}"></div>
+      <button onclick="guardarEdicionCompra('${String(id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')" class="btn-gold" style="width:100%">Guardar cambios</button>`;
+    showModal();
+    return;
+  }
+
+  const materiales = state.inventario || [];
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title">Editar compra</div>
+    <div class="field"><label class="field-label">Material</label>
+      <select id="cmp-edit-mat">${materiales.map(m=>`<option value="${esc(m.id)}" ${m.id===c.material_id?'selected':''}>${esc(m.nombre)} (${esc(m.unidad)})</option>`).join('')}</select>
+    </div>
+    <div class="field"><label class="field-label">Fecha</label><input id="cmp-edit-fecha" type="date" value="${esc(c.fecha || todayStr())}"></div>
+    <div class="field"><label class="field-label">Cantidad</label><input id="cmp-edit-cant" type="number" step="0.01" inputmode="decimal" value="${moneyValue(c.cantidad)}"></div>
+    <div class="field"><label class="field-label">Precio unitario (S/)</label><input id="cmp-edit-precio" type="number" step="0.01" inputmode="decimal" value="${moneyValue(c.precio_unitario).toFixed(2)}"></div>
+    <button onclick="guardarEdicionCompra('${String(id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')" class="btn-gold" style="width:100%">Guardar cambios</button>`;
+  showModal();
+}
+
+function guardarEdicionCompra(id){
+  ensureLazyData('comprasMateriales');
+  const c = (state.comprasMateriales || []).find(x=>String(x.id)===String(id));
+  if(!c) return toast('Compra no encontrada','error');
+  const isValor = c.compra_valor || c.material_id === 'stock_valor';
+  if(isValor){
+    const oldTotal = moneyValue(c.total || c.precio_unitario);
+    const fecha = document.getElementById('cmpv-fecha')?.value || todayStr();
+    const desc = (document.getElementById('cmpv-desc')?.value || 'Materiales').trim();
+    const monto = moneyValue(document.getElementById('cmpv-monto')?.value);
+    if(!monto) return toast('Ingresa un monto valido','error');
+    const delta = +(monto - oldTotal).toFixed(2);
+    if(delta !== 0){
+      ajustarStockValorGeneral(delta);
+      registrarMovimientoStockValor(delta > 0 ? 'ajuste_entrada_valor' : 'anulacion_entrada_valor', Math.abs(delta), {
+        fecha, descripcion: desc, txId: c.txId || '', compraId: c.id
+      });
+    }
+    Object.assign(c, {fecha, material: desc || 'Materiales', descripcion: desc, cantidad:1, precio_unitario:monto, total:monto, compra_valor:true, material_id:'stock_valor'});
+    const tx = (state.transactions || []).find(t=>String(t.id)===String(c.txId));
+    if(tx){
+      tx.amount = monto;
+      tx.date = fecha;
+      tx.description = desc || 'Materiales';
+      tx.category = tx.category || 'Materiales';
+      tx.catId = tx.catId || 'cne1';
+      tx.negocio = true;
+      tx.afectaStockValor = true;
+      tx.stockOperacion = 'entrada_valor';
+      tx.ocultarEnMovimientos = true;
+      tx.stockValorOnly = true;
+      tx.stockCompraId = c.id;
+      syncToSheets(tx);
+    }
+    saveAll();
+    syncCompraToSheets(c);
+    closeModal();
+    render();
+    toast('Compra valorizada actualizada');
+    return;
+  }
+
+  const oldMatId = c.material_id;
+  const oldCant = moneyValue(c.cantidad);
+  const oldPrecio = moneyValue(c.precio_unitario);
+  const oldFecha = c.fecha;
+  const matId = document.getElementById('cmp-edit-mat')?.value;
+  const cant = moneyValue(document.getElementById('cmp-edit-cant')?.value);
+  const precio = moneyValue(document.getElementById('cmp-edit-precio')?.value);
+  const fecha = document.getElementById('cmp-edit-fecha')?.value || todayStr();
+  const mat = getMaterialById(matId);
+  if(!mat || !cant || !precio) return toast('Completa material, cantidad y precio','error');
+
+  const oldMat = getMaterialById(oldMatId);
+  if(oldMat && oldMat.id !== mat.id){
+    oldMat.stock_actual = moneyValue(oldMat.stock_actual) - oldCant;
+    syncMaterialToSheets(oldMat);
+    mat.stock_actual = moneyValue(mat.stock_actual) + cant;
+  } else {
+    mat.stock_actual = moneyValue(mat.stock_actual) + (cant - oldCant);
+  }
+  mat.costo_actual = precio;
+  syncMaterialToSheets(mat);
+
+  Object.assign(c, {fecha, material_id:mat.id, material:mat.nombre, cantidad:cant, precio_unitario:precio, total:cant*precio});
+  const mov = (state.movimientosMateriales || []).find(m=>m.compraId===c.id) ||
+    (state.movimientosMateriales || []).find(m=>m.tipo==='compra' && m.material_id===oldMatId && m.fecha===oldFecha && Math.abs(moneyValue(m.costo_total) - oldCant*oldPrecio) < 0.01);
+  if(mov){
+    Object.assign(mov, {compraId:c.id, material_id:mat.id, material:mat.nombre, cantidad:cant, costo_unitario_usado:precio, costo_total:cant*precio, fecha});
+    syncMovimientoToSheets(mov);
+  }
+  saveAll();
+  syncCompraToSheets(c);
+  closeModal();
+  render();
+  toast('Compra actualizada');
+}
+
+function deleteCompraMaterial(id){
+  ensureLazyData('comprasMateriales');
+  const c = (state.comprasMateriales || []).find(x=>String(x.id)===String(id));
+  if(!c) return toast('Compra no encontrada','error');
+  if(!confirm('Eliminar esta compra?')) return;
+  const isValor = c.compra_valor || c.material_id === 'stock_valor';
+  if(isValor){
+    const total = moneyValue(c.total || c.precio_unitario);
+    ajustarStockValorGeneral(-total);
+    registrarMovimientoStockValor('anulacion_entrada_valor', total, {
+      fecha: c.fecha || todayStr(), descripcion: c.descripcion || c.material || '', txId: c.txId || '', compraId: c.id
+    });
+    const tx = (state.transactions || []).find(t=>String(t.id)===String(c.txId));
+    state.transactions = (state.transactions || []).filter(t=>String(t.id)!==String(c.txId));
+    if(tx && tx.negocio && typeof syncSeccionToSheets === 'function') syncSeccionToSheets('tx_delete', {id: tx.id});
+  } else {
+    const mat = getMaterialById(c.material_id);
+    if(mat){
+      mat.stock_actual = moneyValue(mat.stock_actual) - moneyValue(c.cantidad);
+      syncMaterialToSheets(mat);
+    }
+    state.movimientosMateriales = (state.movimientosMateriales || []).filter(m=>{
+      if(m.compraId === c.id) return false;
+      return !(m.tipo==='compra' && m.material_id===c.material_id && m.fecha===c.fecha && Math.abs(moneyValue(m.costo_total) - moneyValue(c.cantidad)*moneyValue(c.precio_unitario)) < 0.01);
+    });
+  }
+  state.comprasMateriales = (state.comprasMateriales || []).filter(x=>String(x.id)!==String(id));
+  saveAll();
+  closeModal();
+  render();
+  toast('Compra eliminada');
+}
+
 function renderSubHistorial(movs){
   const usos = movs.filter(m=>m.tipo==='uso' || /valor$/.test(m.tipo||''));
   return `
@@ -18795,7 +19053,7 @@ function _registrarCompra(matId, cantidad, precio_unitario, fecha, imagenBase64)
   }
 
   // Registrar movimiento
-  const mov = { id:'mov_'+Date.now(), tipo:'compra', material_id:matId, material:mat.nombre, cantidad, costo_unitario_usado:precio_unitario, costo_total:cantidad*precio_unitario, fecha };
+  const mov = { id:'mov_'+Date.now(), tipo:'compra', compraId:compra.id, material_id:matId, material:mat.nombre, cantidad, costo_unitario_usado:precio_unitario, costo_total:cantidad*precio_unitario, fecha };
   state.movimientosMateriales = state.movimientosMateriales||[];
   state.movimientosMateriales.push(mov);
 
