@@ -4563,6 +4563,7 @@ function renderAjustes(){
   const countPerTx = load('fnz_tx',[]).length;
   const countAgenda = load('fnz_agenda',[]).length;
   const countNotas = load('fnz_notas',[]).length;
+  const countStockHist = load('fnz_mov_mat',[]).length;
   const themeButtons = TEMAS_APP.map(t => `<button class="np-pill ${temaActual===t.id?'on':''}" onclick="applyTheme('${t.id}')">${t.nombre}</button>`).join('');
   setTimeout(()=>{ try{ renderSoundsList(); renderRemindersList(); checkNotifBtn(); }catch(e){} }, 0);
   return `<div class="section">
@@ -21548,6 +21549,17 @@ function ajResetNotionSyncCache(){
   toast('Cache de Notion reiniciada');
 }
 
+function ajClearStockHistory(){
+  ensureLazyData('movimientosMateriales');
+  const n = (state.movimientosMateriales || []).length;
+  if(!n){ toast('El historial de stock ya esta vacio'); return; }
+  if(!confirm('Borrar solo el historial de stock local?\n\nNo borra materiales, compras, stock valorizado ni movimientos financieros.')) return;
+  state.movimientosMateriales = [];
+  save('fnz_mov_mat', []);
+  render();
+  toast('Historial de stock borrado');
+}
+
 function ajResetLocalData(){
   if(!confirm('Borrar todos los datos locales?\n\nSe mantienen credenciales, tema y nombre.')) return;
   if(!confirm('Confirmacion final: se borraran movimientos, agenda, deudas, notas, metas, servicios, categorias y stock local.')) return;
@@ -21590,6 +21602,7 @@ function renderAjustes(){
   const countPerTx = load('fnz_tx',[]).length;
   const countAgenda = load('fnz_agenda',[]).length;
   const countNotas = load('fnz_notas',[]).length;
+  const countStockHist = load('fnz_mov_mat',[]).length;
   const themeButtons = TEMAS_APP.map(t => `<button class="aj-theme ${temaActual===t.id?'on':''}" onclick="applyTheme('${t.id}')">
       <span class="aj-swatch" style="background:${t.accent}"></span>
       <span style="min-width:0"><b>${npEsc(t.nombre)}</b><span>${npEsc(t.desc||'')}</span></span>
@@ -21633,9 +21646,10 @@ function renderAjustes(){
         `<div class="aj-row"><button id="notif-btn" class="aj-btn" onclick="requestNotifPermission()">Activar notificaciones</button><button class="aj-btn primary" onclick="openAddReminder()">Nuevo recordatorio</button></div>
          <div style="display:grid;gap:10px;margin-top:10px"><div id="sounds-list" class="aj-listbox"></div><div id="reminders-list" class="aj-listbox"></div></div>`)}
       ${sec('seguridad','trash','Seguridad','Borrado controlado, cache de Notion y credenciales.',
-        `<div class="aj-status">Locales: <b>${countNegTx}</b> movimientos negocio, <b>${countPerTx}</b> personales, <b>${countAgenda}</b> agenda, <b>${countNotas}</b> notas.</div>
+        `<div class="aj-status">Locales: <b>${countNegTx}</b> movimientos negocio, <b>${countPerTx}</b> personales, <b>${countAgenda}</b> agenda, <b>${countNotas}</b> notas, <b>${countStockHist}</b> historial stock.</div>
          <div class="aj-row" style="margin-top:8px"><button class="aj-btn warn" onclick="ajResetNotionSyncCache()">Reiniciar cache Notion</button><button class="aj-btn danger" onclick="ajClearAllMovements()">Borrar movimientos</button></div>
-         <div class="aj-row" style="margin-top:8px"><button class="aj-btn danger" onclick="ajResetLocalData()">Borrar datos locales</button><button class="aj-btn soft" onclick="ajClearCredentials()">Borrar credenciales</button></div>`)}
+         <div class="aj-row" style="margin-top:8px"><button class="aj-btn warn" onclick="ajClearStockHistory()">Borrar historial stock</button><button class="aj-btn soft" onclick="ajClearCredentials()">Borrar credenciales</button></div>
+         <div class="aj-row" style="margin-top:8px"><button class="aj-btn danger" onclick="ajResetLocalData()">Borrar datos locales</button></div>`)}
     </div>
   </div>`;
 }
