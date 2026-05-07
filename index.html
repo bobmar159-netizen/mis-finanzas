@@ -20507,6 +20507,602 @@ function abrirModalCompartir(id){ npOpenShare(id); }
 
 
 // ======================================================================
+
+
+// ======================================================================
+// NOTAS PREMIUM REBUILD FINAL - experiencia nueva, sin ejemplos base
+// ======================================================================
+let _nxFilter = 'all';
+let _nxSearch = '';
+
+function nxEsc(v){
+  return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function nxId(){ return 'nx_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
+function nxMoney(v){ const n=parseFloat(String(v ?? '').replace(',','.').replace(/[^\d.-]/g,'')); return Number.isFinite(n) ? n : 0; }
+function nxFmt(v){ return 'S/ ' + nxMoney(v).toFixed(2); }
+function nxDate(v){
+  try{ return new Date(v || Date.now()).toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'}); }
+  catch(e){ return ''; }
+}
+function nxStrip(html){
+  const div=document.createElement('div');
+  div.innerHTML=String(html||'');
+  return (div.textContent||div.innerText||'').replace(/\s+/g,' ').trim();
+}
+function nxEnsureNotes(){ ensureLazyData('notas'); if(!state.notas) state.notas=[]; }
+function nxAppearance(){
+  return { paper:'#07111D', accent:'#E4B45F', ink:'#F8FAFC', muted:'#B9C2CF', font:'Inter' };
+}
+function nxKind(n){
+  const k=n?.nxKind || n?.npKind || '';
+  if(k==='smart_list' || n?.tipo==='lista' || Array.isArray(n?.items)) return 'list';
+  if(k==='meeting' || n?.tipo==='audio' || n?.transcript || n?.resumen) return 'meeting';
+  return 'doc';
+}
+function nxText(n){
+  if(!n) return '';
+  if(nxKind(n)==='list') return (n.items||[]).map(i=>i.texto||i.name||'').join(' ');
+  if(nxKind(n)==='meeting') return [n.resumen,n.transcript,(n.acuerdos||[]).join(' '),(n.tareas||[]).join(' ')].join(' ');
+  return nxStrip(n.html || n.texto || '');
+}
+function nxTotal(n){
+  return (n?.items||[]).reduce((s,i)=>s+nxMoney(i.total ?? (nxMoney(i.cantidad||1)*nxMoney(i.precio||0))),0);
+}
+function nxSaveCloud(n){
+  try{ if(typeof syncSeccionToSheets==='function') syncSeccionToSheets('nota', n); }catch(e){}
+}
+
+function nxEnsureStyles(){
+  let st=document.getElementById('nx-notes-premium-styles');
+  if(!st){ st=document.createElement('style'); st.id='nx-notes-premium-styles'; document.head.appendChild(st); }
+  st.textContent=`
+  .nx-page{min-height:100%;padding:12px 10px 112px;margin:-4px -2px 0;background:
+    radial-gradient(circle at 18% 0%,rgba(228,180,95,.18),transparent 24%),
+    radial-gradient(circle at 95% 12%,rgba(49,96,145,.20),transparent 24%),
+    linear-gradient(145deg,#07111D 0%,#0B1724 48%,#111827 100%);color:#F8FAFC;font-family:Inter,'DM Sans',sans-serif}
+  .nx-hero{border:1px solid rgba(228,180,95,.28);border-radius:22px;padding:18px 16px;background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.035));box-shadow:0 18px 42px rgba(0,0,0,.22)}
+  .nx-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .nx-brand{display:flex;align-items:center;gap:12px;min-width:0}
+  .nx-logo{width:48px;height:48px;border:1px solid rgba(228,180,95,.72);border-radius:14px;color:#E4B45F;display:flex;align-items:center;justify-content:center;background:rgba(228,180,95,.08);box-shadow:0 0 0 4px rgba(228,180,95,.06)}
+  .nx-title{font-size:30px;font-weight:900;letter-spacing:0;line-height:1;color:#fff}
+  .nx-title span{color:#E4B45F}
+  .nx-sub{font-size:13px;color:#B9C2CF;line-height:1.45;margin-top:6px}
+  .nx-primary{border:1px solid rgba(228,180,95,.65);background:linear-gradient(135deg,#F3C975,#B88734);color:#172033;border-radius:14px;padding:11px 13px;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;box-shadow:0 10px 24px rgba(228,180,95,.22)}
+  .nx-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .nx-action{border:1px solid rgba(228,180,95,.22);background:rgba(255,255,255,.055);border-radius:17px;padding:13px;display:flex;align-items:center;gap:11px;cursor:pointer;min-height:74px;color:#F8FAFC;text-align:left}
+  .nx-action:active{transform:scale(.99)}
+  .nx-action-ic{width:40px;height:40px;border-radius:13px;background:rgba(228,180,95,.12);color:#E4B45F;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .nx-action:nth-child(2) .nx-action-ic{color:#61A5FF;background:rgba(61,130,246,.13)}
+  .nx-action:nth-child(3) .nx-action-ic{color:#A78BFA;background:rgba(124,58,237,.15)}
+  .nx-action:nth-child(4) .nx-action-ic{color:#7DD3A8;background:rgba(34,197,94,.13)}
+  .nx-action b{display:block;font-size:13px;margin-bottom:3px;color:#fff}
+  .nx-action span{font-size:11px;line-height:1.25;color:#B9C2CF}
+  .nx-board{display:grid;grid-template-columns:280px minmax(0,1fr);gap:12px;margin-top:12px}
+  .nx-panel{border:1px solid rgba(228,180,95,.22);border-radius:20px;background:rgba(255,255,255,.055);box-shadow:0 14px 32px rgba(0,0,0,.18);overflow:hidden}
+  .nx-panel-pad{padding:14px}
+  .nx-side-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#E4B45F;font-weight:900;margin-bottom:10px}
+  .nx-search{display:flex;align-items:center;gap:8px;border:1px solid rgba(228,180,95,.18);background:rgba(0,0,0,.18);border-radius:14px;padding:10px 11px;margin-bottom:11px;color:#E4B45F}
+  .nx-search input{flex:1;min-width:0;border:none;background:transparent;outline:none;color:#F8FAFC;font-size:13px;font-family:Inter,'DM Sans',sans-serif}
+  .nx-search input::placeholder{color:#7F8A99}
+  .nx-filters{display:grid;gap:7px}
+  .nx-filter{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.035);color:#C8D1DD;border-radius:13px;padding:10px 11px;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:850;cursor:pointer}
+  .nx-filter.on{border-color:rgba(228,180,95,.55);background:rgba(228,180,95,.12);color:#F8FAFC}
+  .nx-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+  .nx-stat{border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.16);border-radius:14px;padding:10px}
+  .nx-stat span{display:block;color:#8F9AAA;font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:900;margin-bottom:4px}
+  .nx-stat b{font-size:17px;color:#fff}
+  .nx-list-head{padding:14px 14px 0;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .nx-list-title{font-size:14px;font-weight:900;color:#fff}
+  .nx-mini-btn{border:1px solid rgba(228,180,95,.28);background:rgba(228,180,95,.10);color:#E4B45F;border-radius:11px;padding:8px 10px;font-size:11px;font-weight:900;cursor:pointer}
+  .nx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:14px}
+  .nx-card{border:1px solid rgba(228,180,95,.18);background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.042));border-radius:18px;padding:13px;box-shadow:0 10px 26px rgba(0,0,0,.16);min-width:0}
+  .nx-card-top{display:flex;gap:10px;cursor:pointer;align-items:flex-start}
+  .nx-card-ic{width:38px;height:38px;border-radius:13px;background:rgba(228,180,95,.12);color:#E4B45F;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .nx-card-main{min-width:0;flex:1}
+  .nx-card-title{font-size:14px;font-weight:900;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+  .nx-meta{display:flex;gap:6px;flex-wrap:wrap;color:#8F9AAA;font-size:10px;margin-bottom:8px}
+  .nx-chip{border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.16);border-radius:999px;padding:2px 7px;font-weight:850}
+  .nx-preview{font-size:12px;line-height:1.45;color:#C9D3DF;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;min-height:34px}
+  .nx-mini-list{display:grid;gap:6px;margin-top:7px}
+  .nx-mini-row{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:7px;align-items:center;font-size:12px;color:#D3DCE7}
+  .nx-check{width:14px;height:14px;border-radius:5px;border:1.5px solid rgba(228,180,95,.55)}
+  .nx-mini-row.done{opacity:.55;text-decoration:line-through}
+  .nx-total{display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.08);padding-top:9px;margin-top:10px;font-size:12px;color:#9EABBA}
+  .nx-total b{color:#E4B45F;font-size:15px}
+  .nx-card-actions{display:flex;gap:7px;margin-top:11px}
+  .nx-act{flex:1;border:1px solid rgba(255,255,255,.09);background:rgba(0,0,0,.15);color:#C9D3DF;border-radius:11px;padding:8px 6px;font-size:11px;font-weight:850;cursor:pointer}
+  .nx-act.danger{color:#FCA5A5}
+  .nx-empty{grid-column:1/-1;border:1px dashed rgba(228,180,95,.35);border-radius:20px;padding:34px 18px;text-align:center;color:#B9C2CF;background:rgba(255,255,255,.035)}
+  .nx-empty b{display:block;color:#fff;font-size:17px;margin-bottom:6px}
+  .nx-editor{position:fixed;inset:0;z-index:560;background:#06101B;color:#F8FAFC;font-family:Inter,'DM Sans',sans-serif;display:flex;flex-direction:column}
+  .nx-ed-top{height:58px;display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid rgba(228,180,95,.18);background:rgba(6,16,27,.92);backdrop-filter:blur(14px)}
+  .nx-ib{width:39px;height:39px;border-radius:13px;border:1px solid rgba(228,180,95,.24);background:rgba(255,255,255,.045);color:#E4B45F;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:900}
+  .nx-save{border:1px solid rgba(228,180,95,.65);background:linear-gradient(135deg,#F2CA78,#B88734);color:#111827;border-radius:13px;padding:11px 13px;font-size:12px;font-weight:950;cursor:pointer}
+  .nx-ed-body{flex:1;overflow:auto;padding:14px 12px 128px;max-width:860px;width:100%;margin:0 auto}
+  .nx-ed-title{width:100%;border:none;background:transparent;outline:none;color:#fff;font-size:29px;font-weight:900;letter-spacing:0;font-family:Inter,'DM Sans',sans-serif;margin:8px 0 12px}
+  .nx-ed-title::placeholder{color:#5E6A78}
+  .nx-sheet{border:1px solid rgba(228,180,95,.22);border-radius:21px;background:#07111D;box-shadow:0 20px 54px rgba(0,0,0,.26);padding:14px;min-height:58vh}
+  .nx-toolbar{display:flex;gap:7px;overflow:auto;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .nx-tool{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.05);color:#D6DFEA;border-radius:11px;padding:9px 11px;font-size:12px;font-weight:900;cursor:pointer;white-space:nowrap;min-width:39px}
+  .nx-tool.gold{background:rgba(228,180,95,.14);border-color:rgba(228,180,95,.35);color:#E4B45F}
+  .nx-body{min-height:54vh;outline:none;color:inherit;font-size:15.5px;line-height:1.72}
+  .nx-body:empty:before{content:'Escribe aqui o dicta con el microfono...';color:#748191}
+  .nx-body p{margin:0 0 13px}.nx-body h2{font-size:22px;margin:18px 0 8px}.nx-body h3{font-size:18px;margin:16px 0 8px}.nx-body blockquote{border-left:3px solid #E4B45F;margin:14px 0;padding:8px 12px;background:rgba(228,180,95,.08);border-radius:0 12px 12px 0;color:#EBD8B4}
+  .nx-note-box{border:1px solid rgba(228,180,95,.22);background:rgba(255,255,255,.05);border-radius:15px;padding:12px;margin:12px 0}
+  .nx-calc{width:100%;border-collapse:separate;border-spacing:0;margin:13px 0;border:1px solid rgba(228,180,95,.22);border-radius:14px;overflow:hidden;font-size:13px}
+  .nx-calc th,.nx-calc td{border-right:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08);padding:9px 10px;min-width:68px}
+  .nx-calc th{background:rgba(228,180,95,.13);color:#F2D99F;text-align:left}.nx-calc td:last-child,.nx-calc th:last-child{border-right:none}.nx-calc tr:last-child td{border-bottom:none}.nx-calc tfoot td{font-weight:900;color:#E4B45F;background:rgba(0,0,0,.18)}
+  .nx-media{max-width:100%;border-radius:14px;border:1px solid rgba(228,180,95,.18);margin:10px 0}
+  .nx-bottom{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:860px;background:rgba(6,16,27,.92);backdrop-filter:blur(14px);border-top:1px solid rgba(228,180,95,.18);padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;overflow:auto;z-index:570}
+  .nx-btm{min-width:78px;flex:1;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.05);color:#D6DFEA;border-radius:13px;padding:11px 8px;font-size:11px;font-weight:900;cursor:pointer}
+  .nx-btm.primary{background:linear-gradient(135deg,#F2CA78,#B88734);color:#111827;border-color:rgba(228,180,95,.65)}
+  .nx-style{display:none;border:1px solid rgba(228,180,95,.20);background:rgba(255,255,255,.045);border-radius:16px;padding:12px;margin-bottom:12px}
+  .nx-style.on{display:block}.nx-style-title{font-size:12px;font-weight:900;color:#E4B45F;margin-bottom:9px}.nx-swatches{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.nx-swatch{width:30px;height:30px;border-radius:999px;border:1px solid rgba(255,255,255,.30);box-shadow:inset 0 0 0 3px rgba(255,255,255,.12);cursor:pointer}.nx-swatch.on{outline:2px solid #E4B45F;outline-offset:2px}
+  .nx-list-row{display:grid;grid-template-columns:28px minmax(0,1fr) 34px;gap:8px;align-items:start;border-bottom:1px solid rgba(255,255,255,.08);padding:10px 0}
+  .nx-list-row input[type=checkbox]{width:19px;height:19px;accent-color:#E4B45F;margin-top:9px}.nx-row-main{display:grid;gap:7px;min-width:0}.nx-row-main input{width:100%;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.055);color:#F8FAFC;border-radius:11px;padding:9px 10px;outline:none;font-size:13px}.nx-money-grid{display:grid;grid-template-columns:64px 86px 94px;gap:7px}.nx-label{font-size:9px;color:#8996A6;text-transform:uppercase;letter-spacing:.06em;font-weight:900;margin:0 0 4px 2px}.nx-del{border:none;background:rgba(239,68,68,.14);color:#FCA5A5;border-radius:10px;height:36px;margin-top:28px;cursor:pointer}.nx-editor-total{display:flex;justify-content:space-between;align-items:center;padding-top:13px;color:#B9C2CF}.nx-editor-total b{font-size:24px;color:#E4B45F}
+  .nx-voice{position:fixed;inset:0;z-index:580;background:rgba(3,7,18,.72);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:14px;color:#F8FAFC;font-family:Inter,'DM Sans',sans-serif}.nx-voice-box{width:min(560px,100%);max-height:92vh;overflow:auto;border:1px solid rgba(228,180,95,.30);border-radius:22px;background:#07111D;box-shadow:0 24px 80px rgba(0,0,0,.45);padding:16px}.nx-voice-title{font-size:22px;font-weight:900;margin-bottom:4px}.nx-voice-sub{font-size:12px;color:#B9C2CF;line-height:1.45;margin-bottom:12px}.nx-live{display:grid;gap:8px;margin:11px 0}.nx-live-row{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.045);border-radius:13px;padding:8px 10px}.nx-live-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#D6DFEA;font-size:13px}.nx-live-money{color:#E4B45F;font-weight:900;font-size:12px}.nx-interim{min-height:40px;border:1px dashed rgba(228,180,95,.24);border-radius:14px;padding:10px;color:#9AA7B7;font-size:12px;line-height:1.45}.nx-voice-actions{display:flex;gap:8px;margin-top:12px}.nx-voice-actions button{flex:1;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.055);color:#D6DFEA;border-radius:13px;padding:12px;font-size:12px;font-weight:900}.nx-voice-actions button.primary{background:linear-gradient(135deg,#F2CA78,#B88734);color:#111827;border-color:rgba(228,180,95,.65)}
+  .nx-sketch{position:fixed;inset:0;z-index:590;background:#07111D;display:flex;flex-direction:column}.nx-sketch-top{display:flex;align-items:center;gap:8px;padding:10px;border-bottom:1px solid rgba(228,180,95,.20)}.nx-sketch canvas{flex:1;background:#F8FAFC;touch-action:none}.nx-file-card{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(228,180,95,.25);background:rgba(228,180,95,.08);border-radius:13px;padding:9px 10px;color:#E4B45F;text-decoration:none;margin:8px 0}
+  @media(max-width:760px){.nx-board{grid-template-columns:1fr}.nx-panel.side{order:2}.nx-title{font-size:27px}.nx-actions{grid-template-columns:1fr 1fr}.nx-grid{grid-template-columns:1fr}.nx-money-grid{grid-template-columns:1fr 1fr 1fr}.nx-page{padding-left:8px;padding-right:8px}}
+  `;
+}
+
+function renderNotas(){
+  nxEnsureNotes();
+  nxEnsureStyles();
+  const all=[...(state.notas||[])].sort((a,b)=>String(b.modificado||b.creado||'').localeCompare(String(a.modificado||a.creado||'')));
+  const q=(_nxSearch||'').toLowerCase().trim();
+  const filtered=all.filter(n=>{
+    const k=nxKind(n);
+    if(_nxFilter!=='all' && _nxFilter!==k && !(_nxFilter==='fav' && n.favorita)) return false;
+    if(!q) return true;
+    return [n.titulo,n.tags?.join(' '),nxText(n)].join(' ').toLowerCase().includes(q);
+  });
+  const counts={all:all.length,doc:all.filter(n=>nxKind(n)==='doc').length,list:all.filter(n=>nxKind(n)==='list').length,meeting:all.filter(n=>nxKind(n)==='meeting').length,fav:all.filter(n=>n.favorita).length};
+  const listTotal=all.reduce((s,n)=>s+(nxKind(n)==='list'?nxTotal(n):0),0);
+  const filter=(id,label)=>`<button class="nx-filter ${_nxFilter===id?'on':''}" onclick="_nxFilter='${id}';render()"><span>${label}</span><b>${counts[id]||0}</b></button>`;
+  return `<div class="nx-page">
+    <section class="nx-hero">
+      <div class="nx-top">
+        <div class="nx-brand">
+          <div class="nx-logo">${appIcon('note')}</div>
+          <div><div class="nx-title">Notas <span>Premium</span></div><div class="nx-sub">Editor limpio, listas inteligentes, audio, tablas, dibujo, adjuntos y exportacion.</div></div>
+        </div>
+        <button class="nx-primary" onclick="nxOpenDoc()">Nueva nota</button>
+      </div>
+      <div class="nx-actions">
+        <button class="nx-action" onclick="nxOpenDoc()"><div class="nx-action-ic">${appIcon('plus')}</div><div><b>Crear nota</b><span>Editor libre con formato y adjuntos</span></div></button>
+        <button class="nx-action" onclick="nxStartVoiceList()"><div class="nx-action-ic">${appIcon('mic')}</div><div><b>Lista por voz</b><span>Checks, precios y suma automatica</span></div></button>
+        <button class="nx-action" onclick="nxOpenExpenseNote()"><div class="nx-action-ic">${appIcon('chart')}</div><div><b>Cuadro de gastos</b><span>Tabla editable con calculos</span></div></button>
+        <button class="nx-action" onclick="nxOpenMeeting()"><div class="nx-action-ic">${appIcon('document')}</div><div><b>Reunion IA</b><span>Transcripcion, resumen y acuerdos</span></div></button>
+      </div>
+    </section>
+    <div class="nx-board">
+      <aside class="nx-panel side"><div class="nx-panel-pad">
+        <div class="nx-side-title">Organizacion</div>
+        <div class="nx-search">${appIcon('search')}<input value="${nxEsc(_nxSearch)}" placeholder="Buscar notas..." oninput="_nxSearch=this.value;render()">${_nxSearch?`<button class="nx-ib" style="width:30px;height:30px" onclick="_nxSearch='';render()">x</button>`:''}</div>
+        <div class="nx-filters">${filter('all','Todas')}${filter('doc','Notas')}${filter('list','Listas')}${filter('meeting','Reuniones')}${filter('fav','Favoritas')}</div>
+        <div class="nx-stats">
+          <div class="nx-stat"><span>Total</span><b>${all.length}</b></div>
+          <div class="nx-stat"><span>Listas</span><b>${counts.list}</b></div>
+          <div class="nx-stat"><span>Reuniones</span><b>${counts.meeting}</b></div>
+          <div class="nx-stat"><span>Suma listas</span><b>${nxFmt(listTotal)}</b></div>
+        </div>
+      </div></aside>
+      <section class="nx-panel">
+        <div class="nx-list-head"><div class="nx-list-title">Mis notas</div><button class="nx-mini-btn" onclick="nxOpenTemplates()">Plantillas guardadas</button></div>
+        <div class="nx-grid">${filtered.length?filtered.map(nxRenderCard).join(''):`<div class="nx-empty"><b>No hay notas todavia</b><span>Crea una nota, dicta una lista o guarda tus propias plantillas cuando las necesites.</span></div>`}</div>
+      </section>
+    </div>
+  </div>`;
+}
+
+function nxRenderCard(n){
+  const k=nxKind(n);
+  const icon=k==='list'?'clipboard':k==='meeting'?'mic':'note';
+  const title=nxEsc(n.titulo || 'Sin titulo');
+  const date=nxDate(n.modificado || n.creado);
+  const type=k==='list'?'Lista':k==='meeting'?'Reunion':'Nota';
+  let body='';
+  if(k==='list'){
+    const items=(n.items||[]).slice(0,4);
+    body=`<div class="nx-mini-list">${items.length?items.map(i=>`<div class="nx-mini-row ${i.done?'done':''}"><span class="nx-check"></span><span>${nxEsc(i.texto||'Item')}</span><b>${nxMoney(i.total||i.precio)?nxFmt(i.total || i.precio):''}</b></div>`).join(''):`<div class="nx-preview">Lista vacia</div>`}</div><div class="nx-total"><span>Total</span><b>${nxFmt(nxTotal(n))}</b></div>`;
+  }else{
+    body=`<div class="nx-preview">${nxEsc(nxText(n) || 'Sin contenido')}</div>`;
+  }
+  return `<article class="nx-card">
+    <div class="nx-card-top" onclick="nxOpenNote('${n.id}')"><div class="nx-card-ic">${appIcon(icon)}</div><div class="nx-card-main"><div class="nx-card-title">${title}</div><div class="nx-meta"><span class="nx-chip">${type}</span><span>${date}</span>${n.favorita?`<span class="nx-chip">Favorita</span>`:''}</div>${body}</div></div>
+    <div class="nx-card-actions"><button class="nx-act" onclick="nxToggleFavorite('${n.id}')">Favorita</button><button class="nx-act" onclick="nxShareNote('${n.id}')">Compartir</button><button class="nx-act danger" onclick="nxDeleteNote('${n.id}')">Borrar</button></div>
+  </article>`;
+}
+
+function nxOpenNote(id){
+  const n=(state.notas||[]).find(x=>String(x.id)===String(id));
+  if(!n) return;
+  const k=nxKind(n);
+  if(k==='list') return nxOpenSmartList(id);
+  if(k==='meeting' && typeof npOpenMeetingEditor==='function') return npOpenMeetingEditor(id);
+  return nxOpenDoc(id);
+}
+function abrirEditorNota(editId){ return editId ? nxOpenNote(editId) : nxOpenDoc(); }
+function abrirEditorNotaBloque(editId){ return abrirEditorNota(editId); }
+function openEditNotaLista(n){ return nxOpenSmartList(typeof n==='object'?n.id:n); }
+function abrirGrabarAudio(){ return nxStartVoiceList(); }
+function notaAgregarVoz(notaId){ return nxStartVoiceList(notaId); }
+function notaAgregarVozGemini(notaId){ return nxStartVoiceList(notaId); }
+function abrirModalCompartir(id){ return nxShareNote(id); }
+function abrirNotaTypeMenu(){ return nxOpenTemplates(); }
+function mostrarTemplates(){ return nxOpenTemplates(); }
+function npShowTemplates(){ return nxOpenTemplates(); }
+
+function nxOpenDoc(id, pre={}){
+  nxEnsureNotes(); nxEnsureStyles();
+  let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
+  n=n?JSON.parse(JSON.stringify(n)):{id:null,nxKind:'doc',tipo:'texto',titulo:pre.titulo||'',html:pre.html||pre.texto||'',texto:pre.texto||'',appearance:{...nxAppearance(),...(pre.appearance||{})},creado:new Date().toISOString(),favorita:false};
+  n.appearance={...nxAppearance(),...(n.appearance||{})};
+  window._nxEditor={mode:'doc',note:n};
+  document.getElementById('nx-editor')?.remove();
+  document.body.style.overflow='hidden';
+  document.body.insertAdjacentHTML('beforeend',`<div class="nx-editor" id="nx-editor">
+    <div class="nx-ed-top"><button class="nx-ib" onclick="nxCloseEditor()">x</button><div style="flex:1;color:#B9C2CF;font-size:12px;font-weight:900">Editor de notas</div><button class="nx-ib" onclick="nxUndo()">↶</button><button class="nx-ib" onclick="nxRedo()">↷</button><button class="nx-save" onclick="nxSaveDoc(true)">Guardar</button></div>
+    <div class="nx-ed-body">
+      <input class="nx-ed-title" id="nx-title" value="${nxEsc(n.titulo||'')}" placeholder="Titulo">
+      <div class="nx-style" id="nx-style">${nxStylePanel(n)}</div>
+      <div class="nx-sheet" id="nx-sheet">
+        <div class="nx-toolbar">
+          <button class="nx-tool gold" onclick="nxCmd('bold')">B</button><button class="nx-tool" onclick="nxCmd('italic')">I</button><button class="nx-tool" onclick="nxCmd('underline')">U</button><button class="nx-tool" onclick="nxCmd('strikeThrough')">S</button>
+          <button class="nx-tool" onclick="nxBlock('h2')">Titulo</button><button class="nx-tool" onclick="nxBlock('p')">Texto</button><button class="nx-tool" onclick="nxCmd('insertUnorderedList')">Lista</button><button class="nx-tool" onclick="nxCmd('insertOrderedList')">1.</button>
+          <button class="nx-tool" onclick="nxInsertChecklist()">Check</button><button class="nx-tool" onclick="nxInsertQuote()">Cita</button><button class="nx-tool gold" onclick="nxInsertCalcTable()">Tabla S/</button><button class="nx-tool" onclick="nxOpenSketch()">Dibujo</button>
+        </div>
+        <div class="nx-body" id="nx-body" contenteditable="true" oninput="nxRecalcTables()">${n.html || n.texto || ''}</div>
+      </div>
+    </div>
+    <div class="nx-bottom">
+      <button class="nx-btm" onclick="nxPickImage()">Imagen</button><button class="nx-btm" onclick="nxPickFile()">Archivo</button><button class="nx-btm" onclick="nxPickAudio()">Audio</button><button class="nx-btm" onclick="nxStartVoiceText()">Microfono</button><button class="nx-btm" onclick="nxToggleStyle()">Color</button><button class="nx-btm" onclick="nxSaveTemplate()">Plantilla</button><button class="nx-btm primary" onclick="nxShareCurrent()">Exportar</button>
+    </div>
+  </div>`);
+  nxApplyAppearance();
+  nxRecalcTables();
+  setTimeout(()=>document.getElementById('nx-body')?.focus(),80);
+}
+
+function nxStylePanel(n){
+  const ap={...nxAppearance(),...(n?.appearance||{})};
+  const papers=['#07111D','#0F172A','#111827','#F8FAFC','#FFF7ED','#F5F3FF','#F4F8F6'];
+  const accents=['#E4B45F','#60A5FA','#A78BFA','#34D399','#F87171','#F8FAFC'];
+  const sw=(type,c)=>`<button class="nx-swatch ${ap[type]===c?'on':''}" style="background:${c}" onclick="nxSetAppearance('${type}','${c}')"></button>`;
+  return `<div class="nx-style-title">Personalizacion</div><div style="font-size:10px;color:#8F9AAA;font-weight:900;margin-bottom:6px">Fondo</div><div class="nx-swatches">${papers.map(c=>sw('paper',c)).join('')}</div><div style="font-size:10px;color:#8F9AAA;font-weight:900;margin-bottom:6px">Acento</div><div class="nx-swatches">${accents.map(c=>sw('accent',c)).join('')}</div>`;
+}
+function nxToggleStyle(){ document.getElementById('nx-style')?.classList.toggle('on'); }
+function nxSetAppearance(type,value){
+  if(!window._nxEditor?.note) return;
+  window._nxEditor.note.appearance={...nxAppearance(),...(window._nxEditor.note.appearance||{}),[type]:value};
+  nxApplyAppearance();
+  const n=window._nxEditor.note;
+  document.getElementById('nx-style').innerHTML=nxStylePanel(n);
+}
+function nxApplyAppearance(){
+  const ap={...nxAppearance(),...(window._nxEditor?.note?.appearance||{})};
+  const sheet=document.getElementById('nx-sheet'), body=document.getElementById('nx-body');
+  if(sheet){ sheet.style.background=ap.paper; sheet.style.borderColor=ap.accent+'55'; }
+  if(body){ body.style.color=ap.ink || (ap.paper==='#F8FAFC'?'#111827':'#F8FAFC'); }
+  document.querySelectorAll('.nx-save,.nx-btm.primary').forEach(el=>{ el.style.background=`linear-gradient(135deg,${ap.accent},#B88734)`; });
+}
+function nxCloseEditor(){
+  document.getElementById('nx-editor')?.remove();
+  document.body.style.overflow='';
+  window._nxEditor=null;
+}
+function nxCmd(cmd,value=null){ const b=document.getElementById('nx-body'); b?.focus(); document.execCommand(cmd,false,value); nxRecalcTables(); }
+function nxBlock(tag){ nxCmd('formatBlock', tag); }
+function nxUndo(){ nxCmd('undo'); }
+function nxRedo(){ nxCmd('redo'); }
+function nxInsertHTML(html){ const b=document.getElementById('nx-body'); b?.focus(); document.execCommand('insertHTML',false,html); nxRecalcTables(); }
+function nxInsertChecklist(){ nxInsertHTML('<p><input type="checkbox"> <span> </span></p>'); }
+function nxInsertQuote(){ nxInsertHTML('<blockquote>Escribe una cita o idea importante...</blockquote><p><br></p>'); }
+function nxInsertDivider(){ nxInsertHTML('<hr><p><br></p>'); }
+function nxBlankCalcTable(){
+  return `<table class="nx-calc" data-nx-calc="expense"><thead><tr><th>Concepto</th><th>Cant.</th><th>Precio</th><th>Total</th></tr></thead><tbody><tr><td><br></td><td>1</td><td>0</td><td contenteditable="false" data-total>S/ 0.00</td></tr><tr><td><br></td><td>1</td><td>0</td><td contenteditable="false" data-total>S/ 0.00</td></tr></tbody><tfoot><tr><td colspan="3" contenteditable="false">Total</td><td contenteditable="false" data-grand>S/ 0.00</td></tr></tfoot></table><p><br></p>`;
+}
+function nxInsertCalcTable(){ nxInsertHTML(nxBlankCalcTable()); }
+function nxAddCalcRow(){
+  const table=document.querySelector('#nx-body table.nx-calc:last-of-type');
+  if(!table) return nxInsertCalcTable();
+  table.querySelector('tbody').insertAdjacentHTML('beforeend','<tr><td><br></td><td>1</td><td>0</td><td contenteditable="false" data-total>S/ 0.00</td></tr>');
+  nxRecalcTables();
+}
+function nxRecalcTables(){
+  document.querySelectorAll('#nx-body table.nx-calc').forEach(table=>{
+    let grand=0;
+    table.querySelectorAll('tbody tr').forEach(tr=>{
+      const tds=[...tr.children];
+      const qty=nxMoney(tds[1]?.textContent||1), price=nxMoney(tds[2]?.textContent||0), total=qty*price;
+      grand+=total;
+      const cell=tr.querySelector('[data-total]')||tds[3];
+      if(cell) cell.textContent=nxFmt(total);
+    });
+    const g=table.querySelector('[data-grand]');
+    if(g) g.textContent=nxFmt(grand);
+  });
+}
+function nxSaveDoc(close){
+  nxEnsureNotes();
+  const ed=window._nxEditor; if(!ed) return null;
+  nxRecalcTables();
+  const n=ed.note;
+  n.nxKind='doc'; n.tipo='texto';
+  n.titulo=(document.getElementById('nx-title')?.value||'').trim() || 'Sin titulo';
+  n.html=document.getElementById('nx-body')?.innerHTML || '';
+  n.texto=nxStrip(n.html);
+  n.modificado=new Date().toISOString();
+  if(!n.id){ n.id=nxId(); n.creado=n.modificado; state.notas.unshift(n); }
+  else state.notas=state.notas.map(x=>String(x.id)===String(n.id)?n:x);
+  save('fnz_notas',state.notas); nxSaveCloud(n);
+  if(close){ nxCloseEditor(); render(); toast('Nota guardada'); }
+  return n;
+}
+function nxOpenExpenseNote(){
+  nxOpenDoc(null,{html:nxBlankCalcTable()});
+}
+
+function nxPickImage(){ nxPickAny('image/*','image'); }
+function nxPickAudio(){ nxPickAny('audio/*','audio'); }
+function nxPickFile(){ nxPickAny('','file'); }
+function nxPickAny(accept,type){
+  const input=document.createElement('input'); input.type='file'; input.accept=accept;
+  input.onchange=()=>{ const f=input.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{
+    const url=r.result;
+    if(type==='image') nxInsertHTML(`<img class="nx-media" src="${url}" alt="${nxEsc(f.name)}"><p><br></p>`);
+    else if(type==='audio') nxInsertHTML(`<audio class="nx-media" controls src="${url}"></audio><p>${nxEsc(f.name)}</p>`);
+    else nxInsertHTML(`<a class="nx-file-card" download="${nxEsc(f.name)}" href="${url}">${appIcon('document')} ${nxEsc(f.name)}</a><p><br></p>`);
+  }; r.readAsDataURL(f); };
+  input.click();
+}
+
+function nxOpenSmartList(id, pre={}){
+  nxEnsureNotes(); nxEnsureStyles();
+  let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
+  const kind=pre.listType || pre.kind || n?.listType || 'compras';
+  n=n?JSON.parse(JSON.stringify(n)):{id:null,nxKind:'smart_list',tipo:'lista',listType:kind,titulo:pre.titulo||'',items:pre.items||[],appearance:{...nxAppearance(),...(pre.appearance||{})},creado:new Date().toISOString(),favorita:false};
+  n.items=(n.items&&n.items.length?n.items:[{texto:'',cantidad:1,precio:0,total:0,done:false}]).map(i=>({texto:i.texto||i.name||'',cantidad:nxMoney(i.cantidad||1)||1,precio:nxMoney(i.precio||0),total:nxMoney(i.total||0),done:!!i.done}));
+  n.appearance={...nxAppearance(),...(n.appearance||{})};
+  window._nxEditor={mode:'list',note:n};
+  document.getElementById('nx-editor')?.remove();
+  document.body.style.overflow='hidden';
+  document.body.insertAdjacentHTML('beforeend',`<div class="nx-editor" id="nx-editor">
+    <div class="nx-ed-top"><button class="nx-ib" onclick="nxCloseEditor()">x</button><div style="flex:1;color:#B9C2CF;font-size:12px;font-weight:900">Lista inteligente</div><button class="nx-save" onclick="nxSaveList(true)">Guardar</button></div>
+    <div class="nx-ed-body">
+      <input class="nx-ed-title" id="nx-title" value="${nxEsc(n.titulo||'')}" placeholder="Titulo de la lista">
+      <div class="nx-style" id="nx-style">${nxStylePanel(n)}</div>
+      <div class="nx-sheet" id="nx-sheet">
+        <div class="nx-toolbar">${['compras','mercado','materiales','gastos','tareas'].map(k=>`<button class="nx-tool ${n.listType===k?'gold':''}" onclick="nxSetListType('${k}',this)">${k}</button>`).join('')}</div>
+        <div id="nx-list-rows"></div>
+        <div class="nx-editor-total"><span>Total</span><b id="nx-list-total">S/ 0.00</b></div>
+      </div>
+    </div>
+    <div class="nx-bottom"><button class="nx-btm" onclick="nxAddListItem()">Item</button><button class="nx-btm" onclick="nxStartVoiceList()">Microfono</button><button class="nx-btm" onclick="nxToggleStyle()">Color</button><button class="nx-btm" onclick="nxSaveTemplate()">Plantilla</button><button class="nx-btm primary" onclick="nxShareCurrent()">Exportar</button></div>
+  </div>`);
+  nxApplyAppearance();
+  nxRenderListRows();
+}
+function nxSetListType(k,btn){ if(window._nxEditor?.note) window._nxEditor.note.listType=k; document.querySelectorAll('.nx-toolbar .nx-tool').forEach(b=>b.classList.remove('gold')); btn?.classList.add('gold'); }
+function nxCollectList(){
+  const rows=[...document.querySelectorAll('#nx-list-rows .nx-list-row')].map(r=>{
+    const texto=r.querySelector('[data-field=texto]')?.value.trim()||'';
+    const cantidad=nxMoney(r.querySelector('[data-field=cantidad]')?.value||1)||1;
+    const precio=nxMoney(r.querySelector('[data-field=precio]')?.value||0);
+    return {texto,cantidad,precio,total:+(cantidad*precio).toFixed(2),done:!!r.querySelector('[data-field=done]')?.checked};
+  }).filter(i=>i.texto || i.precio);
+  if(window._nxEditor?.note) window._nxEditor.note.items=rows;
+  return rows;
+}
+function nxRenderListRows(){
+  const ed=window._nxEditor; if(!ed) return;
+  const rows=document.getElementById('nx-list-rows'); if(!rows) return;
+  rows.innerHTML=(ed.note.items||[]).map((i,idx)=>`<div class="nx-list-row">
+    <input type="checkbox" data-field="done" ${i.done?'checked':''} onchange="nxRecalcList()">
+    <div class="nx-row-main">
+      <input data-field="texto" value="${nxEsc(i.texto||'')}" placeholder="Articulo o tarea" oninput="nxRecalcList()">
+      <div class="nx-money-grid"><div><div class="nx-label">Cant.</div><input data-field="cantidad" type="number" step="0.01" value="${i.cantidad||1}" oninput="nxRecalcList()"></div><div><div class="nx-label">Precio</div><input data-field="precio" type="number" step="0.01" value="${i.precio||0}" oninput="nxRecalcList()"></div><div><div class="nx-label">Total</div><input data-field="total" value="${nxFmt((i.cantidad||1)*(i.precio||0))}" readonly></div></div>
+    </div>
+    <button class="nx-del" onclick="nxDelListItem(${idx})">x</button>
+  </div>`).join('');
+  nxRecalcList();
+}
+function nxRecalcList(){
+  let total=0;
+  document.querySelectorAll('#nx-list-rows .nx-list-row').forEach(r=>{
+    const q=nxMoney(r.querySelector('[data-field=cantidad]')?.value||1)||1;
+    const p=nxMoney(r.querySelector('[data-field=precio]')?.value||0);
+    const t=q*p; total+=t;
+    const out=r.querySelector('[data-field=total]'); if(out) out.value=nxFmt(t);
+  });
+  const el=document.getElementById('nx-list-total'); if(el) el.textContent=nxFmt(total);
+}
+function nxAddListItem(){ nxCollectList(); window._nxEditor.note.items.push({texto:'',cantidad:1,precio:0,total:0,done:false}); nxRenderListRows(); }
+function nxDelListItem(idx){ nxCollectList(); window._nxEditor.note.items.splice(idx,1); if(!window._nxEditor.note.items.length) window._nxEditor.note.items.push({texto:'',cantidad:1,precio:0,total:0,done:false}); nxRenderListRows(); }
+function nxSaveList(close){
+  nxEnsureNotes(); const ed=window._nxEditor; if(!ed) return null;
+  const n=ed.note; n.nxKind='smart_list'; n.npKind='smart_list'; n.tipo='lista';
+  n.titulo=(document.getElementById('nx-title')?.value||'').trim() || 'Lista';
+  n.items=nxCollectList(); n.totalLista=nxTotal(n); n.texto=n.items.map(i=>`${i.done?'[x]':'[ ]'} ${i.texto} ${i.precio?nxFmt(i.total):''}`).join('\\n');
+  n.modificado=new Date().toISOString();
+  if(!n.id){ n.id=nxId(); n.creado=n.modificado; state.notas.unshift(n); }
+  else state.notas=state.notas.map(x=>String(x.id)===String(n.id)?n:x);
+  save('fnz_notas',state.notas); nxSaveCloud(n);
+  if(close){ nxCloseEditor(); render(); toast('Lista guardada'); }
+  return n;
+}
+
+function nxOpenMeeting(){
+  if(typeof npOpenVoiceCapture==='function') return npOpenVoiceCapture('meeting');
+  if(typeof npOpenMeetingEditor==='function') return npOpenMeetingEditor(null);
+  nxOpenDoc(null,{titulo:'Reunion'});
+}
+
+function nxSpeechClean(t){
+  return String(t||'').toLowerCase().replace(/\b(\d+)\s+con\s+(\d+)\b/g,'$1.$2').replace(/\s+/g,' ').trim();
+}
+function nxParseSpeechItem(raw){
+  let t=nxSpeechClean(raw)
+    .replace(/\b(que mas|siguiente|aparte|otro|otra|agrega|anota|pon|tambien|y tambien)\b/g,' ')
+    .replace(/\b(listo|eso es todo|termina|finaliza|guardar)\b/g,' ')
+    .trim();
+  if(!t || /^crea una lista/.test(t)) return null;
+  let price=0, item=t, m=t.match(/(?:gaste|pague|compre)\s+(\d+(?:[.,]\d+)?)\s*(?:soles|sol|s\/)?\s*(?:en|por)?\s*(.+)$/);
+  if(m){ price=nxMoney(m[1]); item=m[2]; }
+  else {
+    m=t.match(/(.+?)\s+(\d+(?:[.,]\d+)?)\s*(?:soles|sol|s\/)?$/);
+    if(m){ item=m[1]; price=nxMoney(m[2]); }
+  }
+  item=item.replace(/\b(soles|sol|s\/)\b/g,'').trim();
+  if(!item) return null;
+  return {texto:item.charAt(0).toUpperCase()+item.slice(1),cantidad:1,precio:price,total:price,done:false};
+}
+function nxVoiceKindFromText(t){
+  t=nxSpeechClean(t);
+  if(/mercado/.test(t)) return {kind:'mercado', title:'Lista de mercado'};
+  if(/material/.test(t)) return {kind:'materiales', title:'Lista de materiales'};
+  if(/gasto/.test(t)) return {kind:'gastos', title:'Lista de gastos'};
+  if(/tarea|pendiente/.test(t)) return {kind:'tareas', title:'Lista de tareas'};
+  return {kind:'compras', title:'Lista de compras'};
+}
+function nxStartVoiceList(targetId){
+  nxEnsureStyles();
+  const seed=nxVoiceKindFromText('compras');
+  window._nxVoice={title:seed.title,kind:seed.kind,items:[],rec:null,active:false,targetId:targetId||''};
+  document.getElementById('nx-voice')?.remove();
+  document.body.insertAdjacentHTML('beforeend',`<div class="nx-voice" id="nx-voice"><div class="nx-voice-box">
+    <div class="nx-voice-title" id="nx-v-title">${seed.title}</div><div class="nx-voice-sub">Di los productos y precios. Usa "siguiente", "que mas" o "aparte" para separar. Di "listo" o "eso es todo" para terminar.</div>
+    <div class="nx-interim" id="nx-v-interim">Preparando microfono...</div><div class="nx-live" id="nx-v-list"></div><div class="nx-total"><span>Total</span><b id="nx-v-total">S/ 0.00</b></div>
+    <div class="nx-voice-actions"><button onclick="nxVoiceCancel()">Cancelar</button><button onclick="nxVoiceToggle()" id="nx-v-toggle">Pausar</button><button class="primary" onclick="nxVoiceFinish()">Editar y guardar</button></div>
+  </div></div>`);
+  nxVoiceStart();
+}
+function nxVoiceStart(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ document.getElementById('nx-v-interim').textContent='Tu navegador no permite dictado aqui. Puedes crear la lista manualmente.'; return; }
+  const rec=new SR(); const v=window._nxVoice; v.rec=rec; v.active=true;
+  rec.lang='es-PE'; rec.continuous=true; rec.interimResults=true;
+  rec.onresult=e=>{
+    let interim='', final='';
+    for(let i=e.resultIndex;i<e.results.length;i++){ const txt=e.results[i][0].transcript; if(e.results[i].isFinal) final+=txt+' '; else interim+=txt; }
+    if(interim) document.getElementById('nx-v-interim').textContent=interim;
+    if(final) nxVoiceConsume(final);
+  };
+  rec.onend=()=>{ if(window._nxVoice?.active){ try{rec.start();}catch(e){} } };
+  try{ rec.start(); document.getElementById('nx-v-interim').textContent='Escuchando...'; }catch(e){ document.getElementById('nx-v-interim').textContent='No se pudo iniciar el microfono.'; }
+}
+function nxVoiceConsume(text){
+  const v=window._nxVoice; if(!v) return;
+  const clean=nxSpeechClean(text);
+  if(/crea una lista|lista de/.test(clean)){ const k=nxVoiceKindFromText(clean); v.kind=k.kind; v.title=k.title; document.getElementById('nx-v-title').textContent=v.title; }
+  const finish=/\b(listo|eso es todo|termina|finaliza|guardar)\b/.test(clean);
+  clean.split(/\b(?:que mas|siguiente|aparte|otro|otra|tambien|y tambien)\b|[,;]/).forEach(part=>{
+    const item=nxParseSpeechItem(part);
+    if(item) v.items.push(item);
+  });
+  nxVoiceRender();
+  if(finish) setTimeout(nxVoiceFinish,350);
+}
+function nxVoiceRender(){
+  const v=window._nxVoice; if(!v) return;
+  document.getElementById('nx-v-list').innerHTML=(v.items||[]).map(i=>`<div class="nx-live-row"><span class="nx-check"></span><span class="nx-live-text">${nxEsc(i.texto)}</span><span class="nx-live-money">${i.precio?nxFmt(i.precio):''}</span></div>`).join('');
+  document.getElementById('nx-v-total').textContent=nxFmt((v.items||[]).reduce((s,i)=>s+nxMoney(i.total||i.precio),0));
+}
+function nxVoiceToggle(){ const v=window._nxVoice;if(!v?.rec)return; if(v.active){v.active=false;try{v.rec.stop();}catch(e){} document.getElementById('nx-v-toggle').textContent='Seguir';}else{document.getElementById('nx-v-toggle').textContent='Pausar';nxVoiceStart();} }
+function nxVoiceCancel(){ const v=window._nxVoice;if(v?.rec){v.active=false;try{v.rec.stop();}catch(e){}} document.getElementById('nx-voice')?.remove(); window._nxVoice=null; }
+function nxVoiceFinish(){
+  const v=window._nxVoice; if(!v) return;
+  if(v.rec){ v.active=false; try{v.rec.stop();}catch(e){} }
+  const pre={titulo:v.title,listType:v.kind,items:v.items};
+  document.getElementById('nx-voice')?.remove(); window._nxVoice=null;
+  nxOpenSmartList(null,pre);
+}
+function nxStartVoiceText(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR) return toast('Microfono no disponible en este navegador','error');
+  const rec=new SR(); rec.lang='es-PE'; rec.continuous=false; rec.interimResults=false;
+  rec.onresult=e=>{ const txt=e.results[0][0].transcript; nxInsertHTML(`<p>${nxEsc(txt)}</p>`); };
+  try{ rec.start(); toast('Escuchando...'); }catch(e){ toast('No se pudo iniciar microfono','error'); }
+}
+
+function nxOpenSketch(){
+  document.getElementById('nx-sketch')?.remove();
+  document.body.insertAdjacentHTML('beforeend',`<div class="nx-sketch" id="nx-sketch"><div class="nx-sketch-top"><button class="nx-ib" onclick="nxCloseSketch()">x</button><input type="color" id="nx-sk-color" value="#111827"><input type="range" id="nx-sk-size" min="2" max="18" value="5"><button class="nx-mini-btn" onclick="nxClearSketch()">Limpiar</button><button class="nx-primary" onclick="nxInsertSketch()">Insertar dibujo</button></div><canvas id="nx-sk-canvas"></canvas></div>`);
+  const cv=document.getElementById('nx-sk-canvas'), ctx=cv.getContext('2d'); let drawing=false,last=null;
+  function resize(){cv.width=innerWidth;cv.height=innerHeight-60;ctx.fillStyle='#F8FAFC';ctx.fillRect(0,0,cv.width,cv.height);}
+  resize();
+  function pt(e){const r=cv.getBoundingClientRect(),p=e.touches?e.touches[0]:e;return{x:p.clientX-r.left,y:p.clientY-r.top};}
+  function down(e){drawing=true;last=pt(e);e.preventDefault();}
+  function move(e){if(!drawing)return;const p=pt(e);ctx.strokeStyle=document.getElementById('nx-sk-color').value;ctx.lineWidth=+document.getElementById('nx-sk-size').value;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;e.preventDefault();}
+  function up(){drawing=false;}
+  cv.addEventListener('mousedown',down);cv.addEventListener('mousemove',move);window.addEventListener('mouseup',up);cv.addEventListener('touchstart',down,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',up);
+}
+function nxClearSketch(){ const cv=document.getElementById('nx-sk-canvas'),ctx=cv?.getContext('2d'); if(ctx){ctx.fillStyle='#F8FAFC';ctx.fillRect(0,0,cv.width,cv.height);} }
+function nxCloseSketch(){ document.getElementById('nx-sketch')?.remove(); }
+function nxInsertSketch(){ const cv=document.getElementById('nx-sk-canvas'); if(cv){ nxInsertHTML(`<img class="nx-media" src="${cv.toDataURL('image/png')}" alt="Dibujo"><p><br></p>`); } nxCloseSketch(); }
+
+function nxToggleFavorite(id){ const n=(state.notas||[]).find(x=>String(x.id)===String(id)); if(!n)return; n.favorita=!n.favorita; n.modificado=new Date().toISOString(); save('fnz_notas',state.notas); render(); }
+function nxDeleteNote(id){ if(!confirm('Eliminar esta nota?')) return; state.notas=(state.notas||[]).filter(n=>String(n.id)!==String(id)); save('fnz_notas',state.notas); render(); toast('Nota eliminada'); }
+function nxShareText(n){ if(nxKind(n)==='list') return `${n.titulo||'Lista'}\\n`+(n.items||[]).map(i=>`${i.done?'[x]':'[ ]'} ${i.texto}${i.precio?' - '+nxFmt(i.total||i.precio):''}`).join('\\n')+`\\nTotal: ${nxFmt(nxTotal(n))}`; return `${n.titulo||'Nota'}\\n\\n${nxText(n)}`; }
+function nxShareCurrent(){
+  let n=null;
+  if(window._nxEditor?.mode==='list') n=nxSaveList(false);
+  else n=nxSaveDoc(false);
+  if(!n) return;
+  nxCloseEditor();
+  render();
+  setTimeout(()=>nxShareNote(n.id),80);
+}
+function nxShareNote(id){
+  const n=(state.notas||[]).find(x=>String(x.id)===String(id)); if(!n)return;
+  const text=nxShareText(n);
+  document.getElementById('modal-content').innerHTML=`<div class="modal-title" style="color:#172033">Compartir nota</div>
+    <div style="display:grid;gap:9px">
+      <button class="share-btn" onclick="nxCopyShare('${n.id}')"><div class="share-icon copy">${appIcon('clipboard')}</div><div class="share-label"><b>Copiar texto</b><div class="share-desc">Portapapeles</div></div></button>
+      <button class="share-btn" onclick="nxWhatsApp('${n.id}')"><div class="share-icon whatsapp">${appIcon('phone')}</div><div class="share-label"><b>WhatsApp</b><div class="share-desc">Enviar como texto</div></div></button>
+      <button class="share-btn" onclick="nxEmail('${n.id}')"><div class="share-icon email">${appIcon('document')}</div><div class="share-label"><b>Correo</b><div class="share-desc">Abrir email</div></div></button>
+      <button class="share-btn" onclick="nxExportPDF('${n.id}')"><div class="share-icon copy">${appIcon('document')}</div><div class="share-label"><b>PDF</b><div class="share-desc">Imprimir o guardar en PDF</div></div></button>
+      <button class="share-btn" onclick="nxExportJPG('${n.id}')"><div class="share-icon copy">${appIcon('image')||appIcon('document')}</div><div class="share-label"><b>JPG</b><div class="share-desc">Imagen simple de la nota</div></div></button>
+    </div>`;
+  showModal();
+}
+function nxCopyShare(id){ const n=state.notas.find(x=>String(x.id)===String(id)); navigator.clipboard?.writeText(nxShareText(n)); closeModal(); toast('Copiado'); }
+function nxWhatsApp(id){ const n=state.notas.find(x=>String(x.id)===String(id)); window.open('https://wa.me/?text='+encodeURIComponent(nxShareText(n)),'_blank'); }
+function nxEmail(id){ const n=state.notas.find(x=>String(x.id)===String(id)); location.href='mailto:?subject='+encodeURIComponent(n.titulo||'Nota')+'&body='+encodeURIComponent(nxShareText(n)); }
+function nxExportPDF(id){ const n=state.notas.find(x=>String(x.id)===String(id)); if(!n)return; const w=window.open('','_blank'); w.document.write(`<html><head><title>${nxEsc(n.titulo||'Nota')}</title><style>body{font-family:Inter,Arial,sans-serif;padding:28px;color:#111827}h1{font-size:28px}pre{white-space:pre-wrap;line-height:1.55;font-family:inherit}</style></head><body><h1>${nxEsc(n.titulo||'Nota')}</h1><pre>${nxEsc(nxShareText(n))}</pre><script>setTimeout(()=>print(),250)<\\/script></body></html>`); w.document.close(); }
+function nxExportJPG(id){
+  const n=state.notas.find(x=>String(x.id)===String(id)); if(!n)return;
+  const c=document.createElement('canvas'), ctx=c.getContext('2d'); c.width=1200; c.height=1600;
+  ctx.fillStyle='#07111D'; ctx.fillRect(0,0,c.width,c.height); ctx.fillStyle='#E4B45F'; ctx.font='bold 48px Arial'; ctx.fillText(n.titulo||'Nota',70,95);
+  ctx.fillStyle='#F8FAFC'; ctx.font='28px Arial'; const lines=nxShareText(n).split(/\\n/).flatMap(line=>nxWrap(ctx,line,1020)); let y=160; for(const line of lines){ if(y>1500)break; ctx.fillText(line,70,y); y+=42; }
+  const a=document.createElement('a'); a.download=(n.titulo||'nota').replace(/[^a-z0-9_-]+/gi,'_')+'.jpg'; a.href=c.toDataURL('image/jpeg',.92); a.click();
+}
+function nxWrap(ctx,text,max){ const words=String(text||'').split(' '), out=[]; let line=''; for(const w of words){ const test=line?line+' '+w:w; if(ctx.measureText(test).width>max&&line){out.push(line); line=w;} else line=test; } out.push(line); return out; }
+
+function nxSaveTemplate(){
+  let n=null; if(window._nxEditor?.mode==='list') n=nxSaveList(false); else n=nxSaveDoc(false); if(!n)return;
+  const list=JSON.parse(localStorage.getItem('fnz_nx_templates')||'[]');
+  list.unshift({id:nxId(),titulo:n.titulo||'Plantilla',kind:nxKind(n),listType:n.listType||'',html:n.html||'',items:(n.items||[]).map(i=>({...i,done:false})),appearance:n.appearance||nxAppearance(),creado:new Date().toISOString()});
+  localStorage.setItem('fnz_nx_templates',JSON.stringify(list.slice(0,40)));
+  toast('Plantilla guardada');
+}
+function nxOpenTemplates(){
+  nxEnsureStyles();
+  const list=JSON.parse(localStorage.getItem('fnz_nx_templates')||'[]');
+  document.getElementById('modal-content').innerHTML=`<div class="modal-title" style="color:#172033">Plantillas guardadas</div>
+    ${list.length?`<div style="display:grid;gap:9px">${list.map(t=>`<button class="share-btn" onclick="nxUseTemplate('${t.id}')"><div class="share-icon copy">${appIcon(t.kind==='list'?'clipboard':'note')}</div><div class="share-label"><b>${nxEsc(t.titulo)}</b><div class="share-desc">Plantilla personalizada</div></div></button>`).join('')}</div>`:`<div style="padding:18px;border:1px dashed #CBD5E1;border-radius:16px;color:#64748B;text-align:center">Aun no tienes plantillas guardadas.</div>`}`;
+  showModal();
+}
+function nxUseTemplate(id){
+  const list=JSON.parse(localStorage.getItem('fnz_nx_templates')||'[]');
+  const t=list.find(x=>String(x.id)===String(id)); closeModal(); if(!t)return;
+  if(t.kind==='list') return nxOpenSmartList(null,{titulo:t.titulo,listType:t.listType||'compras',items:t.items||[],appearance:t.appearance});
+  nxOpenDoc(null,{titulo:t.titulo,html:t.html||'',appearance:t.appearance});
+}
+
+
 // AJUSTES ACORDEON FINAL - secciones desplegables
 // ======================================================================
 function ajToggle(section){
