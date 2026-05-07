@@ -4280,20 +4280,76 @@ function syncAllTxToSheets(silencioso){
   if(!url) return;
   const txs=state.transactions||[];
   if(!txs.length) return;
-  if(!silencioso) toast('⬆ Enviando '+txs.length+' movimientos a Sheets...');
+
+  const trabajosMap = new Map();
+  const txsLibres = [];
+  const baseTrabajo = (id, tx) => ({
+    id,
+    fecha: tx.date || todayStr(),
+    cliente: tx.cliente || '',
+    telefono: tx.contacto || '',
+    contacto: tx.contacto || '',
+    ubicacion: tx.ubicacion || '',
+    distrito: tx.ubicacion || '',
+    formaPago1: tx.formaPago || '',
+    formaPago2: '',
+    servicio1:'', materiales1:0, precio1:0,
+    servicio2:'', materiales2:0, precio2:0,
+    servicio3:'', materiales3:0, precio3:0,
+    comida:0, otros_gastos:0, agregados:0, movilidad:0, meta:0,
+    observaciones: tx.description || '',
+    _notionRowId:id
+  });
+
+  txs.forEach(tx=>{
+    if(tx && tx._importadoDeNotion && tx._notionRowId){
+      const id = tx._notionRowId || String(tx.id||'').replace(/-(svc\d+|mat|com|otr|agr|mov)$/,'');
+      let row = trabajosMap.get(id) || baseTrabajo(id, tx);
+      if(tx._notionTrabajo){
+        row = {...row, ...tx._notionTrabajo, id};
+      } else {
+        const amt = parseFloat(tx.amount)||0;
+        const svcMatch = String(tx.id||'').match(/-svc(\d+)$/);
+        if(tx.type==='ingreso' && svcMatch){
+          const n = Math.max(1, Math.min(3, Number(svcMatch[1])||1));
+          row['servicio'+n] = row['servicio'+n] || tx.category || 'Servicio';
+          row['precio'+n] = (parseFloat(row['precio'+n])||0) + amt;
+        } else if(tx.type==='egreso') {
+          const cat = String(tx.category||'').toLowerCase();
+          if(cat.includes('material')) row.materiales1 = (parseFloat(row.materiales1)||0) + amt;
+          else if(cat.includes('comida') || cat.includes('snack') || cat.includes('menu') || cat.includes('bebida')) row.comida = (parseFloat(row.comida)||0) + amt;
+          else if(cat.includes('movilidad') || cat.includes('transporte')) row.movilidad = (parseFloat(row.movilidad)||0) + amt;
+          else if(cat.includes('agregado')) row.agregados = (parseFloat(row.agregados)||0) + amt;
+          else row.otros_gastos = (parseFloat(row.otros_gastos)||0) + amt;
+        }
+      }
+      trabajosMap.set(id,row);
+    } else {
+      txsLibres.push(tx);
+    }
+  });
+
+  const trabajos = Array.from(trabajosMap.values());
+  const total = txsLibres.length + trabajos.length;
+  if(!total) return;
+  if(!silencioso) toast('Enviando '+total+' registros a Sheets...');
   _syncStatus='syncing'; _updateSyncBadge();
-  // Enviar en batch de 20, con delay entre cada uno
+
+  const jobs = [
+    ...trabajos.map(trabajo => ({type:'trabajo', item:trabajo, timestamp:'trabajo_'+trabajo.id+'_'+Date.now()})),
+    ...txsLibres.map(tx => ({type:'tx', modo:state.modo, timestamp:'tx_'+tx.id+'_'+Date.now(), tx}))
+  ];
+
   let idx=0;
   function sendNext(){
-    if(idx>=txs.length){
+    if(idx>=jobs.length){
       _syncStatus='ok';_updateSyncBadge();
       setTimeout(()=>{_syncStatus='idle';_updateSyncBadge();},4000);
-      if(!silencioso) toast('✓ '+txs.length+' movimientos sincronizados a Sheets');
+      if(!silencioso) toast('Sheets: '+trabajos.length+' Reporte Diario y '+txsLibres.length+' movimientos enviados');
       return;
     }
-    const tx=txs[idx++];
-    const payload={type:'tx',modo:state.modo,timestamp:'tx_'+tx.id+'_'+Date.now(),tx};
-    fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)}).finally(()=>setTimeout(sendNext,120));
+    const payload=jobs[idx++];
+    fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)}).finally(()=>setTimeout(sendNext,140));
   }
   sendNext();
 }
@@ -4442,6 +4498,10 @@ function renderAjustes(){
   const notionDb = localStorage.getItem('fnz_notion_dbid') || '';
   const notionClientesDb = localStorage.getItem('fnz_notion_dbid_clientes') || '';
   const notionInterval = localStorage.getItem('fnz_notion_interval') || '15';
+  const countNegTx = load('fnz_neg_tx',[]).length;
+  const countPerTx = load('fnz_tx',[]).length;
+  const countAgenda = load('fnz_agenda',[]).length;
+  const countNotas = load('fnz_notas',[]).length;
   const themeButtons = TEMAS_APP.map(t => `<button class="np-pill ${temaActual===t.id?'on':''}" onclick="applyTheme('${t.id}')">${t.nombre}</button>`).join('');
   setTimeout(()=>{ try{ renderSoundsList(); renderRemindersList(); checkNotifBtn(); }catch(e){} }, 0);
   return `<div class="section">
@@ -4610,52 +4670,95 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
   try {
     const rows = _parseCsv(csv);
     if (rows.length < 2) { if (status) status.textContent = 'El archivo esta vacio o no es valido'; return; }
-    const headers = rows[0].map(h => String(h||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' '));
+
+    const normHead = h => String(h||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
+    const headers = rows[0].map(normHead);
+    const normNames = names => names.map(n => normHead(n));
     const col = (names) => {
-      const wanted = names.map(n => String(n).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim());
+      const wanted = normNames(names);
       for (const n of wanted) { const exact = headers.findIndex(h => h === n); if (exact >= 0) return exact; }
       for (const n of wanted) { const partial = headers.findIndex(h => h.includes(n)); if (partial >= 0) return partial; }
       return -1;
     };
-    const val = (r, idx) => idx >= 0 ? (r[idx] || '').trim() : '';
+    const cols = (names) => {
+      const wanted = normNames(names);
+      const out = [];
+      wanted.forEach(n => headers.forEach((h,idx) => { if(h === n && !out.includes(idx)) out.push(idx); }));
+      wanted.forEach(n => headers.forEach((h,idx) => { if(h.includes(n) && !out.includes(idx)) out.push(idx); }));
+      return out;
+    };
+    const val = (r, idx) => idx >= 0 ? String(r[idx] || '').trim() : '';
     const sumCols = (r, idxs) => idxs.reduce((s,idx) => s + _parseMonto(val(r, idx)), 0);
+
     const iDate=col(['fecha','date']), iCliente=col(['cliente','client','nombre']), iContacto=col(['contacto','telefono','tel','phone','celular']), iDistrito=col(['distrito','district','zona','ubicacion']);
     const iForma1=col(['1 forma de pago','1 forma pago','forma de pago 1','pago 1','forma de pago']), iForma2=col(['2 forma de pago','2 forma pago','forma de pago 2','pago 2']);
     const iSvc1=col(['servicio 1','service 1','servicio1','servicio']), iSvc2=col(['servicio 2','service 2','servicio2']), iSvc3=col(['servicio 3','service 3','servicio3']);
     const iMat1=col(['1 materiales','materiales 1','1 material','materiales']), iMat2=col(['2 materiales','materiales 2','2 material']), iMat3=col(['3 materiales','materiales 3','3 material']);
-    const iPrecio1=col(['1 precio del servicio','precio del servicio 1','1 precio','precio 1','precio del servicio','precio']), iPrecio2=col(['2 precio del servicio','precio del servicio 2','2 precio','precio 2']), iPrecio3=col(['3 precio de servicio','3 precio del servicio','precio del servicio 3','3 precio','precio 3']);
-    const iComida=col(['comida','alimentos','menu','snacks','bebidas']), iOtros=col(['otros','otros gastos','gastos extra','extra']), iAgreg=col(['agregados','agregado','adicional','adicionales']), iMovil=col(['movilidad','movil','transport','transporte','pasajes']);
-    const iObs=col(['observaciones','observ','nota','notas','comment','descripcion']), iNotionId=col(['notionid']);
-    let txImportadas=0, egresosMov=0, egresosMat=0, egresosCom=0, egresosOtros=0, egresosAgr=0;
+    const iPrecio1=col(['1 precio del servicio','1 precio de servicio','precio del servicio 1','precio de servicio 1','1 precio','precio 1','precio del servicio','precio']), iPrecio2=col(['2 precio del servicio','2 precio de servicio','precio del servicio 2','precio de servicio 2','2 precio','precio 2']), iPrecio3=col(['3 precio de servicio','3 precio del servicio','precio de servicio 3','precio del servicio 3','3 precio','precio 3']);
+    const iComida=col(['comida','alimentos','menu','menus','snacks','snak','snaks','bebidas','gaseosa','gaseosas']), iOtros=col(['otros','otros gastos','gastos extra','extra']), iAgreg=col(['agregados','agregado','adicional','adicionales']), iMovil=col(['movilidad','movil','transport','transporte','pasajes']);
+    const iMeta=col(['meta','objetivo']), iObs=col(['observaciones','observacion','observ','nota','notas','comment','descripcion']), iNotionId=col(['notionid','notion id','page id']);
+    const comidaCols = cols(['comida','alimentos','menu','menus','snack','snacks','snak','snaks','bebida','bebidas','gaseosa','gaseosas']);
+
+    let txImportadas=0, egresosMov=0, egresosMat=0, egresosCom=0, egresosOtros=0, egresosAgr=0, filasUtiles=0;
     const nuevasTx = [];
+    const nuevosTrabajos = [];
+
     for (let i=1; i<rows.length; i++) {
-      const r=rows[i]; if (r.length < 2) continue;
-      const fecha=_parseFechaNotion(val(r,iDate))||todayStr(), clienteFinal=val(r,iCliente)||'(Sin cliente)', rawNotionId=val(r,iNotionId), nId=rawNotionId||('not_'+fecha+'_r'+i);
-      const obs=val(r,iObs), forma=val(r,iForma1)||val(r,iForma2), contacto=val(r,iContacto), distrito=val(r,iDistrito);
+      const r=rows[i];
+      if(!r || !r.some(c => String(c||'').trim())) continue;
+
+      const fecha=_parseFechaNotion(val(r,iDate))||todayStr();
+      const clienteFinal=val(r,iCliente)||'(Sin cliente)';
+      const clienteLimpio=clienteFinal.split('@')[0].trim();
+      const rawNotionId=val(r,iNotionId);
+      const nId=rawNotionId||('not_'+fecha+'_r'+i);
+      const obs=val(r,iObs), forma1=val(r,iForma1), forma2=val(r,iForma2), forma=forma1||forma2, contacto=val(r,iContacto), distrito=val(r,iDistrito);
+      const svc1=val(r,iSvc1), svc2=val(r,iSvc2), svc3=val(r,iSvc3);
+      const precio1=_parseMonto(val(r,iPrecio1)), precio2=_parseMonto(val(r,iPrecio2)), precio3=_parseMonto(val(r,iPrecio3));
+      const mat1=_parseMonto(val(r,iMat1)), mat2=_parseMonto(val(r,iMat2)), mat3=_parseMonto(val(r,iMat3));
+      const comida=sumCols(r, comidaCols.length ? comidaCols : [iComida].filter(idx=>idx>=0));
+      const otros=_parseMonto(val(r,iOtros));
+      const agregados=_parseMonto(val(r,iAgreg));
+      const movil=_parseMonto(val(r,iMovil));
+      const meta=_parseMonto(val(r,iMeta));
+      const ganancia=(precio1+precio2+precio3)-(mat1+mat2+mat3+comida+otros+agregados+movil+meta);
+      const hasContenido=[clienteLimpio,contacto,distrito,svc1,svc2,svc3,obs].some(v=>v && v!=='(Sin cliente)') || [precio1,precio2,precio3,mat1,mat2,mat3,comida,otros,agregados,movil,meta].some(n=>n>0);
+
+      if(hasContenido){
+        filasUtiles++;
+        nuevosTrabajos.push({
+          id:nId, fecha, cliente:clienteLimpio, telefono:contacto, contacto, ubicacion:distrito, distrito,
+          formaPago1:forma1, formaPago2:forma2,
+          servicio1:svc1, materiales1:mat1, precio1,
+          servicio2:svc2, materiales2:mat2, precio2,
+          servicio3:svc3, materiales3:mat3, precio3,
+          comida, otros_gastos:otros, agregados, movilidad:movil, meta, ganancia,
+          observaciones:obs, _importadoDeNotion:true, _notionRowId:rawNotionId
+        });
+      }
+
       [
-        {idx:1,svc:val(r,iSvc1),precio:_parseMonto(val(r,iPrecio1))},
-        {idx:2,svc:val(r,iSvc2),precio:_parseMonto(val(r,iPrecio2))},
-        {idx:3,svc:val(r,iSvc3),precio:_parseMonto(val(r,iPrecio3))}
+        {idx:1,svc:svc1,precio:precio1},
+        {idx:2,svc:svc2,precio:precio2},
+        {idx:3,svc:svc3,precio:precio3}
       ].forEach(s => {
         if (s.precio <= 0) return;
         const servicio=_mapearCategoriaNotion(s.svc||'Servicio Gas')||'Servicio Gas';
-        const clienteLimpio=clienteFinal.split('@')[0].trim();
         const obsFiltrado=obs && obs.toLowerCase()!==servicio.toLowerCase() && obs.toLowerCase()!==clienteLimpio.toLowerCase() ? obs : '';
-        nuevasTx.push({id:nId+'-svc'+s.idx,type:'ingreso',amount:s.precio,category:servicio,catId:_getCatIdByName(servicio),description:servicio+(clienteLimpio&&clienteLimpio!=='(Sin cliente)'?' - '+clienteLimpio:'')+(obsFiltrado?' - '+obsFiltrado:''),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,formaPago:forma,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId});
+        nuevasTx.push({id:nId+'-svc'+s.idx,type:'ingreso',amount:s.precio,category:servicio,catId:_getCatIdByName(servicio),description:servicio+(clienteLimpio&&clienteLimpio!=='(Sin cliente)'?' - '+clienteLimpio:'')+(obsFiltrado?' - '+obsFiltrado:''),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,formaPago:forma,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null});
         txImportadas++;
       });
-      const mat=sumCols(r,[iMat1,iMat2,iMat3].filter(idx=>idx>=0));
-      if(mat>0){ nuevasTx.push({id:nId+'-mat',type:'egreso',amount:mat,category:'Materiales',catId:'cne1',description:'Materiales - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId}); egresosMat++; }
-      const comida=_parseMonto(val(r,iComida));
-      if(comida>0){ nuevasTx.push({id:nId+'-com',type:'egreso',amount:comida,category:'Comida',catId:'cne_menu',description:'Comida - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId}); egresosCom++; }
-      const otros=_parseMonto(val(r,iOtros));
-      if(otros>0){ nuevasTx.push({id:nId+'-otr',type:'egreso',amount:otros,category:'Otros gastos de negocio',catId:'cne6',description:'Otros gastos - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId}); egresosOtros++; }
-      const agregados=_parseMonto(val(r,iAgreg));
-      if(agregados>0){ nuevasTx.push({id:nId+'-agr',type:'egreso',amount:agregados,category:'Agregados',catId:'cne_agregados',description:'Agregados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId}); egresosAgr++; }
-      const movil=_parseMonto(val(r,iMovil));
-      if(movil>0){ nuevasTx.push({id:nId+'-mov',type:'egreso',amount:movil,category:'Movilidad',catId:'cne5',description:'Movilidad - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId}); egresosMov++; }
+
+      const mat=mat1+mat2+mat3;
+      if(mat>0){ nuevasTx.push({id:nId+'-mat',type:'egreso',amount:mat,category:'Materiales',catId:'cne1',description:'Materiales - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMat++; }
+      if(comida>0){ nuevasTx.push({id:nId+'-com',type:'egreso',amount:comida,category:'Comida',catId:'cne_menu',description:'Comida - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosCom++; }
+      if(otros>0){ nuevasTx.push({id:nId+'-otr',type:'egreso',amount:otros,category:'Otros gastos de negocio',catId:'cne6',description:'Otros gastos - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosOtros++; }
+      if(agregados>0){ nuevasTx.push({id:nId+'-agr',type:'egreso',amount:agregados,category:'Agregados',catId:'cne_agregados',description:'Agregados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosAgr++; }
+      if(movil>0){ nuevasTx.push({id:nId+'-mov',type:'egreso',amount:movil,category:'Movilidad',catId:'cne5',description:'Movilidad - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMov++; }
     }
-    if(nuevasTx.length===0){ if(status) status.textContent='No se encontraron datos validos. Revisa las columnas.'; return; }
+
+    if(nuevasTx.length===0 && nuevosTrabajos.length===0){ if(status) status.textContent='No se encontraron datos validos. Revisa las columnas.'; return; }
+
     const existing=load('fnz_neg_tx',[]);
     let merged=[];
     if(isFullSync){
@@ -4667,21 +4770,27 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
       for(const t of nuevasTx) map.set(t.id,t);
       merged=Array.from(map.values());
     }
+
     save('fnz_neg_tx',merged);
     if(state.modo==='negocio') state.transactions=merged;
+
     const url=localStorage.getItem('fnz_sheets_url')||'';
-    if(url) nuevasTx.forEach((tx,idx)=>setTimeout(()=>syncToSheets(tx),idx*150));
+    if(url && nuevosTrabajos.length){
+      nuevosTrabajos.forEach((trabajo,idx)=>setTimeout(()=>_sendToSheets(url,{type:'trabajo',item:trabajo,timestamp:'notion_tr_'+trabajo.id+'_'+Date.now()}),idx*180));
+    }
+
     saveAll(); render();
-    const msg=`Importado: ${txImportadas} ingresos - ${egresosCom} comida - ${egresosMov} movilidad - ${egresosMat} materiales`;
+    const msg='Notion: '+(rows.length-1)+' filas leidas, '+filasUtiles+' utiles, '+nuevasTx.length+' movimientos ('+txImportadas+' ingresos, '+egresosCom+' comida, '+egresosMov+' movilidad, '+egresosMat+' materiales)';
     if(status) status.textContent=msg;
     toast(msg);
-    return {ok:true,txImportadas,egresosMov,egresosMat,egresosCom,egresosOtros,egresosAgr};
+    return {ok:true,filasNotion:rows.length-1,filasUtiles,movimientos:nuevasTx.length,trabajos:nuevosTrabajos.length,txImportadas,egresosMov,egresosMat,egresosCom,egresosOtros,egresosAgr};
   } catch(err) {
     console.error('Error procesando CSV Notion:',err);
     if(status) status.textContent='Error al procesar el CSV: '+err.message;
     return {ok:false,error:err.message};
   }
 }
+
 // Importacion manual (input file) — usa el mismo núcleo ──────────
 function importarNotion(input) {
   const file = input.files ? input.files[0] : null;
@@ -6605,7 +6714,9 @@ async function _pushToNotion(item, cobroObj) {
 
   // Detectar si el ID es un UUID de Notion (8-4-4-4-12)
   const isNotionGuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(id);
-  const pageId = isNotionGuid(item.id) ? item.id : null;
+  cobroObj = cobroObj || {};
+  const notionCandidate = item._notionRowId || item.notionId || item.id;
+  const pageId = isNotionGuid(notionCandidate) ? notionCandidate : null;
 
   const props = await _fetchNotionSchema(token, dbId);
   const payload = { properties: {} };
@@ -6669,11 +6780,20 @@ async function _pushToNotion(item, cobroObj) {
   if (pagosMethods[0]) setProp(fPago1Col, pagosMethods[0].name);
   if (pagosMethods[1]) setProp(fPago2Col, pagosMethods[1].name);
 
+  const totalPrecio = [1,2,3].reduce((s,i)=>s+(parseFloat(cobroObj['precio'+i] || item['precio'+i] || 0)||0),0);
+  const totalMateriales = [1,2,3].reduce((s,i)=>s+(parseFloat(cobroObj['materiales'+i] || item['materiales'+i] || 0)||0),0);
+  const totalGastos = totalMateriales + (parseFloat(cobroObj.comida||0)||0) + (parseFloat(cobroObj.otros_gastos||cobroObj.otros||0)||0) + (parseFloat(cobroObj.agregados||0)||0) + (parseFloat(cobroObj.movilidad||0)||0) + (parseFloat(cobroObj.meta||0)||0);
+  const ganancia = +(totalPrecio - totalGastos).toFixed(2);
+
   // 5. Gastos extra
   if (cobroObj.movilidad > 0) setProp(findCol('movilidad', 'pasajes', 'gasolina'), cobroObj.movilidad);
   if (cobroObj.comida > 0) setProp(findCol('comida','alimentos','menu','snack','snacks','bebida','bebidas'), cobroObj.comida);
   if (cobroObj.agregados > 0 || cobroObj.otros > 0) setProp(findCol('agregados'), cobroObj.agregados || cobroObj.otros);
   if (cobroObj.otros_gastos > 0) setProp(findCol('otros', 'extra'), cobroObj.otros_gastos);
+  if (cobroObj.meta > 0) setProp(findCol('meta','objetivo'), cobroObj.meta);
+  setProp(findCol('ganancia'), ganancia);
+  const obsFinal = cobroObj.observaciones || item.observaciones || item.notas;
+  if (obsFinal) setProp(findCol('observaciones','observacion','notas','nota','descripcion'), obsFinal);
 
   // 6. Ejecutar Petición (POST para crear, PATCH para actualizar)
   const notionUrl = pageId ? 'https://api.notion.com/v1/pages/' + pageId : 'https://api.notion.com/v1/pages';
@@ -7034,10 +7154,10 @@ async function notionCargarManual() {
   if (statusEl) statusEl.textContent = '⏳ Consultando Notion...';
 
   try {
-    // ── 1. Traer registros de Notion (Finanzas + Clientes) ──
+    // 1. Traer solo la DB Finanzas / Reporte Diario.
+    // La DB Clientes pertenece a Agenda y no debe mezclarse con movimientos.
     const dbIdFinanzas = localStorage.getItem('fnz_notion_dbid');
-    const dbIdClientes = localStorage.getItem('fnz_notion_dbid_clientes');
-    const dbs = [dbIdFinanzas, dbIdClientes].filter(Boolean);
+    const dbs = [dbIdFinanzas].filter(Boolean);
     
     let allResults = [];
     for (const dbId of dbs) {
@@ -7069,15 +7189,14 @@ async function notionCargarManual() {
     // ── 2. Motor de deduplicación ──
     const txExistentes = state.transactions || [];
 
-    // Índice de IDs de Notion ya en la app
+    // Indice de IDs de Notion ya en la app.
+    // Se comparan sin guiones porque Notion puede entregar UUID con o sin guiones.
+    const normalizarNotionId = id => String(id||'').replace(/-/g,'').trim().toLowerCase();
     const notionIdsEnApp = new Set(
       txExistentes
         .filter(t => t._notionRowId)
-        .map(t => {
-          // Normalizar: quitar sufijos -ing, -mov, -mat, -otr
-          const id = t._notionRowId;
-          return id.includes('-') ? id.split('-').slice(0,-1).join('-') : id;
-        })
+        .map(t => normalizarNotionId(t._notionRowId))
+        .filter(Boolean)
     );
 
     const yaExisten   = [];  // Tienen el mismo PageId → no importar
@@ -7107,11 +7226,12 @@ async function notionCargarManual() {
       const cliente = titleEntry ? (titleEntry[1].title||[]).map(t=>t.plain_text).join('').trim()
                                  : getPropVal('cliente','nombre','name');
       const fecha   = getPropVal('fecha','date') || page.created_time?.split('T')[0] || '';
-      const precio  = parseFloat(getPropVal('precio del servicio','precio','monto','total')) || 0;
+      const precio  = ['1 PRECIO DEL SERVICIO','1 PRECIO DE SERVICIO','2 PRECIO DEL SERVICIO','2 PRECIO DE SERVICIO','3 PRECIO DE SERVICIO','3 PRECIO DEL SERVICIO']
+        .reduce((s,n)=>s+(_parseMonto(getPropVal(n))||0),0) || _parseMonto(getPropVal('precio del servicio','precio','monto','total')) || 0;
 
       // Capa 1: Notion Page ID exacto
-      const pureId = pageId.replace(/-/g,'');
-      if (notionIdsEnApp.has(pureId) || notionIdsEnApp.has(pageId)) {
+      const pureId = normalizarNotionId(pageId);
+      if (notionIdsEnApp.has(pureId)) {
         yaExisten.push({ pageId, cliente, fecha, precio });
         continue;
       }
@@ -7398,22 +7518,16 @@ async function notionApiPoll(){
     }
 
     if(!csvText){
-      // ── Ruta 2: Notion API directamente via proxy CORS ──
-      // corsproxy.io soporta POST + headers personalizados correctamente
+      // Ruta 2: Notion API directamente via proxy CORS, con paginacion completa.
       const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
       const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
-      const bodyObj = {
-        filter: {
-          timestamp: 'last_edited_time',
-          last_edited_time: { after: lastSync }
-        },
-        sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }],
-        page_size: 100
-      };
+      const proxy2    = 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(notionUrl);
+      const allResults = [];
+      let cursor = undefined;
+      let page = 0;
 
-      let res, data;
-      try {
-        res = await fetch(proxyUrl, {
+      const fetchPage = async (proxy, bodyObj) => {
+        const res = await fetch(proxy, {
           method: 'POST',
           headers: {
             'Authorization': 'Bearer ' + token,
@@ -7426,35 +7540,35 @@ async function notionApiPoll(){
           const errTxt = await res.text().catch(()=>'');
           throw new Error('Notion API HTTP ' + res.status + (errTxt ? ': ' + errTxt.slice(0,120) : ''));
         }
-        data = await res.json();
-      } catch(proxyErr) {
-        // Intentar proxy alternativo si corsproxy.io falla
-        const proxy2 = 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(notionUrl);
-        try {
-          res = await fetch(proxy2, {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Bearer ' + token,
-              'Notion-Version': '2022-06-28',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(bodyObj)
-          });
-          if(!res.ok) throw new Error('Proxy alternativo HTTP ' + res.status);
-          data = await res.json();
-        } catch(e2) {
-          throw proxyErr; // lanzar error original
-        }
-      }
+        return await res.json();
+      };
 
-      if(!data || !data.results || data.results.length === 0){
-        if(statusEl) statusEl.textContent = '✓ Sin cambios · '+new Date().toLocaleTimeString('es-PE');
+      do {
+        page++;
+        const bodyObj = {
+          filter: { timestamp: 'last_edited_time', last_edited_time: { after: lastSync } },
+          sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }],
+          page_size: 100,
+          ...(cursor ? { start_cursor: cursor } : {})
+        };
+        let data;
+        try { data = await fetchPage(proxyUrl, bodyObj); }
+        catch(proxyErr) {
+          try { data = await fetchPage(proxy2, bodyObj); }
+          catch(e2) { throw proxyErr; }
+        }
+        if(data && data.results) allResults.push(...data.results);
+        cursor = data && data.has_more ? data.next_cursor : undefined;
+        if(statusEl) statusEl.textContent = 'Consultando Notion... '+allResults.length+' registros';
+      } while(cursor);
+
+      if(!allResults.length){
+        if(statusEl) statusEl.textContent = 'Sin cambios - '+new Date().toLocaleTimeString('es-PE');
         localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
         _notionBadgeOk(0);
         return;
       }
-      // Convertir resultados de Notion API al mismo formato CSV que exporta Notion
-      csvText = _notionResultsToCSV(data.results);
+      csvText = _notionResultsToCSV(allResults);
     }
 
     if(!csvText || csvText.trim().length < 10){
@@ -7473,7 +7587,7 @@ async function notionApiPoll(){
         '✓ '+importados+' nuevos · '+new Date().toLocaleTimeString('es-PE');
       _notionBadgeOk(importados > 0 ? importados : 0);
       // Sincronizar lo nuevo a Sheets también
-      if(importados > 0) syncAllTxToSheets(true);
+      // _procesarCsvNotionTexto ya envia lo nuevo agrupado al Reporte Diario de Sheets.
     } else {
       _notionBadgeOk(0);
     }
@@ -21143,6 +21257,8 @@ function ensureAjustesStyles(){
     .aj-btn{border:1px solid #E2E8F0;background:#fff;color:#475569;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:850;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;flex:1}
     .aj-btn.primary{background:#172033;color:#fff;border-color:#172033}
     .aj-btn.soft{background:#F8FAFC}
+    .aj-btn.danger{background:#FFF5F5;color:#B42318;border-color:#F5C2C0}
+    .aj-btn.warn{background:#FFF7ED;color:#9A5415;border-color:#FED7AA}
     .aj-status{font-size:11px;color:#64748B;background:#F8FAFC;border:1px solid #E6EBF0;border-radius:12px;padding:9px 10px;min-height:34px}
     .aj-themes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
     .aj-theme{border:1px solid #E2E8F0;background:#fff;border-radius:13px;padding:10px;display:flex;align-items:center;gap:9px;text-align:left;cursor:pointer;color:#172033;min-width:0}
@@ -21154,6 +21270,50 @@ function ensureAjustesStyles(){
     .aj-listbox:empty{display:none}
     @media(max-width:560px){.aj-themes{grid-template-columns:repeat(2,minmax(0,1fr))}.aj-row{display:grid;grid-template-columns:1fr 1fr}.aj-btn{width:100%}}
   `;
+}
+
+function ajClearAllMovements(){
+  if(!confirm('Borrar todos los movimientos financieros locales?\n\nNo se borran agenda, notas, stock ni configuraciones.')) return;
+  localStorage.setItem('fnz_neg_tx','[]');
+  localStorage.setItem('fnz_tx','[]');
+  state.transactions = [];
+  render();
+  toast('Movimientos financieros borrados');
+}
+
+function ajResetNotionSyncCache(){
+  if(!confirm('Reiniciar cache de importacion Notion?\n\nLa proxima importacion puede volver a leer todo desde Notion.')) return;
+  localStorage.removeItem('fnz_notion_last_sync');
+  localStorage.removeItem('fnz_notion_polling');
+  try{ notionApiSyncStop(); }catch(e){}
+  render();
+  toast('Cache de Notion reiniciada');
+}
+
+function ajResetLocalData(){
+  if(!confirm('Borrar todos los datos locales?\n\nSe mantienen credenciales, tema y nombre.')) return;
+  if(!confirm('Confirmacion final: se borraran movimientos, agenda, deudas, notas, metas, servicios, categorias y stock local.')) return;
+  [
+    'fnz_neg_tx','fnz_tx','fnz_agenda','fnz_notas','fnz_neg_debts','fnz_debts',
+    'fnz_neg_services','fnz_services','fnz_neg_prestamos','fnz_prestamos','fnz_neg_prestpers','fnz_prestpers',
+    'fnz_neg_metas','fnz_metas','fnz_neg_presup','fnz_presup','fnz_recordatorios','fnz_sonidos',
+    'fnz_inventario','fnz_plantillas','fnz_plantillas_mat','fnz_mov_mat','fnz_compras_mat','fnz_stock_valor_general',
+    'fnz_neg_cats_in','fnz_neg_cats_ex','fnz_cats_in','fnz_cats_ex','fnz_category_defaults_version','fnz_neg_category_defaults_version'
+  ].forEach(k=>localStorage.removeItem(k));
+  state.transactions=[]; state.debts=[]; state.agenda=[]; state.notas=[]; state.metas=[]; state.prestamos=[]; state.prestamosPersonales=[];
+  state.presupuesto=[]; state.recordatorios=[]; state.inventario=[]; state.plantillas=[]; state.movimientosMateriales=[]; state.comprasMateriales=[]; state.stockValorGeneral=0;
+  state._lazyLoaded={};
+  loadStateForModo('negocio');
+  render();
+  toast('Datos locales borrados');
+}
+
+function ajClearCredentials(){
+  if(!confirm('Borrar credenciales y conexiones?\n\nEsto elimina URL de Sheets, token/DB de Notion y API key de Gemini.')) return;
+  ['fnz_sheets_url','fnz_notion_token','fnz_notion_dbid','fnz_notion_dbid_clientes','fnz_notion_last_sync','fnz_notion_polling','fnz_gemini_key'].forEach(k=>localStorage.removeItem(k));
+  try{ notionApiSyncStop(); }catch(e){}
+  render();
+  toast('Credenciales borradas');
 }
 
 function renderAjustes(){
@@ -21168,6 +21328,10 @@ function renderAjustes(){
   const notionDb = localStorage.getItem('fnz_notion_dbid') || '';
   const notionClientesDb = localStorage.getItem('fnz_notion_dbid_clientes') || '';
   const notionInterval = localStorage.getItem('fnz_notion_interval') || '15';
+  const countNegTx = load('fnz_neg_tx',[]).length;
+  const countPerTx = load('fnz_tx',[]).length;
+  const countAgenda = load('fnz_agenda',[]).length;
+  const countNotas = load('fnz_notas',[]).length;
   const themeButtons = TEMAS_APP.map(t => `<button class="aj-theme ${temaActual===t.id?'on':''}" onclick="applyTheme('${t.id}')">
       <span class="aj-swatch" style="background:${t.accent}"></span>
       <span style="min-width:0"><b>${npEsc(t.nombre)}</b><span>${npEsc(t.desc||'')}</span></span>
@@ -21210,6 +21374,10 @@ function renderAjustes(){
       ${sec('alertas','clipboard','Alertas','Notificaciones, sonidos y recordatorios.',
         `<div class="aj-row"><button id="notif-btn" class="aj-btn" onclick="requestNotifPermission()">Activar notificaciones</button><button class="aj-btn primary" onclick="openAddReminder()">Nuevo recordatorio</button></div>
          <div style="display:grid;gap:10px;margin-top:10px"><div id="sounds-list" class="aj-listbox"></div><div id="reminders-list" class="aj-listbox"></div></div>`)}
+      ${sec('seguridad','trash','Seguridad','Borrado controlado, cache de Notion y credenciales.',
+        `<div class="aj-status">Locales: <b>${countNegTx}</b> movimientos negocio, <b>${countPerTx}</b> personales, <b>${countAgenda}</b> agenda, <b>${countNotas}</b> notas.</div>
+         <div class="aj-row" style="margin-top:8px"><button class="aj-btn warn" onclick="ajResetNotionSyncCache()">Reiniciar cache Notion</button><button class="aj-btn danger" onclick="ajClearAllMovements()">Borrar movimientos</button></div>
+         <div class="aj-row" style="margin-top:8px"><button class="aj-btn danger" onclick="ajResetLocalData()">Borrar datos locales</button><button class="aj-btn soft" onclick="ajClearCredentials()">Borrar credenciales</button></div>`)}
     </div>
   </div>`;
 }
