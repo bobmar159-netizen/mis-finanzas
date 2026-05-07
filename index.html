@@ -2481,6 +2481,10 @@ function isMaterialesCategory(catId, category){
   return catId === 'cne1' || catId === 'cneg_mat' || name === 'materiales' || name === 'materiales negocio';
 }
 
+function isStockValueTx(t){
+  return !!(t && t.type === 'egreso' && (t.ocultarEnMovimientos || t.afectaStockValor || t.stockOperacion === 'entrada_valor' || isMaterialesCategory(t.catId, t.category)));
+}
+
 function isComidaCategory(catId, category, description=''){
   const text = [category, description].filter(Boolean).join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   return ['cne_gaseosa','cne_snack','cne_menu','ce_gaseosa','ce_snack','ce_menu'].includes(catId) ||
@@ -2527,6 +2531,9 @@ function filteredTx(){
     const d=new Date(t.date+'T00:00:00');
     return d.getMonth()===state.filterMonth&&d.getFullYear()===state.filterYear;
   });
+}
+function visibleTx(){
+  return filteredTx().filter(t=>!isStockValueTx(t));
 }
 const totalIncome=()=>filteredTx().filter(t=>t.type==='ingreso').reduce((s,t)=>s+t.amount,0);
 const totalExpense=()=>filteredTx().filter(t=>t.type==='egreso').reduce((s,t)=>s+t.amount,0);
@@ -2651,7 +2658,7 @@ function renderResumenSemanal(){
 function renderDashboard(){
   const bal=balance(),balColor=bal>=0?'var(--gold)':'var(--red)';
   const inc=totalIncome(),exp=totalExpense();
-  const filtered=filteredTx();
+  const filtered=visibleTx();
   const urgent=state.servicios.filter(s=>!s.pagado&&daysUntil(s.venceDia)<=5);
 
   // Alerta cuotas de deuda próximas
@@ -2790,7 +2797,7 @@ function renderDashboard(){
 function renderMovimientos(){
   if(!window._movBusqueda) window._movBusqueda='';
   if(!window._movFiltro) window._movFiltro='todos';
-  let filtered=filteredTx();
+  let filtered=visibleTx();
   // Filtro por tipo
   if(window._movFiltro==='ingresos') filtered=filtered.filter(t=>t.type==='ingreso');
   if(window._movFiltro==='egresos')  filtered=filtered.filter(t=>t.type==='egreso');
@@ -5091,9 +5098,13 @@ async function saveTx(editId){
   if(entraAStockValor){
     item.afectaStockValor = true;
     item.stockOperacion = 'entrada_valor';
+    item.ocultarEnMovimientos = true;
+    item.stockValorOnly = true;
   } else {
     delete item.afectaStockValor;
     delete item.stockOperacion;
+    delete item.ocultarEnMovimientos;
+    delete item.stockValorOnly;
   }
 
   const stockAnterior = original?.afectaStockValor ? moneyValue(original.amount) : 0;
@@ -20496,8 +20507,14 @@ function abrirModalCompartir(id){ npOpenShare(id); }
 
 
 // ======================================================================
-// AJUSTES FINAL - layout propio, sin depender de estilos de Notas
+// AJUSTES ACORDEON FINAL - secciones desplegables
 // ======================================================================
+function ajToggle(section){
+  window._ajOpen = window._ajOpen === section ? '' : section;
+  localStorage.setItem('fnz_aj_open', window._ajOpen || '');
+  render();
+}
+
 function ensureAjustesStyles(){
   let st = document.getElementById('ajustes-clean-styles');
   if(!st){ st = document.createElement('style'); st.id = 'ajustes-clean-styles'; document.head.appendChild(st); }
@@ -20507,16 +20524,21 @@ function ensureAjustesStyles(){
     .aj-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748B;font-weight:850;margin-bottom:5px}
     .aj-title{font-size:23px;font-weight:900;color:#172033;letter-spacing:0;margin-bottom:3px}
     .aj-sub{font-size:12px;color:#64748B;line-height:1.45;max-width:680px}
-    .aj-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-    .aj-card{background:#fff;border:1px solid #E6EBF0;border-radius:16px;padding:14px;box-shadow:0 8px 22px rgba(15,23,42,.04);min-width:0}
-    .aj-card.full{grid-column:1/-1}
-    .aj-card-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-    .aj-ic{width:36px;height:36px;border-radius:12px;background:#F4F8F6;color:#2F5F56;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
-    .aj-card:nth-child(2) .aj-ic{background:#EFF6FF;color:#1F5C99}
-    .aj-card:nth-child(3) .aj-ic{background:#F5F3FF;color:#6D46A5}
-    .aj-card:nth-child(4) .aj-ic{background:#FFF7ED;color:#9A5415}
+    .aj-accordion{display:grid;gap:10px}
+    .aj-sec{background:#fff;border:1px solid #E6EBF0;border-radius:16px;box-shadow:0 8px 22px rgba(15,23,42,.04);overflow:hidden}
+    .aj-sec-btn{width:100%;border:none;background:#fff;padding:14px;display:flex;align-items:center;gap:11px;text-align:left;cursor:pointer;color:#172033}
+    .aj-sec-btn:active{background:#F8FAFC}
+    .aj-ic{width:38px;height:38px;border-radius:12px;background:#F4F8F6;color:#2F5F56;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+    .aj-sec:nth-child(2) .aj-ic{background:#EFF6FF;color:#1F5C99}
+    .aj-sec:nth-child(3) .aj-ic{background:#F5F3FF;color:#6D46A5}
+    .aj-sec:nth-child(4) .aj-ic{background:#FFF7ED;color:#9A5415}
+    .aj-main{flex:1;min-width:0}
     .aj-h{font-size:14px;font-weight:900;color:#172033}
     .aj-p{font-size:11px;color:#64748B;margin-top:2px;line-height:1.3}
+    .aj-chevron{width:24px;height:24px;border-radius:999px;background:#F8FAFC;color:#94A3B8;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;transition:transform .18s;flex:0 0 auto}
+    .aj-sec.open .aj-chevron{transform:rotate(180deg);color:#172033}
+    .aj-body{display:none;border-top:1px solid #EEF2F6;padding:14px;background:#FFFFFF}
+    .aj-sec.open .aj-body{display:block}
     .aj-field{display:grid;gap:5px;margin-bottom:10px}
     .aj-field label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#64748B;font-weight:850}
     .aj-field input{width:100%;min-width:0;border:1px solid #E2E8F0;background:#F8FAFC;border-radius:12px;padding:11px 12px;font-size:13px;color:#172033;outline:none;font-family:Inter,'DM Sans',sans-serif}
@@ -20534,13 +20556,15 @@ function ensureAjustesStyles(){
     .aj-theme span{font-size:10px;color:#64748B;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .aj-listbox{display:grid;gap:8px}
     .aj-listbox:empty{display:none}
-    @media(max-width:560px){.aj-grid{grid-template-columns:1fr}.aj-themes{grid-template-columns:repeat(2,minmax(0,1fr))}.aj-card.full{grid-column:auto}.aj-row{display:grid;grid-template-columns:1fr 1fr}.aj-btn{width:100%}}
+    @media(max-width:560px){.aj-themes{grid-template-columns:repeat(2,minmax(0,1fr))}.aj-row{display:grid;grid-template-columns:1fr 1fr}.aj-btn{width:100%}}
   `;
 }
 
 function renderAjustes(){
   ensureAjustesStyles();
   ensureLazyData('sonidos');
+  if(window._ajOpen === undefined) window._ajOpen = localStorage.getItem('fnz_aj_open') || 'perfil';
+  const open = window._ajOpen || '';
   const temaActual = localStorage.getItem('fnz_tema') || 'esmeralda';
   const sheetsUrl = localStorage.getItem('fnz_sheets_url') || '';
   const gemKey = localStorage.getItem('fnz_gemini_key') || '';
@@ -20553,66 +20577,46 @@ function renderAjustes(){
       <span style="min-width:0"><b>${npEsc(t.nombre)}</b><span>${npEsc(t.desc||'')}</span></span>
     </button>`).join('');
   setTimeout(()=>{ try{ renderSoundsList(); renderRemindersList(); checkNotifBtn(); }catch(e){} }, 0);
+  const sec = (id, icon, title, sub, body) => `<div class="aj-sec ${open===id?'open':''}">
+    <button class="aj-sec-btn" onclick="ajToggle('${id}')">
+      <div class="aj-ic">${appIcon(icon)}</div><div class="aj-main"><div class="aj-h">${title}</div><div class="aj-p">${sub}</div></div><div class="aj-chevron">v</div>
+    </button>
+    <div class="aj-body">${body}</div>
+  </div>`;
 
   return `<div class="aj-page">
     <div class="aj-head">
       <div class="aj-kicker">Configuracion</div>
       <div class="aj-title">Ajustes</div>
-      <div class="aj-sub">Conexiones, tema visual, Notion, Google Sheets, Gemini y alertas.</div>
+      <div class="aj-sub">Toca cada bloque para desplegar sus opciones.</div>
     </div>
-
-    <div class="aj-grid">
-      <div class="aj-card">
-        <div class="aj-card-head"><div class="aj-ic">${appIcon('settings')}</div><div><div class="aj-h">Perfil</div><div class="aj-p">Nombre usado en reportes y mensajes.</div></div></div>
-        <div class="aj-field"><label>Tu nombre</label><input id="input-nombre-usuario" value="${npEsc(state.nombreUsuario||'')}" placeholder="Nombre para reportes"></div>
-        <button class="aj-btn primary" onclick="guardarNombreUsuario()">Guardar nombre</button>
-      </div>
-
-      <div class="aj-card">
-        <div class="aj-card-head"><div class="aj-ic">${appIcon('document')}</div><div><div class="aj-h">Gemini</div><div class="aj-p">IA para agenda, notas y reuniones.</div></div></div>
-        <div class="aj-field"><label>API key</label><input id="gemini-key-input" value="${npEsc(gemKey)}" placeholder="AIza..."></div>
-        <div class="aj-row"><button class="aj-btn primary" onclick="saveGeminiKey()">Guardar</button><button class="aj-btn" onclick="testGeminiKey()">Probar</button></div>
-      </div>
-
-      <div class="aj-card full">
-        <div class="aj-card-head"><div class="aj-ic">${appIcon('box')}</div><div><div class="aj-h">Tema visual</div><div class="aj-p">Elige una apariencia limpia para toda la app.</div></div></div>
-        <div class="aj-themes">${themeButtons}</div>
-      </div>
-
-      <div class="aj-card full">
-        <div class="aj-card-head"><div class="aj-ic">${appIcon('document')}</div><div><div class="aj-h">Google Sheets</div><div class="aj-p">URL del Apps Script publicado.</div></div></div>
-        <div class="aj-field"><label>URL Apps Script</label><input id="sheets-url-input" value="${npEsc(sheetsUrl)}" placeholder="https://script.google.com/..."></div>
-        <div class="aj-row"><button class="aj-btn primary" onclick="saveSheetsUrl()">Guardar URL</button><button class="aj-btn" onclick="testSheetsSync()">Probar</button></div>
-        <div class="aj-row" style="margin-top:8px"><button class="aj-btn soft" onclick="reloadFromSheets()">Importar desde Sheets</button><button class="aj-btn soft" onclick="syncAllTxToSheets(false)">Enviar movimientos</button></div>
-      </div>
-
-      <div class="aj-card full">
-        <div class="aj-card-head"><div class="aj-ic">${appIcon('store')}</div><div><div class="aj-h">Notion</div><div class="aj-p">Bases de datos de finanzas y clientes.</div></div></div>
-        <div class="aj-field"><label>Token</label><input id="notion-token-input" value="${npEsc(notionToken)}" placeholder="secret_..."></div>
-        <div class="aj-field"><label>DB Finanzas / Reporte Diario</label><input id="notion-db-input" value="${npEsc(notionDb)}" placeholder="ID de base de datos"></div>
-        <div class="aj-field"><label>DB Clientes / Agenda</label><input id="notion-clientes-db-input" value="${npEsc(notionClientesDb)}" placeholder="ID de clientes"></div>
-        <div class="aj-field"><label>Intervalo sync minutos</label><input id="notion-interval-input" type="number" min="1" value="${npEsc(notionInterval)}"></div>
-        <div class="aj-row"><button class="aj-btn primary" onclick="saveNotionSettings()">Guardar Notion</button><button class="aj-btn" onclick="notionApiTest()">Forzar importacion</button></div>
-        <div class="aj-row" style="margin-top:8px"><button class="aj-btn soft" onclick="notionCargarManual()">Preview Notion</button><button class="aj-btn soft" onclick="notionApiSyncStart()">Auto sync</button><button class="aj-btn soft" onclick="notionApiSyncStop()">Detener</button></div>
-        <div style="display:grid;gap:7px;margin-top:10px">
-          <div id="notion-api-status" class="aj-status"></div>
-          <div id="notion-load-status" class="aj-status"></div>
-          <div id="notion-import-status" class="aj-status"></div>
-        </div>
-      </div>
-
-      <div class="aj-card full">
-        <div class="aj-card-head"><div class="aj-ic">${appIcon('note')}</div><div><div class="aj-h">Alertas</div><div class="aj-p">Notificaciones, sonidos y recordatorios.</div></div></div>
-        <div class="aj-row"><button id="notif-btn" class="aj-btn" onclick="requestNotifPermission()">Activar notificaciones</button><button class="aj-btn primary" onclick="openAddReminder()">Nuevo recordatorio</button></div>
-        <div style="display:grid;gap:10px;margin-top:10px">
-          <div id="sounds-list" class="aj-listbox"></div>
-          <div id="reminders-list" class="aj-listbox"></div>
-        </div>
-      </div>
+    <div class="aj-accordion">
+      ${sec('perfil','settings','Perfil','Nombre usado en reportes y mensajes.',
+        `<div class="aj-field"><label>Tu nombre</label><input id="input-nombre-usuario" value="${npEsc(state.nombreUsuario||'')}" placeholder="Nombre para reportes"></div>
+         <button class="aj-btn primary" onclick="guardarNombreUsuario()">Guardar nombre</button>`)}
+      ${sec('tema','box','Tema visual','Apariencia limpia para toda la app.',
+        `<div class="aj-themes">${themeButtons}</div>`)}
+      ${sec('sheets','document','Google Sheets','URL del Apps Script publicado.',
+        `<div class="aj-field"><label>URL Apps Script</label><input id="sheets-url-input" value="${npEsc(sheetsUrl)}" placeholder="https://script.google.com/..."></div>
+         <div class="aj-row"><button class="aj-btn primary" onclick="saveSheetsUrl()">Guardar URL</button><button class="aj-btn" onclick="testSheetsSync()">Probar</button></div>
+         <div class="aj-row" style="margin-top:8px"><button class="aj-btn soft" onclick="reloadFromSheets()">Importar desde Sheets</button><button class="aj-btn soft" onclick="syncAllTxToSheets(false)">Enviar movimientos</button></div>`)}
+      ${sec('notion','store','Notion','Bases de datos de finanzas y clientes.',
+        `<div class="aj-field"><label>Token</label><input id="notion-token-input" value="${npEsc(notionToken)}" placeholder="secret_..."></div>
+         <div class="aj-field"><label>DB Finanzas / Reporte Diario</label><input id="notion-db-input" value="${npEsc(notionDb)}" placeholder="ID de base de datos"></div>
+         <div class="aj-field"><label>DB Clientes / Agenda</label><input id="notion-clientes-db-input" value="${npEsc(notionClientesDb)}" placeholder="ID de clientes"></div>
+         <div class="aj-field"><label>Intervalo sync minutos</label><input id="notion-interval-input" type="number" min="1" value="${npEsc(notionInterval)}"></div>
+         <div class="aj-row"><button class="aj-btn primary" onclick="saveNotionSettings()">Guardar Notion</button><button class="aj-btn" onclick="notionApiTest()">Forzar importacion</button></div>
+         <div class="aj-row" style="margin-top:8px"><button class="aj-btn soft" onclick="notionCargarManual()">Preview Notion</button><button class="aj-btn soft" onclick="notionApiSyncStart()">Auto sync</button><button class="aj-btn soft" onclick="notionApiSyncStop()">Detener</button></div>
+         <div style="display:grid;gap:7px;margin-top:10px"><div id="notion-api-status" class="aj-status"></div><div id="notion-load-status" class="aj-status"></div><div id="notion-import-status" class="aj-status"></div></div>`)}
+      ${sec('gemini','note','Gemini','IA para agenda, notas y reuniones.',
+        `<div class="aj-field"><label>API key</label><input id="gemini-key-input" value="${npEsc(gemKey)}" placeholder="AIza..."></div>
+         <div class="aj-row"><button class="aj-btn primary" onclick="saveGeminiKey()">Guardar</button><button class="aj-btn" onclick="testGeminiKey()">Probar</button></div>`)}
+      ${sec('alertas','clipboard','Alertas','Notificaciones, sonidos y recordatorios.',
+        `<div class="aj-row"><button id="notif-btn" class="aj-btn" onclick="requestNotifPermission()">Activar notificaciones</button><button class="aj-btn primary" onclick="openAddReminder()">Nuevo recordatorio</button></div>
+         <div style="display:grid;gap:10px;margin-top:10px"><div id="sounds-list" class="aj-listbox"></div><div id="reminders-list" class="aj-listbox"></div></div>`)}
     </div>
   </div>`;
 }
-
 
 
 setTimeout(()=>{
