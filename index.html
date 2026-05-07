@@ -20493,6 +20493,128 @@ function abrirEditorNota(editId){ if(editId) npOpenNote(editId); else npOpenDoc(
 function openEditNotaLista(n){ npOpenSmartList((typeof n==='object'?n.id:n),(typeof n==='object'?n.listType:null)||'compras'); }
 function abrirModalCompartir(id){ npOpenShare(id); }
 
+
+
+// ======================================================================
+// AJUSTES FINAL - layout propio, sin depender de estilos de Notas
+// ======================================================================
+function ensureAjustesStyles(){
+  let st = document.getElementById('ajustes-clean-styles');
+  if(!st){ st = document.createElement('style'); st.id = 'ajustes-clean-styles'; document.head.appendChild(st); }
+  st.textContent = `
+    .aj-page{padding:2px 0 112px;font-family:Inter,'DM Sans',sans-serif;color:var(--text)}
+    .aj-head{background:#fff;border:1px solid #E6EBF0;border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:0 10px 26px rgba(15,23,42,.045)}
+    .aj-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748B;font-weight:850;margin-bottom:5px}
+    .aj-title{font-size:23px;font-weight:900;color:#172033;letter-spacing:0;margin-bottom:3px}
+    .aj-sub{font-size:12px;color:#64748B;line-height:1.45;max-width:680px}
+    .aj-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .aj-card{background:#fff;border:1px solid #E6EBF0;border-radius:16px;padding:14px;box-shadow:0 8px 22px rgba(15,23,42,.04);min-width:0}
+    .aj-card.full{grid-column:1/-1}
+    .aj-card-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .aj-ic{width:36px;height:36px;border-radius:12px;background:#F4F8F6;color:#2F5F56;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+    .aj-card:nth-child(2) .aj-ic{background:#EFF6FF;color:#1F5C99}
+    .aj-card:nth-child(3) .aj-ic{background:#F5F3FF;color:#6D46A5}
+    .aj-card:nth-child(4) .aj-ic{background:#FFF7ED;color:#9A5415}
+    .aj-h{font-size:14px;font-weight:900;color:#172033}
+    .aj-p{font-size:11px;color:#64748B;margin-top:2px;line-height:1.3}
+    .aj-field{display:grid;gap:5px;margin-bottom:10px}
+    .aj-field label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#64748B;font-weight:850}
+    .aj-field input{width:100%;min-width:0;border:1px solid #E2E8F0;background:#F8FAFC;border-radius:12px;padding:11px 12px;font-size:13px;color:#172033;outline:none;font-family:Inter,'DM Sans',sans-serif}
+    .aj-field input:focus{border-color:#8DBBA3;box-shadow:0 0 0 3px rgba(79,127,103,.12);background:#fff}
+    .aj-row{display:flex;gap:8px;flex-wrap:wrap}
+    .aj-btn{border:1px solid #E2E8F0;background:#fff;color:#475569;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:850;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;flex:1}
+    .aj-btn.primary{background:#172033;color:#fff;border-color:#172033}
+    .aj-btn.soft{background:#F8FAFC}
+    .aj-status{font-size:11px;color:#64748B;background:#F8FAFC;border:1px solid #E6EBF0;border-radius:12px;padding:9px 10px;min-height:34px}
+    .aj-themes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .aj-theme{border:1px solid #E2E8F0;background:#fff;border-radius:13px;padding:10px;display:flex;align-items:center;gap:9px;text-align:left;cursor:pointer;color:#172033;min-width:0}
+    .aj-theme.on{border-color:#172033;box-shadow:0 0 0 2px rgba(23,32,51,.08)}
+    .aj-swatch{width:22px;height:22px;border-radius:999px;border:1px solid #D8E0E8;box-shadow:inset 0 0 0 3px #fff;flex:0 0 auto}
+    .aj-theme b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .aj-theme span{font-size:10px;color:#64748B;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .aj-listbox{display:grid;gap:8px}
+    .aj-listbox:empty{display:none}
+    @media(max-width:560px){.aj-grid{grid-template-columns:1fr}.aj-themes{grid-template-columns:repeat(2,minmax(0,1fr))}.aj-card.full{grid-column:auto}.aj-row{display:grid;grid-template-columns:1fr 1fr}.aj-btn{width:100%}}
+  `;
+}
+
+function renderAjustes(){
+  ensureAjustesStyles();
+  ensureLazyData('sonidos');
+  const temaActual = localStorage.getItem('fnz_tema') || 'esmeralda';
+  const sheetsUrl = localStorage.getItem('fnz_sheets_url') || '';
+  const gemKey = localStorage.getItem('fnz_gemini_key') || '';
+  const notionToken = localStorage.getItem('fnz_notion_token') || '';
+  const notionDb = localStorage.getItem('fnz_notion_dbid') || '';
+  const notionClientesDb = localStorage.getItem('fnz_notion_dbid_clientes') || '';
+  const notionInterval = localStorage.getItem('fnz_notion_interval') || '15';
+  const themeButtons = TEMAS_APP.map(t => `<button class="aj-theme ${temaActual===t.id?'on':''}" onclick="applyTheme('${t.id}')">
+      <span class="aj-swatch" style="background:${t.accent}"></span>
+      <span style="min-width:0"><b>${npEsc(t.nombre)}</b><span>${npEsc(t.desc||'')}</span></span>
+    </button>`).join('');
+  setTimeout(()=>{ try{ renderSoundsList(); renderRemindersList(); checkNotifBtn(); }catch(e){} }, 0);
+
+  return `<div class="aj-page">
+    <div class="aj-head">
+      <div class="aj-kicker">Configuracion</div>
+      <div class="aj-title">Ajustes</div>
+      <div class="aj-sub">Conexiones, tema visual, Notion, Google Sheets, Gemini y alertas.</div>
+    </div>
+
+    <div class="aj-grid">
+      <div class="aj-card">
+        <div class="aj-card-head"><div class="aj-ic">${appIcon('settings')}</div><div><div class="aj-h">Perfil</div><div class="aj-p">Nombre usado en reportes y mensajes.</div></div></div>
+        <div class="aj-field"><label>Tu nombre</label><input id="input-nombre-usuario" value="${npEsc(state.nombreUsuario||'')}" placeholder="Nombre para reportes"></div>
+        <button class="aj-btn primary" onclick="guardarNombreUsuario()">Guardar nombre</button>
+      </div>
+
+      <div class="aj-card">
+        <div class="aj-card-head"><div class="aj-ic">${appIcon('document')}</div><div><div class="aj-h">Gemini</div><div class="aj-p">IA para agenda, notas y reuniones.</div></div></div>
+        <div class="aj-field"><label>API key</label><input id="gemini-key-input" value="${npEsc(gemKey)}" placeholder="AIza..."></div>
+        <div class="aj-row"><button class="aj-btn primary" onclick="saveGeminiKey()">Guardar</button><button class="aj-btn" onclick="testGeminiKey()">Probar</button></div>
+      </div>
+
+      <div class="aj-card full">
+        <div class="aj-card-head"><div class="aj-ic">${appIcon('box')}</div><div><div class="aj-h">Tema visual</div><div class="aj-p">Elige una apariencia limpia para toda la app.</div></div></div>
+        <div class="aj-themes">${themeButtons}</div>
+      </div>
+
+      <div class="aj-card full">
+        <div class="aj-card-head"><div class="aj-ic">${appIcon('document')}</div><div><div class="aj-h">Google Sheets</div><div class="aj-p">URL del Apps Script publicado.</div></div></div>
+        <div class="aj-field"><label>URL Apps Script</label><input id="sheets-url-input" value="${npEsc(sheetsUrl)}" placeholder="https://script.google.com/..."></div>
+        <div class="aj-row"><button class="aj-btn primary" onclick="saveSheetsUrl()">Guardar URL</button><button class="aj-btn" onclick="testSheetsSync()">Probar</button></div>
+        <div class="aj-row" style="margin-top:8px"><button class="aj-btn soft" onclick="reloadFromSheets()">Importar desde Sheets</button><button class="aj-btn soft" onclick="syncAllTxToSheets(false)">Enviar movimientos</button></div>
+      </div>
+
+      <div class="aj-card full">
+        <div class="aj-card-head"><div class="aj-ic">${appIcon('store')}</div><div><div class="aj-h">Notion</div><div class="aj-p">Bases de datos de finanzas y clientes.</div></div></div>
+        <div class="aj-field"><label>Token</label><input id="notion-token-input" value="${npEsc(notionToken)}" placeholder="secret_..."></div>
+        <div class="aj-field"><label>DB Finanzas / Reporte Diario</label><input id="notion-db-input" value="${npEsc(notionDb)}" placeholder="ID de base de datos"></div>
+        <div class="aj-field"><label>DB Clientes / Agenda</label><input id="notion-clientes-db-input" value="${npEsc(notionClientesDb)}" placeholder="ID de clientes"></div>
+        <div class="aj-field"><label>Intervalo sync minutos</label><input id="notion-interval-input" type="number" min="1" value="${npEsc(notionInterval)}"></div>
+        <div class="aj-row"><button class="aj-btn primary" onclick="saveNotionSettings()">Guardar Notion</button><button class="aj-btn" onclick="notionApiTest()">Forzar importacion</button></div>
+        <div class="aj-row" style="margin-top:8px"><button class="aj-btn soft" onclick="notionCargarManual()">Preview Notion</button><button class="aj-btn soft" onclick="notionApiSyncStart()">Auto sync</button><button class="aj-btn soft" onclick="notionApiSyncStop()">Detener</button></div>
+        <div style="display:grid;gap:7px;margin-top:10px">
+          <div id="notion-api-status" class="aj-status"></div>
+          <div id="notion-load-status" class="aj-status"></div>
+          <div id="notion-import-status" class="aj-status"></div>
+        </div>
+      </div>
+
+      <div class="aj-card full">
+        <div class="aj-card-head"><div class="aj-ic">${appIcon('note')}</div><div><div class="aj-h">Alertas</div><div class="aj-p">Notificaciones, sonidos y recordatorios.</div></div></div>
+        <div class="aj-row"><button id="notif-btn" class="aj-btn" onclick="requestNotifPermission()">Activar notificaciones</button><button class="aj-btn primary" onclick="openAddReminder()">Nuevo recordatorio</button></div>
+        <div style="display:grid;gap:10px;margin-top:10px">
+          <div id="sounds-list" class="aj-listbox"></div>
+          <div id="reminders-list" class="aj-listbox"></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+
+
 setTimeout(()=>{
   if(window._fnzBoot){
     const boot = window._fnzBoot;
