@@ -2481,6 +2481,12 @@ function isMaterialesCategory(catId, category){
   return catId === 'cne1' || catId === 'cneg_mat' || name === 'materiales' || name === 'materiales negocio';
 }
 
+function isComidaCategory(catId, category, description=''){
+  const text = [category, description].filter(Boolean).join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  return ['cne_gaseosa','cne_snack','cne_menu','ce_gaseosa','ce_snack','ce_menu'].includes(catId) ||
+    /\b(gaseosa|bebida|bebidas|refresco|snack|snacks|snak|snaks|menu|almuerzo|cena|desayuno|comida|restaurant|restaurante|golosina|golosinas|papitas|galleta|galletas)\b/.test(text);
+}
+
 function ajustarStockValorGeneral(delta){
   const before = moneyValue(state.stockValorGeneral);
   const after = Math.max(0, +(before + moneyValue(delta)).toFixed(2));
@@ -4408,6 +4414,72 @@ function testSheetsSync(){
 }
 
 // ★ Forzar carga de datos desde Sheets
+function saveNotionSettings(){
+  const token = document.getElementById('notion-token-input')?.value.trim() || '';
+  const dbFin = document.getElementById('notion-db-input')?.value.trim() || '';
+  const dbCli = document.getElementById('notion-clientes-db-input')?.value.trim() || '';
+  const interval = document.getElementById('notion-interval-input')?.value || '15';
+  localStorage.setItem('fnz_notion_token', token);
+  localStorage.setItem('fnz_notion_dbid', dbFin);
+  localStorage.setItem('fnz_notion_dbid_clientes', dbCli);
+  localStorage.setItem('fnz_notion_interval', interval);
+  toast('Notion guardado');
+}
+
+function renderAjustes(){
+  ensureLazyData('sonidos');
+  const temaActual = localStorage.getItem('fnz_tema') || 'esmeralda';
+  const sheetsUrl = localStorage.getItem('fnz_sheets_url') || '';
+  const gemKey = localStorage.getItem('fnz_gemini_key') || '';
+  const notionToken = localStorage.getItem('fnz_notion_token') || '';
+  const notionDb = localStorage.getItem('fnz_notion_dbid') || '';
+  const notionClientesDb = localStorage.getItem('fnz_notion_dbid_clientes') || '';
+  const notionInterval = localStorage.getItem('fnz_notion_interval') || '15';
+  const themeButtons = TEMAS_APP.map(t => `<button class="np-pill ${temaActual===t.id?'on':''}" onclick="applyTheme('${t.id}')">${t.nombre}</button>`).join('');
+  setTimeout(()=>{ try{ renderSoundsList(); renderRemindersList(); checkNotifBtn(); }catch(e){} }, 0);
+  return `<div class="section">
+    <div class="section-title">Ajustes</div>
+    <div class="card" style="display:grid;gap:12px">
+      <div class="field"><label class="field-label">Tu nombre</label><input id="input-nombre-usuario" value="${esc(state.nombreUsuario||'')}" placeholder="Nombre para reportes"></div>
+      <button class="btn-primary" onclick="guardarNombreUsuario()">Guardar nombre</button>
+    </div>
+    <div class="card" style="display:grid;gap:12px;margin-top:12px">
+      <div class="section-title" style="margin:0">Tema visual</div>
+      <div class="np-filters">${themeButtons}</div>
+    </div>
+    <div class="card" style="display:grid;gap:12px;margin-top:12px">
+      <div class="section-title" style="margin:0">Google Sheets</div>
+      <div class="field"><label class="field-label">URL Apps Script</label><input id="sheets-url-input" value="${esc(sheetsUrl)}" placeholder="https://script.google.com/..."></div>
+      <div class="btn-row"><button class="btn-ghost" onclick="testSheetsSync()">Probar</button><button class="btn-primary" onclick="saveSheetsUrl()">Guardar URL</button></div>
+      <div class="btn-row"><button class="btn-ghost" onclick="reloadFromSheets()">Importar desde Sheets</button><button class="btn-ghost" onclick="syncAllTxToSheets(false)">Enviar movimientos</button></div>
+    </div>
+    <div class="card" style="display:grid;gap:12px;margin-top:12px">
+      <div class="section-title" style="margin:0">Notion</div>
+      <div class="field"><label class="field-label">Token</label><input id="notion-token-input" value="${esc(notionToken)}" placeholder="secret_..."></div>
+      <div class="field"><label class="field-label">DB Finanzas / Reporte Diario</label><input id="notion-db-input" value="${esc(notionDb)}" placeholder="ID de base de datos"></div>
+      <div class="field"><label class="field-label">DB Clientes / Agenda</label><input id="notion-clientes-db-input" value="${esc(notionClientesDb)}" placeholder="ID de clientes"></div>
+      <div class="field"><label class="field-label">Intervalo sync minutos</label><input id="notion-interval-input" type="number" value="${esc(notionInterval)}"></div>
+      <div class="btn-row"><button class="btn-primary" onclick="saveNotionSettings()">Guardar Notion</button><button class="btn-ghost" onclick="notionApiTest()">Forzar importacion</button></div>
+      <div class="btn-row"><button class="btn-ghost" onclick="notionCargarManual()">Preview Notion</button><button class="btn-ghost" onclick="notionApiSyncStart()">Auto sync</button><button class="btn-ghost" onclick="notionApiSyncStop()">Detener</button></div>
+      <div id="notion-api-status" style="font-size:12px;color:var(--muted)"></div>
+      <div id="notion-load-status" style="font-size:12px;color:var(--muted)"></div>
+      <div id="notion-import-status" style="font-size:12px;color:var(--muted)"></div>
+    </div>
+    <div class="card" style="display:grid;gap:12px;margin-top:12px">
+      <div class="section-title" style="margin:0">Gemini</div>
+      <div class="field"><label class="field-label">API key</label><input id="gemini-key-input" value="${esc(gemKey)}" placeholder="AIza..."></div>
+      <div class="btn-row"><button class="btn-primary" onclick="saveGeminiKey()">Guardar Gemini</button><button class="btn-ghost" onclick="testGeminiKey()">Probar</button></div>
+    </div>
+    <div class="card" style="display:grid;gap:12px;margin-top:12px">
+      <div class="section-title" style="margin:0">Alertas</div>
+      <button id="notif-btn" class="btn-ghost" onclick="requestNotifPermission()">Activar notificaciones</button>
+      <div id="sounds-list"></div>
+      <div id="reminders-list"></div>
+      <button class="btn-primary" onclick="openAddReminder()">Nuevo recordatorio</button>
+    </div>
+  </div>`;
+}
+
 function reloadFromSheets(){
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(!url) return toast('Primero configura la URL de Sheets','error');
@@ -4529,233 +4601,81 @@ function enviarTodoASheets() {
 function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
   const status = statusElId ? document.getElementById(statusElId) : null;
   try {
-      const rows = _parseCsv(csv);
-      if (rows.length < 2) {
-        if (status) status.textContent = '⚠ El archivo está vacío o no es válido';
-        return;
-      }
-
-      // ── Detectar columnas automáticamente ──
-      const headers = rows[0].map(h => h.trim().toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,''));
-
-      const col = (names) => {
-        for (const n of names) {
-          const idx = headers.findIndex(h => h.includes(n));
-          if (idx >= 0) return idx;
-        }
-        return -1;
-      };
-
-      const iDate     = col(['fecha','date']);
-      const iCliente  = col(['cliente','cue','client','nombre']);
-      const iContacto = col(['contacto','conta','contact','tel','celular']);
-      const iSvc1     = col(['servicio 1','service 1','servicio1']);
-      const iSvc2     = col(['servicio 2','service 2','servicio2']);
-      const iSvc3     = col(['servicio 3','service 3','servicio3']);
-      const iSvc4     = col(['servicio 4','service 4','servicio4']);
-      const iDistrito = col(['distrito','district','zona','ubicacion']);
-      const iForma    = col(['forma de pago','forma','pago','payment']);
-      const iMovil    = col(['movilidad','movil','transport']);
-      const iMaterial = col(['materiales','material','materi']);
-      const iOtros    = col(['otros','other','extra']);
-      // ★ Precio del servicio — columna exacta del CSV de Notion
-      const iPrecio   = col(['precio del servicio','precio serv','precio s','precio']);
-      const iGanancia = col(['ganancia']); // ignorado — es columna calculada
-      const iObs      = col(['observaciones','observ','nota','comment','descripcion']);
-      const iNotionId = col(['notionid']); // La columna oculta generada por nuestro proxy
-
-      let txImportadas = 0;
-      let egresosMov = 0;
-      let egresosMat = 0;
-      const nuevasTx = [];
-
-      for (let i = 1; i < rows.length; i++) {
-        const r = rows[i];
-        if (r.length < 2) continue;
-
-        // Fecha
-        const fechaRaw = iDate >= 0 ? r[iDate]?.trim() : '';
-        const fecha = _parseFechaNotion(fechaRaw) || todayStr();
-
-        // Cliente (si está en blanco le ponemos 'Desconocido' para no perder gastos)
-        const cliente = iCliente >= 0 ? r[iCliente]?.trim().replace(/^\s+/,'') : '';
-        const clienteFinal = cliente || '(Sin cliente)';
-
-        // Notion ID original
-        const rawNotionId = iNotionId >= 0 ? r[iNotionId]?.trim() : '';
-        const nId = rawNotionId || ('not_' + fecha + '_r' + i);
-
-        // Servicio — tomar el primer servicio reconocido (no concatenar)
-        const svcs = [iSvc1,iSvc2,iSvc3,iSvc4]
-          .filter(idx => idx >= 0)
-          .map(idx => r[idx]?.trim())
-          .filter(v => v && v !== '-' && v !== '');
-        // ★ Mapear cada servicio y tomar el primero que no sea genérico
-        let servicio = 'Servicio Gas';
-        for (const s of svcs) {
-          const mapped = _mapearCategoriaNotion(s);
-          if (mapped && mapped !== 'Servicio Gas' && mapped !== s) {
-            servicio = mapped;
-            break;
-          }
-        }
-        if (servicio === 'Servicio Gas' && svcs.length > 0) {
-          servicio = _mapearCategoriaNotion(svcs[0]) || svcs[0];
-        }
-
-        // Precio / ingreso principal
-        // ★ Parsear formato Notion: "10,00 PEN" o "1.200,00 PEN" → número
-        const precio = _parseMonto(iPrecio >= 0 ? r[iPrecio] : '');
-
-        // Observaciones
-        const obs = iObs >= 0 ? r[iObs]?.trim() : '';
-
-        // Forma de pago
-        const forma = iForma >= 0 ? r[iForma]?.trim() : '';
-
-        // ── Crear tx de INGRESO ──
-        if (precio > 0) {
-          // Descripción limpia: servicio real, cliente separado, obs solo si aporta info nueva
-          const descBase = servicio; // nombre del servicio (ya mapeado)
-          const clienteLimpio = clienteFinal.split('@')[0].trim(); // quitar emails si vienen
-          // Solo agregar obs si tiene contenido distinto al servicio y al cliente
-          const obsFiltrado = obs && obs.toLowerCase() !== servicio.toLowerCase() && obs.toLowerCase() !== clienteLimpio.toLowerCase() ? obs : '';
-          const descripcion = descBase + (clienteLimpio && clienteLimpio !== '(Sin cliente)' ? ' — ' + clienteLimpio : '') + (obsFiltrado ? ' · ' + obsFiltrado : '');
-
-          nuevasTx.push({
-            id: nId + '-ing',
-            type: 'ingreso',
-            amount: precio,
-            category: servicio,
-            catId: _getCatIdByName(servicio),
-            description: descripcion,
-            date: fecha,
-            cliente: clienteLimpio,
-            contacto: iContacto >= 0 ? r[iContacto]?.trim() : '',
-            ubicacion: iDistrito >= 0 ? r[iDistrito]?.trim() : '',
-            formaPago: forma,
-            negocio: true,
-            moneda: 'PEN',
-            _importadoDeNotion: true,
-            _notionRowId: rawNotionId
-          });
-          txImportadas++;
-        }
-
-        // ── Crear egreso de MOVILIDAD si tiene valor ──
-        const movil = _parseMonto(iMovil >= 0 ? r[iMovil] : '');
-        if (movil > 0) {
-          nuevasTx.push({
-            id: nId + '-mov',
-            type: 'egreso',
-            amount: movil,
-            category: 'Movilidad',
-            catId: 'cne5',
-            description: 'Movilidad — ' + (clienteFinal !== '(Sin cliente)' ? clienteFinal : fecha),
-            date: fecha,
-            negocio: true,
-            moneda: 'PEN',
-            _importadoDeNotion: true,
-            _notionRowId: rawNotionId
-          });
-          egresosMov++;
-        }
-
-        // ── Crear egreso de MATERIALES si tiene valor ──
-        const mat = _parseMonto(iMaterial >= 0 ? r[iMaterial] : '');
-        if (mat > 0) {
-          nuevasTx.push({
-            id: nId + '-mat',
-            type: 'egreso',
-            amount: mat,
-            category: 'Materiales',
-            catId: 'cne1',
-            description: 'Materiales — ' + (clienteFinal !== '(Sin cliente)' ? clienteFinal : fecha),
-            date: fecha,
-            negocio: true,
-            moneda: 'PEN',
-            _importadoDeNotion: true,
-            _notionRowId: rawNotionId
-          });
-          egresosMat++;
-        }
-
-        // ── Crear egreso de OTROS si tiene valor ──
-        const otros = _parseMonto(iOtros >= 0 ? r[iOtros] : '');
-        if (otros > 0) {
-          nuevasTx.push({
-            id: nId + '-otr',
-            type: 'egreso',
-            amount: otros,
-            category: 'Otros gastos de negocio',
-            catId: 'cne6',
-            description: 'Otros gastos — ' + (clienteFinal !== '(Sin cliente)' ? clienteFinal : fecha),
-            date: fecha,
-            negocio: true,
-            moneda: 'PEN',
-            _importadoDeNotion: true,
-            _notionRowId: rawNotionId
-          });
-        }
-      }
-
-      if (nuevasTx.length === 0) {
-        if (status) status.textContent = '⚠ No se encontraron datos válidos. Revisa el CSV.';
-        return;
-      }
-
-      // ── Importar: FUSIONAR O ESPEJO ──
-      const existing = load('fnz_neg_tx', []);
-      let merged = [];
-
-      if (isFullSync) {
-        // MODO ESPEJO: Preservar solo los registros manuales. TODO lo de Notion se borra y se reemplaza entero
-        const manuales = existing.filter(t => !t._importadoDeNotion);
-        // Validar duplicados dentro del lote de importación (por si acaso Notion manda el mismo ID dos veces)
-        const idsExistentes = new Set(manuales.map(t => t.id)); // manuales
-        const sinDuplicar = [];
-        for (const t of nuevasTx) {
-          if (idsExistentes.has(t.id)) continue; 
-          idsExistentes.add(t.id);
-          sinDuplicar.push(t);
-        }
-        merged = [...manuales, ...sinDuplicar];
-      } else {
-        // MODO INCREMENTAL: Preservar todos, solo agregar/actualizar los que entran
-        // (Sobrescribe si hay IDs idénticos, por si cambió el monto, sino agrega)
-        const map = new Map(existing.map(t => [t.id, t]));
-        for (const t of nuevasTx) {
-          map.set(t.id, t);
-        }
-        merged = Array.from(map.values());
-      }
-
-      save('fnz_neg_tx', merged);
-      if (state.modo === 'negocio') state.transactions = merged;
-
-      // Sincronizar cada tx a Sheets si hay URL
-      const url = localStorage.getItem('fnz_sheets_url') || '';
-      if (url) {
-        nuevasTx.forEach((tx, idx) => {
-          setTimeout(() => syncToSheets(tx), idx * 150);
-        });
-      }
-
-      saveAll(); render();
-      const msg = `✓ Importado: ${txImportadas} ingresos · ${egresosMov} movilidad · ${egresosMat} materiales`;
-      if (status) status.textContent = msg;
-      toast(msg);
-      return { ok: true, txImportadas, egresosMov, egresosMat };
-
+    const rows = _parseCsv(csv);
+    if (rows.length < 2) { if (status) status.textContent = 'El archivo esta vacio o no es valido'; return; }
+    const headers = rows[0].map(h => String(h||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' '));
+    const col = (names) => {
+      const wanted = names.map(n => String(n).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim());
+      for (const n of wanted) { const exact = headers.findIndex(h => h === n); if (exact >= 0) return exact; }
+      for (const n of wanted) { const partial = headers.findIndex(h => h.includes(n)); if (partial >= 0) return partial; }
+      return -1;
+    };
+    const val = (r, idx) => idx >= 0 ? (r[idx] || '').trim() : '';
+    const sumCols = (r, idxs) => idxs.reduce((s,idx) => s + _parseMonto(val(r, idx)), 0);
+    const iDate=col(['fecha','date']), iCliente=col(['cliente','client','nombre']), iContacto=col(['contacto','telefono','tel','phone','celular']), iDistrito=col(['distrito','district','zona','ubicacion']);
+    const iForma1=col(['1 forma de pago','1 forma pago','forma de pago 1','pago 1','forma de pago']), iForma2=col(['2 forma de pago','2 forma pago','forma de pago 2','pago 2']);
+    const iSvc1=col(['servicio 1','service 1','servicio1','servicio']), iSvc2=col(['servicio 2','service 2','servicio2']), iSvc3=col(['servicio 3','service 3','servicio3']);
+    const iMat1=col(['1 materiales','materiales 1','1 material','materiales']), iMat2=col(['2 materiales','materiales 2','2 material']), iMat3=col(['3 materiales','materiales 3','3 material']);
+    const iPrecio1=col(['1 precio del servicio','precio del servicio 1','1 precio','precio 1','precio del servicio','precio']), iPrecio2=col(['2 precio del servicio','precio del servicio 2','2 precio','precio 2']), iPrecio3=col(['3 precio de servicio','3 precio del servicio','precio del servicio 3','3 precio','precio 3']);
+    const iComida=col(['comida','alimentos','menu','snacks','bebidas']), iOtros=col(['otros','otros gastos','gastos extra','extra']), iAgreg=col(['agregados','agregado','adicional','adicionales']), iMovil=col(['movilidad','movil','transport','transporte','pasajes']);
+    const iObs=col(['observaciones','observ','nota','notas','comment','descripcion']), iNotionId=col(['notionid']);
+    let txImportadas=0, egresosMov=0, egresosMat=0, egresosCom=0, egresosOtros=0, egresosAgr=0;
+    const nuevasTx = [];
+    for (let i=1; i<rows.length; i++) {
+      const r=rows[i]; if (r.length < 2) continue;
+      const fecha=_parseFechaNotion(val(r,iDate))||todayStr(), clienteFinal=val(r,iCliente)||'(Sin cliente)', rawNotionId=val(r,iNotionId), nId=rawNotionId||('not_'+fecha+'_r'+i);
+      const obs=val(r,iObs), forma=val(r,iForma1)||val(r,iForma2), contacto=val(r,iContacto), distrito=val(r,iDistrito);
+      [
+        {idx:1,svc:val(r,iSvc1),precio:_parseMonto(val(r,iPrecio1))},
+        {idx:2,svc:val(r,iSvc2),precio:_parseMonto(val(r,iPrecio2))},
+        {idx:3,svc:val(r,iSvc3),precio:_parseMonto(val(r,iPrecio3))}
+      ].forEach(s => {
+        if (s.precio <= 0) return;
+        const servicio=_mapearCategoriaNotion(s.svc||'Servicio Gas')||'Servicio Gas';
+        const clienteLimpio=clienteFinal.split('@')[0].trim();
+        const obsFiltrado=obs && obs.toLowerCase()!==servicio.toLowerCase() && obs.toLowerCase()!==clienteLimpio.toLowerCase() ? obs : '';
+        nuevasTx.push({id:nId+'-svc'+s.idx,type:'ingreso',amount:s.precio,category:servicio,catId:_getCatIdByName(servicio),description:servicio+(clienteLimpio&&clienteLimpio!=='(Sin cliente)'?' - '+clienteLimpio:'')+(obsFiltrado?' - '+obsFiltrado:''),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,formaPago:forma,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId});
+        txImportadas++;
+      });
+      const mat=sumCols(r,[iMat1,iMat2,iMat3].filter(idx=>idx>=0));
+      if(mat>0){ nuevasTx.push({id:nId+'-mat',type:'egreso',amount:mat,category:'Materiales',catId:'cne1',description:'Materiales - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId}); egresosMat++; }
+      const comida=_parseMonto(val(r,iComida));
+      if(comida>0){ nuevasTx.push({id:nId+'-com',type:'egreso',amount:comida,category:'Comida',catId:'cne_menu',description:'Comida - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId}); egresosCom++; }
+      const otros=_parseMonto(val(r,iOtros));
+      if(otros>0){ nuevasTx.push({id:nId+'-otr',type:'egreso',amount:otros,category:'Otros gastos de negocio',catId:'cne6',description:'Otros gastos - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId}); egresosOtros++; }
+      const agregados=_parseMonto(val(r,iAgreg));
+      if(agregados>0){ nuevasTx.push({id:nId+'-agr',type:'egreso',amount:agregados,category:'Agregados',catId:'cne_agregados',description:'Agregados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId}); egresosAgr++; }
+      const movil=_parseMonto(val(r,iMovil));
+      if(movil>0){ nuevasTx.push({id:nId+'-mov',type:'egreso',amount:movil,category:'Movilidad',catId:'cne5',description:'Movilidad - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId}); egresosMov++; }
+    }
+    if(nuevasTx.length===0){ if(status) status.textContent='No se encontraron datos validos. Revisa las columnas.'; return; }
+    const existing=load('fnz_neg_tx',[]);
+    let merged=[];
+    if(isFullSync){
+      const manuales=existing.filter(t=>!t._importadoDeNotion), ids=new Set(manuales.map(t=>t.id)), sin=[];
+      for(const t of nuevasTx){ if(ids.has(t.id)) continue; ids.add(t.id); sin.push(t); }
+      merged=[...manuales,...sin];
+    }else{
+      const map=new Map(existing.map(t=>[t.id,t]));
+      for(const t of nuevasTx) map.set(t.id,t);
+      merged=Array.from(map.values());
+    }
+    save('fnz_neg_tx',merged);
+    if(state.modo==='negocio') state.transactions=merged;
+    const url=localStorage.getItem('fnz_sheets_url')||'';
+    if(url) nuevasTx.forEach((tx,idx)=>setTimeout(()=>syncToSheets(tx),idx*150));
+    saveAll(); render();
+    const msg=`Importado: ${txImportadas} ingresos - ${egresosCom} comida - ${egresosMov} movilidad - ${egresosMat} materiales`;
+    if(status) status.textContent=msg;
+    toast(msg);
+    return {ok:true,txImportadas,egresosMov,egresosMat,egresosCom,egresosOtros,egresosAgr};
   } catch(err) {
-    console.error('Error procesando CSV Notion:', err);
-    if (status) status.textContent = '⚠ Error al procesar el CSV: ' + err.message;
-    return { ok: false, error: err.message };
+    console.error('Error procesando CSV Notion:',err);
+    if(status) status.textContent='Error al procesar el CSV: '+err.message;
+    return {ok:false,error:err.message};
   }
 }
-
-// ── Importación manual (input file) — usa el mismo núcleo ──────────
+// Importacion manual (input file) — usa el mismo núcleo ──────────
 function importarNotion(input) {
   const file = input.files ? input.files[0] : null;
   if (!file) return;
@@ -6720,7 +6640,7 @@ async function _pushToNotion(item, cobroObj) {
     const p = cobroObj['precio' + i] || item['precio' + i] || 0;
     const m = cobroObj['materiales' + i] || item['materiales' + i] || 0;
     if (s) setProp(findCol('servicio ' + i, 'svc ' + i, 'servicio' + i), s);
-    if (p > 0) setProp(findCol(i + ' precio del servicio', 'precio del servicio ' + i, 'precio ' + i, i + ' precio', 'precio ' + i), p);
+    if (p > 0) setProp(findCol(i + ' precio del servicio', i + ' precio de servicio', i + ' precio servicio', 'precio del servicio ' + i, 'precio de servicio ' + i, 'precio ' + i, i + ' precio'), p);
     if (m > 0) setProp(findCol(i + ' materiales', 'materiales ' + i, i + ' material', 'material ' + i), m);
   }
 
@@ -6740,6 +6660,7 @@ async function _pushToNotion(item, cobroObj) {
 
   // 5. Gastos extra
   if (cobroObj.movilidad > 0) setProp(findCol('movilidad', 'pasajes', 'gasolina'), cobroObj.movilidad);
+  if (cobroObj.comida > 0) setProp(findCol('comida','alimentos','menu','snack','snacks','bebida','bebidas'), cobroObj.comida);
   if (cobroObj.agregados > 0 || cobroObj.otros > 0) setProp(findCol('agregados'), cobroObj.agregados || cobroObj.otros);
   if (cobroObj.otros_gastos > 0) setProp(findCol('otros', 'extra'), cobroObj.otros_gastos);
 
@@ -6811,6 +6732,8 @@ async function _updateNotionPage(pageId, updatedTx) {
       setProp(findCol('movilidad','pasajes','gasolina','combustible','transporte'), parseFloat(updatedTx.amount)||0);
     else if (catL.includes('material'))
       setProp(findCol('materiales','material','insumos','compras'), parseFloat(updatedTx.amount)||0);
+    else if (isComidaCategory(updatedTx.catId, updatedTx.category, updatedTx.description))
+      setProp(findCol('comida','alimentos','menu','snack','snacks','bebida','bebidas'), parseFloat(updatedTx.amount)||0);
     else
       setProp(findCol('otros','otros gastos','gastos extra'), parseFloat(updatedTx.amount)||0);
   }
@@ -6852,7 +6775,8 @@ async function _updateNotionPageFull(pageId, item, cobroObj) {
   const ingreso    = cobroObj.ingreso    || 0;
   const movilidad  = cobroObj.movilidad  || 0;
   const materiales = cobroObj.materiales || 0;
-  const otros      = cobroObj.otros      || 0;
+  const otros      = cobroObj.otros      || cobroObj.otros_gastos || 0;
+  const comida     = cobroObj.comida     || 0;
   const meta       = cobroObj.meta       || 0;
   const formaPago  = cobroObj.formaPago  || '';
   const observaciones = cobroObj.observaciones || '';
@@ -6920,6 +6844,7 @@ async function _updateNotionPageFull(pageId, item, cobroObj) {
   // ── Gastos ──
   if (movilidad  > 0) setProp(findCol('movilidad','pasajes','gasolina','combustible','transporte'), movilidad);
   if (materiales > 0) setProp(findCol('materiales','material','insumos','compras'), materiales);
+  if (comida     > 0) setProp(findCol('comida','alimentos','menu','snack','snacks','bebida','bebidas'), comida);
   if (otros      > 0) setProp(findCol('otros','otros gastos','gastos extra','extra'), otros);
   if (meta       > 0) setProp(findCol('meta','objetivo','goal','target'), meta);
 
@@ -7552,810 +7477,58 @@ async function notionApiPoll(){
 // Convierte resultados de Notion API al formato CSV que espera _procesarCsvNotionTexto
 function _notionResultsToCSV(results){
   if(!results||!results.length) return '';
-  // Encabezado exacto que usa el importador + NotionId para espejo
-  const headers = ['Fecha','Cliente','Servicio 1','Servicio 2','Servicio 3','Servicio 4',
-                   'Precio del servicio','Movilidad','Materiales','Otros',
-                   'Distrito','Forma de pago','Observaciones','Contacto','NotionId'];
-
-  function getProp(props, ...names){
+  const headers=['FECHA','CLIENTE','CONTACTO','DISTRITO','1 FORMA DE PAGO','2 FORMA DE PAGO','SERVICIO 1','1 MATERIALES','1 PRECIO DEL SERVICIO','SERVICIO 2','2 MATERIALES','2 PRECIO DEL SERVICIO','SERVICIO 3','3 MATERIALES','3 PRECIO DE SERVICIO','COMIDA','OTROS','AGREGADOS','MOVILIDAD','META','GANANCIA','OBSERVACIONES','NotionId'];
+  function getProp(props,...names){
     for(const name of names){
-      const p = props[name] ||
-                props[name.toLowerCase()] ||
-                Object.entries(props).find(([k])=>k.toLowerCase()===name.toLowerCase())?.[1];
+      const p=props[name]||props[name.toLowerCase()]||Object.entries(props).find(([k])=>k.toLowerCase()===name.toLowerCase())?.[1];
       if(!p) continue;
-      if(p.type==='title')       return (p.title||[]).map(t=>t.plain_text).join('').trim();
-      if(p.type==='rich_text')   return (p.rich_text||[]).map(t=>t.plain_text).join('').trim();
-      if(p.type==='date')        return p.date?.start||'';
-      if(p.type==='number')      return p.number!=null ? p.number.toString() : '';
-      if(p.type==='select')      return p.select?.name||'';
-      if(p.type==='multi_select')return (p.multi_select||[]).map(s=>s.name).join(', ');
-      if(p.type==='formula')     return p.formula?.number!=null ? p.formula.number.toString() : (p.formula?.string||'');
-      if(p.type==='phone_number')return p.phone_number||'';
-      if(p.type==='checkbox')    return p.checkbox ? 'Si' : '';
-      if(p.type==='url')         return p.url||'';
+      if(p.type==='title') return (p.title||[]).map(t=>t.plain_text).join('').trim();
+      if(p.type==='rich_text') return (p.rich_text||[]).map(t=>t.plain_text).join('').trim();
+      if(p.type==='date') return p.date?.start||'';
+      if(p.type==='number') return p.number!=null?p.number.toString():'';
+      if(p.type==='select') return p.select?.name||'';
+      if(p.type==='multi_select') return (p.multi_select||[]).map(s=>s.name).join(', ');
+      if(p.type==='formula') return p.formula?.number!=null?p.formula.number.toString():(p.formula?.string||'');
+      if(p.type==='phone_number') return p.phone_number||'';
+      if(p.type==='checkbox') return p.checkbox?'Si':'';
+      if(p.type==='url') return p.url||'';
     }
     return '';
   }
-
-  // Helper: buscar el titulo (type=title) en cualquier columna
-  function getTitleProp(props){
-    const titleEntry = Object.entries(props).find(([,v])=>v.type==='title');
-    if(!titleEntry) return '';
-    return (titleEntry[1].title||[]).map(t=>t.plain_text).join('').trim();
-  }
-
-  const rows = [headers.join(',')];
+  function getTitleProp(props){ const e=Object.entries(props).find(([,v])=>v.type==='title'); return e?(e[1].title||[]).map(t=>t.plain_text).join('').trim():''; }
+  const rows=[headers.join(',')];
   for(const page of results){
-    const p = page.properties||{};
-
-    // Cliente: buscar por nombre o usar el campo title de la página
-    const cliente = getProp(p,'Cliente','cliente','Nombre','nombre','Name','name') || getTitleProp(p);
-
-    // Servicio: soportar nombre de columna "Servicio X", "servicio", "Tipo", "Categoría", "categoria", "Categoria", "Category"
-    const servicio1 = getProp(p,'SERVICIO 1','Servicio 1','servicio 1','Servicio1','Servicio','servicio','Tipo','tipo','Categoría','Categoria','categoria','Category','category');
-    const servicio2 = getProp(p,'SERVICIO 2','Servicio 2','servicio 2','Servicio2');
-    const servicio3 = getProp(p,'SERVICIO 3','Servicio 3','servicio 3','Servicio3');
-    const servicio4 = getProp(p,'Servicio 4','servicio 4','Servicio4');
-
-    // Precio: soportar "Precio del servicio", "Precio", "precio", "Monto", "monto", "Importe", "Total"
-    const precio = getProp(p,'1 PRECIO DEL SERVICIO','Precio del servicio','precio del servicio','Precio','precio','Monto','monto','Importe','importe','Total','total','Amount','amount');
-
-    const row = [
-      getProp(p,'Fecha','fecha','Date','date') || (page.created_time||'').split('T')[0],
+    const p=page.properties||{};
+    const cliente=getProp(p,'CLIENTE','Cliente','cliente','Nombre','nombre','Name','name')||getTitleProp(p);
+    const row=[
+      getProp(p,'FECHA','Fecha','fecha','Date','date')||(page.created_time||'').split('T')[0],
       cliente,
-      servicio1, servicio2, servicio3, servicio4,
-      precio,
-      getProp(p,'Movilidad','movilidad','Transporte','transporte'),
-      getProp(p,'1 MATERIALES','Materiales','materiales','Material','material'),
-      getProp(p,'AGREGADOS','Otros','otros','Extra','extra','Adicional','adicional'),
-      getProp(p,'DISTRITO','Distrito','distrito','Ubicacion','ubicacion','Ubicación','Zona','zona'),
-      getProp(p,'1 FORMA DE PAGO','Forma de pago','forma de pago','Pago','pago','Payment','payment','Método de pago'),
-      getProp(p,'Observaciones','observaciones','Nota','nota','Notas','notas','Notes','notes','Descripcion','Descripción','descripcion'),
-      getProp(p,'CONTACTO','Contacto','contacto','Telefono','Teléfono','telefono','tel','Tel','Phone','phone'),
+      getProp(p,'CONTACTO','Contacto','contacto','Telefono','telefono','Tel','tel','Phone','phone'),
+      getProp(p,'DISTRITO','Distrito','distrito','Ubicacion','ubicacion','Zona','zona'),
+      getProp(p,'1 FORMA DE PAGO','1 Forma de Pago','1 Forma Pago','Forma de pago 1','Pago 1','Forma de pago','Pago'),
+      getProp(p,'2 FORMA DE PAGO','2 Forma de Pago','2 Forma Pago','Forma de pago 2','Pago 2'),
+      getProp(p,'SERVICIO 1','Servicio 1','servicio 1','Servicio1','Servicio','servicio','Tipo','tipo','Categoria','categoria','Category','category'),
+      getProp(p,'1 MATERIALES','1 Materiales','Materiales 1','Materiales','materiales','Material','material'),
+      getProp(p,'1 PRECIO DEL SERVICIO','1 Precio del Servicio','Precio del servicio 1','1 Precio','Precio del servicio','Precio','Monto','Importe','Total','Amount'),
+      getProp(p,'SERVICIO 2','Servicio 2','servicio 2','Servicio2'),
+      getProp(p,'2 MATERIALES','2 Materiales','Materiales 2'),
+      getProp(p,'2 PRECIO DEL SERVICIO','2 Precio del Servicio','Precio del servicio 2','2 Precio','Precio 2'),
+      getProp(p,'SERVICIO 3','Servicio 3','servicio 3','Servicio3'),
+      getProp(p,'3 MATERIALES','3 Materiales','Materiales 3'),
+      getProp(p,'3 PRECIO DE SERVICIO','3 PRECIO DEL SERVICIO','3 Precio de Servicio','3 Precio del Servicio','Precio del servicio 3','3 Precio','Precio 3'),
+      getProp(p,'COMIDA','Comida','comida','Alimentos','Menu','Snacks','Bebidas'),
+      getProp(p,'OTROS','Otros','otros','Otros gastos','Gastos extra','Extra'),
+      getProp(p,'AGREGADOS','Agregados','agregados','Adicional','Adicionales'),
+      getProp(p,'MOVILIDAD','Movilidad','movilidad','Transporte','transporte','Pasajes'),
+      getProp(p,'META','Meta','meta','Objetivo'),
+      getProp(p,'GANANCIA','Ganancia','ganancia'),
+      getProp(p,'OBSERVACIONES','Observaciones','observaciones','Nota','Notas','Notes','Descripcion','descripcion'),
       page.id
-    ].map(v => '"' + (v||'').replace(/"/g,'""') + '"');
+    ].map(v=>'"'+String(v||'').replace(/"/g,'""')+'"');
     rows.push(row.join(','));
   }
   return rows.join('\n');
 }
-
-// ── Ajuste section toggle ─────────────────────────────────────────
-// Todas cerradas por defecto — el usuario abre lo que necesita
-if(!window._ajSection) window._ajSection = {};
-
-function ajToggle(k){
-  window._ajSection[k] = !window._ajSection[k];
-  const open  = window._ajSection[k];
-  const body  = document.getElementById('aj-body-'+k);
-  const arrow = document.getElementById('aj-arrow-'+k);
-  const hdr   = document.querySelector('#aj-card-'+k+' > div:first-child');
-  if(!body){ render(); return; }
-  body.style.display  = open ? 'block' : 'none';
-  body.style.padding  = open ? '14px 14px 16px' : '0';
-  if(arrow) arrow.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
-  if(hdr)   hdr.style.borderBottom = open ? '1px solid var(--border)' : '0';
-}
-
-function ajOpen(k){ return !!window._ajSection[k]; }
-
-function renderAjustes(){
-  const txCount=state.transactions.length;
-  const debtCount=state.debts.length;
-  const svcCount=state.servicios.length;
-  const catCount=state.catsIn.filter(c=>!c.hidden&&!c.system).length+state.catsEx.filter(c=>!c.hidden&&!c.system).length;
-  const presCount=state.prestamos.length;
-  const lastBackup=localStorage.getItem('fnz_last_backup')||'Nunca';
-  const sheetsUrl=localStorage.getItem('fnz_sheets_url')||'';
-  const notionPolling=localStorage.getItem('fnz_notion_polling')==='1';
-  const notionToken=localStorage.getItem('fnz_notion_token')||'';
-  const notionDbId=localStorage.getItem('fnz_notion_dbid')||'';
-  const notionInterval=localStorage.getItem('fnz_notion_interval')||'15';
-
-  const sec=(key,icon,title,subtitle,accentColor,content)=>{
-    const open=ajOpen(key);
-    return `
-    <div id="aj-card-${key}" class="card" style="margin-bottom:7px;padding:0;overflow:hidden">
-      <div onclick="ajToggle('${key}')" style="display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;border-bottom:${open?'1px solid var(--border)':'0'}">
-        <div style="width:36px;height:36px;border-radius:10px;background:${accentColor}18;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">${icon}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:700;color:${accentColor};font-family:'DM Sans',sans-serif">${title}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${subtitle}</div>
-        </div>
-        <span id="aj-arrow-${key}" style="font-size:13px;color:var(--muted);flex-shrink:0;transition:transform .18s;transform:rotate(${open?'180':'0'}deg)">⌄</span>
-      </div>
-      <div id="aj-body-${key}" style="display:${open?'block':'none'};padding:14px 14px 16px" onclick="event.stopPropagation()">
-        ${content}
-      </div>
-    </div>`;
-  };
-
-  return `
-    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:6px">Ajustes</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Toca para expandir cada sección</div>
-
-    ${sec('temas','🎨','Personalización','Tema visual de la app','var(--gold)',`
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        ${(()=>{
-          const temaActivo=localStorage.getItem('fnz_tema')||'esmeralda';
-          return TEMAS_APP.map(t=>`
-            <div onclick="applyTheme('${t.id}')" style="border-radius:12px;padding:10px 8px;cursor:pointer;text-align:center;border:2px solid ${temaActivo===t.id?t.accent:'transparent'};background:${t.bg};position:relative">
-              ${temaActivo===t.id?`<div style="position:absolute;top:4px;right:4px;background:${t.accent};color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:20px">✓</div>`:''}
-              <div style="font-size:22px;margin-bottom:4px">${t.emoji}</div>
-              <div style="font-size:11px;font-weight:700;color:${t.accent}">${t.nombre}</div>
-            </div>`).join('');
-        })()}
-      </div>
-      <div style="margin-top:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Tu nombre (asistente de voz)</div>
-        <div style="display:flex;gap:8px">
-          <input id="input-nombre-usuario" type="text" placeholder="Ej: Omar" value="${state.nombreUsuario||''}" style="flex:1">
-          <button onclick="guardarNombreUsuario()" style="background:var(--gold);color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">OK</button>
-        </div>
-      </div>
-    `)}
-
-    ${sec('ia','✨','Gemini IA','Asistente inteligente de voz','#7C3AED',`
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">Con Gemini el micrófono entiende fechas, servicios y montos en lenguaje natural.</div>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <input id="gemini-key-input" type="password" placeholder="AIza... (tu API key de Gemini)" value="${localStorage.getItem('fnz_gemini_key')||''}" style="flex:1;background:#F8FAFC;border:1px solid #8B5CF644;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px">
-      </div>
-      <div class="btn-row">
-        <button onclick="saveGeminiKey()" style="flex:2;background:linear-gradient(135deg,#7C3AED,#8B5CF6);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">💾 Activar Gemini</button>
-        <button onclick="testGeminiKey()" style="flex:1;background:transparent;border:1px solid #8B5CF644;color:#7C3AED;border-radius:10px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Probar</button>
-      </div>
-      <div style="margin-top:10px;background:#F5F3FF;border:1px solid #8B5CF633;border-radius:8px;padding:10px;font-size:11px;color:var(--muted);line-height:1.7">
-        <strong style="color:#7C3AED">Obtener key gratis:</strong> aistudio.google.com/apikey → Crear clave de API
-      </div>
-      <button onclick="descargarAppsScript()" style="width:100%;margin-top:10px;background:#EBF1F5;border:1px solid #54687844;color:var(--gold);border-radius:10px;padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">⬇ Descargar código Apps Script</button>
-    `)}
-
-    ${sec('sheets','📊','Google Sheets','Sincronización v9.0 SAAS','#1565C0',`
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">${sheetsUrl?'✓ Conectado a Sheets':'Sin configurar — datos solo locales'}</div>
-      <div style="background:#F0F9FF;border:1px solid #1E40AF22;border-radius:10px;padding:10px;margin-bottom:12px;font-size:11px;color:#1E40AF">
-        <strong>Estructura activa:</strong><br>
-        • Reporte Diario (Finanzas)<br>
-        • Agenda (Visitas/Construcciones)<br>
-        • Mov. Negocio & Personal<br>
-        • Dashboard Semanal activo
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <input id="sheets-url-input" type="url" placeholder="https://script.google.com/macros/s/.../exec" value="${sheetsUrl}" style="flex:1;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px">
-      </div>
-      <div class="btn-row">
-        <button onclick="saveSheetsUrl()" style="flex:2;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">💾 Guardar URL</button>
-        <button onclick="testSheetsSync()" style="flex:1;background:transparent;border:1px solid #1565C044;color:#1565C0;border-radius:10px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Probar</button>
-      </div>
-      <button onclick="reloadFromSheets()" style="width:100%;margin-top:8px;background:#EBF1F5;border:1px solid #54687844;color:var(--gold);border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">☁️ Restaurar datos desde Sheets</button>
-      <button onclick="enviarTodoASheets()" style="width:100%;margin-top:6px;background:linear-gradient(135deg,#1565C0,#2E86AB);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">⬆ Enviar TODO a Sheets</button>
-      <div id="sheets-sync-status" style="margin-top:6px;font-size:11px;color:var(--muted);text-align:center"></div>
-    `)}
-
-    ${sec('notion','🔥','Notion','App → Notion (fuente de verdad)','#6B46C1',`
-
-      <!-- FLUJO VISUAL -->
-      <div style="background:linear-gradient(135deg,#F3F0FF,#EDE9FE);border:1px solid #7C3AED22;border-radius:12px;padding:12px;margin-bottom:12px">
-        <div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;margin-bottom:6px">
-          <div style="background:#6B46C1;color:#fff;padding:4px 12px;border-radius:20px;font-weight:700;font-size:11px">APP</div>
-          <div style="color:#6B46C1;font-size:16px;font-weight:700">→</div>
-          <div style="background:#fff;border:2px solid #6B46C1;color:#6B46C1;padding:4px 12px;border-radius:20px;font-weight:700;font-size:11px">NOTION</div>
-          <div style="color:#6B46C1;font-size:16px;font-weight:700">→</div>
-          <div style="background:#fff;border:2px solid #1565C0;color:#1565C0;padding:4px 12px;border-radius:20px;font-weight:700;font-size:11px">SHEETS</div>
-        </div>
-        <div style="font-size:11px;color:#6B46C1;text-align:center;font-weight:500">
-          Lo que registrás en la app cae automáticamente en Notion y Sheets.
-        </div>
-      </div>
-
-      <!-- CREDENCIALES -->
-      <div style="font-size:10px;font-weight:700;color:#6B46C1;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">🔑 Credenciales</div>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
-        <input id="notion-token-inp" type="password"
-          placeholder="ntn_xxxx... o secret_xxxx... (Integration token)"
-          value="${notionToken}"
-          style="background:#F8FAFC;border:1px solid #7C3AED44;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%"
-          oninput="const v=this.value.trim();if(v.startsWith('secret_')||v.startsWith('ntn_'))localStorage.setItem('fnz_notion_token',v)">
-          
-        <div style="font-size:10px;font-weight:700;color:#4338CA;text-transform:uppercase;letter-spacing:.06em;margin-top:4px">📋 DB 1 — Reporte Diario (Trabajos)</div>
-        <input id="notion-dbid-inp" type="text"
-          placeholder="ID base datos Reporte Diario (32 hex)"
-          value="${notionDbId}"
-          style="background:#F8FAFC;border:1px solid #7C3AED44;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%"
-          oninput="if(this.value.length>=32)localStorage.setItem('fnz_notion_dbid',this.value.trim().replace(/-/g,''))">
-
-        <div style="font-size:10px;font-weight:700;color:#0891B2;text-transform:uppercase;letter-spacing:.06em;margin-top:4px">👥 DB 2 — Clientes Potenciales (Visitas)</div>
-        <input id="notion-dbid-clientes-inp" type="text"
-          placeholder="ID base datos Clientes Potenciales (32 hex)"
-          value="${localStorage.getItem('fnz_notion_dbid_clientes')||''}"
-          style="background:#F0F9FF;border:1px solid #0891B244;border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%"
-          oninput="if(this.value.length>=32)localStorage.setItem('fnz_notion_dbid_clientes',this.value.trim().replace(/-/g,''))">
-
-        <button onclick="saveNotionConfig()"
-          style="background:linear-gradient(135deg,#6B46C1,#7C3AED);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;margin-top:4px">
-          💾 Guardar credenciales
-        </button>
-        <div style="font-size:11px;text-align:center;font-weight:600;color:${notionToken&&notionDbId?'#2A4455':'#888'}">
-          ${notionToken&&notionDbId?'✅ Notion DB1 conectado':'⚠ Sin credenciales DB1'}
-          ${localStorage.getItem('fnz_notion_dbid_clientes') ? ' · 👥 DB2 OK' : ''}
-        </div>
-      </div>
-
-      <!-- CARGA MANUAL CON DEDUP -->
-      <div style="border-top:1px solid #7C3AED22;padding-top:12px;margin-top:4px">
-        <div style="font-size:10px;font-weight:700;color:#6B46C1;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📥 Carga manual desde Notion</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.6">
-          Trae registros de Notion a la app. Detecta duplicados automáticamente y muestra un preview antes de importar.
-        </div>
-        <button onclick="notionCargarManual()"
-          style="width:100%;background:linear-gradient(135deg,#5B21B6,#7C3AED);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
-          📥 Cargar desde Notion
-        </button>
-        <div id="notion-load-status" style="margin-top:8px;font-size:12px;color:#6B46C1;text-align:center;min-height:16px;font-weight:500"></div>
-      </div>
-
-      <!-- CSV ALTERNATIVA -->
-      <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:12px">
-        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📂 Alternativa: CSV exportado de Notion</div>
-        <label style="display:block;width:100%;background:#F3F0FF;border:1px dashed #7C3AED44;border-radius:10px;padding:11px;font-weight:600;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;text-align:center;color:#6B46C1">
-          📂 Seleccionar archivo CSV
-          <input type="file" accept=".csv" onchange="importarNotion(this)" style="display:none">
-        </label>
-        <div id="notion-import-status" style="margin-top:6px;font-size:11px;color:var(--muted);text-align:center;min-height:14px"></div>
-      </div>
-    `)}
-
-    ${sec('backup','💾','Copia de seguridad','Exportar e importar datos locales','var(--gold)',`
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Último respaldo: <strong style="color:var(--text)">${lastBackup}</strong></div>
-      <div class="btn-row">
-        <button class="btn-gold" onclick="exportData()" style="font-size:13px;padding:12px">⬇ Exportar .json</button>
-        <button class="btn-ghost" onclick="document.getElementById('import-file').click()" style="font-size:13px;padding:12px;border-color:#2E86AB44;color:var(--blue)">⬆ Importar</button>
-        <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
-      </div>
-    `)}
-
-    ${sec('notifs','🔔','Sonidos y Recordatorios','Alertas personalizadas','#6C3483',`
-      <div style="font-size:12px;font-weight:600;color:#6C3483;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">🎵 Mis Sonidos</div>
-      <div id="sounds-list" style="margin-bottom:10px"></div>
-      <label style="display:block;width:100%;background:#F3F0FF;border:1px dashed #9B59B644;border-radius:10px;padding:10px;text-align:center;cursor:pointer;font-size:13px;color:#6C3483;font-weight:600;margin-bottom:16px">
-        ＋ Subir sonido (MP3/WAV/OGG)
-        <input type="file" accept="audio/*" onchange="uploadSound(this)" style="display:none">
-      </label>
-      <div style="font-size:12px;font-weight:600;color:#6C3483;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">📅 Mis Recordatorios</div>
-      <div id="reminders-list" style="margin-bottom:10px"></div>
-      <button onclick="openAddReminder()" style="width:100%;background:#F3F0FF;border:1px solid #9B59B644;color:#6C3483;border-radius:10px;padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">＋ Nuevo recordatorio</button>
-      <div style="margin-top:12px;background:#FFFBEB;border:1px solid #C9A84C33;border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--gold)">🔔 Notificaciones del navegador</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">Recibí alertas aunque la app no esté abierta</div>
-        </div>
-        <button onclick="requestNotifPermission()" id="notif-btn" style="background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0D0D0F;border:none;border-radius:8px;padding:8px 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer">Activar</button>
-      </div>
-    `)}
-
-    ${sec('stats','📈','Resumen de datos','Estado actual de tu información','var(--text)',`
-      ${[
-        {icon:'↕',label:'Movimientos',val:txCount,color:'var(--text)'},
-        {icon:'🏦',label:'Deudas',val:debtCount,color:'var(--blue)'},
-        {icon:'💸',label:'Préstamos',val:presCount,color:'#9B59B6'},
-        {icon:'🏠',label:'Servicios',val:svcCount,color:'var(--gold)'},
-        {icon:'🏷',label:'Categorías',val:catCount,color:'var(--gold)'},
-      ].map(r=>`
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
-          <div style="display:flex;align-items:center;gap:10px">
-            <div style="width:30px;height:30px;border-radius:8px;background:#F8FAFC;display:flex;align-items:center;justify-content:center;font-size:14px">${r.icon}</div>
-            <span style="font-size:14px;color:var(--text)">${r.label}</span>
-          </div>
-          <span style="font-family:'Playfair Display',serif;font-size:18px;color:${r.color}">${r.val}</span>
-        </div>`).join('')}
-    `)}
-
-    ${sec('danger','⚠️','Zona de peligro','Acciones irreversibles','var(--red)',`
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Estas acciones son permanentes. Exportá primero como respaldo.</div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <button onclick="clearTransactions()" style="background:#FEF2F2;border:1px solid #E0525244;color:var(--red);border-radius:10px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;text-align:left">🗑 Eliminar todos los movimientos</button>
-        <button onclick="resetAllData()" style="background:#FEF2F2;border:1px solid #E05252;color:var(--red);border-radius:10px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-align:left">💥 Borrar todos los datos</button>
-      </div>
-    `)}
-
-    <div style="text-align:center;font-size:11px;color:var(--dim);margin-top:8px;margin-bottom:20px">Mis Finanzas v4.1 · Datos locales + Google Sheets + Notion sync</div>
-  `;
-}
-
-function saveNotionConfig(){
-  const token     = document.getElementById('notion-token-inp')?.value.trim();
-  const dbId      = document.getElementById('notion-dbid-inp')?.value.trim();
-  const dbIdCli   = document.getElementById('notion-dbid-clientes-inp')?.value.trim();
-
-  if(!token || !dbId){
-    toast('Completá al menos el Token y el ID de Reporte Diario (DB1)','error');
-    return;
-  }
-
-  localStorage.setItem('fnz_notion_token', token);
-  localStorage.setItem('fnz_notion_dbid',  dbId);
-  if(dbIdCli) localStorage.setItem('fnz_notion_dbid_clientes', dbIdCli.replace(/-/g,''));
-  else localStorage.removeItem('fnz_notion_dbid_clientes');
-
-  // Limpiar el caché de esquema por si cambio la DB
-  sessionStorage.removeItem('fnz_notion_schema');
-  localStorage.removeItem('fnz_notion_polling');
-
-  toast('✓ Credenciales de Notion guardadas ✓', 'success');
-  render();
-}
-
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// NOTAS PREMIUM 2026 - flujo nuevo, sin depender de los editores antiguos
-// ═══════════════════════════════════════════════════════════════════════════════
-let _npFilter = 'todas';
-let _npSearch = '';
-
-function npEsc(v){
-  return String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-}
-function npPlain(v){
-  return String(v ?? '').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
-}
-function npMoney(n){
-  const v = parseFloat(n);
-  return Number.isFinite(v) ? v : 0;
-}
-function npFmt(n){
-  return 'S/ ' + npMoney(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
-}
-function npId(){
-  return 'np_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-}
-
-function npEnsureStyles(){
-  if(document.getElementById('np-premium-styles')) return;
-  const st=document.createElement('style');
-  st.id='np-premium-styles';
-  st.textContent=`
-  .np-page{padding:2px 0 112px;color:var(--text)}
-  .np-hero{background:linear-gradient(180deg,#FFFFFF,#F8FAFC);border:1px solid #E8EDF2;border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:0 10px 30px rgba(15,23,42,.05)}
-  .np-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748B;font-weight:800;margin-bottom:5px}
-  .np-title{font-size:23px;font-weight:800;letter-spacing:0;color:#172033;margin-bottom:4px}
-  .np-sub{font-size:12px;color:#64748B;line-height:1.45}
-  .np-quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}
-  .np-q{border:1px solid #E6EBF0;background:#fff;border-radius:14px;padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer;min-height:62px;box-shadow:0 6px 18px rgba(15,23,42,.035)}
-  .np-q:active{transform:scale(.99)}
-  .np-q-ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#2F5F56;background:#EDF7F2;flex:0 0 auto}
-  .np-q:nth-child(2) .np-q-ic{background:#EFF6FF;color:#1F5C99}
-  .np-q:nth-child(3) .np-q-ic{background:#FFF7ED;color:#9A5415}
-  .np-q:nth-child(4) .np-q-ic{background:#F5F3FF;color:#6D46A5}
-  .np-q b{display:block;font-size:13px;color:#172033;margin-bottom:2px}
-  .np-q span{display:block;font-size:10px;color:#64748B;line-height:1.2}
-  .np-search{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E6EBF0;border-radius:14px;padding:10px 12px;margin:12px 0}
-  .np-search input{border:none;outline:none;flex:1;font-family:Inter,'DM Sans',sans-serif;font-size:14px;background:transparent;color:#172033}
-  .np-filters{display:flex;gap:7px;overflow:auto;padding-bottom:5px;margin-bottom:10px}
-  .np-pill{border:1px solid #E6EBF0;background:#fff;border-radius:999px;padding:7px 11px;font-size:11px;font-weight:700;color:#64748B;white-space:nowrap;cursor:pointer}
-  .np-pill.on{background:#172033;color:#fff;border-color:#172033}
-  .np-grid{display:grid;gap:10px}
-  .np-card{background:#fff;border:1px solid #E6EBF0;border-radius:16px;padding:13px;box-shadow:0 8px 24px rgba(15,23,42,.04)}
-  .np-card-top{display:flex;align-items:flex-start;gap:11px}
-  .np-card-ic{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#F4F8F6;color:#2F5F56;flex:0 0 auto}
-  .np-card-main{min-width:0;flex:1}
-  .np-card-title{font-size:15px;font-weight:800;color:#172033;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .np-card-meta{display:flex;gap:6px;flex-wrap:wrap;font-size:10px;color:#64748B;margin-bottom:8px}
-  .np-tag{background:#F3F6F8;border:1px solid #E6EBF0;border-radius:999px;padding:2px 7px;font-weight:700}
-  .np-prev{font-size:12px;color:#475569;line-height:1.45}
-  .np-mini-list{display:grid;gap:5px;margin-top:5px}
-  .np-mini-row{display:flex;align-items:center;gap:8px;font-size:12px;color:#334155}
-  .np-mini-check{width:14px;height:14px;border:1.5px solid #CBD5E1;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff}
-  .np-mini-row.done{opacity:.5;text-decoration:line-through}
-  .np-total{display:flex;align-items:center;justify-content:space-between;margin-top:10px;border-top:1px solid #EEF2F6;padding-top:9px;font-size:12px;color:#64748B}
-  .np-total b{font-size:15px;color:#172033}
-  .np-card-actions{display:flex;gap:6px;margin-top:11px}
-  .np-act{flex:1;border:1px solid #E6EBF0;background:#FAFBFC;border-radius:10px;padding:8px;font-size:11px;font-weight:800;color:#475569;cursor:pointer}
-  .np-empty{padding:28px 16px;text-align:center;color:#64748B;background:#fff;border:1px dashed #CBD5E1;border-radius:18px}
-  .np-ov{position:fixed;inset:0;background:#F7F8FA;z-index:520;display:flex;flex-direction:column;color:#172033}
-  .np-ed-top{height:58px;display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FFFFFFE8;backdrop-filter:blur(12px);border-bottom:1px solid #E6EBF0}
-  .np-icon-btn{width:38px;height:38px;border-radius:11px;border:1px solid #E6EBF0;background:#fff;display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer}
-  .np-save{border:none;background:#172033;color:#fff;border-radius:11px;padding:10px 13px;font-size:12px;font-weight:800;cursor:pointer}
-  .np-ed-body{flex:1;overflow:auto;padding:14px 14px 120px;max-width:760px;width:100%;margin:0 auto}
-  .np-ed-title{width:100%;border:none;outline:none;background:transparent;font-size:25px;font-weight:850;color:#172033;margin:8px 0 10px;font-family:Inter,'DM Sans',sans-serif}
-  .np-sheet{background:#fff;border:1px solid #E6EBF0;border-radius:18px;padding:13px;box-shadow:0 12px 30px rgba(15,23,42,.045)}
-  .np-type-row{display:flex;gap:7px;overflow:auto;margin-bottom:12px}
-  .np-type{border:1px solid #E6EBF0;background:#FAFBFC;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:800;color:#64748B;white-space:nowrap;cursor:pointer}
-  .np-type.on{background:#EAF6F0;color:#2F5F56;border-color:#BFDCCE}
-  .np-row{display:grid;grid-template-columns:26px minmax(0,1fr) 70px 28px;gap:7px;align-items:center;border-bottom:1px solid #EEF2F6;padding:8px 0}
-  .np-row:last-child{border-bottom:none}
-  .np-row input[type=text],.np-row input[type=number]{width:100%;border:1px solid #E6EBF0;background:#FAFBFC;border-radius:10px;padding:9px 10px;font-family:Inter,'DM Sans',sans-serif;font-size:13px;color:#172033;outline:none}
-  .np-row input[type=checkbox]{width:18px;height:18px;accent-color:#2F7D64}
-  .np-del{border:none;background:#FEF2F2;color:#C44B4B;border-radius:9px;height:32px;cursor:pointer}
-  .np-editor-total{display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:4px}
-  .np-editor-total span{font-size:12px;color:#64748B}
-  .np-editor-total b{font-size:22px;color:#172033}
-  .np-bottom{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:780px;background:#FFFFFFE8;backdrop-filter:blur(12px);border-top:1px solid #E6EBF0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:530}
-  .np-tool{flex:1;border:1px solid #E6EBF0;background:#fff;border-radius:12px;padding:11px 8px;font-size:11px;font-weight:850;color:#475569;cursor:pointer}
-  .np-tool.primary{background:#172033;color:#fff;border-color:#172033}
-  .np-textarea{width:100%;min-height:48vh;border:none;outline:none;resize:vertical;background:transparent;font-family:Inter,'DM Sans',sans-serif;font-size:15px;line-height:1.65;color:#172033}
-  .np-meeting-box{display:grid;gap:10px}
-  .np-section{background:#FAFBFC;border:1px solid #E6EBF0;border-radius:14px;padding:12px}
-  .np-section h4{margin:0 0 7px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#64748B}
-  .np-mic-box{background:#fff;border:1px solid #E6EBF0;border-radius:20px;margin:auto 14px;padding:18px;box-shadow:0 18px 50px rgba(15,23,42,.14);max-width:520px}
-  .np-mic-title{font-size:20px;font-weight:850;margin-bottom:5px}
-  .np-mic-sub{font-size:12px;color:#64748B;line-height:1.45;margin-bottom:12px}
-  .np-mic-tabs{display:flex;gap:7px;margin:10px 0}
-  .np-mic-tabs button{flex:1;border:1px solid #E6EBF0;background:#FAFBFC;border-radius:11px;padding:9px;font-size:11px;font-weight:800;color:#64748B}
-  .np-mic-tabs button.on{background:#172033;color:#fff;border-color:#172033}
-  .np-timer{font-size:34px;font-weight:900;letter-spacing:.04em;text-align:center;margin:12px 0;color:#172033}
-  .np-transcript{min-height:92px;max-height:150px;overflow:auto;background:#F8FAFC;border:1px solid #E6EBF0;border-radius:14px;padding:12px;font-size:13px;line-height:1.55;color:#334155}
-  .np-preview{background:#F4F8F6;border:1px solid #CFE5DA;border-radius:14px;padding:11px;margin-top:10px;font-size:12px;color:#2F5F56;display:none}
-  .np-mic-actions{display:flex;gap:8px;margin-top:12px}
-  .np-mic-actions button{flex:1;border:1px solid #E6EBF0;background:#fff;border-radius:13px;padding:12px;font-size:12px;font-weight:850;color:#475569}
-  .np-mic-actions button.primary{background:#172033;color:#fff;border-color:#172033}
-  `;
-  document.head.appendChild(st);
-}
-
-function npNormalizeItem(it){
-  if(typeof it === 'string') return {id:npId(),texto:it,cantidad:1,precio:0,total:0,done:false};
-  const cantidad=npMoney(it.cantidad || it.qty || 1) || 1;
-  const precio=npMoney(it.precio ?? it.price ?? it.monto ?? 0);
-  const total=npMoney(it.total || precio);
-  return {
-    id: it.id || npId(),
-    texto: it.texto || it.text || it.nombre || it.content || '',
-    cantidad,
-    precio,
-    total,
-    done: !!it.done,
-    categoria: it.categoria || it.category || ''
-  };
-}
-function npListTotal(items){ return (items||[]).reduce((s,i)=>s+npMoney(i.total || i.precio),0); }
-function npNoteKind(n){
-  if(n?.npKind) return n.npKind;
-  if(n?.tipo==='audio') return 'meeting';
-  if(n?.tipo==='tabla') return 'table';
-  if(n?.tipo==='lista') return 'smart_list';
-  return 'doc';
-}
-function npUpgradeNotas(){
-  ensureLazyData('notas');
-  if(!state.notas) state.notas=[];
-  let changed=false;
-  state.notas.forEach(n=>{
-    if(!n.id){ n.id=Date.now()+Math.random()+''; changed=true; }
-    if(!n.npKind){
-      n.npKind=npNoteKind(n);
-      changed=true;
-    }
-    if(n.npKind==='smart_list'){
-      n.tipo='lista';
-      n.items=(n.items||[]).map(npNormalizeItem);
-      n.listType=n.listType || 'compras';
-    }
-    if(n.npKind==='meeting'){
-      n.tipo='audio';
-      n.transcript=n.transcript || npPlain(n.texto||'');
-      n.resumen=n.resumen || '';
-      n.acuerdos=n.acuerdos || [];
-      n.tareas=n.tareas || [];
-    }
-    if(n.npKind==='doc'){
-      n.tipo='texto';
-      n.texto=n.texto || '';
-    }
-  });
-  if(changed) save('fnz_notas',state.notas);
-}
-
-function renderNotas(){
-  npEnsureStyles();
-  npUpgradeNotas();
-  const q=(_npSearch||'').toLowerCase().trim();
-  const all=[...(state.notas||[])].sort((a,b)=>(b.modificado||b.creado||'').localeCompare(a.modificado||a.creado||''));
-  let notes=all.filter(n=>{
-    const kind=npNoteKind(n);
-    if(_npFilter!=='todas' && _npFilter!==kind && !(_npFilter==='listas'&&kind==='smart_list')) return false;
-    if(!q) return true;
-    const text=[n.titulo,n.texto,n.transcript,n.resumen,(n.items||[]).map(i=>i.texto).join(' '),(n.tags||[]).join(' ')].join(' ').toLowerCase();
-    return text.includes(q);
-  });
-  const pendientes=all.reduce((s,n)=>s+(n.items||[]).filter(i=>!i.done).length,0);
-  const totalListas=all.reduce((s,n)=>s+(npNoteKind(n)==='smart_list'?npListTotal(n.items):0),0);
-  const counts={
-    todas:all.length,
-    listas:all.filter(n=>npNoteKind(n)==='smart_list').length,
-    meeting:all.filter(n=>npNoteKind(n)==='meeting').length,
-    doc:all.filter(n=>npNoteKind(n)==='doc').length,
-    table:all.filter(n=>npNoteKind(n)==='table').length
-  };
-  const pill=(k,l)=>`<button class="np-pill ${_npFilter===k?'on':''}" onclick="npSetFilter('${k}')">${l} ${counts[k]||0}</button>`;
-  return `<div class="np-page">
-    <div class="np-hero">
-      <div class="np-kicker">Cuaderno inteligente</div>
-      <div class="np-title">Notas</div>
-      <div class="np-sub">Listas con precios, reuniones con resumen IA, cuadros de gastos y exportacion limpia para compartir.</div>
-      <div class="np-quick">
-        <div class="np-q" onclick="npOpenVoiceCapture('list')"><div class="np-q-ic">${appIcon('mic')}</div><div><b>Lista por voz</b><span>Detecta items, precios y total</span></div></div>
-        <div class="np-q" onclick="npOpenVoiceCapture('meeting')"><div class="np-q-ic">${appIcon('note')}</div><div><b>Reunion IA</b><span>Transcribe y resume al final</span></div></div>
-        <div class="np-q" onclick="npOpenSmartList(null,'gastos')"><div class="np-q-ic">${appIcon('chart')}</div><div><b>Cuadro gastos</b><span>Filas editables y suma</span></div></div>
-        <div class="np-q" onclick="npShowTemplates()"><div class="np-q-ic">${appIcon('clipboard')}</div><div><b>Plantillas</b><span>Mercado, compras, cotizacion</span></div></div>
-      </div>
-    </div>
-    <div class="np-card" style="margin-bottom:12px">
-      <div class="np-total" style="border-top:none;margin-top:0;padding-top:0">
-        <span>${all.length} notas · ${pendientes} pendientes</span><b>${npFmt(totalListas)}</b>
-      </div>
-    </div>
-    <div class="np-search">${appIcon('search')}<input value="${npEsc(_npSearch)}" placeholder="Buscar notas, listas o reuniones..." oninput="_npSearch=this.value;render()">${_npSearch?`<button class="np-icon-btn" onclick="_npSearch='';render()" style="width:30px;height:30px">x</button>`:''}</div>
-    <div class="np-filters">${pill('todas','Todas')}${pill('listas','Listas')}${pill('meeting','Reuniones')}${pill('doc','Notas')}${pill('table','Cuadros')}</div>
-    <div class="np-grid">${notes.length?notes.map(npRenderCard).join(''):`<div class="np-empty"><b>Sin notas todavia</b><br><span>Empieza con una lista por voz o una plantilla.</span></div>`}</div>
-  </div>`;
-}
-
-function npSetFilter(f){ _npFilter=f; render(); }
-
-function npRenderCard(n){
-  const kind=npNoteKind(n);
-  const conf={
-    smart_list:{label:n.listType==='gastos'?'Cuadro gastos':'Lista',icon:'clipboard',color:'#2F5F56',bg:'#EDF7F2'},
-    meeting:{label:'Reunion IA',icon:'note',color:'#1F5C99',bg:'#EFF6FF'},
-    table:{label:'Cuadro',icon:'chart',color:'#6D46A5',bg:'#F5F3FF'},
-    doc:{label:'Nota',icon:'note',color:'#475569',bg:'#F8FAFC'}
-  }[kind] || {label:'Nota',icon:'note',color:'#475569',bg:'#F8FAFC'};
-  const date=n.modificado||n.creado?new Date(n.modificado||n.creado).toLocaleDateString('es-PE',{day:'numeric',month:'short'}):'';
-  let preview='';
-  if(kind==='smart_list'){
-    const items=(n.items||[]).slice(0,4);
-    preview=`<div class="np-mini-list">${items.map(i=>`<div class="np-mini-row ${i.done?'done':''}"><span class="np-mini-check" style="${i.done?'background:#2F7D64;border-color:#2F7D64':''}">${i.done?'✓':''}</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${npEsc(i.texto)}</span>${npMoney(i.total||i.precio)?`<b>${npFmt(i.total||i.precio)}</b>`:''}</div>`).join('')}</div>
-      <div class="np-total"><span>${(n.items||[]).length} items</span><b>${npFmt(npListTotal(n.items))}</b></div>`;
-  } else if(kind==='meeting'){
-    preview=`<div class="np-prev">${npEsc(n.resumen || npPlain(n.transcript||n.texto||'Reunion sin resumen aun').substring(0,130))}</div>`;
-  } else {
-    preview=`<div class="np-prev">${npEsc(npPlain(n.texto||'').substring(0,140) || 'Nota sin contenido')}</div>`;
-  }
-  return `<div class="np-card">
-    <div class="np-card-top" onclick="npOpenNote('${n.id}')">
-      <div class="np-card-ic" style="background:${conf.bg};color:${conf.color}">${appIcon(conf.icon)}</div>
-      <div class="np-card-main">
-        <div class="np-card-title">${npEsc(n.titulo||'Sin titulo')}</div>
-        <div class="np-card-meta"><span class="np-tag">${conf.label}</span>${date?`<span>${date}</span>`:''}${n.tags?.length?`<span>${npEsc(n.tags[0])}</span>`:''}</div>
-        ${preview}
-      </div>
-    </div>
-    <div class="np-card-actions">
-      <button class="np-act" onclick="npOpenNote('${n.id}')">Editar</button>
-      <button class="np-act" onclick="npOpenVoiceCapture('${kind==='meeting'?'meeting':'list'}','${n.id}')">Mic</button>
-      <button class="np-act" onclick="npOpenShare('${n.id}')">Compartir</button>
-      <button class="np-act" onclick="npDeleteNote('${n.id}')">Eliminar</button>
-    </div>
-  </div>`;
-}
-
-function npOpenNote(id){
-  ensureLazyData('notas');
-  const n=(state.notas||[]).find(x=>String(x.id)===String(id));
-  if(!n) return;
-  const kind=npNoteKind(n);
-  if(kind==='smart_list') return npOpenSmartList(n.id,n.listType||'compras');
-  if(kind==='meeting') return npOpenMeetingEditor(n.id);
-  return npOpenDoc(n.id);
-}
-
-function npDeleteNote(id){
-  ensureLazyData('notas');
-  if(!confirm('Eliminar esta nota?')) return;
-  state.notas=(state.notas||[]).filter(n=>String(n.id)!==String(id));
-  save('fnz_notas',state.notas);
-  render();
-  toast('Nota eliminada');
-}
-
-function npBlankList(kind,title){
-  return {id:null,npKind:'smart_list',tipo:'lista',listType:kind||'compras',titulo:title||npTitleForKind(kind),items:[],creado:new Date().toISOString(),modificado:new Date().toISOString()};
-}
-function npTitleForKind(kind){
-  if(kind==='gastos') return 'Cuadro de gastos';
-  if(kind==='materiales') return 'Lista de materiales';
-  if(kind==='mercado') return 'Lista de mercado';
-  return 'Lista de compras';
-}
-function npOpenSmartList(id,kind,pre){
-  npEnsureStyles();
-  npUpgradeNotas();
-  let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
-  n=n?JSON.parse(JSON.stringify(n)):npBlankList(kind,pre?.titulo);
-  n.npKind='smart_list'; n.tipo='lista'; n.listType=kind||n.listType||'compras';
-  n.items=(pre?.items||n.items||[]).map(npNormalizeItem);
-  window._npEditor={mode:'list',note:n,isNew:!id};
-  document.body.style.overflow='hidden';
-  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-editor">
-    <div class="np-ed-top"><button class="np-icon-btn" onclick="npCloseEditor()">${appIcon('plus')}</button><div style="flex:1;font-size:12px;font-weight:850;color:#64748B">Lista inteligente</div><button class="np-save" onclick="npSaveList(true)">Guardar</button></div>
-    <div class="np-ed-body">
-      <input class="np-ed-title" id="np-title" value="${npEsc(n.titulo||'')}" placeholder="Titulo">
-      <div class="np-sheet">
-        <div class="np-type-row">
-          ${['compras','mercado','materiales','gastos','tareas'].map(k=>`<button class="np-type ${n.listType===k?'on':''}" onclick="npSetListType('${k}')">${k.charAt(0).toUpperCase()+k.slice(1)}</button>`).join('')}
-        </div>
-        <div id="np-list-rows"></div>
-        <div class="np-editor-total"><span>Total de la lista</span><b id="np-list-total">S/ 0.00</b></div>
-      </div>
-    </div>
-    <div class="np-bottom">
-      <button class="np-tool" onclick="npAddListItem()">+ Item</button>
-      <button class="np-tool" onclick="npOpenVoiceCapture('list','__editor')">Mic</button>
-      <button class="np-tool" onclick="npImproveCurrentList()">IA ordenar</button>
-      <button class="np-tool primary" onclick="npOpenShareFromEditor()">Exportar</button>
-    </div>
-  </div>`);
-  npRenderListRows();
-}
-function npSetListType(k){
-  if(!window._npEditor) return;
-  npCollectListRows();
-  window._npEditor.note.listType=k;
-  document.querySelectorAll('.np-type').forEach(b=>b.classList.remove('on'));
-  event?.target?.classList.add('on');
-}
-function npRenderListRows(){
-  const ed=window._npEditor;if(!ed)return;
-  const box=document.getElementById('np-list-rows');if(!box)return;
-  if(!ed.note.items.length) ed.note.items.push(npNormalizeItem({texto:'',precio:0}));
-  box.innerHTML=ed.note.items.map((it,i)=>`<div class="np-row" data-np-row="${i}">
-    <input type="checkbox" ${it.done?'checked':''} onchange="npListRecalc()">
-    <input type="text" value="${npEsc(it.texto)}" placeholder="Item, tarea o concepto" oninput="npListRecalc()">
-    <input type="number" inputmode="decimal" step="0.01" value="${npMoney(it.total||it.precio)||''}" placeholder="S/ 0" oninput="npListRecalc()">
-    <button class="np-del" onclick="npDelListItem(${i})">x</button>
-  </div>`).join('');
-  npListRecalc();
-}
-function npCollectListRows(){
-  const ed=window._npEditor;if(!ed||ed.mode!=='list')return [];
-  const rows=[...document.querySelectorAll('[data-np-row]')].map(r=>{
-    const els=r.querySelectorAll('input');
-    return npNormalizeItem({done:els[0]?.checked,texto:els[1]?.value.trim(),precio:npMoney(els[2]?.value),total:npMoney(els[2]?.value)});
-  }).filter(i=>i.texto||i.total);
-  ed.note.items=rows;
-  return rows;
-}
-function npListRecalc(){
-  const rows=npCollectListRows();
-  const el=document.getElementById('np-list-total');
-  if(el) el.textContent=npFmt(npListTotal(rows));
-}
-function npAddListItem(){
-  const ed=window._npEditor;if(!ed)return;
-  npCollectListRows();
-  ed.note.items.push(npNormalizeItem({texto:'',precio:0}));
-  npRenderListRows();
-}
-function npDelListItem(i){
-  const ed=window._npEditor;if(!ed)return;
-  npCollectListRows();
-  ed.note.items.splice(i,1);
-  npRenderListRows();
-}
-function npSaveList(close){
-  const ed=window._npEditor;if(!ed)return null;
-  const n=ed.note;
-  n.titulo=document.getElementById('np-title')?.value.trim()||npTitleForKind(n.listType);
-  n.items=npCollectListRows();
-  n.texto=n.items.map(i=>`${i.done?'✓':'○'} ${i.texto}${npMoney(i.total||i.precio)?' - '+npFmt(i.total||i.precio):''}`).join('<br>');
-  n.modificado=new Date().toISOString();
-  if(!n.id){ n.id=Date.now()+''; n.creado=n.modificado; state.notas.unshift(n); }
-  else state.notas=state.notas.map(x=>String(x.id)===String(n.id)?n:x);
-  save('fnz_notas',state.notas);
-  if(close){ npCloseEditor(); render(); toast('Lista guardada'); }
-  return n;
-}
-
-function npOpenDoc(id,pre){
-  ensureLazyData('notas');
-  npEnsureStyles();
-  let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
-  n=n?JSON.parse(JSON.stringify(n)):{id:null,npKind:'doc',tipo:'texto',titulo:pre?.titulo||'Nota nueva',texto:pre?.texto||'',creado:new Date().toISOString()};
-  window._npEditor={mode:'doc',note:n};
-  document.body.style.overflow='hidden';
-  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-editor">
-    <div class="np-ed-top"><button class="np-icon-btn" onclick="npCloseEditor()">x</button><div style="flex:1;font-size:12px;font-weight:850;color:#64748B">Documento</div><button class="np-save" onclick="npSaveDoc(true)">Guardar</button></div>
-    <div class="np-ed-body"><input class="np-ed-title" id="np-title" value="${npEsc(n.titulo||'')}" placeholder="Titulo"><div class="np-sheet"><textarea class="np-textarea" id="np-doc-text" placeholder="Escribe o dicta aqui...">${npEsc(npPlain(n.texto||''))}</textarea></div></div>
-    <div class="np-bottom"><button class="np-tool" onclick="npOpenVoiceCapture('text','${n.id||''}')">Mic</button><button class="np-tool" onclick="npDocImprove()">IA mejorar</button><button class="np-tool primary" onclick="npOpenShareFromEditor()">Exportar</button></div>
-  </div>`);
-}
-function npSaveDoc(close){
-  const ed=window._npEditor;if(!ed)return null;
-  const n=ed.note;
-  n.npKind='doc'; n.tipo='texto';
-  n.titulo=document.getElementById('np-title')?.value.trim()||'Nota';
-  const txt=document.getElementById('np-doc-text')?.value||'';
-  n.texto=txt.replace(/\n/g,'<br>');
-  n.modificado=new Date().toISOString();
-  if(!n.id){n.id=Date.now()+'';n.creado=n.modificado;state.notas.unshift(n);}
-  else state.notas=state.notas.map(x=>String(x.id)===String(n.id)?n:x);
-  save('fnz_notas',state.notas);
-  if(close){npCloseEditor();render();toast('Nota guardada');}
-  return n;
-}
-
-function npOpenMeetingEditor(id,pre){
-  ensureLazyData('notas');
-  npEnsureStyles();
-  let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
-  n=n?JSON.parse(JSON.stringify(n)):{id:null,npKind:'meeting',tipo:'audio',titulo:pre?.titulo||'Reunion con IA',transcript:pre?.transcript||'',resumen:pre?.resumen||'',acuerdos:pre?.acuerdos||[],tareas:pre?.tareas||[],gastos:pre?.gastos||[],creado:new Date().toISOString()};
-  window._npEditor={mode:'meeting',note:n};
-  document.body.style.overflow='hidden';
-  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-editor">
-    <div class="np-ed-top"><button class="np-icon-btn" onclick="npCloseEditor()">x</button><div style="flex:1;font-size:12px;font-weight:850;color:#64748B">Reunion inteligente</div><button class="np-save" onclick="npSaveMeeting(true)">Guardar</button></div>
-    <div class="np-ed-body">
-      <input class="np-ed-title" id="np-title" value="${npEsc(n.titulo||'')}" placeholder="Titulo de reunion">
-      <div class="np-meeting-box">
-        <div class="np-section"><h4>Resumen</h4><textarea class="np-textarea" id="np-meet-resumen" style="min-height:100px">${npEsc(n.resumen||'')}</textarea></div>
-        <div class="np-section"><h4>Acuerdos</h4><textarea class="np-textarea" id="np-meet-acuerdos" style="min-height:90px">${npEsc((n.acuerdos||[]).join('\n'))}</textarea></div>
-        <div class="np-section"><h4>Pendientes</h4><textarea class="np-textarea" id="np-meet-tareas" style="min-height:90px">${npEsc((n.tareas||[]).join('\n'))}</textarea></div>
-        <div class="np-section"><h4>Transcripcion</h4><textarea class="np-textarea" id="np-meet-transcript">${npEsc(n.transcript||'')}</textarea></div>
-      </div>
-    </div>
-    <div class="np-bottom"><button class="np-tool" onclick="npOpenVoiceCapture('meeting','${n.id||''}')">Grabar</button><button class="np-tool" onclick="npMeetingSummarize()">IA resumen</button><button class="np-tool primary" onclick="npOpenShareFromEditor()">Exportar</button></div>
-  </div>`);
-}
-function npSaveMeeting(close){
-  const ed=window._npEditor;if(!ed)return null;
-  const n=ed.note;
-  n.npKind='meeting'; n.tipo='audio';
-  n.titulo=document.getElementById('np-title')?.value.trim()||'Reunion con IA';
-  n.resumen=document.getElementById('np-meet-resumen')?.value.trim()||'';
-  n.acuerdos=(document.getElementById('np-meet-acuerdos')?.value||'').split('\n').map(x=>x.trim()).filter(Boolean);
-  n.tareas=(document.getElementById('np-meet-tareas')?.value||'').split('\n').map(x=>x.trim()).filter(Boolean);
-  n.transcript=document.getElementById('np-meet-transcript')?.value.trim()||'';
-  n.texto=[n.resumen,n.acuerdos.join('\n'),n.tareas.join('\n')].filter(Boolean).join('<br>');
-  n.modificado=new Date().toISOString();
-  if(!n.id){n.id=Date.now()+'';n.creado=n.modificado;state.notas.unshift(n);}
-  else state.notas=state.notas.map(x=>String(x.id)===String(n.id)?n:x);
-  save('fnz_notas',state.notas);
-  if(close){npCloseEditor();render();toast('Reunion guardada');}
-  return n;
-}
-function npCloseEditor(){ document.getElementById('np-editor')?.remove(); document.body.style.overflow=''; window._npEditor=null; }
-
-function npShowTemplates(){
-  const html=`<div class="modal-title" style="color:#172033">Plantillas premium</div>
-    <div style="display:grid;gap:9px">
-      <button class="share-btn" onclick="closeModal();npCreateTemplate('mercado')"><div class="share-icon whatsapp">${appIcon('cart')}</div><div class="share-label"><b>Lista de mercado</b><div class="share-desc">Items con precios y total</div></div></button>
-      <button class="share-btn" onclick="closeModal();npCreateTemplate('materiales')"><div class="share-icon excel">${appIcon('stock')}</div><div class="share-label"><b>Compra de materiales</b><div class="share-desc">Para obra o servicio</div></div></button>
-      <button class="share-btn" onclick="closeModal();npCreateTemplate('gastos')"><div class="share-icon pdf">${appIcon('chart')}</div><div class="share-label"><b>Cuadro de gastos</b><div class="share-desc">Operacion, transporte, comida, otros</div></div></button>
-      <button class="share-btn" onclick="closeModal();npOpenVoiceCapture('meeting')"><div class="share-icon copy">${appIcon('mic')}</div><div class="share-label"><b>Reunion con IA</b><div class="share-desc">Escuchar, resumir y sacar tareas</div></div></button>
-    </div>`;
-  document.getElementById('modal-content').innerHTML=html;
-  showModal();
-}
-function npCreateTemplate(kind){
-  if(kind==='mercado') return npOpenSmartList(null,'mercado',{titulo:'Lista de mercado',items:['Verduras','Gaseosa','Menu'].map(t=>npNormalizeItem(t))});
-  if(kind==='materiales') return npOpenSmartList(null,'materiales',{titulo:'Compra de materiales',items:['Tuberia','Codos','Valvulas'].map(t=>npNormalizeItem(t))});
-  return npOpenSmartList(null,'gastos',{titulo:'Cuadro de gastos',items:['Movilidad','Snack / bebida','Materiales'].map(t=>npNormalizeItem(t))});
-}
-
-function npParseSmartInput(text,mode){
-  const t=nrm(text);
-  const kind = mode==='meeting'||/\b(reunion|cliente dijo|acuerdos|agenda de reunion|acta)\b/.test(t) ? 'meeting'
-    : mode==='text' ? 'doc' : 'smart_list';
-  if(kind==='meeting') return {kind:'meeting',titulo:'Reunion '+new Date().toLocaleDateString('es-PE'),transcript:text,resumen:'',acuerdos:[],tareas:[],confidence:.55};
-  if(kind==='doc') return {kind:'doc',titulo:'Nota dictada',texto:text,confidence:.7};
-  const listType=/material/.test(t)?'materiales':/mercado|super/.test(t)?'mercado':/gasto|egreso/.test(t)?'gastos':/tarea|pendiente/.test(t)?'tareas':'compras';
-  let clean=text.replace(/\b(crea|crear|haz|hacer|anota|apunta|agrega|lista de|lista|compras|mercado|gastos|materiales|tareas)\b/gi,' ');
-  clean=clean.replace(/\s+(tambien|también|luego|ademas|además|despues|después)\s+/gi, ', ');
-  clean=clean.replace(/\s+y\s+/gi, ', ');
-  const parts=clean.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
-  const items=parts.map(part=>{
-    const amount=extractAmount(part)||0;
-    let label=part
-      .replace(/s\/\.?\s*\d+(?:[.,]\d+)?/gi,' ')
-      .replace(/\d+(?:[.,]\d+)?\s*(soles?|sol)?/gi,' ')
-      .replace(/\b\w+\s+con\s+\w+\b/gi,' ')
-      .replace(/\b(con|por|precio|cuesta|vale|de|en|a)\b\s*$/gi,' ')
-      .replace(/\s+/g,' ').trim();
-    label=label.replace(/^(compre|compré|comprar|compra|gaste|gasté|necesito|quiero|agrega|anota)\s+/i,'').trim();
-    if(!label && amount) label='Item';
-    return npNormalizeItem({texto:label,precio:amount,total:amount});
-  }).filter(i=>i.texto);
-  return {kind:'smart_list',titulo:npTitleForKind(listType),listType,items,confidence:(items.length>=2||npListTotal(items)>0)?.85:.45};
-}
-
 async function npGeminiOrganize(text,mode,local){
   const key=localStorage.getItem('fnz_gemini_key');
   if(!key) return local;
@@ -9733,6 +8906,7 @@ window._saveCobroStateToItem = function(id) {
   });
   item.movilidad = parseFloat(document.getElementById('cobro-movilidad')?.value)||item.movilidad||0;
   item.agregados = parseFloat(document.getElementById('cobro-otros')?.value)||item.agregados||0;
+  item.comida = parseFloat(document.getElementById('cobro-comida')?.value)||item.comida||0;
   item.otros = parseFloat(document.getElementById('cobro-otrosgastos')?.value)||item.otros||0;
   item.meta = parseFloat(document.getElementById('cobro-meta')?.value)||item.meta||0;
   item.ubicacion = document.getElementById('cobro-distrito')?.value||item.ubicacion||'';
@@ -9889,6 +9063,7 @@ function abrirModalCobro(id){
       <div class="cierre-card">
         <div class="cierre-section-title" style="margin-bottom:12px">Otros datos del cierre</div>
         <div class="cierre-grid-3">
+          <div class="cierre-field"><label>Comida</label><input id="cobro-comida" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.comida||''}" oninput="updateCobroTotals()"></div>
           <div class="cierre-field"><label>Movilidad</label><input id="cobro-movilidad" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.movilidad||''}" oninput="updateCobroTotals()"></div>
           <div class="cierre-field"><label>Agregados</label><input id="cobro-otros" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.agregados||''}" oninput="updateCobroTotals()"></div>
           <div class="cierre-field"><label>Otros</label><input id="cobro-otrosgastos" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.otros||''}" oninput="updateCobroTotals()"></div>
@@ -9947,6 +9122,7 @@ async function guardarFinalizacion(id){
 
   const cobroObj = {
     otros_gastos: parseFloat(document.getElementById('cobro-otrosgastos')?.value)||0,
+    comida: parseFloat(document.getElementById('cobro-comida')?.value)||0,
     svc1: document.getElementById('cobro-svc1')?.value||'',
     precio1: parseFloat(document.getElementById('cobro-precio1')?.value)||0,
     materiales1: parseFloat(document.getElementById('cobro-mat1')?.value)||0,
@@ -9976,6 +9152,11 @@ async function guardarFinalizacion(id){
   const gastosVinculadosIds = getSelectedGastosCierreIds();
   const gastosVinculados = (state.transactions||[]).filter(t => gastosVinculadosIds.includes(String(t.id)));
   const totalGastosVinculados = gastosVinculados.reduce((s,t) => s + moneyValue(t.amount), 0);
+  const totalComidaVinculada = gastosVinculados.filter(t => isComidaCategory(t.catId, t.category, t.description)).reduce((s,t) => s + moneyValue(t.amount), 0);
+  const comidaManual = moneyValue(cobroObj.comida);
+  cobroObj.comida_manual = comidaManual;
+  cobroObj.comida_vinculada = totalComidaVinculada;
+  cobroObj.comida = +(comidaManual + totalComidaVinculada).toFixed(2);
   const agDesc = (cobroObj.svc1 || item.servicio || 'Servicio') + ' — ' + (item.cliente || '');
   const fechasCierre = new Set([item.fecha, todayStr()].filter(Boolean));
 
@@ -9998,6 +9179,7 @@ async function guardarFinalizacion(id){
   item.materiales1 = cobroObj.materiales1;
   item.materiales2 = cobroObj.materiales2;
   item.materiales3 = cobroObj.materiales3;
+  item.comida = cobroObj.comida;
   item.gastosVinculados = gastosVinculadosIds;
   item.gastosVinculadosTotal = totalGastosVinculados;
   item.gastosVinculadosResumen = gastosVinculados.map(t => `${t.category}: ${fmt(t.amount)}`).join(' · ');
@@ -10103,8 +9285,9 @@ async function guardarFinalizacion(id){
   const pagosMethods = pagos.filter(p => p.val > 0).map(p => p.name);
   item.formaPago1 = pagosMethods[0] || '';
   item.formaPago2 = pagosMethods[1] || '';
-  if (crearMovimientosCierre && cobroObj.movilidad > 0) { const txId=rowId+'-mov'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.movilidad, category:'Movilidad', description:'Movilidad · '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
-  if (crearMovimientosCierre && cobroObj.otros_gastos > 0) { const txId=rowId+'-otg'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos · '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.movilidad > 0) { const txId=rowId+'-mov'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.movilidad, category:'Movilidad', description:'Movilidad - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.comida_manual > 0) { const txId=rowId+'-com'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.comida_manual, category:'Comida', catId:'cne_menu', description:'Comida - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.otros_gastos > 0) { const txId=rowId+'-otg'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   // Materiales no crean egreso aquí: ya salieron de caja cuando se compraron y ahora solo consumen stock valorizado.
   if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', description:'Agregados · '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if(crearMovimientosCierre) item.cierreTxIds = nuevosCierreTxIds;
@@ -10127,7 +9310,7 @@ async function guardarFinalizacion(id){
       servicio2: cobroObj.svc2, precio2: cobroObj.precio2, materiales2: cobroObj.materiales2,
       servicio3: cobroObj.svc3, precio3: cobroObj.precio3, materiales3: cobroObj.materiales3,
       formaPago1: tp[0]?tp[0].name:'', formaPago2: tp[1]?tp[1].name:'',
-      movilidad: cobroObj.movilidad, agregados: cobroObj.agregados, otros_gastos: cobroObj.otros_gastos, meta: cobroObj.meta, observaciones: cobroObj.observaciones,
+      movilidad: cobroObj.movilidad, comida: cobroObj.comida, agregados: cobroObj.agregados, otros_gastos: cobroObj.otros_gastos, meta: cobroObj.meta, observaciones: cobroObj.observaciones,
       gastosVinculadosTotal: totalGastosVinculados, gastosVinculadosResumen: item.gastosVinculadosResumen
     }, modo: state.modo });
     syncAgendaToSheets({ ...item, estado:'se_finalizo', montoPagado:totalPagado, estadoPago:item.estadoPago });
@@ -15776,7 +14959,11 @@ async function processVoiceWithGemini(text){
     let titulo = tipo==='lista' ? 'Lista de compras' : 'Nota';
     const matchTitulo2 = text.match(/(?:lista|nota)\s+de\s+([\w\s]{2,40}?)(?:\s*$|,|\s+para\b)/i) || text.match(/(?:lista|nota)\s+para\s+([\w\s]{2,40}?)(?:\s*$|,)/i);
     if(matchTitulo2){ let tt2=matchTitulo2[1].trim().replace(/^(de |del |una |un |para |el |la )/i,'').trim(); titulo=tt2.charAt(0).toUpperCase()+tt2.slice(1); }
-    abrirModoLista(tipo, titulo);
+    if(typeof npStartLiveListFromCommand === 'function'){
+      npStartLiveListFromCommand(text);
+    } else {
+      abrirModoLista(tipo, titulo);
+    }
     return;
   }
 
@@ -19598,6 +18785,29 @@ function npEnsureStyles(){
   .np-tool{flex:1;border:1px solid #E6EBF0;background:#fff;border-radius:12px;padding:11px 8px;font-size:11px;font-weight:850;color:#475569;cursor:pointer}
   .np-tool.primary{background:#172033;color:#fff;border-color:#172033}
   .np-textarea{width:100%;min-height:48vh;border:none;outline:none;resize:vertical;background:transparent;font-family:Inter,'DM Sans',sans-serif;font-size:15px;line-height:1.65;color:#172033}
+  .np-style-panel{display:none;margin:0 0 12px;padding:12px;border:1px solid #E6EBF0;background:#F8FAFC;border-radius:14px}
+  .np-style-panel.on{display:block}
+  .np-style-title{font-size:12px;font-weight:850;color:#172033;margin-bottom:9px}
+  .np-swatches{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+  .np-swatch{width:30px;height:30px;border-radius:999px;border:1px solid #D8E0E8;box-shadow:inset 0 0 0 2px #fff;cursor:pointer}
+  .np-swatch.on{outline:2px solid #172033;outline-offset:2px}
+  .np-doc-toolbar{display:flex;gap:7px;overflow:auto;margin-bottom:10px}
+  .np-doc-tool{border:1px solid #E6EBF0;background:#FAFBFC;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:850;color:#475569;white-space:nowrap;cursor:pointer}
+  .np-doc-editor{min-height:58vh;outline:none;font-size:15px;line-height:1.7;color:#172033}
+  .np-doc-editor:empty:before{content:'Escribe aqui o usa el microfono...';color:#94A3B8}
+  .np-doc-editor p{margin:0 0 12px}
+  .np-doc-editor ul{margin:8px 0 14px 20px;padding:0}
+  .np-doc-editor li{margin:6px 0}
+  .np-note-box{border:1px solid #E6EBF0;background:#FAFBFC;border-radius:14px;padding:12px;margin:12px 0;color:#263244}
+  .np-live-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .np-live-title{font-weight:900;color:#172033}
+  .np-live-count{font-size:11px;color:#64748B;font-weight:850}
+  .np-live-list{display:grid;gap:7px}
+  .np-live-row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;background:#fff;border:1px solid #E6EBF0;border-radius:12px;padding:8px 10px}
+  .np-live-check{width:18px;height:18px;border:1.6px solid #CBD5E1;border-radius:6px;background:#F8FAFC}
+  .np-live-text{font-size:13px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .np-live-money{font-size:12px;font-weight:900;color:#172033}
+  .np-live-hint{margin-top:10px;font-size:11px;line-height:1.45;color:#64748B;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:12px;padding:9px}
   .np-meeting-box{display:grid;gap:10px}
   .np-section{background:#FAFBFC;border:1px solid #E6EBF0;border-radius:14px;padding:12px}
   .np-section h4{margin:0 0 7px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#64748B}
@@ -19615,6 +18825,333 @@ function npEnsureStyles(){
   .np-mic-actions button.primary{background:#172033;color:#fff;border-color:#172033}
   @media(max-width:420px){.np-quick,.np-stats{grid-template-columns:1fr 1fr}.np-money-grid{grid-template-columns:1fr 1fr 1fr}.np-card-actions{overflow:auto}.np-act{min-width:74px}}
   `;
+}
+
+
+
+// Helpers compartidos para Notas Premium. Mantienen viva la pantalla aunque
+// existan funciones antiguas declaradas en otras zonas del archivo.
+var _npSearch = typeof _npSearch !== 'undefined' ? _npSearch : '';
+var _npFilter = typeof _npFilter !== 'undefined' ? _npFilter : 'todas';
+
+function esc(v){
+  return String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function npEsc(v){ return esc(v); }
+function npPlain(v){
+  const s = String(v || '');
+  if(typeof document === 'undefined') return s.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '').trim();
+  const div = document.createElement('div');
+  div.innerHTML = s.replace(/<br\s*\/?>/gi, '\n');
+  return (div.textContent || div.innerText || '').trim();
+}
+function npMoney(v){
+  if(typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  let s = String(v ?? '').trim().toLowerCase();
+  const con = s.match(/(\d+)\s+con\s+(\d{1,2})/);
+  if(con) return Number(con[1]) + Number(con[2].padEnd(2,'0')) / 100;
+  s = s.replace(/[^\d,.\-]/g, '');
+  if(!s || s === '-' || s === '.' || s === ',') return 0;
+  if(s.includes(',') && s.includes('.')) s = s.replace(/\./g, '').replace(',', '.');
+  else s = s.replace(',', '.');
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+}
+function npFmt(v){
+  return 'S/ ' + npMoney(v).toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function npId(){
+  return 'np_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+}
+function npNoteKind(n){
+  if(!n) return 'doc';
+  return n.npKind || (n.tipo === 'audio' ? 'meeting' : n.tipo === 'tabla' ? 'table' : n.tipo === 'lista' ? 'smart_list' : 'doc');
+}
+function npSetFilter(k){
+  _npFilter = k || 'todas';
+  render();
+}
+function npDefaultAppearance(){
+  return {paper:'#FFFFFF', accent:'#2F5F56', border:'#E6EBF0'};
+}
+function npBlankList(kind, title){
+  const listType = kind || 'compras';
+  const now = new Date().toISOString();
+  return {
+    id:null,
+    npKind:'smart_list',
+    tipo:'lista',
+    listType,
+    titulo:title || npTitleForKind(listType),
+    items:[],
+    totalLista:0,
+    appearance:npDefaultAppearance(),
+    creado:now,
+    modificado:now
+  };
+}
+function npStylePanelHtml(n){
+  const ap = {...npDefaultAppearance(), ...(n?.appearance || {})};
+  const papers = ['#FFFFFF','#F8FAFC','#F4F8F6','#F7F3EA','#F5F3FF','#FFF7ED'];
+  const accents = ['#172033','#2F5F56','#1F5C99','#6D46A5','#9A5415','#B04759'];
+  const sw = (type, color) => `<button class="np-swatch ${ap[type]===color?'on':''}" style="background:${color}" onclick="npSetAppearance('${type}','${color}')"></button>`;
+  return `<div class="np-style-panel" id="np-style-panel">
+    <div class="np-style-title">Apariencia de la nota</div>
+    <div class="np-field-label">Fondo</div>
+    <div class="np-swatches">${papers.map(c=>sw('paper', c)).join('')}</div>
+    <div class="np-field-label">Acento</div>
+    <div class="np-swatches">${accents.map(c=>sw('accent', c)).join('')}</div>
+  </div>`;
+}
+function npToggleStylePanel(){
+  document.getElementById('np-style-panel')?.classList.toggle('on');
+}
+function npSetAppearance(type, value){
+  const ed = window._npEditor;
+  if(!ed?.note) return;
+  ed.note.appearance = {...npDefaultAppearance(), ...(ed.note.appearance || {}), [type]:value};
+  npApplyEditorAppearance();
+  document.querySelectorAll('.np-swatch').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll(`.np-swatch[onclick*="${value}"]`).forEach(b=>b.classList.add('on'));
+}
+function npApplyEditorAppearance(){
+  const ed = window._npEditor;
+  const ap = {...npDefaultAppearance(), ...(ed?.note?.appearance || {})};
+  const sheet = document.getElementById('np-sheet-main');
+  if(sheet){
+    sheet.style.background = ap.paper;
+    sheet.style.borderColor = ap.border || '#E6EBF0';
+    sheet.style.boxShadow = `0 14px 36px ${ap.accent}14`;
+  }
+  document.querySelectorAll('.np-save,.np-tool.primary').forEach(el=>{
+    el.style.background = ap.accent;
+    el.style.borderColor = ap.accent;
+  });
+}
+function npAddListItem(){
+  const ed = window._npEditor;
+  if(!ed || ed.mode !== 'list') return;
+  npCollectListRows();
+  ed.note.items.push(npNormalizeItem({texto:'', cantidad:1, precio:0, total:0}));
+  npRenderListRows();
+}
+function npDelListItem(i){
+  const ed = window._npEditor;
+  if(!ed || ed.mode !== 'list') return;
+  npCollectListRows();
+  ed.note.items.splice(i, 1);
+  if(!ed.note.items.length) ed.note.items.push(npNormalizeItem({texto:'', cantidad:1, precio:0, total:0}));
+  npRenderListRows();
+}
+function npCloseEditor(){
+  document.getElementById('np-editor')?.remove();
+  document.body.style.overflow = '';
+  window._npEditor = null;
+}
+function npOpenNote(id){
+  const n = (state.notas || []).find(x => String(x.id) === String(id));
+  if(!n) return;
+  const kind = npNoteKind(n);
+  if(kind === 'smart_list') return npOpenSmartList(n.id, n.listType || 'compras');
+  if(kind === 'meeting') return npOpenMeetingEditor(n.id);
+  return npOpenDoc(n.id);
+}
+function npDeleteNote(id){
+  if(!confirm('Eliminar esta nota?')) return;
+  state.notas = (state.notas || []).filter(n => String(n.id) !== String(id));
+  save('fnz_notas', state.notas);
+  render();
+  toast('Nota eliminada');
+}
+function npShowTemplates(){
+  npEnsureStyles();
+  const templates = [
+    {kind:'compras', title:'Lista de compras', sub:'Items con check, precio y total'},
+    {kind:'mercado', title:'Lista de mercado', sub:'Compras diarias ordenadas'},
+    {kind:'materiales', title:'Lista de materiales', sub:'Materiales para servicios'},
+    {kind:'gastos', title:'Cuadro de gastos', sub:'Concepto, cantidad y monto'},
+    {kind:'tareas', title:'Tareas', sub:'Pendientes con checklist'},
+    {kind:'doc', title:'Block premium', sub:'Nota libre con cuadros editables'}
+  ];
+  document.getElementById('modal-content').innerHTML = `<div class="modal-title" style="color:#172033">Plantillas</div>
+    <div style="display:grid;gap:9px">
+      ${templates.map(t=>`<button class="share-btn" onclick="npCreateTemplate('${t.kind}')"><div class="share-icon copy">${appIcon(t.kind==='doc'?'note':t.kind==='gastos'?'chart':'clipboard')}</div><div class="share-label"><b>${t.title}</b><div class="share-desc">${t.sub}</div></div></button>`).join('')}
+    </div>`;
+  showModal();
+}
+function npCreateTemplate(kind){
+  closeModal();
+  if(kind === 'doc') return npOpenDoc(null, {titulo:'Nota nueva'});
+  npOpenSmartList(null, kind, {titulo:npTitleForKind(kind), listType:kind, items:[]});
+}
+function npSaveMeeting(close){
+  const ed = window._npEditor;
+  if(!ed || ed.mode !== 'meeting') return null;
+  const n = ed.note;
+  n.npKind = 'meeting';
+  n.tipo = 'audio';
+  n.titulo = document.getElementById('np-title')?.value.trim() || 'Reunion';
+  n.transcript = document.getElementById('np-meet-transcript')?.value.trim() || '';
+  n.resumen = document.getElementById('np-meet-resumen')?.value.trim() || '';
+  n.acuerdos = (document.getElementById('np-meet-acuerdos')?.value || '').split('\n').map(x=>x.trim()).filter(Boolean);
+  n.tareas = (document.getElementById('np-meet-tareas')?.value || '').split('\n').map(x=>x.trim()).filter(Boolean);
+  n.gastos = (document.getElementById('np-meet-gastos')?.value || '').split('\n').map(x=>x.trim()).filter(Boolean);
+  n.texto = n.resumen;
+  n.modificado = new Date().toISOString();
+  if(!n.id){ n.id = npId(); n.creado = n.modificado; state.notas.unshift(n); }
+  else state.notas = state.notas.map(x => String(x.id) === String(n.id) ? n : x);
+  npSaveNoteToCloud(n);
+  if(close){ npCloseEditor(); render(); toast('Reunion guardada'); }
+  return n;
+}
+function npOpenMeetingEditor(id, pre){
+  ensureLazyData('notas');
+  npEnsureStyles();
+  let n = id ? (state.notas || []).find(x => String(x.id) === String(id)) : null;
+  n = n ? JSON.parse(JSON.stringify(n)) : {
+    id:null,
+    npKind:'meeting',
+    tipo:'audio',
+    titulo:pre?.titulo || 'Reunion',
+    transcript:pre?.transcript || '',
+    resumen:pre?.resumen || '',
+    acuerdos:pre?.acuerdos || [],
+    tareas:pre?.tareas || [],
+    gastos:pre?.gastos || [],
+    appearance:npDefaultAppearance(),
+    creado:new Date().toISOString()
+  };
+  n.appearance = {...npDefaultAppearance(), ...(pre?.appearance || n.appearance || {})};
+  window._npEditor = {mode:'meeting', note:n};
+  document.getElementById('np-editor')?.remove();
+  document.body.style.overflow = 'hidden';
+  document.body.insertAdjacentHTML('beforeend', `<div class="np-ov" id="np-editor">
+    <div class="np-ed-top"><button class="np-icon-btn" onclick="npCloseEditor()">x</button><div style="flex:1;font-size:12px;font-weight:850;color:#64748B">Reunion inteligente</div><button class="np-save" onclick="npSaveMeeting(true)">Guardar</button></div>
+    <div class="np-ed-body">
+      <input class="np-ed-title" id="np-title" value="${npEsc(n.titulo || '')}" placeholder="Titulo">
+      <div class="np-sheet" id="np-sheet-main">
+        ${npStylePanelHtml(n)}
+        <div class="np-meeting-box">
+          <div class="np-section"><h4>Transcripcion</h4><textarea class="np-textarea" id="np-meet-transcript" placeholder="Pega o dicta la reunion completa...">${npEsc(n.transcript || '')}</textarea></div>
+          <div class="np-section"><h4>Resumen</h4><textarea class="np-textarea" id="np-meet-resumen" style="min-height:110px">${npEsc(n.resumen || '')}</textarea></div>
+          <div class="np-section"><h4>Acuerdos</h4><textarea class="np-textarea" id="np-meet-acuerdos" style="min-height:100px">${npEsc((n.acuerdos || []).join('\n'))}</textarea></div>
+          <div class="np-section"><h4>Pendientes</h4><textarea class="np-textarea" id="np-meet-tareas" style="min-height:100px">${npEsc((n.tareas || []).join('\n'))}</textarea></div>
+          <div class="np-section"><h4>Gastos detectados</h4><textarea class="np-textarea" id="np-meet-gastos" style="min-height:86px">${npEsc((n.gastos || []).join('\n'))}</textarea></div>
+        </div>
+      </div>
+    </div>
+    <div class="np-bottom">
+      <button class="np-tool" onclick="npOpenVoiceCapture('meeting','__meeting_editor')">Mic</button>
+      <button class="np-tool" onclick="npMeetingSummarize()">IA resumen</button>
+      <button class="np-tool" onclick="npToggleStylePanel()">Personalizar</button>
+      <button class="np-tool primary" onclick="npOpenShareFromEditor()">Exportar</button>
+    </div>
+  </div>`);
+  npApplyEditorAppearance();
+}
+function npDocInsertParsedVoice(p, raw){
+  if(p?.kind === 'smart_list'){
+    const html = `<div class="np-note-box"><b>${npEsc(p.titulo || 'Lista')}</b><ul>${(p.items || []).map(i=>`<li>${npEsc(i.texto)}${npMoney(i.total) ? ' - ' + npFmt(i.total) : ''}</li>`).join('')}</ul><b>Total: ${npFmt(npListTotal(p.items || []))}</b></div><p><br></p>`;
+    return npDocInsertHtml(html);
+  }
+  if(p?.kind === 'meeting'){
+    const html = `<div class="np-note-box"><b>${npEsc(p.titulo || 'Resumen')}</b><p>${npEsc(p.resumen || raw || '').replace(/\n/g,'<br>')}</p></div><p><br></p>`;
+    return npDocInsertHtml(html);
+  }
+  npDocInsertHtml(npEsc(p?.texto || raw || '').replace(/\n/g,'<br>') + '<p><br></p>');
+}
+function npBuildLiveList(seedText){
+  const seed = String(seedText || '');
+  const listType = npGuessListType(seed);
+  return {listType, titulo:npTitleForKind(listType), items:[], seedText:seed, appearance:npDefaultAppearance()};
+}
+function npStartLiveListFromCommand(seed){
+  window._npPendingLiveList = npBuildLiveList(seed || 'crea una lista de compras');
+  npOpenVoiceCapture('list');
+}
+function npLiveAppendItems(list, items){
+  const seen = new Set((list.items || []).map(i => nrm(i.texto + ' ' + npMoney(i.total))));
+  (items || []).forEach(it => {
+    const item = npNormalizeItem(it);
+    const key = nrm(item.texto + ' ' + npMoney(item.total));
+    if(item.texto && !seen.has(key)){
+      list.items.push(item);
+      seen.add(key);
+    }
+  });
+  list.totalLista = npListTotal(list.items);
+}
+function npMicProcessLiveSegment(seg){
+  const m = window._npMic;
+  if(!m?.liveList) return;
+  const clean = npCleanVoicePiece(seg);
+  const norm = npVoiceNorm(clean);
+  if(!norm) return;
+  if(/\b(eso es todo|termina|terminar|finaliza|guardar lista|listo nada mas|nada mas)\b/.test(norm)){
+    npMicFinishLiveList('voice');
+    return;
+  }
+  if(/\b(crea|crear|haz|hacer)\s+(una\s+)?lista\b/.test(norm) && !/\d|sol|s\/|con\b/.test(norm)){
+    m.liveList.listType = npGuessListType(clean);
+    m.liveList.titulo = npTitleForKind(m.liveList.listType);
+    npRenderLiveListPreview();
+    return;
+  }
+  const expanded = clean.replace(/\b(aparte|siguiente|que mas|que mas|otra cosa|tambien|ademas)\b/gi, ', ');
+  const parsed = npParseSmartListLocal(expanded);
+  if(parsed.listType && parsed.listType !== 'compras') m.liveList.listType = parsed.listType;
+  m.liveList.titulo = npTitleForKind(m.liveList.listType);
+  npLiveAppendItems(m.liveList, parsed.items);
+  npRenderLiveListPreview();
+}
+function npRenderLiveListPreview(){
+  const m = window._npMic;
+  if(!m?.liveList) return;
+  const list = m.liveList;
+  const text = document.getElementById('np-mic-text');
+  const prev = document.getElementById('np-mic-preview');
+  if(text){
+    text.textContent = list.items.length
+      ? `${list.titulo}\n${list.items.map(i=>`- ${i.texto}${npMoney(i.total)?' | '+npFmt(i.total):''}`).join('\n')}${m.interim?'\n\nEscuchando: '+m.interim:''}`
+      : `${list.titulo}\nDi cada item. Para separar usa: aparte, siguiente o que mas. Para cerrar di: eso es todo.`;
+  }
+  if(prev){
+    prev.style.display = 'block';
+    prev.innerHTML = `<div class="np-live-head"><div class="np-live-title">${npEsc(list.titulo)}</div><div class="np-live-count">${list.items.length} item(s)</div></div>
+      <div class="np-live-list">${(list.items || []).slice(-8).map(i=>`<div class="np-live-row"><span class="np-live-check"></span><span class="np-live-text">${npEsc(i.texto)}</span><b class="np-live-money">${npMoney(i.total)?npFmt(i.total):''}</b></div>`).join('')}</div>
+      <div class="np-live-hint">Total: <b>${npFmt(npListTotal(list.items))}</b>. Di "eso es todo" para abrir el editor y revisar antes de guardar.</div>`;
+  }
+  const save = document.getElementById('np-mic-save');
+  if(save){ save.style.display = 'block'; save.textContent = 'Abrir editor'; }
+}
+function npMicBumpSilence(){
+  const m = window._npMic;
+  if(!m) return;
+  clearTimeout(m.silenceTimer);
+  clearTimeout(m.idleHintTimer);
+  m.idleHintTimer = setTimeout(()=>npRenderLiveListPreview(), 12000);
+  if(m.mode === 'meeting') return;
+  m.silenceTimer = setTimeout(()=>{
+    if(!window._npMic?.recording) return;
+    if(window._npMic.liveList && window._npMic.liveList.items.length) npMicFinishLiveList('silence');
+    else if(window._npMic.segments?.length) npMicStop();
+  }, 45000);
+}
+function npMicFinishLiveList(reason){
+  const m = window._npMic;
+  if(!m?.liveList) return;
+  const list = JSON.parse(JSON.stringify(m.liveList));
+  list.items = (list.items || []).map(npNormalizeItem);
+  list.totalLista = npListTotal(list.items);
+  if(m.recording && m.rec){ m.recording = false; try{ m.rec.stop(); }catch(e){} }
+  clearInterval(m.timer);
+  clearTimeout(m.silenceTimer);
+  clearTimeout(m.idleHintTimer);
+  document.getElementById('np-mic')?.remove();
+  document.body.style.overflow = '';
+  window._npMic = null;
+  npOpenSmartList(null, list.listType || 'compras', list);
+  if(reason === 'silence') toast('Lista lista para revisar');
 }
 
 function npSaveNoteToCloud(n){
@@ -19774,6 +19311,7 @@ function npOpenSmartList(id,kind,pre){
   n=n?JSON.parse(JSON.stringify(n)):npBlankList(kind||pre?.listType,pre?.titulo);
   n.npKind='smart_list'; n.tipo='lista'; n.listType=kind||n.listType||pre?.listType||'compras';
   n.items=(pre?.items||n.items||[]).map(npNormalizeItem);
+  n.appearance={...npDefaultAppearance(),...(pre?.appearance||n.appearance||{})};
   window._npEditor={mode:'list',note:n,isNew:!id};
   document.getElementById('np-editor')?.remove();
   document.body.style.overflow='hidden';
@@ -19781,21 +19319,24 @@ function npOpenSmartList(id,kind,pre){
     <div class="np-ed-top"><button class="np-icon-btn" onclick="npCloseEditor()">x</button><div style="flex:1;font-size:12px;font-weight:850;color:#64748B">Lista inteligente</div><button class="np-save" onclick="npSaveList(true)">Guardar</button></div>
     <div class="np-ed-body">
       <input class="np-ed-title" id="np-title" value="${npEsc(n.titulo||'')}" placeholder="Titulo">
-      <div class="np-sheet">
+      <div class="np-sheet" id="np-sheet-main">
         <div class="np-type-row">
           ${['compras','mercado','materiales','gastos','tareas'].map(k=>`<button class="np-type ${n.listType===k?'on':''}" onclick="npSetListType('${k}',this)">${k.charAt(0).toUpperCase()+k.slice(1)}</button>`).join('')}
         </div>
+        ${npStylePanelHtml(n)}
         <div id="np-list-rows"></div>
         <div class="np-editor-total"><span>Total de la lista</span><b id="np-list-total">S/ 0.00</b></div>
       </div>
     </div>
     <div class="np-bottom">
       <button class="np-tool" onclick="npAddListItem()">+ Item</button>
-      <button class="np-tool" onclick="npOpenVoiceCapture('list','${n.id||''}')">Mic</button>
+      <button class="np-tool" onclick="npOpenVoiceCapture('list','__editor')">Mic</button>
+      <button class="np-tool" onclick="npToggleStylePanel()">Personalizar</button>
       <button class="np-tool" onclick="npImproveCurrentList()">IA ordenar</button>
       <button class="np-tool primary" onclick="npOpenShareFromEditor()">Exportar</button>
     </div>
   </div>`);
+  npApplyEditorAppearance();
   npRenderListRows();
 }
 
@@ -19870,6 +19411,66 @@ function npSaveList(close){
   if(close){ npCloseEditor(); render(); toast('Lista guardada'); }
   return n;
 }
+
+function npOpenDoc(id,pre){
+  ensureLazyData('notas');
+  npEnsureStyles();
+  let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
+  n=n?JSON.parse(JSON.stringify(n)):{id:null,npKind:'doc',tipo:'texto',titulo:pre?.titulo||'Nota nueva',texto:pre?.texto||'',appearance:npDefaultAppearance(),creado:new Date().toISOString()};
+  n.appearance={...npDefaultAppearance(),...(pre?.appearance||n.appearance||{})};
+  window._npEditor={mode:'doc',note:n};
+  document.getElementById('np-editor')?.remove();
+  document.body.style.overflow='hidden';
+  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-editor">
+    <div class="np-ed-top"><button class="np-icon-btn" onclick="npCloseEditor()">x</button><div style="flex:1;font-size:12px;font-weight:850;color:#64748B">Block premium</div><button class="np-save" onclick="npSaveDoc(true)">Guardar</button></div>
+    <div class="np-ed-body">
+      <input class="np-ed-title" id="np-title" value="${npEsc(n.titulo||'')}" placeholder="Titulo">
+      <div class="np-sheet" id="np-sheet-main">
+        <div class="np-doc-toolbar">
+          <button class="np-doc-tool" onclick="document.execCommand('bold')">B</button>
+          <button class="np-doc-tool" onclick="document.execCommand('italic')">I</button>
+          <button class="np-doc-tool" onclick="npDocInsertBox()">Cuadro</button>
+          <button class="np-doc-tool" onclick="npDocInsertChecklist()">Checklist</button>
+          <button class="np-doc-tool" onclick="npDocInsertDivider()">Linea</button>
+          <button class="np-doc-tool" onclick="npToggleStylePanel()">Color</button>
+        </div>
+        ${npStylePanelHtml(n)}
+        <div class="np-doc-editor" id="np-doc-editor" contenteditable="true">${n.texto||''}</div>
+      </div>
+    </div>
+    <div class="np-bottom">
+      <button class="np-tool" onclick="npOpenVoiceCapture('text','__doc_editor')">Mic</button>
+      <button class="np-tool" onclick="npDocInsertBox()">+ Cuadro</button>
+      <button class="np-tool" onclick="npToggleStylePanel()">Personalizar</button>
+      <button class="np-tool primary" onclick="npOpenShareFromEditor()">Exportar</button>
+    </div>
+  </div>`);
+  npApplyEditorAppearance();
+  setTimeout(()=>document.getElementById('np-doc-editor')?.focus(),80);
+}
+
+function npSaveDoc(close){
+  const ed=window._npEditor; if(!ed) return null;
+  const n=ed.note;
+  n.npKind='doc'; n.tipo='texto';
+  n.titulo=document.getElementById('np-title')?.value.trim()||'Nota';
+  n.texto=document.getElementById('np-doc-editor')?.innerHTML||'';
+  n.modificado=new Date().toISOString();
+  if(!n.id){ n.id=npId(); n.creado=n.modificado; state.notas.unshift(n); }
+  else state.notas=state.notas.map(x=>String(x.id)===String(n.id)?n:x);
+  npSaveNoteToCloud(n);
+  if(close){ npCloseEditor(); render(); toast('Nota guardada'); }
+  return n;
+}
+
+function npDocInsertHtml(html){
+  const ed=document.getElementById('np-doc-editor'); if(!ed) return;
+  ed.focus();
+  document.execCommand('insertHTML', false, html);
+}
+function npDocInsertBox(){ npDocInsertHtml('<div class="np-note-box">Escribe dentro de este cuadro...</div><p><br></p>'); }
+function npDocInsertChecklist(){ npDocInsertHtml('<ul><li>Nuevo pendiente</li><li>Otro item</li></ul><p><br></p>'); }
+function npDocInsertDivider(){ npDocInsertHtml('<hr style="border:none;border-top:1px solid #E6EBF0;margin:14px 0"><p><br></p>'); }
 
 function npCleanVoicePiece(text){
   return String(text||'').replace(/([a-zA-Z])\1{3,}/g,'$1$1').replace(/\balas\b/gi,'a las').replace(/\s+/g,' ').trim();
@@ -20017,16 +19618,24 @@ function npOpenVoiceCapture(mode='auto',targetId=''){
   npEnsureStyles();
   document.getElementById('np-mic')?.remove();
   document.body.style.overflow='hidden';
-  window._npMic={mode,targetId,recording:false,segments:[],norms:new Set(),seconds:0,parsed:null,interim:''};
+  const pending=window._npPendingLiveList||null;
+  window._npPendingLiveList=null;
+  const liveList=pending||(mode==='list'?npBuildLiveList(''):null);
+  window._npMic={mode,targetId,recording:false,segments:[],norms:new Set(),seconds:0,parsed:null,interim:'',liveList,liveNorms:new Set(),silenceTimer:null,idleHintTimer:null};
+  const sub=mode==='meeting'
+    ? 'Modo reunion: puede escuchar dictados largos y usar Gemini para resumen, acuerdos y pendientes.'
+    : mode==='list'
+      ? 'Modo lista viva: di items y precios. Usa aparte, siguiente o que mas. Termina con eso es todo.'
+      : 'Local primero para listas y precios. Gemini se usa para reuniones, textos largos o dictados ambiguos.';
   document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-mic">
     <div class="np-mic-box">
       <div class="np-mic-title">Microfono inteligente</div>
-      <div class="np-mic-sub">Listas y precios se procesan localmente. Reuniones largas o dictados ambiguos usan Gemini cuando hay API configurada.</div>
+      <div class="np-mic-sub">${npEsc(sub)}</div>
       <div class="np-mic-tabs">
         ${['auto','list','meeting','text'].map(k=>`<button class="${mode===k?'on':''}" onclick="npMicMode('${k}',this)">${k==='auto'?'Auto':k==='list'?'Lista':k==='meeting'?'Reunion':'Texto'}</button>`).join('')}
       </div>
       <div class="np-timer" id="np-mic-timer">00:00</div>
-      <div class="np-transcript" id="np-mic-text">Toca iniciar y dicta. Ej: gaseosa 2 con 50, snacks 3 soles, 2 tubos a 8 soles cada uno.</div>
+      <div class="np-transcript" id="np-mic-text">${mode==='list'?'Preparando lista viva...':'Toca iniciar y dicta. Ej: gaseosa 2 con 50, snacks 3 soles, 2 tubos a 8 soles cada uno.'}</div>
       <div class="np-preview" id="np-mic-preview"></div>
       <div class="np-mic-actions">
         <button onclick="npCloseMic()">Cancelar</button>
@@ -20034,10 +19643,12 @@ function npOpenVoiceCapture(mode='auto',targetId=''){
       </div>
       <div class="np-mic-actions">
         <button onclick="npMicProcess(true)">Procesar con IA</button>
-        <button class="primary" id="np-mic-save" onclick="npMicCommit()" style="display:none">Crear nota</button>
+        <button class="primary" id="np-mic-save" onclick="npMicCommit()" style="${mode==='list'?'display:block':'display:none'}">${mode==='list'?'Abrir editor':'Crear nota'}</button>
       </div>
     </div>
   </div>`);
+  if(liveList) setTimeout(()=>{ npRenderLiveListPreview(); if(liveList.seedText) npMicProcessLiveSegment(liveList.seedText); },40);
+  setTimeout(()=>{ if(window._npMic && !window._npMic.recording) npMicStart(); },120);
 }
 
 function npMicMode(m,btn){
@@ -20054,6 +19665,7 @@ function npMicStart(){
   const m=window._npMic; if(!m) return;
   m.recording=true; m.parsed=null; m.interim='';
   document.getElementById('np-mic-main').textContent='Detener';
+  clearInterval(m.timer);
   m.timer=setInterval(()=>{
     m.seconds++;
     const mm=String(Math.floor(m.seconds/60)).padStart(2,'0'), ss=String(m.seconds%60).padStart(2,'0');
@@ -20061,15 +19673,20 @@ function npMicStart(){
   },1000);
   const rec=new SR(); m.rec=rec;
   rec.lang='es-PE'; rec.continuous=true; rec.interimResults=true; rec.maxAlternatives=1;
+  npMicBumpSilence();
   rec.onresult=e=>{
     let interim='';
     for(let i=e.resultIndex;i<e.results.length;i++){
       const seg=npCleanVoicePiece(e.results[i][0].transcript||'');
       if(!seg) continue;
-      if(e.results[i].isFinal) npAppendVoiceSegment(m,seg);
-      else interim+=' '+seg;
+      if(e.results[i].isFinal){
+        npAppendVoiceSegment(m,seg);
+        if(m.mode==='list') npMicProcessLiveSegment(seg);
+        npMicBumpSilence();
+      }else interim+=' '+seg;
     }
     m.interim=npCleanVoicePiece(interim);
+    if(m.liveList){ npRenderLiveListPreview(); return; }
     const stored=npCleanLongTranscript(m.segments.join(' '),m.mode==='meeting'?0:90);
     const display=npCleanLongTranscript([stored,m.interim].filter(Boolean).join(' '),m.mode==='meeting'?140:90);
     const el=document.getElementById('np-mic-text');
@@ -20082,14 +19699,21 @@ function npMicStart(){
 
 function npMicStop(){
   const m=window._npMic; if(!m) return;
-  m.recording=false; clearInterval(m.timer);
+  m.recording=false; clearInterval(m.timer); clearTimeout(m.silenceTimer); clearTimeout(m.idleHintTimer);
   if(m.rec) try{ m.rec.stop(); }catch(e){}
   const btn=document.getElementById('np-mic-main'); if(btn) btn.textContent='Grabar mas';
+  if(m.liveList) return npMicFinishLiveList('manual');
   npMicProcess(false);
 }
 
 async function npMicProcess(forceGemini){
   const m=window._npMic; if(!m) return;
+  if(m.liveList){
+    npRenderLiveListPreview();
+    const save=document.getElementById('np-mic-save');
+    if(save){ save.style.display='block'; save.textContent='Abrir editor'; }
+    return;
+  }
   const raw=npCleanLongTranscript(m.segments.join(' '),0).trim();
   if(!raw){ toast('No hay texto grabado','error'); return; }
   const local=npParseSmartInput(raw,m.mode);
@@ -20118,8 +19742,15 @@ function npRenderParsedPreview(parsed,source){
 function npMicCommit(){
   ensureLazyData('notas');
   const m=window._npMic; if(!m) return;
+  if(m.liveList) return npMicFinishLiveList('commit');
   const raw=npCleanLongTranscript(m.segments.join(' '),0);
   const p=m.parsed||npParseSmartInput(raw,m.mode);
+  if(m.targetId==='__doc_editor' && window._npEditor?.mode==='doc'){
+    npDocInsertParsedVoice(p,raw);
+    npCloseMic();
+    toast('Dictado agregado');
+    return;
+  }
   let note=null;
   if(p.kind==='smart_list'){
     if(m.targetId==='__editor' && window._npEditor?.mode==='list'){
@@ -20165,7 +19796,7 @@ function npMicCommit(){
 function npCloseMic(){
   const m=window._npMic;
   if(m?.recording){ m.recording=false; if(m.rec) try{m.rec.stop();}catch(e){} }
-  clearInterval(m?.timer);
+  clearInterval(m?.timer); clearTimeout(m?.silenceTimer); clearTimeout(m?.idleHintTimer);
   document.getElementById('np-mic')?.remove();
   document.body.style.overflow='';
   window._npMic=null;
@@ -20210,11 +19841,650 @@ function npExportPDF(id){
   win.document.close(); closeModal();
 }
 
+
+
+// ======================================================================
+// NOTAS Y AGENDA - orden premium, lista viva y mic mas limpio
+// ======================================================================
+function _deduplicarTranscript(text){
+  if(!text) return '';
+  let words = String(text)
+    .replace(/([a-zA-Z])\1{3,}/g, '$1$1')
+    .replace(/\balas\b/gi, 'a las')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if(words.length < 2) return words.join(' ');
+
+  for(let n = Math.min(24, Math.floor(words.length / 2)); n >= 1; n--){
+    let i = 0;
+    while(i <= words.length - 2*n){
+      const a = words.slice(i, i+n).join(' ').toLowerCase();
+      const b = words.slice(i+n, i+2*n).join(' ').toLowerCase();
+      if(a === b) words.splice(i+n, n);
+      else i++;
+    }
+  }
+
+  const agendaStarts = [];
+  words.forEach((w,i)=>{
+    const nw = nrm(w);
+    if(['agenda','agendar','programar','visita','trabajo','construccion','servicio'].includes(nw)) agendaStarts.push(i);
+  });
+  if(agendaStarts.length > 1 && words.length > 65){
+    const last = agendaStarts[agendaStarts.length - 1];
+    if(last > 10) words = words.slice(last);
+  }
+  if(words.length > 95) words = words.slice(-95);
+  return words.join(' ').trim();
+}
+
+function _agendaMicListeningSummary(text){
+  let p = {};
+  try{ parseAgendaVoz(text); p = window._avParsed || {}; }catch(e){ p = {}; }
+  const rows = [];
+  const add = (label, value) => { if(value) rows.push(label + ': ' + value); };
+  add('Cliente', p.cliente);
+  add('Fecha', p.fecha);
+  add('Hora', p.hora);
+  add('Servicio', p.servicio);
+  if(p.precio) add('Precio', 'S/ ' + Number(p.precio).toFixed(2));
+  add('Ubicacion', p.ubicacion);
+  if(!rows.length) return 'Escuchando agenda... habla cliente, fecha, hora, servicio, precio y distrito.';
+  return 'Agenda detectada\n' + rows.join('\n');
+}
+
+function startListeningHandlers(rec) {
+  rec.onresult = (e) => {
+    let sessionInterim = '';
+    let sessionFinals  = '';
+    let lastTr = '';
+
+    for(let i = 0; i < e.results.length; i++){
+      let tr = e.results[i][0].transcript.trim();
+      if(e.results[i].isFinal) {
+        if(tr && tr !== lastTr) {
+          sessionFinals += tr + ' ';
+          lastTr = tr;
+        }
+      } else {
+        sessionInterim += tr + ' ';
+      }
+    }
+
+    _micSessionFinals = sessionFinals.trim();
+    const base = _micSessionBase.trim();
+    const finals = _micSessionFinals.trim();
+    let combinedFinal = (base + (base && finals ? ' ' : '') + finals).trim();
+    combinedFinal = _deduplicarTranscript(combinedFinal);
+    micFullTranscript = combinedFinal;
+
+    const interimClean = sessionInterim.trim();
+    const display = _deduplicarTranscript((micFullTranscript + (micFullTranscript && interimClean ? ' ' : '') + interimClean).trim());
+    const micText = document.getElementById('micText');
+    if(micText){
+      if(isAgendaCommand(display)) micText.textContent = _agendaMicListeningSummary(display);
+      else if(isNotaCommand(display)) micText.textContent = 'Preparando Notas...\n' + _deduplicarTranscript(display).split(/\s+/).slice(0,18).join(' ');
+      else micText.textContent = display || '...';
+    }
+
+    _actualizarContextoMic(display);
+    if(display) try { updateGhostFromText(display); } catch(err){}
+    window._micLastInterim = sessionInterim;
+
+    clearTimeout(micSilenceTimer);
+    const textoParaTimer = display;
+    if(textoParaTimer.trim()){
+      const esAgenda = isAgendaCommand(textoParaTimer);
+      if(isNotaCommand(textoParaTimer)){
+        const _textoNota = display;
+        micSilenceTimer = setTimeout(()=>{
+          const texto = (micFullTranscript.trim() || _textoNota).trim();
+          if(micListening && texto) processVoiceResult(texto);
+        }, 600);
+      } else if(esAgenda){
+        const nrmText = textoParaTimer.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        const tieneCliente  = /\b(se[nñ]or[a]?|don|do[nñ]a|sr|sra)\s+[a-z]/i.test(nrmText);
+        const tieneServicio = /(punto adicional|terma|cocina|horno|calefon|parrilla|secadora|instalacion|conexion|reparacion|modificacion|gasfiteria|documentacion|conversion|servicio)/i.test(nrmText);
+        const tieneFecha    = /\b(ma[nñ]ana|lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|proximo|este|\d{4}-\d{2})\b/i.test(nrmText);
+        const tieneUbic     = !!extractUbicacion(textoParaTimer);
+        const suficiente    = tieneCliente && tieneFecha && (tieneServicio || tieneUbic);
+        const esAndroid = /android/i.test(navigator.userAgent);
+        const espera = esAndroid ? (suficiente ? 2800 : 5200) : (suficiente ? 1600 : 3200);
+        const _textoAgenda = display;
+        micSilenceTimer = setTimeout(()=>{
+          const texto = (micFullTranscript.trim() || _textoAgenda).trim();
+          if(micListening && texto) processVoiceResult(texto);
+        }, espera);
+      } else {
+        const _textoGeneral = display;
+        micSilenceTimer = setTimeout(()=>{
+          const texto = (micFullTranscript.trim() || _textoGeneral).trim();
+          if(micListening && texto) processVoiceResult(texto);
+        }, MIC_SILENCE_MS);
+      }
+    }
+    window._micLastDisplay = display;
+  };
+
+  rec.onerror = (e) => {
+    if(e.error === 'no-speech'){ if(micListening && !micRestartLock) restartListening(); return; }
+    if(e.error === 'aborted') return;
+    if(e.error === 'not-allowed'){
+      const micText = document.getElementById('micText');
+      if(micText){ micText.textContent = 'Permiso de microfono denegado.'; micText.style.color = '#E05252'; }
+    }
+    micRestartLock = false;
+    stopListening();
+  };
+  rec.onend = () => {
+    if(micListening && !micRestartLock) restartListening();
+  };
+}
+
+function _agendaMicReadPanel(){
+  const d = {...(_agendaMicData || {})};
+  const val = id => document.getElementById(id)?.value?.trim();
+  d.cliente = val('agmic-cliente') || d.cliente || '';
+  d.fecha = val('agmic-fecha') || d.fecha || '';
+  d.hora = val('agmic-hora') || d.hora || '';
+  d.servicio = val('agmic-servicio') || d.servicio || '';
+  d.precio = npMoney(val('agmic-precio') || d.precio || 0);
+  d.ubicacion = val('agmic-ubicacion') || d.ubicacion || '';
+  d.notas = val('agmic-notas') || d.notas || '';
+  _agendaMicData = d;
+  return d;
+}
+
+function _mostrarResumenAgendaEnMic(data, rawText, tipo){
+  _agendaMicData = {...(data || {}), tipo: tipo || data?.tipo || 'trabajo'};
+  stopListening();
+  const box = document.getElementById('micBox');
+  if(!box) return;
+  const d = _agendaMicData;
+  const isVisita = d.tipo === 'visita';
+  const fechaVal = d.fecha || '';
+  const horaVal = d.hora || '';
+  const precioVal = d.precio ? Number(d.precio).toFixed(2) : '';
+  const title = isVisita ? 'Agenda de visita' : 'Agenda de trabajo';
+  const subtitle = isVisita ? 'Revisa cliente, fecha, hora y ubicacion.' : 'Revisa servicio, precio y datos del cliente.';
+  const missing = [];
+  if(!d.cliente) missing.push('cliente');
+  if(!d.fecha) missing.push('fecha');
+  if(isVisita && !d.hora) missing.push('hora');
+  if(!isVisita && !d.servicio) missing.push('servicio');
+  if(!d.ubicacion) missing.push('ubicacion');
+
+  box.innerHTML = `
+    <div style="padding:16px 16px 12px;border-bottom:1px solid #E6EBF0;background:#FFFFFFE8;backdrop-filter:blur(10px)">
+      <div style="display:flex;align-items:center;gap:11px">
+        <div style="width:42px;height:42px;border-radius:14px;background:${isVisita?'#EFF6FF':'#F5F3FF'};color:${isVisita?'#1F5C99':'#6D46A5'};display:flex;align-items:center;justify-content:center">${appIcon(isVisita?'eye':'tool')}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:17px;font-weight:900;color:#172033">${title}</div>
+          <div style="font-size:12px;color:#64748B;margin-top:2px">${subtitle}</div>
+        </div>
+        <button class="mic-close" onclick="closeMicModal()">x</button>
+      </div>
+    </div>
+    <div style="padding:14px;display:grid;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div class="field" style="margin:0"><label class="field-label">Cliente</label><input id="agmic-cliente" value="${npEsc(d.cliente || '')}" placeholder="Sr. Marcos"></div>
+        <div class="field" style="margin:0"><label class="field-label">Fecha</label><input id="agmic-fecha" type="date" value="${npEsc(fechaVal)}"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div class="field" style="margin:0"><label class="field-label">Hora</label><input id="agmic-hora" type="time" value="${npEsc(horaVal)}"></div>
+        <div class="field" style="margin:0"><label class="field-label">Precio</label><input id="agmic-precio" type="number" inputmode="decimal" value="${npEsc(precioVal)}" placeholder="0.00"></div>
+      </div>
+      ${!isVisita ? `<div class="field" style="margin:0"><label class="field-label">Servicio</label><input id="agmic-servicio" value="${npEsc(d.servicio || '')}" placeholder="Punto adicional"></div>` : ''}
+      <div class="field" style="margin:0"><label class="field-label">Ubicacion</label><input id="agmic-ubicacion" value="${npEsc(d.ubicacion || '')}" placeholder="Los Olivos"></div>
+      <div class="field" style="margin:0"><label class="field-label">Notas</label><input id="agmic-notas" value="${npEsc(d.notas || '')}" placeholder="Opcional"></div>
+      <div id="ag-mic-status" style="font-size:12px;color:${missing.length?'#92400E':'#2F5F56'};background:${missing.length?'#FEF9EC':'#EDF7F2'};border:1px solid ${missing.length?'#F4D08A':'#CFE5DA'};border-radius:12px;padding:10px;text-align:center">
+        ${missing.length ? 'Falta: ' + missing.join(', ') + '. Puedes corregir aqui o abrir formulario.' : 'Datos listos para guardar.'}
+      </div>
+      <button onclick="_agendaMicAbrir()" style="width:100%;border:1px solid #E6EBF0;background:#fff;color:#172033;border-radius:14px;padding:13px;font-weight:900">Abrir formulario completo</button>
+      <div style="display:flex;gap:9px">
+        <button onclick="closeMicModal()" style="flex:1;background:#fff;border:1px solid #E6EBF0;border-radius:14px;padding:13px;font-weight:850;color:#64748B">Cancelar</button>
+        <button onclick="_agendaMicGuardarDirecto()" style="flex:1.4;background:#172033;color:#fff;border:none;border-radius:14px;padding:13px;font-weight:900">Guardar asi</button>
+      </div>
+    </div>`;
+}
+
+function _agendaMicAbrir(){
+  const d = _agendaMicReadPanel();
+  document.getElementById('micModal').style.display='none';
+  openAddAgenda(d.tipo || 'trabajo', null, d);
+}
+
+function _agendaMicGuardarDirecto(){
+  const d = _agendaMicReadPanel();
+  if(!d.cliente){ toast('Falta el nombre del cliente','error'); return; }
+  if(!d.fecha){ toast('Falta la fecha','error'); return; }
+  if(d.tipo === 'visita'){
+    if(!d.hora){ toast('Falta la hora para la visita','error'); return; }
+    if(!d.ubicacion){ toast('Falta la ubicacion','error'); return; }
+  }
+  const item = {
+    id: Date.now() + '',
+    tipo: d.tipo || 'trabajo',
+    fecha: d.fecha || todayStr(),
+    hora: d.hora || '',
+    cliente: d.cliente || '',
+    servicio: d.servicio || '',
+    precio: d.precio || 0,
+    ubicacion: d.ubicacion || '',
+    notas: d.notas || '',
+    telefono: d.telefono || '',
+    estado: 'agendado',
+    creado: new Date().toISOString(),
+  };
+  ensureLazyData('agenda');
+  state.agenda.unshift(item);
+  save('fnz_agenda', state.agenda);
+  syncAgendaToSheets(item);
+  const nToken = localStorage.getItem('fnz_notion_token');
+  if(nToken){
+    const nDbidClientes = localStorage.getItem('fnz_notion_dbid_clientes');
+    const nDbidFinanzas = localStorage.getItem('fnz_notion_dbid');
+    if((d.tipo === 'visita' || d.tipo === 'trabajo') && nDbidClientes){
+      _pushToNotionClientes(item).then(res => {
+        if(res && res.id && !item._notionRowId){
+          item._notionRowId = res.id;
+          state.agenda = state.agenda.map(x => x.id === item.id ? item : x);
+          save('fnz_agenda', state.agenda);
+        }
+      }).catch(err => console.warn('Notion Clientes Mic:', err.message));
+    }
+    if(d.tipo === 'trabajo' && nDbidFinanzas){
+      _pushToNotion(item, {}).catch(err => console.warn('Notion Finanzas Mic:', err.message));
+    }
+  }
+  document.getElementById('micModal').style.display='none';
+  switchPage('agenda');
+  render();
+  toast((d.tipo === 'visita' ? 'Visita' : 'Trabajo') + ' agendado');
+}
+
+function npBuildLiveList(seedText){
+  const seed = String(seedText || '');
+  const listType = npGuessListType(seed);
+  return {listType, titulo:npTitleForKind(listType), items:[], seedText:seed, appearance:npDefaultAppearance()};
+}
+
+function npStartLiveListFromCommand(seed){
+  window._npPendingLiveList = npBuildLiveList(seed || 'crea una lista de compras');
+  npOpenVoiceCapture('list');
+}
+
+function npMicProcessLiveSegment(seg){
+  const m = window._npMic;
+  if(!m?.liveList) return;
+  const clean = npCleanVoicePiece(seg);
+  const norm = npVoiceNorm(clean);
+  if(!norm) return;
+  const finish = /\b(eso es todo|termina|terminar|finaliza|finalizar|guardar lista|listo|listo eso es todo|nada mas|ya esta|ya estaria)\b/.test(norm);
+  let work = clean.replace(/\b(eso es todo|termina|terminar|finaliza|finalizar|guardar lista|listo|nada mas|ya esta|ya estaria)\b/gi, ' ');
+  if(/\b(crea|crear|haz|hacer)\s+(una\s+)?lista\b/i.test(work) && !/\d|sol|s\/|con\b/i.test(work)){
+    m.liveList.listType = npGuessListType(work);
+    m.liveList.titulo = npTitleForKind(m.liveList.listType);
+    npRenderLiveListPreview();
+    if(finish) npMicFinishLiveList('voice');
+    return;
+  }
+  work = work.replace(/\b(aparte|siguiente|que mas|qué mas|otra cosa|tambien|también|ademas|además|luego|despues|después)\b/gi, ', ');
+  const parsed = npParseSmartListLocal(work);
+  if(parsed.listType && parsed.listType !== 'compras') m.liveList.listType = parsed.listType;
+  m.liveList.titulo = npTitleForKind(m.liveList.listType);
+  npLiveAppendItems(m.liveList, parsed.items);
+  npRenderLiveListPreview();
+  if(finish) setTimeout(()=>npMicFinishLiveList('voice'), 180);
+}
+
+function npRenderLiveListPreview(){
+  const m = window._npMic;
+  if(!m?.liveList) return;
+  const list = m.liveList;
+  const text = document.getElementById('np-mic-text');
+  const prev = document.getElementById('np-mic-preview');
+  const rows = (list.items || []).map(i=>`- ${i.texto}${npMoney(i.total)?' | '+npFmt(i.total):''}`).join('\n');
+  if(text){
+    text.textContent = list.items.length
+      ? `${list.titulo}\n${rows}${m.interim?'\n\nEscuchando: '+m.interim:''}`
+      : `${list.titulo}\nDi: calabaza 8 soles, que mas zanahoria 3 soles, aparte frijol 4 soles, listo.`;
+  }
+  if(prev){
+    prev.style.display = 'block';
+    prev.innerHTML = `<div class="np-live-head"><div class="np-live-title">${npEsc(list.titulo)}</div><div class="np-live-count">${list.items.length} item(s)</div></div>
+      <div class="np-live-list">${(list.items || []).slice(-10).map(i=>`<div class="np-live-row"><span class="np-live-check"></span><span class="np-live-text">${npEsc(i.texto)}</span><b class="np-live-money">${npMoney(i.total)?npFmt(i.total):''}</b></div>`).join('')}</div>
+      <div class="np-live-hint">Total: <b>${npFmt(npListTotal(list.items))}</b>. Cada frase crea un check. Di "listo" o "eso es todo" para abrir el editor.</div>`;
+  }
+  const save = document.getElementById('np-mic-save');
+  if(save){ save.style.display = 'block'; save.textContent = 'Abrir editor'; }
+}
+
+function npMicFinishLiveList(reason){
+  const m = window._npMic;
+  if(!m?.liveList) return;
+  const list = JSON.parse(JSON.stringify(m.liveList));
+  list.items = (list.items || []).map(npNormalizeItem);
+  list.totalLista = npListTotal(list.items);
+  if(m.recording && m.rec){ m.recording = false; try{ m.rec.stop(); }catch(e){} }
+  clearInterval(m.timer);
+  clearTimeout(m.silenceTimer);
+  clearTimeout(m.idleHintTimer);
+  document.getElementById('np-mic')?.remove();
+  document.body.style.overflow = '';
+  window._npMic = null;
+  npOpenSmartList(null, list.listType || 'compras', list);
+  if(reason === 'voice') toast('Lista lista para revisar');
+}
+
+function npSaveCurrentAsTemplate(){
+  let n = null;
+  if(window._npEditor?.mode === 'list') n = npSaveList(false);
+  else if(window._npEditor?.mode === 'doc') n = npSaveDoc(false);
+  else if(window._npEditor?.mode === 'meeting') n = npSaveMeeting(false);
+  if(!n) return;
+  const templates = JSON.parse(localStorage.getItem('fnz_np_templates') || '[]');
+  const tpl = {
+    id:npId(),
+    titulo:n.titulo || 'Plantilla',
+    npKind:npNoteKind(n),
+    listType:n.listType || '',
+    texto:n.texto || '',
+    items:(n.items || []).map(i=>({...i, done:false})),
+    appearance:{...npDefaultAppearance(), ...(n.appearance || {})},
+    creado:new Date().toISOString()
+  };
+  templates.unshift(tpl);
+  localStorage.setItem('fnz_np_templates', JSON.stringify(templates.slice(0,30)));
+  toast('Plantilla guardada');
+}
+
+function npUseTemplate(id){
+  const templates = JSON.parse(localStorage.getItem('fnz_np_templates') || '[]');
+  const t = templates.find(x=>String(x.id) === String(id));
+  closeModal();
+  if(!t) return;
+  if(t.npKind === 'smart_list') return npOpenSmartList(null, t.listType || 'compras', {titulo:t.titulo, listType:t.listType || 'compras', items:t.items || [], appearance:t.appearance});
+  return npOpenDoc(null, {titulo:t.titulo, texto:t.texto || '', appearance:t.appearance});
+}
+
+function npShowTemplates(){
+  npEnsureStyles();
+  const custom = JSON.parse(localStorage.getItem('fnz_np_templates') || '[]');
+  const base = [
+    {kind:'compras', title:'Lista de compras', sub:'Checks, precios y total'},
+    {kind:'mercado', title:'Lista de mercado', sub:'Compras diarias ordenadas'},
+    {kind:'materiales', title:'Lista de materiales', sub:'Materiales para servicios'},
+    {kind:'gastos', title:'Cuadro de gastos', sub:'Concepto, cantidad y monto'},
+    {kind:'tareas', title:'Tareas', sub:'Pendientes con checklist'},
+    {kind:'doc', title:'Nota en blanco', sub:'Editor libre con cuadros y tablas'}
+  ];
+  document.getElementById('modal-content').innerHTML = `<div class="modal-title" style="color:#172033">Plantillas</div>
+    <div style="display:grid;gap:9px">
+      ${base.map(t=>`<button class="share-btn" onclick="npCreateTemplate('${t.kind}')"><div class="share-icon copy">${appIcon(t.kind==='doc'?'note':t.kind==='gastos'?'chart':'clipboard')}</div><div class="share-label"><b>${t.title}</b><div class="share-desc">${t.sub}</div></div></button>`).join('')}
+      ${custom.length?`<div style="font-size:11px;font-weight:900;color:#64748B;text-transform:uppercase;margin-top:8px">Mis plantillas</div>`:''}
+      ${custom.map(t=>`<button class="share-btn" onclick="npUseTemplate('${t.id}')"><div class="share-icon copy">${appIcon(t.npKind==='doc'?'note':'clipboard')}</div><div class="share-label"><b>${npEsc(t.titulo)}</b><div class="share-desc">Plantilla guardada</div></div></button>`).join('')}
+    </div>`;
+  showModal();
+}
+
+function npDocInsertTable(){
+  npDocInsertHtml('<table class="np-doc-table"><tbody><tr><th>Concepto</th><th>Cantidad</th><th>Monto</th></tr><tr><td>Item</td><td>1</td><td>S/ 0.00</td></tr><tr><td>Item</td><td>1</td><td>S/ 0.00</td></tr></tbody></table><p><br></p>');
+}
+
+function renderNotas(){
+  npEnsureStyles(); npUpgradeNotas();
+  const q=(_npSearch||'').toLowerCase().trim();
+  const all=[...(state.notas||[])].sort((a,b)=>(b.modificado||b.creado||'').localeCompare(a.modificado||a.creado||''));
+  const filtered=all.filter(n=>{
+    const kind=npNoteKind(n);
+    const filterOk=_npFilter==='todas'||_npFilter===kind||(_npFilter==='listas'&&kind==='smart_list')||(_npFilter==='meeting'&&kind==='meeting')||(_npFilter==='doc'&&kind==='doc');
+    if(!filterOk) return false;
+    if(!q) return true;
+    const hay=[n.titulo,n.texto,n.transcript,n.resumen,(n.items||[]).map(i=>i.texto).join(' '),(n.tags||[]).join(' ')].join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+  const totalListas=all.reduce((s,n)=>s+(npNoteKind(n)==='smart_list'?npListTotal(n.items):0),0);
+  const counts={
+    todas:all.length,
+    listas:all.filter(n=>npNoteKind(n)==='smart_list').length,
+    meeting:all.filter(n=>npNoteKind(n)==='meeting').length,
+    doc:all.filter(n=>npNoteKind(n)==='doc').length
+  };
+  const pill=(k,l)=>`<button class="np-pill ${_npFilter===k?'on':''}" onclick="npSetFilter('${k}')">${l} ${counts[k]||0}</button>`;
+  return `<div class="np-page">
+    <div class="np-hero">
+      <div class="np-kicker">Cuaderno de trabajo</div>
+      <div class="np-title">Notas</div>
+      <div class="np-sub">Tres espacios: notas y listas editables, reunion IA y documentacion. Documentacion queda intacta por ahora.</div>
+      <div class="np-quick">
+        <div class="np-q" onclick="npOpenDoc(null)"><div class="np-q-ic">${appIcon('note')}</div><div><b>Notas</b><span>Block premium, cuadros, tablas y colores</span></div></div>
+        <div class="np-q" onclick="npOpenVoiceCapture('list')"><div class="np-q-ic">${appIcon('mic')}</div><div><b>Lista por voz</b><span>Checks automaticos, precios y suma</span></div></div>
+        <div class="np-q" onclick="npOpenVoiceCapture('meeting')"><div class="np-q-ic">${appIcon('document')}</div><div><b>Reunion IA</b><span>Dictado largo, resumen y pendientes</span></div></div>
+        <div class="np-q" onclick="toast('Documentacion la trabajaremos despues, sin tocarla ahora')"><div class="np-q-ic">${appIcon('clipboard')}</div><div><b>Documentacion</b><span>Se mantiene sin cambios en esta parte</span></div></div>
+      </div>
+      <div class="np-quick" style="margin-top:9px">
+        <div class="np-q" onclick="npShowTemplates()"><div class="np-q-ic">${appIcon('clipboard')}</div><div><b>Plantillas</b><span>Crear o usar formatos guardados</span></div></div>
+        <div class="np-q" onclick="npOpenSmartList(null,'gastos')"><div class="np-q-ic">${appIcon('chart')}</div><div><b>Cuadro gastos</b><span>Tabla simple con total</span></div></div>
+      </div>
+    </div>
+    <div class="np-stats">
+      <div class="np-stat"><span>Notas</span><b>${all.length}</b></div>
+      <div class="np-stat"><span>Listas</span><b>${counts.listas}</b></div>
+      <div class="np-stat"><span>Total listas</span><b>${npFmt(totalListas)}</b></div>
+    </div>
+    <div class="np-search">${appIcon('search')}<input value="${npEsc(_npSearch)}" placeholder="Buscar notas, listas o reuniones..." oninput="_npSearch=this.value;render()">${_npSearch?`<button class="np-icon-btn" onclick="_npSearch='';render()" style="width:30px;height:30px">x</button>`:''}</div>
+    <div class="np-filters">${pill('todas','Todas')}${pill('listas','Listas')}${pill('meeting','Reuniones')}${pill('doc','Notas')}</div>
+    <div class="np-grid">${filtered.length?filtered.map(npRenderCard).join(''):`<div class="np-empty"><b>Sin notas todavia</b><br><span>Empieza con Lista por voz o una nota en blanco.</span></div>`}</div>
+  </div>`;
+}
+
+function npOpenDoc(id,pre){
+  ensureLazyData('notas');
+  npEnsureStyles();
+  let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
+  n=n?JSON.parse(JSON.stringify(n)):{id:null,npKind:'doc',tipo:'texto',titulo:pre?.titulo||'Nota nueva',texto:pre?.texto||'',appearance:pre?.appearance||npDefaultAppearance(),creado:new Date().toISOString()};
+  n.appearance={...npDefaultAppearance(),...(pre?.appearance||n.appearance||{})};
+  window._npEditor={mode:'doc',note:n};
+  document.getElementById('np-editor')?.remove();
+  document.body.style.overflow='hidden';
+  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-editor">
+    <div class="np-ed-top"><button class="np-icon-btn" onclick="npCloseEditor()">x</button><div style="flex:1;font-size:12px;font-weight:850;color:#64748B">Notas</div><button class="np-save" onclick="npSaveDoc(true)">Guardar</button></div>
+    <div class="np-ed-body">
+      <input class="np-ed-title" id="np-title" value="${npEsc(n.titulo||'')}" placeholder="Titulo">
+      <div class="np-sheet" id="np-sheet-main">
+        <div class="np-doc-toolbar">
+          <button class="np-doc-tool" onclick="document.execCommand('bold')">B</button>
+          <button class="np-doc-tool" onclick="document.execCommand('italic')">I</button>
+          <button class="np-doc-tool" onclick="npDocInsertBox()">Cuadro</button>
+          <button class="np-doc-tool" onclick="npDocInsertChecklist()">Checklist</button>
+          <button class="np-doc-tool" onclick="npDocInsertTable()">Tabla</button>
+          <button class="np-doc-tool" onclick="npDocInsertDivider()">Linea</button>
+          <button class="np-doc-tool" onclick="npToggleStylePanel()">Color</button>
+        </div>
+        ${npStylePanelHtml(n)}
+        <div class="np-doc-editor" id="np-doc-editor" contenteditable="true">${n.texto||''}</div>
+      </div>
+    </div>
+    <div class="np-bottom">
+      <button class="np-tool" onclick="npOpenVoiceCapture('text','__doc_editor')">Mic</button>
+      <button class="np-tool" onclick="npDocInsertTable()">+ Tabla</button>
+      <button class="np-tool" onclick="npToggleStylePanel()">Personalizar</button>
+      <button class="np-tool" onclick="npSaveCurrentAsTemplate()">Plantilla</button>
+      <button class="np-tool primary" onclick="npOpenShareFromEditor()">Exportar</button>
+    </div>
+  </div>`);
+  npApplyEditorAppearance();
+  setTimeout(()=>document.getElementById('np-doc-editor')?.focus(),80);
+}
+
+function npOpenSmartList(id,kind,pre){
+  npEnsureStyles(); npUpgradeNotas();
+  let n=id?(state.notas||[]).find(x=>String(x.id)===String(id)):null;
+  n=n?JSON.parse(JSON.stringify(n)):npBlankList(kind||pre?.listType,pre?.titulo);
+  n.npKind='smart_list'; n.tipo='lista'; n.listType=kind||n.listType||pre?.listType||'compras';
+  n.items=(pre?.items||n.items||[]).map(npNormalizeItem);
+  n.appearance={...npDefaultAppearance(),...(pre?.appearance||n.appearance||{})};
+  window._npEditor={mode:'list',note:n,isNew:!id};
+  document.getElementById('np-editor')?.remove();
+  document.body.style.overflow='hidden';
+  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-editor">
+    <div class="np-ed-top"><button class="np-icon-btn" onclick="npCloseEditor()">x</button><div style="flex:1;font-size:12px;font-weight:850;color:#64748B">Lista inteligente</div><button class="np-save" onclick="npSaveList(true)">Guardar</button></div>
+    <div class="np-ed-body">
+      <input class="np-ed-title" id="np-title" value="${npEsc(n.titulo||'')}" placeholder="Titulo">
+      <div class="np-sheet" id="np-sheet-main">
+        <div class="np-type-row">
+          ${['compras','mercado','materiales','gastos','tareas'].map(k=>`<button class="np-type ${n.listType===k?'on':''}" onclick="npSetListType('${k}',this)">${k.charAt(0).toUpperCase()+k.slice(1)}</button>`).join('')}
+        </div>
+        ${npStylePanelHtml(n)}
+        <div id="np-list-rows"></div>
+        <div class="np-editor-total"><span>Total de la lista</span><b id="np-list-total">S/ 0.00</b></div>
+      </div>
+    </div>
+    <div class="np-bottom">
+      <button class="np-tool" onclick="npAddListItem()">+ Item</button>
+      <button class="np-tool" onclick="npOpenVoiceCapture('list','__editor')">Mic</button>
+      <button class="np-tool" onclick="npToggleStylePanel()">Personalizar</button>
+      <button class="np-tool" onclick="npSaveCurrentAsTemplate()">Plantilla</button>
+      <button class="np-tool primary" onclick="npOpenShareFromEditor()">Exportar</button>
+    </div>
+  </div>`);
+  npApplyEditorAppearance();
+  npRenderListRows();
+}
+
+function npEnsureStyles(){
+  let st=document.getElementById('np-premium-styles');
+  if(!st){ st=document.createElement('style'); st.id='np-premium-styles'; document.head.appendChild(st); }
+  st.textContent=`
+  .np-page{padding:2px 0 112px;color:var(--text);font-family:Inter,'DM Sans',sans-serif}
+  .np-hero{background:linear-gradient(180deg,#FFFFFF,#F8FAFC);border:1px solid #E8EDF2;border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:0 10px 30px rgba(15,23,42,.05)}
+  .np-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748B;font-weight:850;margin-bottom:5px}
+  .np-title{font-size:23px;font-weight:850;letter-spacing:0;color:#172033;margin-bottom:4px}
+  .np-sub{font-size:12px;color:#64748B;line-height:1.45;max-width:680px}
+  .np-quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}
+  .np-q{border:1px solid #E6EBF0;background:#fff;border-radius:14px;padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer;min-height:64px;box-shadow:0 6px 18px rgba(15,23,42,.035)}
+  .np-q:active{transform:scale(.99)}
+  .np-q-ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#2F5F56;background:#EDF7F2;flex:0 0 auto}
+  .np-q:nth-child(2) .np-q-ic{background:#EFF6FF;color:#1F5C99}
+  .np-q:nth-child(3) .np-q-ic{background:#FFF7ED;color:#9A5415}
+  .np-q:nth-child(4) .np-q-ic{background:#F5F3FF;color:#6D46A5}
+  .np-q b{display:block;font-size:13px;color:#172033;margin-bottom:2px}
+  .np-q span{display:block;font-size:10.5px;color:#64748B;line-height:1.25}
+  .np-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+  .np-stat{background:#fff;border:1px solid #E6EBF0;border-radius:14px;padding:10px 11px;box-shadow:0 7px 20px rgba(15,23,42,.035)}
+  .np-stat span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#64748B;font-weight:850;margin-bottom:4px}
+  .np-stat b{display:block;font-size:16px;color:#172033}
+  .np-search{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E6EBF0;border-radius:14px;padding:10px 12px;margin:12px 0}
+  .np-search input{border:none;outline:none;flex:1;font-family:Inter,'DM Sans',sans-serif;font-size:14px;background:transparent;color:#172033;min-width:0}
+  .np-filters{display:flex;gap:7px;overflow:auto;padding-bottom:5px;margin-bottom:10px}
+  .np-pill{border:1px solid #E6EBF0;background:#fff;border-radius:999px;padding:7px 11px;font-size:11px;font-weight:800;color:#64748B;white-space:nowrap;cursor:pointer}
+  .np-pill.on{background:#172033;color:#fff;border-color:#172033}
+  .np-grid{display:grid;gap:10px}
+  .np-card{background:#fff;border:1px solid #E6EBF0;border-radius:16px;padding:13px;box-shadow:0 8px 24px rgba(15,23,42,.04)}
+  .np-card-top{display:flex;align-items:flex-start;gap:11px;cursor:pointer}
+  .np-card-ic{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#F4F8F6;color:#2F5F56;flex:0 0 auto}
+  .np-card-main{min-width:0;flex:1}
+  .np-card-title{font-size:15px;font-weight:850;color:#172033;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .np-card-meta{display:flex;gap:6px;flex-wrap:wrap;font-size:10px;color:#64748B;margin-bottom:8px}
+  .np-tag{background:#F3F6F8;border:1px solid #E6EBF0;border-radius:999px;padding:2px 7px;font-weight:800}
+  .np-prev{font-size:12px;color:#475569;line-height:1.45}
+  .np-mini-list{display:grid;gap:5px;margin-top:5px}
+  .np-mini-row{display:flex;align-items:center;gap:8px;font-size:12px;color:#334155}
+  .np-mini-check{width:14px;height:14px;border:1.5px solid #CBD5E1;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex:0 0 auto}
+  .np-mini-row.done{opacity:.55;text-decoration:line-through}
+  .np-total{display:flex;align-items:center;justify-content:space-between;margin-top:10px;border-top:1px solid #EEF2F6;padding-top:9px;font-size:12px;color:#64748B}
+  .np-total b{font-size:15px;color:#172033}
+  .np-card-actions{display:flex;gap:6px;margin-top:11px}
+  .np-act{flex:1;border:1px solid #E6EBF0;background:#FAFBFC;border-radius:10px;padding:8px;font-size:11px;font-weight:850;color:#475569;cursor:pointer}
+  .np-empty{padding:28px 16px;text-align:center;color:#64748B;background:#fff;border:1px dashed #CBD5E1;border-radius:18px}
+  .np-ov{position:fixed;inset:0;background:#F7F8FA;z-index:520;display:flex;flex-direction:column;color:#172033;font-family:Inter,'DM Sans',sans-serif}
+  .np-ed-top{height:58px;display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FFFFFFE8;backdrop-filter:blur(12px);border-bottom:1px solid #E6EBF0}
+  .np-icon-btn{width:38px;height:38px;border-radius:11px;border:1px solid #E6EBF0;background:#fff;display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer}
+  .np-save{border:none;background:#172033;color:#fff;border-radius:11px;padding:10px 13px;font-size:12px;font-weight:850;cursor:pointer}
+  .np-ed-body{flex:1;overflow:auto;padding:14px 14px 120px;max-width:780px;width:100%;margin:0 auto}
+  .np-ed-title{width:100%;border:none;outline:none;background:transparent;font-size:25px;font-weight:850;color:#172033;margin:8px 0 10px;font-family:Inter,'DM Sans',sans-serif}
+  .np-sheet{background:#fff;border:1px solid #E6EBF0;border-radius:18px;padding:13px;box-shadow:0 12px 30px rgba(15,23,42,.045)}
+  .np-type-row{display:flex;gap:7px;overflow:auto;margin-bottom:12px}
+  .np-type{border:1px solid #E6EBF0;background:#FAFBFC;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:850;color:#64748B;white-space:nowrap;cursor:pointer}
+  .np-type.on{background:#EAF6F0;color:#2F5F56;border-color:#BFDCCE}
+  .np-row{display:grid;grid-template-columns:26px minmax(0,1fr) 30px;gap:8px;align-items:start;border-bottom:1px solid #EEF2F6;padding:10px 0}
+  .np-row:last-child{border-bottom:none}
+  .np-row input[type=text],.np-row input[type=number],.np-row select{width:100%;border:1px solid #E6EBF0;background:#FAFBFC;border-radius:10px;padding:9px 10px;font-family:Inter,'DM Sans',sans-serif;font-size:13px;color:#172033;outline:none}
+  .np-row input[type=checkbox]{width:18px;height:18px;accent-color:#2F7D64;margin-top:9px}
+  .np-row-main{display:grid;gap:7px;min-width:0}
+  .np-money-grid{display:grid;grid-template-columns:62px 82px 88px;gap:7px}
+  .np-field-label{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#94A3B8;font-weight:850;margin:0 0 4px 2px}
+  .np-del{border:none;background:#FEF2F2;color:#C44B4B;border-radius:9px;height:34px;cursor:pointer;margin-top:27px}
+  .np-editor-total{display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:4px}
+  .np-editor-total span{font-size:12px;color:#64748B}
+  .np-editor-total b{font-size:22px;color:#172033}
+  .np-bottom{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:780px;background:#FFFFFFE8;backdrop-filter:blur(12px);border-top:1px solid #E6EBF0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:530;overflow:auto}
+  .np-tool{flex:1;min-width:76px;border:1px solid #E6EBF0;background:#fff;border-radius:12px;padding:11px 8px;font-size:11px;font-weight:850;color:#475569;cursor:pointer}
+  .np-tool.primary{background:#172033;color:#fff;border-color:#172033}
+  .np-textarea{width:100%;min-height:48vh;border:none;outline:none;resize:vertical;background:transparent;font-family:Inter,'DM Sans',sans-serif;font-size:15px;line-height:1.65;color:#172033}
+  .np-style-panel{display:none;margin:0 0 12px;padding:12px;border:1px solid #E6EBF0;background:#F8FAFC;border-radius:14px}
+  .np-style-panel.on{display:block}
+  .np-style-title{font-size:12px;font-weight:850;color:#172033;margin-bottom:9px}
+  .np-swatches{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+  .np-swatch{width:30px;height:30px;border-radius:999px;border:1px solid #D8E0E8;box-shadow:inset 0 0 0 2px #fff;cursor:pointer}
+  .np-swatch.on{outline:2px solid #172033;outline-offset:2px}
+  .np-doc-toolbar{display:flex;gap:7px;overflow:auto;margin-bottom:10px}
+  .np-doc-tool{border:1px solid #E6EBF0;background:#FAFBFC;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:850;color:#475569;white-space:nowrap;cursor:pointer}
+  .np-doc-editor{min-height:58vh;outline:none;font-size:15px;line-height:1.7;color:#172033}
+  .np-doc-editor:empty:before{content:'Escribe aqui o usa el microfono...';color:#94A3B8}
+  .np-doc-editor p{margin:0 0 12px}
+  .np-doc-editor ul{margin:8px 0 14px 20px;padding:0}
+  .np-doc-editor li{margin:6px 0}
+  .np-note-box{border:1px solid #E6EBF0;background:#FAFBFC;border-radius:14px;padding:12px;margin:12px 0;color:#263244}
+  .np-doc-table{width:100%;border-collapse:separate;border-spacing:0;margin:12px 0;border:1px solid #E6EBF0;border-radius:12px;overflow:hidden}
+  .np-doc-table th,.np-doc-table td{border-bottom:1px solid #E6EBF0;border-right:1px solid #E6EBF0;padding:9px 10px;text-align:left;min-width:72px}
+  .np-doc-table th{background:#F8FAFC;font-size:12px;color:#475569}
+  .np-doc-table tr:last-child td{border-bottom:none}
+  .np-doc-table th:last-child,.np-doc-table td:last-child{border-right:none}
+  .np-live-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .np-live-title{font-weight:900;color:#172033}
+  .np-live-count{font-size:11px;color:#64748B;font-weight:850}
+  .np-live-list{display:grid;gap:7px}
+  .np-live-row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;background:#fff;border:1px solid #E6EBF0;border-radius:12px;padding:8px 10px}
+  .np-live-check{width:18px;height:18px;border:1.6px solid #CBD5E1;border-radius:6px;background:#F8FAFC}
+  .np-live-text{font-size:13px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .np-live-money{font-size:12px;font-weight:900;color:#172033}
+  .np-live-hint{margin-top:10px;font-size:11px;line-height:1.45;color:#64748B;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:12px;padding:9px}
+  .np-meeting-box{display:grid;gap:10px}
+  .np-section{background:#FAFBFC;border:1px solid #E6EBF0;border-radius:14px;padding:12px}
+  .np-section h4{margin:0 0 7px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#64748B}
+  .np-mic-box{background:#fff;border:1px solid #E6EBF0;border-radius:20px;margin:auto 14px;padding:18px;box-shadow:0 18px 50px rgba(15,23,42,.14);max-width:560px;max-height:92vh;overflow:auto}
+  .np-mic-title{font-size:20px;font-weight:850;margin-bottom:5px}
+  .np-mic-sub{font-size:12px;color:#64748B;line-height:1.45;margin-bottom:12px}
+  .np-mic-tabs{display:flex;gap:7px;margin:10px 0}
+  .np-mic-tabs button{flex:1;border:1px solid #E6EBF0;background:#FAFBFC;border-radius:11px;padding:9px;font-size:11px;font-weight:850;color:#64748B}
+  .np-mic-tabs button.on{background:#172033;color:#fff;border-color:#172033}
+  .np-timer{font-size:34px;font-weight:900;letter-spacing:.04em;text-align:center;margin:12px 0;color:#172033}
+  .np-transcript{min-height:100px;max-height:170px;overflow:auto;background:#F8FAFC;border:1px solid #E6EBF0;border-radius:14px;padding:12px;font-size:13px;line-height:1.55;color:#334155;white-space:pre-wrap}
+  .np-preview{background:#F4F8F6;border:1px solid #CFE5DA;border-radius:14px;padding:11px;margin-top:10px;font-size:12px;color:#2F5F56;display:none;line-height:1.55}
+  .np-mic-actions{display:flex;gap:8px;margin-top:12px}
+  .np-mic-actions button{flex:1;border:1px solid #E6EBF0;background:#fff;border-radius:13px;padding:12px;font-size:12px;font-weight:850;color:#475569}
+  .np-mic-actions button.primary{background:#172033;color:#fff;border-color:#172033}
+  @media(max-width:420px){.np-quick,.np-stats{grid-template-columns:1fr 1fr}.np-money-grid{grid-template-columns:1fr 1fr 1fr}.np-card-actions{overflow:auto}.np-act{min-width:74px}.np-tool{min-width:72px}}
+  `;
+}
+
+
+
 // Redirecciones finales: estas ganan sobre las funciones antiguas.
 function renderNotaCard(n){ return npRenderCard(n); }
 function renderNotaCard3(n){ return npRenderCard(n); }
 function abrirNotaTypeMenu(){ npShowTemplates(); }
-function abrirModoLista(tipo,tituloInicial){ const txt=[tipo,tituloInicial].filter(Boolean).join(' '); npOpenSmartList(null,npGuessListType(txt),{titulo:tituloInicial||npTitleForKind(npGuessListType(txt))}); }
+function abrirModoLista(tipo,tituloInicial){
+  const txt=[tipo,tituloInicial].filter(Boolean).join(' ');
+  if(tipo==='nota') return npOpenDoc(null,{titulo:tituloInicial||'Nota nueva'});
+  const seed=tituloInicial ? 'crea una lista de '+tituloInicial : txt;
+  npStartLiveListFromCommand(seed||'crea una lista de compras');
+}
+
 function abrirGrabarAudio(){ npOpenVoiceCapture('auto'); }
 function notaAgregarVoz(notaId){ npOpenVoiceCapture('auto',notaId); }
 function notaAgregarVozGemini(notaId){ npOpenVoiceCapture('auto',notaId); }
