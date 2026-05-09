@@ -2518,11 +2518,21 @@ function isMaterialesCategory(catId, category){
 }
 
 function isStockValueTx(t){
-  return !!(t && t.type === 'egreso' && (t.ocultarEnMovimientos || t.afectaStockValor || t.stockOperacion === 'entrada_valor' || t.stockValorOnly || t.stockCompraId));
+  // Ocultar de movimientos: compras que van al stock Y usos de stock al cerrar servicio
+  if(!t || t.type !== 'egreso') return false;
+  // Entrada al stock (compra de materiales registrada como egreso)
+  if(t.ocultarEnMovimientos || t.afectaStockValor || t.stockOperacion === 'entrada_valor' || t.stockValorOnly || t.stockCompraId) return true;
+  // Uso de stock al cerrar servicio (no es flujo de caja, es solo reduccion de inventario)
+  if(t.noCashFlow && (t.materialUsoServicio || t.origenServicioMaterial || t.stockOperacion === 'uso_valor')) return true;
+  return false;
 }
 
 function isCashFlowTx(t){
-  return !(t && t.noCashFlow);
+  // No es flujo de caja si: esta marcado como noCashFlow, o es exclusivamente para el stock
+  if(!t) return true;
+  if(t.noCashFlow) return false;
+  if(t.stockValorOnly || t.ocultarEnMovimientos) return false;
+  return true;
 }
 
 function normSimpleText(s){
@@ -2554,6 +2564,53 @@ function ajustarStockValorGeneral(delta){
   const after = Math.max(0, +(before + moneyValue(delta)).toFixed(2));
   state.stockValorGeneral = after;
   return +(after - before).toFixed(2);
+}
+
+// Corrección manual del saldo de stock valorizado
+function corregirStockValorizado(){
+  const actual = moneyValue(state.stockValorGeneral);
+  document.getElementById('modal-content').innerHTML=`
+    <div class="modal-title">🔧 Corregir saldo de stock</div>
+    <div style="background:#FFFBEB;border:1px solid #F59E0B33;border-radius:12px;padding:12px;margin-bottom:16px;font-size:12px;color:#92400E;line-height:1.5">
+      ⚠ Usa esto para corregir el saldo si muestra un número incorrecto. Se registrará un ajuste en el historial.<br>
+      <b>Saldo actual: ${fmt(actual)}</b>
+    </div>
+    <div class="field" style="margin-bottom:16px">
+      <label class="field-label">Nuevo saldo correcto (S/)</label>
+      <input id="corr-stock" type="number" inputmode="decimal" step="0.01" value="${actual.toFixed(2)}"
+        style="width:100%;background:#F5F8FA;border:1.5px solid var(--border);border-radius:14px;padding:14px;font-family:'DM Sans',sans-serif;font-size:20px;font-weight:800;text-align:center">
+    </div>
+    <div class="field" style="margin-bottom:16px">
+      <label class="field-label">Motivo (opcional)</label>
+      <input id="corr-desc" type="text" placeholder="Ej: Corrección por error de cálculo"
+        style="width:100%;background:#F5F8FA;border:1.5px solid var(--border);border-radius:14px;padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:14px">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeModal()" style="flex:1;padding:13px;border-radius:13px;border:1.5px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Cancelar</button>
+      <button onclick="aplicarCorreccionStock()" style="flex:2;padding:13px;border-radius:13px;border:none;background:#2F4A59;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:800;cursor:pointer">✅ Aplicar corrección</button>
+    </div>`;
+  showModal();
+}
+
+function aplicarCorreccionStock(){
+  const nuevoSaldo = parseFloat(document.getElementById('corr-stock')?.value)||0;
+  const desc = document.getElementById('corr-desc')?.value.trim() || 'Corrección manual de saldo';
+  const anterior = moneyValue(state.stockValorGeneral);
+  const delta = +(nuevoSaldo - anterior).toFixed(2);
+  state.stockValorGeneral = Math.max(0, nuevoSaldo);
+  // Registrar el ajuste en el historial
+  ensureLazyData('movimientosMateriales');
+  state.movimientosMateriales = state.movimientosMateriales||[];
+  state.movimientosMateriales.push({
+    id: 'corr_'+Date.now(),
+    tipo: delta>=0 ? 'entrada_valor' : 'uso_valor',
+    monto: Math.abs(delta),
+    fecha: todayStr(),
+    descripcion: desc,
+    saldo: state.stockValorGeneral
+  });
+  saveAll(); closeModal(); render();
+  toast(`✅ Stock corregido: ${fmt(anterior)} → ${fmt(state.stockValorGeneral)}`);
 }
 
 function registrarMovimientoStockValor(tipo, monto, data={}){
@@ -8476,6 +8533,14 @@ function renderAgenda(){
     const montoP = item.montoPendienteCobro>0
       ? `<span class="ag-card-pill" style="background:#FAEEDA;color:#633806">Pendiente: S/ ${item.montoPendienteCobro.toFixed(2)}</span>` : '';
 
+    // Chip de stock consumido (solo en servicios finalizados con materiales)
+    const stockConsumidoHtml = isServicioFinalizado(item) && (item.stockValorConsumido > 0)
+      ? `<div style="background:#FFF8E6;border:1px solid #E9D8A655;border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;color:#9A6B00;font-weight:700">📦 Stock consumido</span>
+          <span style="font-size:14px;font-weight:800;color:#9A6B00">-${fmt(item.stockValorConsumido)}</span>
+        </div>`
+      : '';
+
     const accionesHtml = `
       <div class="ag-card-actions" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 4px">
         <button class="ag-act-btn" style="background:#EEEDFE;border:1px solid #AFA9EC;color:#3C3489;padding:10px;font-size:11px;font-weight:700;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px"
@@ -8530,6 +8595,7 @@ function renderAgenda(){
 
           <!-- ACCIONES SECUNDARIAS -->
           <div style="border-top:1px solid #F1F5F9; margin-top:6px; padding-top:10px">
+            ${stockConsumidoHtml}
             ${secundariosHtml}
           </div>
         </div>
@@ -9745,9 +9811,9 @@ async function guardarFinalizacion(id){
   if (crearMovimientosCierre && cobroObj.movilidad_manual > 0) { const txId=rowId+'-mov'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.movilidad_manual, category:'Movilidad', catId:'cne5', description:'Movilidad - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.comida_manual > 0) { const txId=rowId+'-com'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.comida_manual, category:'Comida', catId:'cne_menu', description:'Comida - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.otros_gastos > 0) { const txId=rowId+'-otg'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
-  // Materiales usados en el servicio: se ven en Movimientos como costo del servicio,
-  // pero no vuelven a descontar caja porque la compra ya afecto el balance al entrar al stock.
-  if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ocultarEnMovimientos:false, ...baseTx }); }
+  // Materiales usados en el servicio: reducen el stock valorizado pero NO afectan la caja
+  // (la caja ya se movio cuando se compraron los materiales). Se ocultan de movimientos.
+  if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ocultarEnMovimientos:true, ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if(crearMovimientosCierre) item.cierreTxIds = nuevosCierreTxIds;
 
@@ -18509,11 +18575,14 @@ function renderInventario(){
 
     <div style="background:#FFFFFF;border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px;box-shadow:0 3px 12px rgba(26,44,53,0.05)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
-        <div>
+        <div style="flex:1;min-width:0">
           <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:800">Stock valorizado</div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px;line-height:1.35">Las compras de materiales entran aquí. Al cerrar un servicio se descuenta de este saldo sin duplicar egresos.</div>
         </div>
-        <div style="font-size:24px;font-weight:800;color:var(--gold);white-space:nowrap">${fmt(stockValor)}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+          <div style="font-size:24px;font-weight:800;color:var(--gold);white-space:nowrap">${fmt(stockValor)}</div>
+          <button onclick="corregirStockValorizado()" style="background:#EBF1F5;border:1px solid #A8BCC9;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--gold)">✏️ Corregir saldo</button>
+        </div>
       </div>
     </div>
 
@@ -18550,6 +18619,8 @@ function renderSubMateriales(inv){
     const badge = sinSt?'🔴 Sin stock':bajo?'🟡 Stock bajo':'✅ OK';
     const badgeBg = sinSt?'#FEF2F2':bajo?'#FFFBEB':'#EBF1F5';
     const badgeCol = sinSt?'#C62828':bajo?'#92400E':'var(--gold)';
+    // Valor valorizado del ítem = unidades × precio unitario
+    const valorItem = (+m.stock_actual) * (+m.costo_actual);
     return `
     <div style="background:var(--card);border:1px solid ${sinSt?'#E0525244':bajo?'#F59E0B44':'var(--border)'};border-left:4px solid ${color};border-radius:16px;padding:14px 16px;margin-bottom:10px;box-shadow:0 3px 12px rgba(26,44,53,0.06)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -18574,6 +18645,10 @@ function renderSubMateriales(inv){
           <span style="font-size:10px;color:var(--muted)"> / mín ${(+m.stock_minimo).toFixed(0)}</span>
         </div>
       </div>
+      ${valorItem > 0 ? `<div style="margin-top:8px;background:#F8FAF5;border:1px solid #D1E7D0;border-radius:8px;padding:6px 10px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:10px;color:#3F7A57;font-weight:700">💰 Valor en stock</span>
+        <span style="font-size:13px;font-weight:800;color:#2F6048">${fmt(valorItem)}</span>
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -18794,40 +18869,155 @@ function deleteCompraMaterial(id){
 
 function renderSubHistorial(movs){
   const usos = movs.filter(m=>m.tipo==='uso' || /valor$/.test(m.tipo||''));
+  if(!usos.length) return `<div style="text-align:center;padding:40px 20px;color:var(--muted)"><div style="font-size:36px;margin-bottom:10px">📋</div><div>Sin movimientos registrados</div></div>`;
   return `
-  ${usos.length===0?`<div style="text-align:center;padding:40px 20px;color:var(--muted)"><div style="font-size:36px;margin-bottom:10px">📋</div><div>Sin movimientos registrados</div></div>`
-  : [...usos].reverse().slice(0,50).map(m=>{
-    if((m.tipo||'').includes('valor')){
-      const esEntrada = m.tipo.includes('entrada') || m.tipo.includes('devolucion');
-      return `
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin-bottom:8px;box-shadow:0 2px 8px rgba(26,44,53,0.04)">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-        <div>
-          <div style="font-weight:700;font-size:13px">${esEntrada?'Entrada valorizada':'Uso valorizado'}</div>
-          <div style="font-size:11px;color:var(--muted)">📅 ${m.fecha} ${m.cliente?'· '+m.cliente:''}</div>
-          ${m.descripcion?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${m.descripcion}</div>`:''}
+  ${[...usos].reverse().slice(0,80).map(m=>{
+    const esValor = (m.tipo||'').includes('valor');
+    const esEntrada = esValor && (m.tipo.includes('entrada')||m.tipo.includes('devolucion'));
+    if(esValor){
+      return `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin-bottom:8px;box-shadow:0 2px 8px rgba(26,44,53,0.04)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:13px">${esEntrada?'📥 Entrada valorizada':'📤 Uso valorizado'}</div>
+          <div style="font-size:11px;color:var(--muted)">📅 ${m.fecha||''} ${m.cliente?'· '+m.cliente:''}</div>
+          ${m.descripcion?`<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.descripcion}</div>`:''}
         </div>
-        <div style="text-align:right">
-          <div style="font-weight:800;color:${esEntrada?'var(--gold)':'#C62828'}">${esEntrada?'+':'-'} ${fmt(m.monto||0)}</div>
-          <div style="font-size:11px;color:var(--muted)">Saldo ${fmt(m.saldo||0)}</div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-weight:800;font-size:14px;color:${esEntrada?'var(--gold)':'#C62828'}">${esEntrada?'+':'-'}${fmt(m.monto||0)}</div>
+          <div style="font-size:10px;color:var(--muted)">Saldo ${fmt(m.saldo||0)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+          <button onclick="editMovStock('${m.id}')" title="Editar" style="background:#EBF1F5;border:none;border-radius:8px;width:32px;height:32px;font-size:13px;cursor:pointer;color:var(--gold)">✏️</button>
+          <button onclick="deleteMovStock('${m.id}')" title="Eliminar" style="background:#FEF2F2;border:none;border-radius:8px;width:32px;height:32px;font-size:13px;cursor:pointer;color:#C62828">✕</button>
         </div>
       </div>
     </div>`;
     }
-    return `
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin-bottom:8px;box-shadow:0 2px 8px rgba(26,44,53,0.04)">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-weight:700;font-size:13px">${m.material}</div>
-          <div style="font-size:11px;color:var(--muted)">📅 ${m.fecha} · Servicio: ${m.id_servicio||'-'}</div>
+    return `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin-bottom:8px;box-shadow:0 2px 8px rgba(26,44,53,0.04)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:13px">📦 ${m.material||'Material'}</div>
+          <div style="font-size:11px;color:var(--muted)">📅 ${m.fecha||''} ${m.id_servicio?'· Serv: '+String(m.id_servicio).slice(0,10)+'...':''}</div>
         </div>
-        <div style="text-align:right">
+        <div style="text-align:right;flex-shrink:0">
           <div style="font-weight:700;color:#C62828">-${m.cantidad} ${getMaterialById(m.material_id)?.unidad||''}</div>
-          <div style="font-size:11px;color:var(--muted)">S/ ${(+m.costo_total).toFixed(2)}</div>
+          <div style="font-size:10px;color:var(--muted)">S/ ${(+(m.costo_total||0)).toFixed(2)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+          <button onclick="editMovStock('${m.id}')" title="Editar" style="background:#EBF1F5;border:none;border-radius:8px;width:32px;height:32px;font-size:13px;cursor:pointer;color:var(--gold)">✏️</button>
+          <button onclick="deleteMovStock('${m.id}')" title="Eliminar" style="background:#FEF2F2;border:none;border-radius:8px;width:32px;height:32px;font-size:13px;cursor:pointer;color:#C62828">✕</button>
         </div>
       </div>
     </div>`;
-  }).join('')}`;
+  }).join('')}
+  <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+    <button onclick="ajClearStockHistory()" style="width:100%;background:#FEF2F2;border:1px solid #E0525233;border-radius:12px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;color:#C62828">🗑 Borrar todo el historial</button>
+  </div>`;
+}
+
+// ── Eliminar un movimiento individual del historial de stock ──────────
+function deleteMovStock(id){
+  ensureLazyData('movimientosMateriales');
+  const all = state.movimientosMateriales||[];
+  const idx = all.findIndex(m=>m.id===id);
+  if(idx<0){ toast('Registro no encontrado','error'); return; }
+  if(!confirm('¿Eliminar este registro del historial?')) return;
+  const mov = all[idx];
+  // Revertir efecto en stockValorGeneral
+  if((mov.tipo||'').includes('valor')){
+    const esEntrada = mov.tipo.includes('entrada')||mov.tipo.includes('devolucion');
+    const monto = moneyValue(mov.monto||0);
+    if(monto>0) ajustarStockValorGeneral(esEntrada ? -monto : monto);
+  }
+  // Revertir stock físico si era uso de unidades
+  if(mov.tipo==='uso' && mov.material_id && (mov.cantidad||0)>0){
+    const matIdx = (state.inventario||[]).findIndex(m=>m.id===mov.material_id);
+    if(matIdx>=0){
+      state.inventario[matIdx].stock_actual = +(((state.inventario[matIdx].stock_actual||0) + mov.cantidad)).toFixed(4);
+      syncMaterialToSheets(state.inventario[matIdx]);
+    }
+  }
+  state.movimientosMateriales.splice(idx,1);
+  saveAll(); render();
+  toast('Registro eliminado ✓');
+}
+
+// ── Editar un movimiento individual del historial de stock ────────────
+function editMovStock(id){
+  ensureLazyData('movimientosMateriales');
+  const mov = (state.movimientosMateriales||[]).find(m=>m.id===id);
+  if(!mov){ toast('Registro no encontrado','error'); return; }
+  const esValor   = (mov.tipo||'').includes('valor');
+  const esEntrada = esValor && (mov.tipo.includes('entrada')||mov.tipo.includes('devolucion'));
+  document.getElementById('modal-content').innerHTML=`
+    <div class="modal-title">✏️ Editar registro de stock</div>
+    <div style="background:#F8FAFB;border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--muted)">${esValor?(esEntrada?'Entrada valorizada':'Uso valorizado'):'Uso físico: '+(mov.material||'')}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px">📅 ${mov.fecha||''} ${mov.cliente?'· '+mov.cliente:''}</div>
+      ${mov.descripcion?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${mov.descripcion}</div>`:''}
+    </div>
+    ${esValor?`
+    <div class="field" style="margin-bottom:14px">
+      <label class="field-label">Monto (S/)</label>
+      <input id="emov-monto" type="number" inputmode="decimal" step="0.01" value="${(+(mov.monto||0)).toFixed(2)}"
+        style="width:100%;background:#F5F8FA;border:1.5px solid var(--border);border-radius:14px;padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700">
+    </div>`:`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="field" style="margin-bottom:0">
+        <label class="field-label">Cantidad</label>
+        <input id="emov-cant" type="number" inputmode="decimal" step="0.01" value="${+(mov.cantidad||0)}"
+          style="width:100%;background:#F5F8FA;border:1.5px solid var(--border);border-radius:14px;padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label class="field-label">Costo unit. (S/)</label>
+        <input id="emov-costo" type="number" inputmode="decimal" step="0.01" value="${(+(mov.costo_unitario_usado||0)).toFixed(2)}"
+          style="width:100%;background:#F5F8FA;border:1.5px solid var(--border);border-radius:14px;padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700">
+      </div>
+    </div>`}
+    <div class="field" style="margin-bottom:14px">
+      <label class="field-label">Fecha</label>
+      <input id="emov-fecha" type="date" value="${mov.fecha||''}"
+        style="width:100%;background:#F5F8FA;border:1.5px solid var(--border);border-radius:14px;padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:14px">
+    </div>
+    <div style="background:#FFFBEB;border:1px solid #F59E0B33;border-radius:10px;padding:9px 12px;font-size:11px;color:#92400E;margin-bottom:14px">
+      ⚠ Al guardar, el stock valorizado y/o el stock físico se ajustan automáticamente con la diferencia.
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeModal()" style="flex:1;padding:13px;border-radius:13px;border:1.5px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Cancelar</button>
+      <button onclick="guardarMovStock('${id}')" style="flex:2;padding:13px;border-radius:13px;border:none;background:#2F4A59;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:800;cursor:pointer">💾 Guardar cambios</button>
+    </div>`;
+  showModal();
+}
+
+function guardarMovStock(id){
+  ensureLazyData('movimientosMateriales');
+  const idx = (state.movimientosMateriales||[]).findIndex(m=>m.id===id);
+  if(idx<0) return;
+  const mov = state.movimientosMateriales[idx];
+  const esValor   = (mov.tipo||'').includes('valor');
+  const esEntrada = esValor && (mov.tipo.includes('entrada')||mov.tipo.includes('devolucion'));
+  const nuevaFecha = document.getElementById('emov-fecha')?.value || mov.fecha;
+  if(esValor){
+    const nuevoMonto   = parseFloat(document.getElementById('emov-monto')?.value)||0;
+    const montoAnterior = moneyValue(mov.monto||0);
+    const delta = +(nuevoMonto - montoAnterior).toFixed(2);
+    if(delta !== 0) ajustarStockValorGeneral(esEntrada ? delta : -delta);
+    state.movimientosMateriales[idx] = {...mov, monto:nuevoMonto, fecha:nuevaFecha, saldo:moneyValue(state.stockValorGeneral)};
+  } else {
+    const nuevaCant  = parseFloat(document.getElementById('emov-cant')?.value)||0;
+    const nuevoCosto = parseFloat(document.getElementById('emov-costo')?.value)||0;
+    const diffCant   = +((mov.cantidad||0) - nuevaCant).toFixed(4); // positivo = se usó menos → devolver al stock
+    if(diffCant !== 0 && mov.material_id){
+      const matIdx = (state.inventario||[]).findIndex(m=>m.id===mov.material_id);
+      if(matIdx>=0){
+        state.inventario[matIdx].stock_actual = Math.max(0, +((state.inventario[matIdx].stock_actual||0)+diffCant).toFixed(4));
+        syncMaterialToSheets(state.inventario[matIdx]);
+      }
+    }
+    state.movimientosMateriales[idx] = {...mov, cantidad:nuevaCant, costo_unitario_usado:nuevoCosto, costo_total:+(nuevaCant*nuevoCosto).toFixed(2), fecha:nuevaFecha};
+  }
+  saveAll(); closeModal(); render();
+  toast('Registro actualizado ✓');
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
