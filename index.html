@@ -3146,7 +3146,7 @@ function renderMovimientos(){
           const ganDiaColor = ganDia >= 0 ? '#099268' : '#C62828';
           const ganDiaBg    = ganDia >= 0 ? '#E6FCF5' : '#FFF5F5';
 
-          const cards = txs.map(t => {
+          const renderTxCard = (t) => {
             const esIng = t.type==='ingreso';
             const {icon, color} = getIconAndColor(t);
             const clienteTxt = t.cliente ? `👤 ${t.cliente}` : '';
@@ -3155,20 +3155,8 @@ function renderMovimientos(){
             const subTxt = (clienteTxt ? (clienteTxt+ubicTxt) : (t.category||'')) + linkTxt;
             const cardId = 'mvcard_'+t.id;
 
-            // Chip ganancia neta para ingresos de servicio
-            const gananciaVal = getGananciaServicio(t);
-            const gananciaChip = gananciaVal !== null ? (()=>{
-              const gc = gananciaVal>=0?'#099268':'#C62828';
-              const gb = gananciaVal>=0?'#E6FCF5':'#FFF5F5';
-              return `<div style="display:flex;justify-content:flex-end;padding:3px 12px 6px">
-                <span style="background:${gb};color:${gc};font-size:10px;font-weight:800;padding:2px 10px;border-radius:20px;border:1px solid ${gc}33">
-                  Ganancia: ${gananciaVal>=0?'+':''}${fmt(gananciaVal)}
-                </span>
-              </div>`;
-            })() : '';
-
             return `
-            <div class="mv-card" id="${cardId}" onclick="toggleMvCard('${cardId}')">
+            <div class="mv-card" id="${cardId}" onclick="toggleMvCard('${cardId}')" style="margin-bottom:4px">
               <div class="mv-top">
                 <div class="mv-icon-box ${esIng?'mv-icon-ing':'mv-icon-egr'}" style="background:${color}18">${icon}</div>
                 <div class="mv-main">
@@ -3183,7 +3171,6 @@ function renderMovimientos(){
                   <span class="mv-chevron">▼</span>
                 </div>
               </div>
-              ${gananciaChip}
               <div class="mv-expand">
                 <div class="mv-detail">
                   <div class="mv-d-item"><span class="mv-d-lbl">Fecha</span><span class="mv-d-val">${fechaLabel}</span></div>
@@ -3198,8 +3185,70 @@ function renderMovimientos(){
                 </div>
               </div>
             </div>`;
+          };
+
+          const svcGroups = {};
+          const looseTxs = [];
+          txs.forEach(t => {
+            const svcId = t.vinculadoServicioId || t._notionRowId || t._notionTrabajo?.id;
+            if (svcId && (t.vinculadoServicioId || t._notionTrabajo || t.origenServicioMaterial || t.origenCierreServicio || t._importadoDeNotion)) {
+              if(!svcGroups[svcId]) svcGroups[svcId] = [];
+              svcGroups[svcId].push(t);
+            } else {
+              looseTxs.push(t);
+            }
+          });
+
+          const groupsHtml = Object.values(svcGroups).map(groupTxs => {
+            groupTxs.sort((a,b) => (b.type==='ingreso'?1:0) - (a.type==='ingreso'?1:0));
+            
+            if(groupTxs.length === 1) {
+              const t = groupTxs[0];
+              let extraChip = '';
+              const gVal = getGananciaServicio(t);
+              if (t.type === 'ingreso' && gVal !== null) {
+                const gc = gVal>=0?'#099268':'#C62828';
+                const gb = gVal>=0?'#E6FCF5':'#FFF5F5';
+                extraChip = `<div style="display:flex;justify-content:flex-end;padding:3px 12px 6px"><span style="background:${gb};color:${gc};font-size:10px;font-weight:800;padding:2px 10px;border-radius:20px;border:1px solid ${gc}33">Ganancia: ${gVal>=0?'+':''}${fmt(gVal)}</span></div>`;
+              }
+              return renderTxCard(t).replace('<div class="mv-expand">', extraChip + '<div class="mv-expand">');
+            }
+
+            const ingTxs = groupTxs.filter(t=>t.type==='ingreso');
+            let ganHtml = '';
+            if (ingTxs.length > 0) {
+              const gVal = getGananciaServicio(ingTxs[0]);
+              if(gVal !== null) {
+                const gc = gVal>=0?'#099268':'#C62828';
+                const gb = gVal>=0?'#E6FCF5':'#FFF5F5';
+                ganHtml = `<span style="background:${gb};color:${gc};font-size:10px;font-weight:800;padding:2px 10px;border-radius:20px;border:1px solid ${gc}33">Ganancia: ${gVal>=0?'+':''}${fmt(gVal)}</span>`;
+              }
+            }
+
+            const cName = groupTxs.find(t=>t.cliente)?.cliente || 'Servicio Agrupado';
+            const groupCards = groupTxs.map(renderTxCard).join('');
+            
+            return `<div style="border:1px dashed #cbd5e1;border-radius:14px;padding:6px;margin-bottom:10px;background:#f8fafc">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px 8px;">
+                <span style="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">📦 Grupo: ${cName}</span>
+                ${ganHtml}
+              </div>
+              ${groupCards}
+            </div>`;
           }).join('');
 
+          const looseCards = looseTxs.map(t => {
+            let extraChip = '';
+            const gVal = getGananciaServicio(t);
+            if (t.type === 'ingreso' && gVal !== null) {
+              const gc = gVal>=0?'#099268':'#C62828';
+              const gb = gVal>=0?'#E6FCF5':'#FFF5F5';
+              extraChip = `<div style="display:flex;justify-content:flex-end;padding:3px 12px 6px"><span style="background:${gb};color:${gc};font-size:10px;font-weight:800;padding:2px 10px;border-radius:20px;border:1px solid ${gc}33">Ganancia: ${gVal>=0?'+':''}${fmt(gVal)}</span></div>`;
+            }
+            return renderTxCard(t).replace('<div class="mv-expand">', extraChip + '<div class="mv-expand">');
+          }).join('');
+
+          const cards = groupsHtml + looseCards;
           return `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 2px 6px;margin-top:4px">
               <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600">${fechaLabel}</span>
@@ -4097,10 +4146,215 @@ function renderServicios(){
     <button class="btn-ghost" style="width:100%;margin-top:12px;font-size:13px" onclick="resetServices()">↺ Reiniciar pagos del mes</button>`;
 }
 
+function toggleGraficosVista(v) {
+  state.graficosVista = v;
+function reproducirDiscurso(texto) {
+  if (!('speechSynthesis' in window)) return toast('Tu navegador no soporta audio', 'error');
+  window.speechSynthesis.cancel();
+  const msg = new SpeechSynthesisUtterance(texto.replace(/\*/g, ''));
+  msg.lang = 'es-ES';
+  msg.rate = 1.15;
+  msg.pitch = 0.9;
+  window.speechSynthesis.speak(msg);
+}
+
+function reproducirUltimoDiscurso() {
+  if (state.ultimoDiscursoAI) {
+    reproducirDiscurso(state.ultimoDiscursoAI);
+  } else {
+    generarDiscursoMotivacional();
+  }
+}
+
+async function generarDiscursoMotivacional() {
+  const btn = document.getElementById('btn-mentor-ai');
+  const box = document.getElementById('box-mentor-ai');
+  const txt = document.getElementById('txt-mentor-ai');
+  const regen = document.getElementById('btn-mentor-regen');
+  
+  if (btn) btn.innerHTML = '🤖 Analizando tu situación...';
+  
+  const isMensual = (state.graficosVista !== 'semanal');
+  const txs = isMensual ? filteredTx() : state.transactions.filter(t => {
+      const d = new Date(t.date + 'T00:00:00');
+      const now = new Date(); const weekAgo = new Date(); weekAgo.setDate(now.getDate() - 7);
+      return d >= weekAgo && d <= now;
+  });
+  
+  let ing = 0, egr = 0;
+  txs.forEach(t=>{ if(t.type==='ingreso' && isCashFlowTx(t)) ing+=t.amount; else if(t.type==='egreso' && isCashFlowTx(t)) egr+=t.amount; });
+  const ganancia = ing - egr;
+  
+  const deudaTotal = state.debts.reduce((s,d)=>s+(d.cuotasTotales-d.cuotasPagadas)*d.cuotaMonto,0);
+  
+  let ultSvc = 'Hace mucho tiempo (sin registros recientes)';
+  const txSvc = state.transactions.filter(t=>t.type==='ingreso' && (t.vinculadoServicioId || t._importadoDeNotion || t._notionTrabajo));
+  if(txSvc.length > 0) {
+    ultSvc = txSvc[0].date;
+  }
+
+  const key = localStorage.getItem('fnz_geminiKey');
+  if(!key) {
+    toast('Configura tu API Key de Gemini en Ajustes primero', 'error');
+    if (btn) btn.innerHTML = '🔥 Generar Discurso Brutal';
+    return;
+  }
+
+  const prompt = `Actúa como un mentor financiero BRUTALMENTE HONESTO, extremadamente duro, directo y sarcástico. Eres callejero, no tienes pelos en la lengua, pero eres experto en hacer dinero. No me saludes ni seas educado, ve directo a la yugular.
+  Aquí están mis números actuales de ${isMensual ? 'este mes' : 'los últimos 7 días'}:
+  - Flujo de caja neto: S/ ${ganancia}
+  - Deuda total pendiente que me asfixia: S/ ${deudaTotal}
+  - La última vez que registré un servicio trabajado fue el: ${ultSvc}
+
+  Evalúa mi desempeño con esta información. Si no he trabajado (la fecha del último servicio es antigua) o mi deuda es altísima y mi ganancia es baja, destrúyeme verbalmente, regáñame durísimo y sin filtro (ej: "no te quiero ver rascándote las bolas en la cama, tienes cuentas que pagar y salir del agujero"). Si voy bien (ganancias altas y trabajando seguido), reconoce que estoy empujando pero exígeme que no sea mediocre y gane aún más, porque las deudas no se pagan solas.
+  Usa un tono muy crudo, corto y conciso. Máximo 3 párrafos cortos de 2 o 3 líneas cada uno. Te quiero leyendo la cartilla con firmeza.`;
+
+  try {
+    const respuesta = await callGemini(prompt);
+    if(box) box.style.display = 'block';
+    if(txt) txt.innerHTML = respuesta.replace(/\n/g, '<br>');
+    if(btn) btn.innerHTML = '🔥 Reproducir discurso';
+    if(regen) regen.style.display = 'block';
+    state.ultimoDiscursoAI = respuesta;
+    saveAll();
+    reproducirDiscurso(respuesta);
+  } catch (e) {
+    if(btn) btn.innerHTML = '🔥 Generar Discurso Brutal';
+    toast('Error al contactar al mentor AI', 'error');
+  }
+}
+
+  saveAll();
+  render();
+}
+
 function renderGraficos(){
+  const isMensual = (state.graficosVista !== 'semanal');
+  let txsParaAnalisis = [];
+  let rangoTexto = '';
+
+  if (isMensual) {
+    txsParaAnalisis = filteredTx();
+    rangoTexto = monthName();
+  } else {
+    const now = new Date();
+    const weekAgo = new Date();
+    weekAgo.setDate(now.getDate() - 7);
+    txsParaAnalisis = state.transactions.filter(t => {
+      const d = new Date(t.date + 'T00:00:00');
+      return d >= weekAgo && d <= now;
+    });
+    rangoTexto = 'Últimos 7 días';
+  }
+
+  // Análisis de Servicios y Ganancia
+  const svcStats = {};
+  txsParaAnalisis.forEach(t => {
+    if (t.type === 'ingreso' && (t.vinculadoServicioId || t._notionTrabajo || t.origenServicioMaterial || t._importadoDeNotion)) {
+      const g = getGananciaServicio(t);
+      if (g !== null) {
+        const id = t.vinculadoServicioId || t._notionRowId || t.id;
+        const nombreSvc = t.category || 'Servicio';
+        if (!svcStats[id]) {
+          svcStats[id] = { nombre: nombreSvc, ganancia: g, count: 1 };
+        }
+      }
+    }
+  });
+
+  const aggByName = {};
+  Object.values(svcStats).forEach(s => {
+    if (!aggByName[s.nombre]) aggByName[s.nombre] = { nombre: s.nombre, count: 0, gananciaTotal: 0 };
+    aggByName[s.nombre].count += 1;
+    aggByName[s.nombre].gananciaTotal += s.ganancia;
+  });
+
+  let arrSvc = Object.values(aggByName);
+  const totalCount = arrSvc.reduce((sum, s) => sum + s.count, 0);
+  const totalGanancia = arrSvc.reduce((sum, s) => sum + s.gananciaTotal, 0);
+  const promedioSvc = totalCount > 0 ? (totalGanancia / totalCount) : 0;
+
+  arrSvc.sort((a, b) => b.count - a.count);
+  const topFrecuente = arrSvc[0] || null;
+  
+  arrSvc.sort((a, b) => b.gananciaTotal - a.gananciaTotal);
+  const topGanancia = arrSvc[0] || null;
+
   return `
-    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:14px">Gráficos</div>
-    <div class="month-nav"><button onclick="prevMonth()">‹</button><span>${monthName()}</span><button onclick="nextMonth()">›</button></div>
+    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:14px">Gráficos y Rendimiento</div>
+    
+    <div style="display:flex;background:#F1F5F9;border-radius:10px;padding:4px;margin-bottom:14px">
+      <button onclick="toggleGraficosVista('mensual')" style="flex:1;padding:8px;border-radius:8px;border:none;background:${isMensual?'#fff':'transparent'};color:${isMensual?'var(--gold)':'var(--muted)'};font-weight:${isMensual?'bold':'normal'};box-shadow:${isMensual?'0 2px 4px rgba(0,0,0,0.05)':'none'};cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;transition:all 0.2s">Mensual</button>
+      <button onclick="toggleGraficosVista('semanal')" style="flex:1;padding:8px;border-radius:8px;border:none;background:${!isMensual?'#fff':'transparent'};color:${!isMensual?'var(--gold)':'var(--muted)'};font-weight:${!isMensual?'bold':'normal'};box-shadow:${!isMensual?'0 2px 4px rgba(0,0,0,0.05)':'none'};cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;transition:all 0.2s">Semanal</button>
+    </div>
+
+    ${isMensual ? `<div class="month-nav"><button onclick="prevMonth()"><</button><span>${rangoTexto}</span><button onclick="nextMonth()">></button></div>` : `<div style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:14px;font-weight:600">${rangoTexto}</div>`}
+
+    <div class="card" style="margin-bottom:12px;background:linear-gradient(135deg,#FFFBEB,#F8FAFC);border:1px solid #C9A84C33">
+      <div class="section-title" style="color:var(--gold)">Rendimiento de Servicios</div>
+      <div class="section-sub">${rangoTexto}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+        <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #e2e8f0">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Ganancia Total Neta</div>
+          <div style="font-family:'Playfair Display',serif;font-size:18px;color:#099268">${fmt(totalGanancia)}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">${totalCount} servicios</div>
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #e2e8f0">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Ganancia Promedio</div>
+          <div style="font-family:'Playfair Display',serif;font-size:18px;color:#2E86AB">${fmt(promedioSvc)}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">por servicio</div>
+        </div>
+      </div>
+      
+      ${totalCount > 0 ? `
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;padding:10px;border-radius:8px;border:1px solid #f1f5f9">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:28px;height:28px;border-radius:6px;background:#F0F9FF;color:#0284C7;display:flex;align-items:center;justify-content:center;font-size:14px">🔥</div>
+            <div>
+              <div style="font-size:10px;color:var(--muted)">Más Frecuente</div>
+              <div style="font-size:12px;font-weight:600;color:var(--text)">${topFrecuente.nombre}</div>
+            </div>
+          </div>
+          <div style="font-size:12px;font-weight:bold;color:#0284C7">${topFrecuente.count} veces</div>
+        </div>
+        
+        <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;padding:10px;border-radius:8px;border:1px solid #f1f5f9">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:28px;height:28px;border-radius:6px;background:#ECFDF5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:14px">💎</div>
+            <div>
+              <div style="font-size:10px;color:var(--muted)">Mayor Ganancia</div>
+              <div style="font-size:12px;font-weight:600;color:var(--text)">${topGanancia.nombre}</div>
+            </div>
+          </div>
+          <div style="font-size:12px;font-weight:bold;color:#059669">${fmt(topGanancia.gananciaTotal)}</div>
+        </div>
+      </div>
+    <div class="card" style="margin-bottom:12px;background:#1a1a1a;border:1px solid #333;color:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-size:20px">🤖</div>
+          <div style="font-family:'Playfair Display',serif;font-size:16px;color:#E67E22">Tu Mentor AI (Sin Filtro)</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:#aaa;margin-bottom:12px;line-height:1.4">
+        Recibe una dosis brutal de realidad financiera. Analizará tus ingresos, deudas y la última vez que trabajaste para decirte lo que necesitas escuchar.
+      </div>
+      
+      <div id="box-mentor-ai" style="display:${state.ultimoDiscursoAI ? 'block' : 'none'};background:#2a2a2a;border-left:3px solid #E67E22;padding:12px;border-radius:0 8px 8px 0;margin-bottom:12px;font-size:13px;line-height:1.5;color:#eee">
+        <div id="txt-mentor-ai">${state.ultimoDiscursoAI ? state.ultimoDiscursoAI.replace(/\n/g, '<br>') : ''}</div>
+      </div>
+
+      <button id="btn-mentor-ai" onclick="reproducirUltimoDiscurso()" style="width:100%;background:linear-gradient(135deg, #D35400, #C0392B);color:#fff;border:none;border-radius:8px;padding:12px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.3)">
+        ${state.ultimoDiscursoAI ? '🔥 Reproducir discurso' : '🔥 Generar Discurso Brutal'}
+      </button>
+      <div id="btn-mentor-regen" style="text-align:center;margin-top:10px;display:${state.ultimoDiscursoAI ? 'block' : 'none'}">
+        <button onclick="generarDiscursoMotivacional()" style="background:none;border:1px solid #555;border-radius:6px;color:#aaa;font-size:11px;padding:4px 10px;cursor:pointer;">Generar uno nuevo</button>
+      </div>
+    </div>
+      ` : `<div style="text-align:center;font-size:12px;color:var(--dim);margin-top:14px">No hay servicios registrados en este periodo.</div>`}
+    </div>
+
     <div class="card" style="margin-bottom:12px">
       <div class="section-title">Ingresos vs Egresos</div>
       <div class="section-sub">Últimos 6 meses</div>
@@ -4110,14 +4364,16 @@ function renderGraficos(){
         <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><div style="width:10px;height:10px;border-radius:2px;background:var(--red)"></div>Egresos</div>
       </div>
     </div>
+    
     <div class="card" style="margin-bottom:12px">
       <div class="section-title">¿En qué gasté?</div>
-      <div class="section-sub">${monthName()}</div>
+      <div class="section-sub">${rangoTexto}</div>
       <div style="display:flex;align-items:center;gap:8px">
         <div class="chart-wrap" style="width:150px;height:150px;flex-shrink:0"><canvas id="pieChart"></canvas></div>
         <div id="pie-legend" style="flex:1;font-size:11px"></div>
       </div>
     </div>
+    
     <div class="card" style="background:#EFF6FF;border-color:#2E86AB33">
       <div class="section-title" style="color:var(--blue)">Progreso de deudas</div>
       <div class="section-sub">Cuotas pagadas</div>
@@ -5350,8 +5606,22 @@ function buildCharts(){
   if(barCtx){if(state.chartBar)state.chartBar.destroy();
     state.chartBar=new Chart(barCtx,{type:'bar',data:{labels:bl,datasets:[{label:'Ingresos',data:bi,backgroundColor:'#C9A84C',borderRadius:4},{label:'Egresos',data:be,backgroundColor:'#E05252',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#666',font:{size:10}}},y:{display:false}}}});}
 
+
+  let txsPie = [];
+  if (state.graficosVista === 'semanal') {
+    const now = new Date();
+    const weekAgo = new Date();
+    weekAgo.setDate(now.getDate() - 7);
+    txsPie = state.transactions.filter(t => {
+      const d = new Date(t.date + 'T00:00:00');
+      return d >= weekAgo && d <= now;
+    });
+  } else {
+    txsPie = filteredTx();
+  }
+
   const cats={};
-  filteredTx().filter(t=>t.type==='egreso').forEach(t=>{cats[t.category]=(cats[t.category]||0)+t.amount;});
+  txsPie.filter(t=>t.type==='egreso').forEach(t=>{cats[t.category]=(cats[t.category]||0)+t.amount;});
   const pl=Object.keys(cats),pd=Object.values(cats);
   const pc=pl.map(name=>{const c=getCatByName(name,'egreso');return c?c.color:'#666';});
   const pieCtx=document.getElementById('pieChart');
@@ -5361,7 +5631,7 @@ function buildCharts(){
       const leg=document.getElementById('pie-legend');
       if(leg)leg.innerHTML=pl.map((l,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:50%;background:${pc[i]};flex-shrink:0"></div><span style="color:#888">${l}</span></div><span style="color:#666">${fmt(pd[i])}</span></div>`).join('');
     } else {
-      pieCtx.parentElement.innerHTML=`<div style="text-align:center;color:var(--dim);padding:30px 0;font-size:13px">Sin egresos este mes</div>`;
+      pieCtx.parentElement.innerHTML=`<div style="text-align:center;color:var(--dim);padding:30px 0;font-size:13px">Sin egresos en este periodo</div>`;
     }
   }
 }
@@ -9920,7 +10190,7 @@ async function guardarFinalizacion(id){
   if (crearMovimientosCierre && cobroObj.otros_gastos > 0) { const txId=rowId+'-otg'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   // Materiales usados en el servicio: reducen el stock valorizado pero NO afectan la caja
   // (la caja ya se movio cuando se compraron los materiales). Se ocultan de movimientos.
-  if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ocultarEnMovimientos:true, ...baseTx }); }
+  if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.meta > 0) { const txId=rowId+'-met'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.meta, category:'Meta', catId:'cne_meta', description:'Meta - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if(crearMovimientosCierre) item.cierreTxIds = nuevosCierreTxIds;
