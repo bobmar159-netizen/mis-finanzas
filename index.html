@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -4958,6 +4958,7 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
       if(otros>0){ nuevasTx.push({id:nId+'-otr',type:'egreso',amount:otros,category:'Otros gastos de negocio',catId:'cne6',description:'Otros gastos - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosOtros++; }
       if(agregados>0){ nuevasTx.push({id:nId+'-agr',type:'egreso',amount:agregados,category:'Agregados',catId:'cne_agregados',description:'Agregados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosAgr++; }
       if(movil>0){ nuevasTx.push({id:nId+'-mov',type:'egreso',amount:movil,category:'Movilidad',catId:'cne5',description:'Movilidad - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMov++; }
+      if(meta>0){ nuevasTx.push({id:nId+'-met',type:'egreso',amount:meta,category:'Meta',catId:'cne_meta',description:'Meta - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); }
     }
 
     if(nuevasTx.length===0 && nuevosTrabajos.length===0){ if(status) status.textContent='No se encontraron datos validos. Revisa las columnas.'; return; }
@@ -4979,7 +4980,13 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
 
     const url=localStorage.getItem('fnz_sheets_url')||'';
     if(url && nuevosTrabajos.length){
-      nuevosTrabajos.forEach((trabajo,idx)=>setTimeout(()=>_sendToSheets(url,{type:'trabajo',item:trabajo,timestamp:'notion_tr_'+trabajo.id+'_'+Date.now()}),idx*180));
+      // Mirror completo: 1 solo POST con todos los trabajos en vez de N peticiones
+      // El GS borra la hoja y reescribe todo de golpe (evita el timeout de 30s de GAS)
+      _sendToSheets(url, {
+        type: 'notion_full_mirror',
+        trabajos: nuevosTrabajos,
+        timestamp: 'mirror_reporte_' + Date.now()
+      });
     }
 
     saveAll(); render();
@@ -5049,6 +5056,44 @@ function _mapearCategoriaNotion(texto) {
 }
 
 // ★ Forzar sincronización a Sheets de todos los movimientos importados de Notion
+// ── Mirror completo Notion → Sheets (Reporte Diario + Clientes Potenciales) ──
+// Envía TODOS los trabajos en 1 POST bulk en vez de N peticiones individuales.
+// Esto evita el timeout de 30s de Google Apps Script.
+function syncNotionMirrorToSheets() {
+  const url = localStorage.getItem('fnz_sheets_url') || '';
+  if (!url) { toast('⚠ URL de Sheets no configurada', 'error'); return; }
+
+  // Recopilar trabajos únicos desde _notionTrabajo
+  const trabajosMap = new Map();
+  (state.transactions || []).forEach(tx => {
+    if (tx._importadoDeNotion && tx._notionRowId && tx._notionTrabajo) {
+      if (!trabajosMap.has(tx._notionRowId)) trabajosMap.set(tx._notionRowId, tx._notionTrabajo);
+    }
+  });
+  const listTrabajos = Array.from(trabajosMap.values());
+  const todaAgenda   = state.agenda || [];
+  const totalReporte  = listTrabajos.length;
+  const totalClientes = todaAgenda.length;
+
+  if (!totalReporte && !totalClientes) { toast('No hay datos para sincronizar', 'error'); return; }
+
+  if (!confirm(
+    `¿Hacer espejo completo a Google Sheets?\n\n` +
+    `📋 Reporte Diario: ${totalReporte} trabajos\n` +
+    `👥 Clientes Potenciales: ${totalClientes} registros\n\n` +
+    `⚠ Esto BORRA y reescribe esas hojas en Sheets.`
+  )) return;
+
+  if (totalReporte > 0) {
+    _sendToSheets(url, { type:'notion_full_mirror', trabajos:listTrabajos, timestamp:'mirror_rpt_'+Date.now() });
+  }
+  if (totalClientes > 0) {
+    setTimeout(() => {
+      _sendToSheets(url, { type:'clientes_full_mirror', items:todaAgenda, timestamp:'mirror_cli_'+Date.now() });
+    }, 2000);
+  }
+  toast(`🔄 Espejo enviado: ${totalReporte} trabajos + ${totalClientes} clientes → Sheets`);
+}
 function sincronizarNotionASheets() {
   const url = localStorage.getItem('fnz_sheets_url') || '';
   if (!url) return toast('Primero configura la URL de Sheets en Ajustes', 'error');
@@ -9815,6 +9860,7 @@ async function guardarFinalizacion(id){
   // (la caja ya se movio cuando se compraron los materiales). Se ocultan de movimientos.
   if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ocultarEnMovimientos:true, ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.meta > 0) { const txId=rowId+'-met'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.meta, category:'Meta', catId:'cne_meta', description:'Meta - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if(crearMovimientosCierre) item.cierreTxIds = nuevosCierreTxIds;
 
   if (item.estadoPago === 'parcial' && item.montoPendienteCobro > 0) {
@@ -22093,6 +22139,7 @@ function renderAjustes(){
          <div class="aj-field"><label>Intervalo sync minutos</label><input id="notion-interval-input" type="number" min="1" value="${npEsc(notionInterval)}"></div>
          <div class="aj-row"><button class="aj-btn primary" onclick="saveNotionSettings()">Guardar Notion</button><button class="aj-btn" onclick="notionApiTest()">Forzar importacion</button></div>
          <div class="aj-row" style="margin-top:8px"><button class="aj-btn soft" onclick="notionCargarManual()">Preview Notion</button><button class="aj-btn soft" onclick="notionApiSyncStart()">Auto sync</button><button class="aj-btn soft" onclick="notionApiSyncStop()">Detener</button></div>
+         <div class="aj-row" style="margin-top:8px"><button class="aj-btn" style="background:#E6FCF5;border-color:#099268;color:#099268;font-weight:800" onclick="syncNotionMirrorToSheets()">🔄 Espejo completo → Sheets</button></div>
          <div style="display:grid;gap:7px;margin-top:10px"><div id="notion-api-status" class="aj-status"></div><div id="notion-load-status" class="aj-status"></div><div id="notion-import-status" class="aj-status"></div></div>`)}
       ${sec('gemini','note','Gemini','IA para agenda, notas y reuniones.',
         `<div class="aj-field"><label>API key</label><input id="gemini-key-input" value="${npEsc(gemKey)}" placeholder="AIza..."></div>
