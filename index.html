@@ -2698,7 +2698,7 @@ function getCatByName(name,type){
 function filteredTx(){
   // state.transactions is already mode-specific (loaded by loadStateForModo)
   // Filter by selected month/year only
-  return state.transactions.filter(t=>{
+  return (state.transactions||[]).filter(t=>{
     const d=new Date(t.date+'T00:00:00');
     return d.getMonth()===state.filterMonth&&d.getFullYear()===state.filterYear;
   });
@@ -2807,11 +2807,11 @@ function updateCatIcon(selId, type){
 function renderNegocioCard(){
   // Solo se muestra en modo Personal como acceso rápido
   if(state.modo==='negocio') return '';
-  var negIn=state.transactions.filter(function(t){
+  var negIn=(state.transactions||[]).filter(function(t){
     var d=new Date(t.date+'T00:00:00');
     return (t.negocio||t.catId==='cneg_svc')&&t.type==='ingreso'&&d.getMonth()===state.filterMonth&&d.getFullYear()===state.filterYear;
   });
-  var negEx=state.transactions.filter(function(t){
+  var negEx=(state.transactions||[]).filter(function(t){
     var d=new Date(t.date+'T00:00:00');
     return (t.negocio||t.catId==='cneg_mat'||t.catId==='cneg_gnv'||t.catId==='cneg_gas')&&t.type==='egreso'&&d.getMonth()===state.filterMonth&&d.getFullYear()===state.filterYear;
   });
@@ -2835,7 +2835,7 @@ function renderNegocioCard(){
 
 function renderResumenSemanal(){
   const {start,end}=getWeekRange();
-  const txWeek=state.transactions.filter(t=>t.date>=start&&t.date<=end);
+  const txWeek=(state.transactions||[]).filter(t=>t.date>=start&&t.date<=end);
   const ing=txWeek.filter(t=>t.type==='ingreso').reduce((s,t)=>s+t.amount,0);
   const egr=txWeek.filter(t=>t.type==='egreso').reduce((s,t)=>s+t.amount,0);
   const bal=ing-egr;
@@ -3056,16 +3056,6 @@ function renderMovimientos(){
   const getGananciaServicio = (t) => {
     if (t.type !== 'ingreso') return null;
     // Caso 1: importado de Notion con datos del trabajo
-    if (t._notionTrabajo) {
-      const tr = t._notionTrabajo;
-      const totalIng = (+(tr.precio1||0))+(+(tr.precio2||0))+(+(tr.precio3||0));
-      const totalEgr = (+(tr.materiales1||0))+(+(tr.materiales2||0))+(+(tr.materiales3||0))
-                     + (+(tr.comida||0))+(+(tr.otros_gastos||tr.otros||0))
-                     + (+(tr.agregados||0))+(+(tr.movilidad||0))+(+(tr.meta||0));
-      if (totalIng <= 0) return null;
-      return +(totalIng - totalEgr).toFixed(2);
-    }
-    // Caso 2: servicio cerrado desde la app (vinculadoServicioId)
     if (t.vinculadoServicioId) {
       const svcId = t.vinculadoServicioId;
       const egresos = (state.transactions||[]).filter(tx =>
@@ -3079,7 +3069,16 @@ function renderMovimientos(){
       if (totalIng <= 0) return null;
       return +(totalIng - totalEgr).toFixed(2);
     }
-    return null;
+    
+    if (t._notionTrabajo) {
+      const tr = t._notionTrabajo;
+      const totalIng = (+(tr.precio1||0))+(+(tr.precio2||0))+(+(tr.precio3||0));
+      const totalEgr = (+(tr.materiales1||0))+(+(tr.materiales2||0))+(+(tr.materiales3||0))
+                     + (+(tr.comida||0))+(+(tr.otros_gastos||tr.otros||0))
+                     + (+(tr.agregados||0))+(+(tr.movilidad||0))+(+(tr.meta||0));
+      if (totalIng <= 0) return null;
+      return +(totalIng - totalEgr).toFixed(2);
+    }
   };
 
 
@@ -3225,7 +3224,9 @@ function renderMovimientos(){
               }
             }
 
-            const cName = groupTxs.find(t=>t.cliente)?.cliente || 'Servicio Agrupado';
+            const mainIng = ingTxs[0];
+            const baseC = groupTxs.find(t=>t.cliente)?.cliente || 'Servicio Agrupado';
+            const cName = mainIng ? `${baseC} - ${mainIng.category}` : baseC;
             const groupCards = groupTxs.map(renderTxCard).join('');
             
             return `<div style="border:1px dashed #cbd5e1;border-radius:14px;padding:6px;margin-bottom:10px;background:#f8fafc">
@@ -4175,7 +4176,7 @@ async function generarDiscursoMotivacional() {
   if (btn) btn.innerHTML = '🤖 Analizando tu situación...';
   
   const isMensual = (state.graficosVista !== 'semanal');
-  const txs = isMensual ? filteredTx() : state.transactions.filter(t => {
+  const txs = isMensual ? filteredTx() : (state.transactions||[]).filter(t => {
       const d = new Date(t.date + 'T00:00:00');
       const now = new Date(); const weekAgo = new Date(); weekAgo.setDate(now.getDate() - 7);
       return d >= weekAgo && d <= now;
@@ -4185,10 +4186,10 @@ async function generarDiscursoMotivacional() {
   txs.forEach(t=>{ if(t.type==='ingreso' && isCashFlowTx(t)) ing+=t.amount; else if(t.type==='egreso' && isCashFlowTx(t)) egr+=t.amount; });
   const ganancia = ing - egr;
   
-  const deudaTotal = state.debts.reduce((s,d)=>s+(d.cuotasTotales-d.cuotasPagadas)*d.cuotaMonto,0);
+  const deudaTotal = (state.debts||[]).reduce((s,d)=>s+(d.cuotasTotales-d.cuotasPagadas)*d.cuotaMonto,0);
   
   let ultSvc = 'Hace mucho tiempo (sin registros recientes)';
-  const txSvc = state.transactions.filter(t=>t.type==='ingreso' && (t.vinculadoServicioId || t._importadoDeNotion || t._notionTrabajo));
+  const txSvc = (state.transactions||[]).filter(t=>t.type==='ingreso' && (t.vinculadoServicioId || t._importadoDeNotion || t._notionTrabajo));
   if(txSvc.length > 0) {
     ultSvc = txSvc[0].date;
   }
@@ -4240,7 +4241,7 @@ function renderGraficos(){
     const now = new Date();
     const weekAgo = new Date();
     weekAgo.setDate(now.getDate() - 7);
-    txsParaAnalisis = state.transactions.filter(t => {
+    txsParaAnalisis = (state.transactions||[]).filter(t => {
       const d = new Date(t.date + 'T00:00:00');
       return d >= weekAgo && d <= now;
     });
@@ -4377,8 +4378,8 @@ function renderGraficos(){
     <div class="card" style="background:#EFF6FF;border-color:#2E86AB33">
       <div class="section-title" style="color:var(--blue)">Progreso de deudas</div>
       <div class="section-sub">Cuotas pagadas</div>
-      ${state.debts.length===0?`<div style="text-align:center;color:var(--dim);padding:16px 0;font-size:13px">Sin deudas registradas</div>`
-      :state.debts.map(d=>{const pct=Math.round((d.cuotasPagadas/d.cuotasTotales)*100);return `
+      ${(state.debts||[]).length===0?`<div style="text-align:center;color:var(--dim);padding:16px 0;font-size:13px">Sin deudas registradas</div>`
+      :(state.debts||[]).map(d=>{const pct=Math.round((d.cuotasPagadas/d.cuotasTotales)*100);return `
         <div style="margin-bottom:12px">
           <div style="display:flex;justify-content:space-between;margin-bottom:5px;align-items:center">
             <span style="font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px">
@@ -5217,7 +5218,7 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
     const iMat1=col(['1 materiales','materiales 1','1 material','materiales']), iMat2=col(['2 materiales','materiales 2','2 material']), iMat3=col(['3 materiales','materiales 3','3 material']);
     const iPrecio1=col(['1 precio del servicio','1 precio de servicio','precio del servicio 1','precio de servicio 1','1 precio','precio 1','precio del servicio','precio']), iPrecio2=col(['2 precio del servicio','2 precio de servicio','precio del servicio 2','precio de servicio 2','2 precio','precio 2']), iPrecio3=col(['3 precio de servicio','3 precio del servicio','precio de servicio 3','precio del servicio 3','3 precio','precio 3']);
     const iComida=col(['comida','alimentos','menu','menus','snacks','snak','snaks','bebidas','gaseosa','gaseosas']), iOtros=col(['otros','otros gastos','gastos extra','extra']), iAgreg=col(['agregados','agregado','adicional','adicionales']), iMovil=col(['movilidad','movil','transport','transporte','pasajes']);
-    const iMeta=col(['meta','objetivo']), iObs=col(['observaciones','observacion','observ','nota','notas','comment','descripcion']), iNotionId=col(['notionid','notion id','page id']);
+    const iComida=col(['comida','alimentos','menu','menus','snacks','snak','snaks','bebidas','gaseosa','gaseosas']), iOtros=col(['otros','otros gastos','gastos extra','extra']), iAgreg=col(['agregados','agregado','adicional','adicionales']), iMovil=col(['movilidad','movil','transport','transporte','pasajes']);
     const comidaCols = cols(['comida','alimentos','alimentacion','menu','menus','snack','snacks','snak','snaks','golosina','golosinas','bebida','bebidas','gaseosa','gaseosas']);
 
     let txImportadas=0, egresosMov=0, egresosMat=0, egresosCom=0, egresosOtros=0, egresosAgr=0, filasUtiles=0;
@@ -5259,27 +5260,30 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
       }
 
       [
-        {idx:1,svc:svc1,precio:precio1},
-        {idx:2,svc:svc2,precio:precio2},
-        {idx:3,svc:svc3,precio:precio3}
+        {idx:1,svc:svc1,precio:precio1,mat:mat1},
+        {idx:2,svc:svc2,precio:precio2,mat:mat2},
+        {idx:3,svc:svc3,precio:precio3,mat:mat3}
       ].forEach(s => {
         if (s.precio <= 0) return;
         const servicio=_mapearCategoriaNotion(s.svc||'Servicio Gas')||'Servicio Gas';
         const obsFiltrado=obs && obs.toLowerCase()!==servicio.toLowerCase() && obs.toLowerCase()!==clienteLimpio.toLowerCase() ? obs : '';
-        nuevasTx.push({id:nId+'-svc'+s.idx,type:'ingreso',amount:s.precio,category:servicio,catId:_getCatIdByName(servicio),description:servicio+(clienteLimpio&&clienteLimpio!=='(Sin cliente)'?' - '+clienteLimpio:'')+(obsFiltrado?' - '+obsFiltrado:''),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,formaPago:forma,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null});
+        const svId = nId+'-svc'+s.idx;
+        nuevasTx.push({id:svId,type:'ingreso',amount:s.precio,category:servicio,catId:_getCatIdByName(servicio),description:servicio+(clienteLimpio&&clienteLimpio!=='(Sin cliente)'?' - '+clienteLimpio:'')+(obsFiltrado?' - '+obsFiltrado:''),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,formaPago:forma,negocio:true,moneda:'PEN',vinculadoServicioId:svId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null});
         txImportadas++;
+
+        if(s.mat>0){ nuevasTx.push({id:nId+'-mat'+s.idx,type:'egreso',amount:s.mat,category:'Materiales',catId:'cne1',description:'Materiales usados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:svId,origenServicioMaterial:true,materialUsoServicio:true,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMat++; }
       });
 
-      const mat=mat1+mat2+mat3;
-      if(mat>0){ nuevasTx.push({id:nId+'-mat',type:'egreso',amount:mat,category:'Materiales',catId:'cne1',description:'Materiales usados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',origenServicioMaterial:true,materialUsoServicio:true,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMat++; }
-      if(comida>0){ nuevasTx.push({id:nId+'-com',type:'egreso',amount:comida,category:'Comida',catId:'cne_menu',description:'Comida - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosCom++; }
-      if(otros>0){ nuevasTx.push({id:nId+'-otr',type:'egreso',amount:otros,category:'Otros gastos de negocio',catId:'cne6',description:'Otros gastos - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosOtros++; }
-      if(agregados>0){ nuevasTx.push({id:nId+'-agr',type:'egreso',amount:agregados,category:'Agregados',catId:'cne_agregados',description:'Agregados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosAgr++; }
-      if(movil>0){ nuevasTx.push({id:nId+'-mov',type:'egreso',amount:movil,category:'Movilidad',catId:'cne5',description:'Movilidad - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMov++; }
-      if(meta>0){ nuevasTx.push({id:nId+'-met',type:'egreso',amount:meta,category:'Meta',catId:'cne_meta',description:'Meta - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); }
-    }
+      const mainSvcId = (precio1>0) ? nId+'-svc1' : ((precio2>0) ? nId+'-svc2' : ((precio3>0) ? nId+'-svc3' : null));
 
+      if(comida>0){ nuevasTx.push({id:nId+'-com',type:'egreso',amount:comida,category:'Comida',catId:'cne_menu',description:'Comida - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosCom++; }
+      if(otros>0){ nuevasTx.push({id:nId+'-otr',type:'egreso',amount:otros,category:'Otros gastos de negocio',catId:'cne6',description:'Otros gastos - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosOtros++; }
+      if(agregados>0){ nuevasTx.push({id:nId+'-agr',type:'egreso',amount:agregados,category:'Agregados',catId:'cne_agregados',description:'Agregados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosAgr++; }
+      if(meta>0){ nuevasTx.push({id:nId+'-met',type:'egreso',amount:meta,category:'Meta',catId:'cne_meta',description:'Meta - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); }
+      
+      if(movil>0){ nuevasTx.push({id:nId+'-mov',type:'egreso',amount:movil,category:'Movilidad',catId:'cne5',description:'Movilidad - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMov++; }
     if(nuevasTx.length===0 && nuevosTrabajos.length===0){ if(status) status.textContent='No se encontraron datos validos. Revisa las columnas.'; return; }
+    }
 
     const existing=load('fnz_neg_tx',[]);
     let merged=[];
@@ -5599,8 +5603,8 @@ function buildCharts(){
     const d=new Date(state.filterYear,state.filterMonth-i,1);
     const m=d.getMonth(),y=d.getFullYear();
     bl.push(MONTHS_SHORT[m]);
-    bi.push(state.transactions.filter(t=>{const td=new Date(t.date+'T00:00:00');return td.getMonth()===m&&td.getFullYear()===y&&t.type==='ingreso';}).reduce((s,t)=>s+t.amount,0));
-    be.push(state.transactions.filter(t=>{const td=new Date(t.date+'T00:00:00');return td.getMonth()===m&&td.getFullYear()===y&&t.type==='egreso';}).reduce((s,t)=>s+t.amount,0));
+    bi.push((state.transactions||[]).filter(t=>{const td=new Date(t.date+'T00:00:00');return td.getMonth()===m&&td.getFullYear()===y&&t.type==='ingreso';}).reduce((s,t)=>s+t.amount,0));
+    be.push((state.transactions||[]).filter(t=>{const td=new Date(t.date+'T00:00:00');return td.getMonth()===m&&td.getFullYear()===y&&t.type==='egreso';}).reduce((s,t)=>s+t.amount,0));
   }
   const barCtx=document.getElementById('barChart');
   if(barCtx){if(state.chartBar)state.chartBar.destroy();
@@ -5612,7 +5616,7 @@ function buildCharts(){
     const now = new Date();
     const weekAgo = new Date();
     weekAgo.setDate(now.getDate() - 7);
-    txsPie = state.transactions.filter(t => {
+    txsPie = (state.transactions||[]).filter(t => {
       const d = new Date(t.date + 'T00:00:00');
       return d >= weekAgo && d <= now;
     });
@@ -5858,7 +5862,7 @@ function deleteTx(id){
     removeCompraStockValorByTx(tx);
   }
   const linkedServicioId = tx?.vinculadoServicioId || null;
-  state.transactions=state.transactions.filter(t=>t.id!==id);
+  state.transactions=(state.transactions||[]).filter(t=>t.id!==id);
   if(linkedServicioId){
     const item = (state.agenda||[]).find(a=>String(a.id)===String(linkedServicioId));
     if(item && isServicioFinalizado(item)){
@@ -5933,7 +5937,7 @@ function saveDebt(editId){
     categoria:'Deuda',
     color:window._debtColor||DEBT_COLORS[0]
   };
-  if(editId)state.debts=state.debts.map(d=>d.id===editId?item:d);
+  if(editId)state.debts=(state.debts||[]).map(d=>d.id===editId?item:d);
   else state.debts.push(item);
   saveAll();
   syncSeccionToSheets('deuda', item);
@@ -10146,7 +10150,7 @@ async function guardarFinalizacion(id){
   const baseTx = { date: item.fecha, cliente: item.cliente||'', ubicacion: item.ubicacion, negocio: true, _notionRowId: notionRowId, _notionFinanceRowId: notionRowId, _notionReporteRowId: notionRowId };
   const prevCierreTxIds = new Set((item.cierreTxIds||[]).map(String));
   if(prevCierreTxIds.size){
-    state.transactions = state.transactions.filter(t => !prevCierreTxIds.has(String(t.id)));
+    state.transactions = (state.transactions||[]).filter(t => !prevCierreTxIds.has(String(t.id)));
   }
   const crearMovimientosCierre = !yaFinalizadoAntes || prevCierreTxIds.size > 0;
   const nuevosCierreTxIds = [];
@@ -16849,7 +16853,7 @@ function ejecutarTransferencia() {
 }
 
 function openNegocioModal() {
-  const txNeg = state.transactions.filter(t=>t.negocio||t.catId==='cneg_svc'||t.catId==='cneg_mat'||t.catId==='cneg_gnv'||t.catId==='cneg_gas');
+  const txNeg = (state.transactions||[]).filter(t=>t.negocio||t.catId==='cneg_svc'||t.catId==='cneg_mat'||t.catId==='cneg_gnv'||t.catId==='cneg_gas');
   const ingresos = txNeg.filter(t=>t.type==='ingreso');
   const egresos  = txNeg.filter(t=>t.type==='egreso');
   const totalIn  = ingresos.reduce((s,t)=>s+t.amount,0);
@@ -22500,3 +22504,6 @@ setTimeout(()=>{
 </script>
 </body>
 </html>
+
+
+
