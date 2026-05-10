@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -3135,13 +3135,16 @@ function renderMovimientos(){
           // Ganancia neta del día (sin doble conteo si hay svc1+svc2+svc3)
           const svcContados = new Set();
           let ganDia = 0;
+          let tieneServicios = false;
           txs.forEach(t => {
             if (t.type !== 'ingreso') return;
             const g = getGananciaServicio(t);
+            if (g !== null) tieneServicios = true;
             if (g === null) { ganDia += (+(t.amount||0)); return; }
             const uid = t.vinculadoServicioId || t._notionRowId || t.id;
             if (!svcContados.has(uid)) { svcContados.add(uid); ganDia += g; }
           });
+          const soloGastos = !tieneServicios && txs.some(t => t.type === 'egreso');
           const ganDiaColor = ganDia >= 0 ? '#099268' : '#C62828';
           const ganDiaBg    = ganDia >= 0 ? '#E6FCF5' : '#FFF5F5';
 
@@ -3253,7 +3256,10 @@ function renderMovimientos(){
           return `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 2px 6px;margin-top:4px">
               <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600">${fechaLabel}</span>
-              ${ganDia!==0?`<span style="font-size:10px;font-weight:800;color:${ganDiaColor};background:${ganDiaBg};padding:2px 8px;border-radius:20px;border:1px solid ${ganDiaColor}33">Ganó: ${ganDia>=0?'+':''}${fmt(ganDia)}</span>`:''}
+              <div style="display:flex;align-items:center;gap:5px">
+                ${soloGastos ? `<span style="font-size:10px;font-weight:700;color:#E67E22;background:#FFF3E0;padding:2px 8px;border-radius:20px;border:1px solid #E67E2233">⚠️ Sin servicios</span>` : ''}
+                ${ganDia!==0?`<span style="font-size:10px;font-weight:800;color:${ganDiaColor};background:${ganDiaBg};padding:2px 8px;border-radius:20px;border:1px solid ${ganDiaColor}33">${soloGastos?'Gasto':'Gan'}: ${ganDia>=0?'+':''}${fmt(ganDia)}</span>`:''}
+              </div>
             </div>
             ${cards}`;
         }).join('');
@@ -4275,6 +4281,19 @@ function renderGraficos(){
   const totalGanancia = arrSvc.reduce((sum, s) => sum + s.gananciaTotal, 0);
   const promedioSvc = totalCount > 0 ? (totalGanancia / totalCount) : 0;
 
+  // Días sin servicios pero con gastos
+  const diasPorFecha = {};
+  txsParaAnalisis.forEach(t => {
+    if (!diasPorFecha[t.date]) diasPorFecha[t.date] = { tieneServicio: false, tieneGasto: false };
+    if (t.type === 'ingreso' && (t.vinculadoServicioId || t._notionTrabajo || t._importadoDeNotion)) {
+      const g = getGananciaServicio(t);
+      if (g !== null) diasPorFecha[t.date].tieneServicio = true;
+    }
+    if (t.type === 'egreso') diasPorFecha[t.date].tieneGasto = true;
+  });
+  const diasSinServicio = Object.values(diasPorFecha).filter(d => !d.tieneServicio && d.tieneGasto).length;
+  const diasConServicio = Object.values(diasPorFecha).filter(d => d.tieneServicio).length;
+
   arrSvc.sort((a, b) => b.count - a.count);
   const topFrecuente = arrSvc[0] || null;
   
@@ -4331,6 +4350,28 @@ function renderGraficos(){
           <div style="font-size:12px;font-weight:bold;color:#059669">${fmt(topGanancia.gananciaTotal)}</div>
         </div>
       </div>
+    ` : ''}
+    </div>
+
+    ${(diasSinServicio > 0 || diasConServicio > 0) ? `
+    <div class="card" style="margin-bottom:12px;border:1px solid #FED7AA;background:#FFF7ED">
+      <div class="section-title" style="color:#C2410C">📅 Actividad del periodo</div>
+      <div class="section-sub">${rangoTexto}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+        <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #FED7AA">
+          <div style="font-size:22px;margin-bottom:4px">💪</div>
+          <div style="font-family:'Playfair Display',serif;font-size:20px;color:#059669;font-weight:700">${diasConServicio}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">días trabajados</div>
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid ${diasSinServicio > 0 ? '#FECACA' : '#FED7AA'}">
+          <div style="font-size:22px;margin-bottom:4px">${diasSinServicio > 0 ? '⚠️' : '🎯'}</div>
+          <div style="font-family:'Playfair Display',serif;font-size:20px;color:${diasSinServicio > 0 ? '#C62828' : '#059669'};font-weight:700">${diasSinServicio}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">días sin servicio (con gastos)</div>
+        </div>
+      </div>
+      ${diasSinServicio > 0 ? `<div style="margin-top:10px;font-size:11px;color:#C2410C;background:#FEF3C7;border-radius:8px;padding:8px;line-height:1.5">⚠️ Tuviste <strong>${diasSinServicio} día${diasSinServicio>1?'s':''}</strong> sin trabajar pero con gastos. Esos gastos salen de tu bolsillo sin retorno.</div>` : `<div style="margin-top:10px;font-size:11px;color:#059669;background:#ECFDF5;border-radius:8px;padding:8px;line-height:1.5">✅ Todos los días con gastos registrados tuvieron al menos un servicio. ¡Bien!</div>`}
+    </div>` : ''}
+
     <div class="card" style="margin-bottom:12px;background:#1a1a1a;border:1px solid #333;color:#fff">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:8px">
@@ -4353,7 +4394,6 @@ function renderGraficos(){
         <button onclick="generarDiscursoMotivacional()" style="background:none;border:1px solid #555;border-radius:6px;color:#aaa;font-size:11px;padding:4px 10px;cursor:pointer;">Generar uno nuevo</button>
       </div>
     </div>
-      ` : `<div style="text-align:center;font-size:12px;color:var(--dim);margin-top:14px">No hay servicios registrados en este periodo.</div>`}
     </div>
 
     <div class="card" style="margin-bottom:12px">
@@ -5217,7 +5257,6 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
     const iSvc1=col(['servicio 1','service 1','servicio1','servicio']), iSvc2=col(['servicio 2','service 2','servicio2']), iSvc3=col(['servicio 3','service 3','servicio3']);
     const iMat1=col(['1 materiales','materiales 1','1 material','materiales']), iMat2=col(['2 materiales','materiales 2','2 material']), iMat3=col(['3 materiales','materiales 3','3 material']);
     const iPrecio1=col(['1 precio del servicio','1 precio de servicio','precio del servicio 1','precio de servicio 1','1 precio','precio 1','precio del servicio','precio']), iPrecio2=col(['2 precio del servicio','2 precio de servicio','precio del servicio 2','precio de servicio 2','2 precio','precio 2']), iPrecio3=col(['3 precio de servicio','3 precio del servicio','precio de servicio 3','precio del servicio 3','3 precio','precio 3']);
-    const iComida=col(['comida','alimentos','menu','menus','snacks','snak','snaks','bebidas','gaseosa','gaseosas']), iOtros=col(['otros','otros gastos','gastos extra','extra']), iAgreg=col(['agregados','agregado','adicional','adicionales']), iMovil=col(['movilidad','movil','transport','transporte','pasajes']);
     const iComida=col(['comida','alimentos','menu','menus','snacks','snak','snaks','bebidas','gaseosa','gaseosas']), iOtros=col(['otros','otros gastos','gastos extra','extra']), iAgreg=col(['agregados','agregado','adicional','adicionales']), iMovil=col(['movilidad','movil','transport','transporte','pasajes']);
     const comidaCols = cols(['comida','alimentos','alimentacion','menu','menus','snack','snacks','snak','snaks','golosina','golosinas','bebida','bebidas','gaseosa','gaseosas']);
 
@@ -22504,6 +22543,7 @@ setTimeout(()=>{
 </script>
 </body>
 </html>
+
 
 
 
