@@ -4162,11 +4162,19 @@ function toggleGraficosVista(v) {
 function reproducirDiscurso(texto) {
   if (!('speechSynthesis' in window)) return toast('Tu navegador no soporta audio', 'error');
   window.speechSynthesis.cancel();
-  const msg = new SpeechSynthesisUtterance(texto.replace(/\*/g, ''));
-  msg.lang = 'es-ES';
-  msg.rate = 1.15;
-  msg.pitch = 0.9;
-  window.speechSynthesis.speak(msg);
+  
+  const limpio = texto.replace(/\*/g, '');
+  // Dividir el texto en oraciones (por punto, coma, exclamación, interrogación o salto de línea) para evitar que se corte el audio
+  const chunks = limpio.match(/[^.,!?\n]+(?:[.,!?\n]+|$)/g) || [limpio];
+  
+  chunks.forEach(chunk => {
+    if (!chunk.trim()) return;
+    const msg = new SpeechSynthesisUtterance(chunk.trim());
+    msg.lang = 'es-ES';
+    msg.rate = 1.15;
+    msg.pitch = 0.9;
+    window.speechSynthesis.speak(msg);
+  });
 }
 
 function reproducirUltimoDiscurso() {
