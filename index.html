@@ -4231,9 +4231,7 @@ async function generarDiscursoMotivacional() {
   }
 }
 
-  saveAll();
-  render();
-}
+
 
 function renderGraficos(){
   const isMensual = (state.graficosVista !== 'semanal');
@@ -4391,7 +4389,6 @@ function renderGraficos(){
       <div id="btn-mentor-regen" style="text-align:center;margin-top:10px;display:${state.ultimoDiscursoAI ? 'block' : 'none'}">
         <button onclick="generarDiscursoMotivacional()" style="background:none;border:1px solid #555;border-radius:6px;color:#aaa;font-size:11px;padding:4px 10px;cursor:pointer;">Generar uno nuevo</button>
       </div>
-    </div>
     </div>
 
     <div class="card" style="margin-bottom:12px">
@@ -22541,6 +22538,8 @@ setTimeout(()=>{
 </script>
 </body>
 </html>
+
+
 
 
 
