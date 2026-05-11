@@ -4204,7 +4204,7 @@ async function generarDiscursoMotivacional() {
     ultSvc = txSvc[0].date;
   }
 
-  const key = localStorage.getItem('fnz_geminiKey');
+  const key = localStorage.getItem('fnz_gemini_key');
   if(!key) {
     toast('Configura tu API Key de Gemini en Ajustes primero', 'error');
     if (btn) btn.innerHTML = '🔥 Generar Discurso Brutal';
