@@ -1996,8 +1996,13 @@ const DEFAULT_CATS_EX = [
   {id:'ce_salidas',name:'Salidas',icon:'play',color:'#7A83A6',type:'egreso'},
   {id:'ce_menu',name:'Menu',icon:'food',color:'#B58B55',type:'egreso'},
   {id:'ce_edu',name:'* EDUCACION *',icon:'clipboard',color:'#2E86AB',type:'egreso'},
+  {id:'ce_edu_colegio',name:'Colegio',icon:'clipboard',color:'#2E86AB',type:'egreso'},
+  {id:'ce_edu_utiles',name:'Utiles',icon:'note',color:'#4A90D9',type:'egreso'},
   {id:'ce5',name:'Entretenimiento',icon:'play',color:'#8A7EA8',type:'egreso'},
   {id:'ce3',name:'* SALUD *',icon:'health',color:'#B96868',type:'egreso'},
+  {id:'ce_salud_samara',name:'Medicina Samara',icon:'health',color:'#C2596B',type:'egreso'},
+  {id:'ce_salud_medicina',name:'Medicina',icon:'health',color:'#B96868',type:'egreso'},
+  {id:'ce_salud_doctor',name:'Consulta doctor',icon:'health',color:'#A05070',type:'egreso'},
   {id:'ce_movilidad',name:'* MOVILIDAD *',icon:'transport',color:'#4F7EA8',type:'egreso'},
   {id:'ce_aseo',name:'Productos de aseo',icon:'box',color:'#6D8C82',type:'egreso'},
   {id:'ce_cuidado',name:'Cuidado personal',icon:'health',color:'#8C7AA3',type:'egreso'},
@@ -2183,7 +2188,14 @@ const DEFAULT_CATS_NEG_EX = [
   {id:'cne_golosina',name:'Golosina',icon:'gift',color:'#C27D8A',type:'egreso'},
   {id:'cne_pizza',name:'Pizza',icon:'food',color:'#C56F54',type:'egreso'},
   {id:'cne_menu',name:'Menu',icon:'food',color:'#B58B55',type:'egreso'},
-  {id:'cne5',name:'• MOVILIDAD •',icon:'transport',color:'#4F7EA8',type:'egreso'},
+  {id:'cne5',name:'* MOVILIDAD *',icon:'transport',color:'#4F7EA8',type:'egreso'},
+  {id:'cne_salud',name:'* SALUD *',icon:'health',color:'#B96868',type:'egreso'},
+  {id:'cne_salud_samara',name:'Medicina Samara',icon:'health',color:'#C2596B',type:'egreso'},
+  {id:'cne_salud_medicina',name:'Medicina',icon:'health',color:'#B96868',type:'egreso'},
+  {id:'cne_salud_doctor',name:'Consulta doctor',icon:'health',color:'#A05070',type:'egreso'},
+  {id:'cne_edu',name:'* EDUCACION *',icon:'clipboard',color:'#2E86AB',type:'egreso'},
+  {id:'cne_edu_colegio',name:'Colegio',icon:'clipboard',color:'#2E86AB',type:'egreso'},
+  {id:'cne_edu_utiles',name:'Utiles',icon:'note',color:'#4A90D9',type:'egreso'},
   {id:'cne_luz',name:'Luz',icon:'light',color:'#D09A4E',type:'egreso'},
   {id:'cne_agua',name:'Agua',icon:'water',color:'#4F7EA8',type:'egreso'},
   {id:'cne_internet_casa',name:'Internet casa',icon:'wifi',color:'#6D8C82',type:'egreso'},
@@ -2247,7 +2259,7 @@ function getKeys(modo){
   if(migrated) console.log('[MisFinanzas] Keys migrados a formato fnz_neg_*');
 })();
 
-const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_voice_local_v7';
+const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_voice_local_v8';
 const CATEGORY_LEGACY_DEFAULT_IDS = {
   personal: {
     ingreso: ['ci1','ci2','ci3','ci4','ci5','ci6','transfer_in','transfer_retiro_in','cneg_svc'],
@@ -13408,6 +13420,8 @@ Object.assign(CAT_KEYWORDS, {
   cne_pizza: ['pizza','pizzeria'],
   cne_menu: ['menu','menú','almuerzo','cena','desayuno','comida','restaurant','restaurante','alimentacion','alimentación','alimento','alimentos'],
   cne5: ['transporte','movilidad','taxi','uber','pasaje','flete','cochera','propina','estacionamiento'],
+  cne_salud: ['medicina de samara','consulta medica','medicina','medicamento','farmacia','doctor','consulta','clinica','clínica','hospital'],
+  cne_edu: ['colegio','escuela','educacion','universidad','instituto','utiles','pension'],
   cne_luz: ['luz','electricidad','enel','luz del sur'],
   cne_agua: ['agua','sedapal','recibo de agua'],
   cne_internet_casa: ['internet casa','wifi casa','internet fijo','fibra'],
@@ -23001,6 +23015,7 @@ setTimeout(()=>{
 </script>
 </body>
 </html>
+
 
 
 
