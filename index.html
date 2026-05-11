@@ -4155,6 +4155,9 @@ function renderServicios(){
 
 function toggleGraficosVista(v) {
   state.graficosVista = v;
+  saveAll();
+  render();
+}
 function reproducirDiscurso(texto) {
   if (!('speechSynthesis' in window)) return toast('Tu navegador no soporta audio', 'error');
   window.speechSynthesis.cancel();
