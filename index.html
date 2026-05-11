@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -1995,9 +1995,10 @@ const DEFAULT_CATS_EX = [
   {id:'ce_pizza',name:'Pizza',icon:'food',color:'#C56F54',type:'egreso'},
   {id:'ce_salidas',name:'Salidas',icon:'play',color:'#7A83A6',type:'egreso'},
   {id:'ce_menu',name:'Menu',icon:'food',color:'#B58B55',type:'egreso'},
+  {id:'ce_edu',name:'* EDUCACION *',icon:'clipboard',color:'#2E86AB',type:'egreso'},
   {id:'ce5',name:'Entretenimiento',icon:'play',color:'#8A7EA8',type:'egreso'},
-  {id:'ce3',name:'• SALUD •',icon:'health',color:'#B96868',type:'egreso'},
-  {id:'ce_movilidad',name:'• MOVILIDAD •',icon:'transport',color:'#4F7EA8',type:'egreso'},
+  {id:'ce3',name:'* SALUD *',icon:'health',color:'#B96868',type:'egreso'},
+  {id:'ce_movilidad',name:'* MOVILIDAD *',icon:'transport',color:'#4F7EA8',type:'egreso'},
   {id:'ce_aseo',name:'Productos de aseo',icon:'box',color:'#6D8C82',type:'egreso'},
   {id:'ce_cuidado',name:'Cuidado personal',icon:'health',color:'#8C7AA3',type:'egreso'},
   {id:'ce_belleza',name:'Belleza',icon:'gift',color:'#B97C9A',type:'egreso'},
@@ -2246,7 +2247,7 @@ function getKeys(modo){
   if(migrated) console.log('[MisFinanzas] Keys migrados a formato fnz_neg_*');
 })();
 
-const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_voice_local_v5';
+const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_voice_local_v7';
 const CATEGORY_LEGACY_DEFAULT_IDS = {
   personal: {
     ingreso: ['ci1','ci2','ci3','ci4','ci5','ci6','transfer_in','transfer_retiro_in','cneg_svc'],
@@ -13378,7 +13379,8 @@ Object.assign(CAT_KEYWORDS, {
   ce_menu: ['menu','menú','almuerzo','cena','desayuno','comida','restaurant','restaurante'],
   ce5: ['entretenimiento','netflix','spotify','juego','videojuego','concierto','evento'],
   ce_movilidad: ['movilidad','pasaje','taxi','uber','cochera','propina','estacionamiento','transporte'],
-  ce3: ['medicina de samara','medicina','medicamento','farmacia','doctor','consulta','clinica','clínica','hospital'],
+  ce_edu: ['colegio','escuela','educacion','universidad','instituto','utiles','pension'],
+  ce3: ['medicina de samara','consulta medica','medicina','medicamento','farmacia','doctor','consulta','clinica','clínica','hospital'],
   ce_aseo: ['aseo','productos de aseo','detergente','jabon','jabón','shampoo','limpieza'],
   ce_cuidado: ['cuidado personal','barberia','barbería','peluqueria','peluquería','spa','manicure','pedicure'],
   ce_belleza: ['belleza','maquillaje','perfume','cosmetico','cosmético','salon','salón'],
@@ -22999,6 +23001,8 @@ setTimeout(()=>{
 </script>
 </body>
 </html>
+
+
 
 
 
