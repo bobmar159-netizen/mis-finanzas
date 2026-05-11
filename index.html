@@ -8400,6 +8400,7 @@ async function _notionTrySheetsProxy(token, dbId, since, statusEl){
   }
 }
 
+
 async function notionApiTest(){
   const token = localStorage.getItem('fnz_notion_token');
   const dbId  = localStorage.getItem('fnz_notion_dbid');
@@ -8408,25 +8409,30 @@ async function notionApiTest(){
   if(statusEl) statusEl.textContent = 'Importando todos los registros de Notion...';
 
   try{
-    let csvText = await _notionTrySheetsProxy(token, dbId, '2000-01-01T00:00:00.000Z', statusEl);
     let allResults = [];
+    let csvText = '';
+    let directErr = null;
 
-    if(!csvText){
-      allResults = await _notionFetchAllRows(token, dbId, { statusEl, label: 'Importando Notion' });
+    try {
+      // Forzar importacion debe leer el esquema actual de Notion. Asi un renombre
+      // de columna, como OTROS -> COMIDA, queda reflejado inmediatamente.
+      allResults = await _notionFetchAllRows(token, dbId, { statusEl, label: 'Leyendo columnas actuales de Notion' });
       if(allResults.length === 0){
         if(statusEl) statusEl.textContent = 'La base de datos esta vacia o no hay registros accesibles';
         toast('La base de datos de Notion esta vacia','error');
         return;
       }
       const propNames = Object.keys(allResults[0]?.properties||{});
-      console.log('[Notion] Propiedades encontradas:', propNames);
+      console.log('[Notion] Propiedades actuales:', propNames);
       csvText = _notionResultsToCSV(allResults);
+    } catch(err) {
+      directErr = err;
+      console.warn('[Notion] lectura directa fallo, probando Sheets:', err);
+      csvText = await _notionTrySheetsProxy(token, dbId, '2000-01-01T00:00:00.000Z', statusEl);
     }
 
     if(!csvText || csvText.trim().length < 10){
-      if(statusEl) statusEl.textContent = 'No se recibieron datos validos desde Notion';
-      toast('No se recibieron datos validos desde Notion','error');
-      return;
+      throw directErr || new Error('No se recibieron datos validos desde Notion');
     }
 
     const result = _procesarCsvNotionTexto(csvText, 'notion-api-status', true);
