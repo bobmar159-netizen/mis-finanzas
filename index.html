@@ -5550,6 +5550,9 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
     const iMat1=col(['1 materiales','materiales 1','1 material','materiales']), iMat2=col(['2 materiales','materiales 2','2 material']), iMat3=col(['3 materiales','materiales 3','3 material']);
     const iPrecio1=col(['1 precio del servicio','1 precio de servicio','precio del servicio 1','precio de servicio 1','1 precio','precio 1','precio del servicio','precio']), iPrecio2=col(['2 precio del servicio','2 precio de servicio','precio del servicio 2','precio de servicio 2','2 precio','precio 2']), iPrecio3=col(['3 precio de servicio','3 precio del servicio','precio de servicio 3','precio del servicio 3','3 precio','precio 3']);
     const iComida=col(['comida','alimentos','menu','menus','snacks','snak','snaks','bebidas','gaseosa','gaseosas']), iOtros=col(['otros','otros gastos','gastos extra','extra']), iAgreg=col(['agregados','agregado','adicional','adicionales']), iMovil=col(['movilidad','movil','transport','transporte','pasajes']);
+    const iMeta=col(['meta','objetivo','separado meta','ahorro meta']);
+    const iObs=col(['observaciones','observacion','nota','notas','notes','descripcion','description','comentario','comentarios']);
+    const iNotionId=col(['notionid','notion id','notion page id','page id','pageid','notion uuid']);
     const comidaCols = cols(['comida','alimentos','alimentacion','menu','menus','snack','snacks','snak','snaks','golosina','golosinas','bebida','bebidas','gaseosa','gaseosas']);
 
     let txImportadas=0, egresosMov=0, egresosMat=0, egresosCom=0, egresosOtros=0, egresosAgr=0, filasUtiles=0;
@@ -8318,65 +8321,129 @@ async function notionConfirmarCarga() {
   }
 }
 
-async function notionApiTest(){
-  const token = localStorage.getItem('fnz_notion_token');
-  const dbId  = localStorage.getItem('fnz_notion_dbid');
-  if(!token||!dbId){ toast('Primero configurá el token y la base de datos','error'); return; }
-  const statusEl = document.getElementById('notion-api-status');
-  if(statusEl) statusEl.textContent = '↻ Importando todos los registros de Notion...';
 
-  try{
-    const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
-    const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
+async function _notionFetchAllRows(token, dbId, opts = {}){
+  const statusEl = opts.statusEl || null;
+  const since = opts.since || '';
+  const label = opts.label || 'Consultando Notion';
+  const notionUrl = 'https://api.notion.com/v1/databases/' + dbId + '/query';
+  const proxies = [
+    'https://corsproxy.io/?' + encodeURIComponent(notionUrl),
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(notionUrl)
+  ];
+  let lastErr = null;
+
+  for (const proxyUrl of proxies) {
     let allResults = [];
     let cursor = undefined;
     let page = 0;
-    // Traer TODOS los registros (maneja paginación)
-    do {
-      page++;
-      const bodyObj = { page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) };
-      const res = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + token,
-          'Notion-Version': '2022-06-28',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(bodyObj)
-      });
-      if(!res.ok) {
-        const txt = await res.text().catch(()=>'');
-        throw new Error('HTTP ' + res.status + ': ' + txt.slice(0,200));
-      }
-      const data = await res.json();
-      if(data.results) allResults = allResults.concat(data.results);
-      cursor = data.has_more ? data.next_cursor : undefined;
-      if(statusEl) statusEl.textContent = '↻ Cargando... ' + allResults.length + ' registros (pág ' + page + ')';
-    } while(cursor);
+    try {
+      do {
+        page++;
+        const bodyObj = {
+          page_size: 100,
+          ...(since ? {
+            filter: { timestamp: 'last_edited_time', last_edited_time: { after: since } },
+            sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }]
+          } : {}),
+          ...(cursor ? { start_cursor: cursor } : {})
+        };
+        const res = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Notion-Version': '2022-06-28',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(bodyObj)
+        });
+        if(!res.ok) {
+          const txt = await res.text().catch(()=>'');
+          throw new Error('HTTP ' + res.status + (txt ? ': ' + txt.slice(0,180) : ''));
+        }
+        const data = await res.json();
+        if(data.results) allResults = allResults.concat(data.results);
+        cursor = data.has_more ? data.next_cursor : undefined;
+        if(statusEl) statusEl.textContent = label + '... ' + allResults.length + ' registros (pag ' + page + ')';
+      } while(cursor);
+      return allResults;
+    } catch(err) {
+      lastErr = err;
+      console.warn('[Notion] proxy fallo:', proxyUrl, err);
+    }
+  }
+  throw lastErr || new Error('No se pudo consultar Notion');
+}
 
-    if(allResults.length === 0){
-      if(statusEl) statusEl.textContent = '⚠ La base de datos está vacía o no hay registros accesibles';
-      toast('La base de datos de Notion está vacía','error');
+async function _notionTrySheetsProxy(token, dbId, since, statusEl){
+  const sheetsUrl = localStorage.getItem('fnz_sheets_url') || '';
+  if(!sheetsUrl) return null;
+  const url = sheetsUrl
+    + '?action=notionQuery'
+    + '&token=' + encodeURIComponent(token)
+    + '&dbId='  + encodeURIComponent(dbId)
+    + '&since=' + encodeURIComponent(since || '2000-01-01T00:00:00.000Z');
+  try {
+    if(statusEl) statusEl.textContent = 'Consultando Notion via Sheets...';
+    const res = await fetch(url, { method: 'GET' });
+    if(!res.ok) return null;
+    const ct = res.headers.get('content-type') || '';
+    if(ct.includes('csv') || ct.includes('text/plain')) {
+      const txt = await res.text();
+      return txt && txt.trim().length > 10 ? txt : null;
+    }
+    const data = await res.json().catch(()=>({}));
+    return data.csv || null;
+  } catch(err) {
+    console.warn('[Notion] Sheets proxy fallo:', err);
+    return null;
+  }
+}
+
+async function notionApiTest(){
+  const token = localStorage.getItem('fnz_notion_token');
+  const dbId  = localStorage.getItem('fnz_notion_dbid');
+  if(!token||!dbId){ toast('Primero configura el token y la base de datos','error'); return; }
+  const statusEl = document.getElementById('notion-api-status');
+  if(statusEl) statusEl.textContent = 'Importando todos los registros de Notion...';
+
+  try{
+    let csvText = await _notionTrySheetsProxy(token, dbId, '2000-01-01T00:00:00.000Z', statusEl);
+    let allResults = [];
+
+    if(!csvText){
+      allResults = await _notionFetchAllRows(token, dbId, { statusEl, label: 'Importando Notion' });
+      if(allResults.length === 0){
+        if(statusEl) statusEl.textContent = 'La base de datos esta vacia o no hay registros accesibles';
+        toast('La base de datos de Notion esta vacia','error');
+        return;
+      }
+      const propNames = Object.keys(allResults[0]?.properties||{});
+      console.log('[Notion] Propiedades encontradas:', propNames);
+      csvText = _notionResultsToCSV(allResults);
+    }
+
+    if(!csvText || csvText.trim().length < 10){
+      if(statusEl) statusEl.textContent = 'No se recibieron datos validos desde Notion';
+      toast('No se recibieron datos validos desde Notion','error');
       return;
     }
 
-    // Log de las primeras propiedades para debug
-    const propNames = Object.keys(allResults[0]?.properties||{});
-    console.log('[Notion] Propiedades encontradas:', propNames);
-
-    const csvText = _notionResultsToCSV(allResults);
-    // IMPORTANTE: isFullSync = true para limpiar los viejos
     const result = _procesarCsvNotionTexto(csvText, 'notion-api-status', true);
     if(result && result.ok){
       localStorage.setItem('fnz_notion_last_sync', new Date().toISOString());
-      const msg = '✓ ' + allResults.length + ' registros procesados de Notion · ' + new Date().toLocaleTimeString('es-PE');
+      const total = allResults.length || result.filasNotion || 0;
+      const msg = 'OK: ' + total + ' registros procesados de Notion · ' + new Date().toLocaleTimeString('es-PE');
       if(statusEl) statusEl.textContent = msg;
       toast(msg, 'success');
+      render();
+    } else {
+      throw new Error(result?.error || 'No se pudo procesar la respuesta de Notion');
     }
   } catch(err){
-    const msg = '⚠ Error: ' + err.message;
+    const msg = 'Error: ' + err.message;
     if(statusEl) statusEl.textContent = msg;
-    console.error('[Notion] Error en importación completa:', err);
+    console.error('[Notion] Error en importacion completa:', err);
     toast('Error conectando a Notion: ' + err.message.slice(0,80), 'error');
   }
 }
