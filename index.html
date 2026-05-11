@@ -4155,26 +4155,346 @@ function renderServicios(){
 }
 
 function toggleGraficosVista(v) {
-  state.graficosVista = v;
+  state.graficosVista = (v === 'semanal') ? 'semanal' : 'mensual';
+  state.ultimoDiscursoAI = '';
   saveAll();
   render();
+  setTimeout(buildCharts, 50);
 }
-function reproducirDiscurso(texto) {
+
+function gfHtml(v) {
+  if (typeof esc === 'function') return esc(v);
+  return String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+function gfLocalDateStr(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function gfParseDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function gfStartOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function gfEndOfDay(d) {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+
+function gfDaysInclusive(start, end) {
+  const a = gfStartOfDay(start), b = gfStartOfDay(end);
+  return Math.max(1, Math.round((b - a) / 86400000) + 1);
+}
+
+function gfTxInRange(t, range) {
+  const d = gfParseDate(t?.date);
+  return !!d && d >= range.start && d <= range.end;
+}
+
+function gfIsCash(t) {
+  return (typeof isCashFlowTx === 'function') ? isCashFlowTx(t) : true;
+}
+
+function gfIsServicioTx(t) {
+  return !!(t && t.type === 'ingreso' && (
+    t.vinculadoServicioId ||
+    t._notionTrabajo ||
+    t.origenServicioMaterial ||
+    t._importadoDeNotion ||
+    t._notionRowId
+  ));
+}
+
+function gfServicioId(t) {
+  return t.vinculadoServicioId || t._notionRowId || t.servicioId || t.id || `${t.date}-${t.category}-${t.amount}`;
+}
+
+function gfGetRange(vista = state.graficosVista) {
+  if (vista === 'semanal') {
+    const endBase = gfStartOfDay(new Date());
+    const start = new Date(endBase);
+    start.setDate(start.getDate() - 6);
+    return {
+      key: 'semanal',
+      label: 'Ultimos 7 dias',
+      start: gfStartOfDay(start),
+      end: gfEndOfDay(endBase),
+      days: 7
+    };
+  }
+  const start = new Date(state.filterYear, state.filterMonth, 1);
+  const end = new Date(state.filterYear, state.filterMonth + 1, 0);
+  return {
+    key: 'mensual',
+    label: monthName(),
+    start: gfStartOfDay(start),
+    end: gfEndOfDay(end),
+    days: gfDaysInclusive(start, end)
+  };
+}
+
+function gfGetTodayRange() {
+  const now = gfStartOfDay(new Date());
+  return { key: 'hoy', label: 'Hoy', start: gfStartOfDay(now), end: gfEndOfDay(now), days: 1 };
+}
+
+function gfPreviousRange(range) {
+  if (range.key === 'mensual') {
+    const start = new Date(range.start.getFullYear(), range.start.getMonth() - 1, 1);
+    const end = new Date(range.start.getFullYear(), range.start.getMonth(), 0);
+    return { key: 'mensual-previo', label: 'Mes anterior', start: gfStartOfDay(start), end: gfEndOfDay(end), days: gfDaysInclusive(start, end) };
+  }
+  const end = new Date(range.start);
+  end.setDate(end.getDate() - 1);
+  const start = new Date(end);
+  start.setDate(start.getDate() - (range.days - 1));
+  return { key: 'semanal-previo', label: 'Periodo anterior', start: gfStartOfDay(start), end: gfEndOfDay(end), days: range.days };
+}
+
+function gfTransactionsForRange(range) {
+  return (state.transactions || []).filter(t => gfTxInRange(t, range));
+}
+
+function gfBuildSummary(range) {
+  const txs = gfTransactionsForRange(range);
+  let ingresos = 0, egresos = 0;
+  const gastosPorCategoria = {};
+  const dias = {};
+  const servicios = {};
+
+  txs.forEach(t => {
+    const amount = moneyValue(t.amount);
+    if (!dias[t.date]) dias[t.date] = { servicio: false, gasto: false };
+
+    if (t.type === 'ingreso' && gfIsCash(t)) ingresos += amount;
+    if (t.type === 'egreso' && gfIsCash(t)) {
+      egresos += amount;
+      dias[t.date].gasto = true;
+      const cat = t.category || 'Sin categoria';
+      gastosPorCategoria[cat] = (gastosPorCategoria[cat] || 0) + amount;
+    }
+
+    if (gfIsServicioTx(t)) {
+      const id = gfServicioId(t);
+      if (!servicios[id]) {
+        let ganancia = (typeof getGananciaServicio === 'function') ? getGananciaServicio(t) : null;
+        if (ganancia === null || !Number.isFinite(Number(ganancia))) ganancia = amount;
+        servicios[id] = {
+          id,
+          nombre: t.category || t.description || 'Servicio',
+          ganancia: Number(ganancia) || 0,
+          fecha: t.date
+        };
+      }
+      dias[t.date].servicio = true;
+    }
+  });
+
+  const serviciosArr = Object.values(servicios);
+  const ganancia = ingresos - egresos;
+  const gananciaServicios = serviciosArr.reduce((s, x) => s + x.ganancia, 0);
+  const serviciosCount = serviciosArr.length;
+  const promedioServicio = serviciosCount ? gananciaServicios / serviciosCount : 0;
+  const margen = ingresos > 0 ? (ganancia / ingresos) * 100 : 0;
+  const diasConServicio = Object.values(dias).filter(d => d.servicio).length;
+  const diasSinServicioConGasto = Object.values(dias).filter(d => !d.servicio && d.gasto).length;
+  const topServicio = serviciosArr.slice().sort((a, b) => b.ganancia - a.ganancia)[0] || null;
+  const topGasto = Object.entries(gastosPorCategoria).map(([nombre, monto]) => ({ nombre, monto })).sort((a, b) => b.monto - a.monto)[0] || null;
+  const deudaPendiente = (typeof totalDebt === 'function') ? totalDebt() : (state.debts || []).reduce((s, d) => s + (d.cuotasTotales - d.cuotasPagadas) * d.cuotaMonto, 0);
+
+  return {
+    range,
+    txs,
+    ingresos,
+    egresos,
+    ganancia,
+    margen,
+    servicios: serviciosCount,
+    gananciaServicios,
+    promedioServicio,
+    diasConServicio,
+    diasSinServicioConGasto,
+    promedioDiario: ganancia / Math.max(1, range.days),
+    topServicio,
+    topGasto,
+    deudaPendiente,
+    deudaVsGanancia: ganancia > 0 ? deudaPendiente / ganancia : null
+  };
+}
+
+function gfLastServiceDate() {
+  const servicios = (state.transactions || [])
+    .filter(gfIsServicioTx)
+    .map(t => t.date)
+    .filter(Boolean)
+    .sort((a, b) => b.localeCompare(a));
+  return servicios[0] || '';
+}
+
+function gfDeltaText(actual, previo) {
+  const diff = actual - previo;
+  if (Math.abs(diff) < 0.01) return { text: 'igual que antes', color: '#64748B' };
+  const sign = diff >= 0 ? '+' : '-';
+  const pct = Math.abs(previo) > 0 ? ` (${sign}${Math.round(Math.abs(diff / previo) * 100)}%)` : '';
+  return { text: `${sign}${fmt(Math.abs(diff))}${pct}`, color: diff >= 0 ? '#059669' : '#C62828' };
+}
+
+function gfDiagnostico(resumen, previo) {
+  const delta = gfDeltaText(resumen.ganancia, previo?.ganancia || 0);
+  let titulo = 'Vas en movimiento';
+  let tono = '#2E86AB';
+  let bg = '#EFF6FF';
+  let texto = 'Hay actividad y ya tienes datos para decidir mejor.';
+  let accion = 'Mira que servicio te deja mas margen y empuja por repetirlo hoy.';
+  let motivacion = 'Constancia mata suerte: un servicio bien cerrado cambia el dia.';
+
+  if (resumen.servicios === 0 && resumen.egresos > 0) {
+    titulo = 'Alerta: gastos sin servicio';
+    tono = '#C2410C';
+    bg = '#FFF7ED';
+    texto = `Registraste ${fmt(resumen.egresos)} en gastos y ningun servicio en este periodo. Eso es plata saliendo sin retorno.`;
+    accion = 'Antes de anotar otro gasto, busca una entrada: llamada, seguimiento o servicio pequeno pero pagado.';
+    motivacion = 'No estas lejos: el primer servicio del dia rompe la inercia.';
+  } else if (resumen.ganancia < 0) {
+    titulo = 'Periodo en rojo';
+    tono = '#C62828';
+    bg = '#FEF2F2';
+    texto = `Tu resultado esta negativo por ${fmt(Math.abs(resumen.ganancia))}. Hay que corregir rapido, sin drama y sin autoengano.`;
+    accion = 'Corta el gasto mas grande y apunta a un servicio que cubra ese hueco hoy.';
+    motivacion = 'Un mal numero no te define; lo que hagas despues si.';
+  } else if (resumen.deudaVsGanancia !== null && resumen.deudaVsGanancia > 6) {
+    titulo = 'La deuda pesa demasiado';
+    tono = '#B45309';
+    bg = '#FFFBEB';
+    texto = `Estas ganando, pero tu deuda equivale a ${resumen.deudaVsGanancia.toFixed(1)} veces esta ganancia. Bien por avanzar, pero todavia no puedes dormirte.`;
+    accion = 'Separa una parte de cada cobro para deuda antes de tocar gastos variables.';
+    motivacion = 'Cada cuota que bajas te devuelve aire.';
+  } else if (resumen.diasSinServicioConGasto > 0) {
+    titulo = 'Buen avance, pero hay fuga';
+    tono = '#C2410C';
+    bg = '#FFF7ED';
+    texto = `Estas positivo, pero hubo ${resumen.diasSinServicioConGasto} dia(s) con gastos y sin servicio. Esa fuga hay que mirarla de frente.`;
+    accion = 'Revisa esos dias y elimina el gasto que no trajo trabajo ni retorno.';
+    motivacion = 'Si ya generaste ganancia con fuga, imagina sin fuga.';
+  } else if (resumen.ganancia > (previo?.ganancia || 0) && resumen.ganancia > 0) {
+    titulo = 'Vas mejor que antes';
+    tono = '#059669';
+    bg = '#ECFDF5';
+    texto = `Tu ganancia subio: ${delta.text}. Eso es progreso real, no sensacion.`;
+    accion = 'Repite lo que funciono y sube el ticket promedio donde puedas.';
+    motivacion = 'Estas construyendo ritmo. Cuidalo y aprietalo.';
+  }
+
+  return { titulo, tono, bg, texto, accion, motivacion, delta };
+}
+
+function gfMetricCard(label, value, sub, color, bg) {
+  return `<div style="background:${bg || '#fff'};border:1px solid ${color}22;border-radius:10px;padding:11px;min-width:0">
+    <div style="font-size:10px;color:#64748B;text-transform:uppercase;font-weight:800;letter-spacing:.02em;margin-bottom:5px">${label}</div>
+    <div style="font-family:'Playfair Display',serif;font-size:20px;color:${color};font-weight:800;line-height:1.05;word-break:break-word">${value}</div>
+    <div style="font-size:10px;color:#64748B;margin-top:4px;line-height:1.3">${sub || ''}</div>
+  </div>`;
+}
+
+function gfInsightRow(label, value, sub, color) {
+  return `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:10px">
+    <div style="min-width:0">
+      <div style="font-size:10px;color:#64748B;text-transform:uppercase;font-weight:800;margin-bottom:2px">${label}</div>
+      <div style="font-size:12px;color:#1E293B;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sub || ''}</div>
+    </div>
+    <div style="font-size:13px;font-weight:900;color:${color};white-space:nowrap">${value}</div>
+  </div>`;
+}
+
+function mentorChunks(texto) {
+  const limpio = String(texto || '').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+  if (!limpio) return [];
+  const frases = limpio.match(/[^.!?\n]+[.!?\n]*/g) || [limpio];
+  const chunks = [];
+  let buffer = '';
+  frases.forEach(frase => {
+    const f = frase.trim();
+    if (!f) return;
+    if ((buffer + ' ' + f).trim().length > 180 && buffer) {
+      chunks.push(buffer.trim());
+      buffer = f;
+    } else {
+      buffer = (buffer + ' ' + f).trim();
+    }
+  });
+  if (buffer) chunks.push(buffer.trim());
+  return chunks.length ? chunks : [limpio.slice(0, 180)];
+}
+
+function mentorPickMaleVoice(voices) {
+  const all = voices || [];
+  const spanish = all.filter(v => /^es[-_]/i.test(v.lang || '') || /espa|spanish/i.test(v.name || ''));
+  const maleHints = ['pablo','raul','jorge','diego','carlos','miguel','javier','juan','ricardo','antonio','male','hombre'];
+  const femaleHints = ['helena','sabina','laura','monica','paulina','mujer','female'];
+  const byName = spanish.find(v => {
+    const n = (v.name || '').toLowerCase();
+    return maleHints.some(h => n.includes(h)) && !femaleHints.some(h => n.includes(h));
+  });
+  return byName || spanish.find(v => /es[-_]pe|es[-_]mx|es[-_]es/i.test(v.lang || '')) || spanish[0] || all[0] || null;
+}
+
+function mentorLoadVoices() {
+  return new Promise(resolve => {
+    const synth = window.speechSynthesis;
+    let voices = synth.getVoices();
+    if (voices && voices.length) return resolve(voices);
+    const done = () => {
+      voices = synth.getVoices();
+      resolve(voices || []);
+    };
+    synth.onvoiceschanged = done;
+    setTimeout(done, 700);
+  });
+}
+
+async function reproducirDiscurso(texto) {
   if (!('speechSynthesis' in window)) return toast('Tu navegador no soporta audio', 'error');
   window.speechSynthesis.cancel();
-  
-  const limpio = texto.replace(/\*/g, '');
-  // Dividir el texto en oraciones (por punto, coma, exclamación, interrogación o salto de línea) para evitar que se corte el audio
-  const chunks = limpio.match(/[^.,!?\n]+(?:[.,!?\n]+|$)/g) || [limpio];
-  
-  chunks.forEach(chunk => {
-    if (!chunk.trim()) return;
-    const msg = new SpeechSynthesisUtterance(chunk.trim());
-    msg.lang = 'es-ES';
-    msg.rate = 1.15;
-    msg.pitch = 0.9;
+  const chunks = mentorChunks(texto);
+  if (!chunks.length) return;
+  const voices = await mentorLoadVoices();
+  const voice = mentorPickMaleVoice(voices);
+  const player = { cancelled: false, index: 0, chunks, voice };
+  window._mentorSpeechPlayer = player;
+
+  const speakNext = () => {
+    if (player.cancelled || player.index >= player.chunks.length) return;
+    const msg = new SpeechSynthesisUtterance(player.chunks[player.index]);
+    msg.lang = voice?.lang || 'es-PE';
+    if (voice) msg.voice = voice;
+    msg.rate = 1.02;
+    msg.pitch = 0.72;
+    msg.volume = 1;
+    msg.onend = () => {
+      player.index += 1;
+      if (!player.cancelled) setTimeout(speakNext, 90);
+    };
+    msg.onerror = () => {
+      player.index += 1;
+      if (!player.cancelled) setTimeout(speakNext, 120);
+    };
     window.speechSynthesis.speak(msg);
-  });
+  };
+
+  speakNext();
+}
+
+function detenerDiscurso() {
+  if (window._mentorSpeechPlayer) window._mentorSpeechPlayer.cancelled = true;
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 }
 
 function reproducirUltimoDiscurso() {
@@ -4185,243 +4505,208 @@ function reproducirUltimoDiscurso() {
   }
 }
 
+function mentorFallback(resumen, hoy, diagnostico) {
+  const base = hoy.ganancia >= 0
+    ? `Hoy estas en ${fmt(hoy.ganancia)} de ganancia.`
+    : `Hoy estas abajo por ${fmt(Math.abs(hoy.ganancia))}.`;
+  return `${base} En el periodo vas con ${fmt(resumen.ganancia)} neto y ${resumen.servicios} servicio(s). ${diagnostico.texto}\n\n${diagnostico.accion}\n\n${diagnostico.motivacion}`;
+}
+
 async function generarDiscursoMotivacional() {
   const btn = document.getElementById('btn-mentor-ai');
   const box = document.getElementById('box-mentor-ai');
   const txt = document.getElementById('txt-mentor-ai');
   const regen = document.getElementById('btn-mentor-regen');
-  
-  if (btn) btn.innerHTML = '🤖 Analizando tu situación...';
-  
-  const isMensual = (state.graficosVista !== 'semanal');
-  const txs = isMensual ? filteredTx() : (state.transactions||[]).filter(t => {
-      const d = new Date(t.date + 'T00:00:00');
-      const now = new Date(); const weekAgo = new Date(); weekAgo.setDate(now.getDate() - 7);
-      return d >= weekAgo && d <= now;
-  });
-  
-  let ing = 0, egr = 0;
-  txs.forEach(t=>{ if(t.type==='ingreso' && isCashFlowTx(t)) ing+=t.amount; else if(t.type==='egreso' && isCashFlowTx(t)) egr+=t.amount; });
-  const ganancia = ing - egr;
-  
-  const deudaTotal = (state.debts||[]).reduce((s,d)=>s+(d.cuotasTotales-d.cuotasPagadas)*d.cuotaMonto,0);
-  
-  let ultSvc = 'Hace mucho tiempo (sin registros recientes)';
-  const txSvc = (state.transactions||[]).filter(t=>t.type==='ingreso' && (t.vinculadoServicioId || t._importadoDeNotion || t._notionTrabajo));
-  if(txSvc.length > 0) {
-    ultSvc = txSvc[0].date;
-  }
+  const stop = document.getElementById('btn-mentor-stop');
+
+  if (btn) btn.innerHTML = 'Analizando tu desempeno...';
+
+  const rango = gfGetRange(state.graficosVista);
+  const resumen = gfBuildSummary(rango);
+  const hoy = gfBuildSummary(gfGetTodayRange());
+  const previo = gfBuildSummary(gfPreviousRange(rango));
+  const diagnostico = gfDiagnostico(resumen, previo);
+  const ultimoServicio = gfLastServiceDate() || 'sin servicios registrados';
+  const topGasto = resumen.topGasto ? `${resumen.topGasto.nombre}: ${fmt(resumen.topGasto.monto)}` : 'sin egresos';
+  const topServicio = resumen.topServicio ? `${resumen.topServicio.nombre}: ${fmt(resumen.topServicio.ganancia)}` : 'sin servicio rentable detectado';
 
   const key = localStorage.getItem('fnz_gemini_key');
-  if(!key) {
-    toast('Configura tu API Key de Gemini en Ajustes primero', 'error');
-    if (btn) btn.innerHTML = '🔥 Generar Discurso Brutal';
-    return;
-  }
+  let respuesta = '';
 
-  const prompt = `Actúa como un mentor financiero BRUTALMENTE HONESTO, extremadamente duro, directo y sarcástico. Eres callejero, no tienes pelos en la lengua, pero eres experto en hacer dinero. No me saludes ni seas educado, ve directo a la yugular.
-  Aquí están mis números actuales de ${isMensual ? 'este mes' : 'los últimos 7 días'}:
-  - Flujo de caja neto: S/ ${ganancia}
-  - Deuda total pendiente que me asfixia: S/ ${deudaTotal}
-  - La última vez que registré un servicio trabajado fue el: ${ultSvc}
+  const prompt = `Actua como mi mentor financiero: honesto, directo, masculino y motivador. No seas falso ni suave, pero tampoco uses insultos sexuales ni humillacion vacia. Dame una lectura firme y util.
 
-  Evalúa mi desempeño con esta información. Si no he trabajado (la fecha del último servicio es antigua) o mi deuda es altísima y mi ganancia es baja, destrúyeme verbalmente, regáñame durísimo y sin filtro (ej: "no te quiero ver rascándote las bolas en la cama, tienes cuentas que pagar y salir del agujero"). Si voy bien (ganancias altas y trabajando seguido), reconoce que estoy empujando pero exígeme que no sea mediocre y gane aún más, porque las deudas no se pagan solas.
-  Usa un tono muy crudo, corto y conciso. Máximo 3 párrafos cortos de 2 o 3 líneas cada uno. Te quiero leyendo la cartilla con firmeza.`;
+Datos de hoy:
+- Ganancia neta de hoy: ${fmt(hoy.ganancia)}
+- Ingresos de hoy: ${fmt(hoy.ingresos)}
+- Egresos de hoy: ${fmt(hoy.egresos)}
+- Servicios de hoy: ${hoy.servicios}
+
+Datos del periodo (${rango.label}):
+- Ganancia neta: ${fmt(resumen.ganancia)}
+- Ingresos: ${fmt(resumen.ingresos)}
+- Egresos: ${fmt(resumen.egresos)}
+- Margen: ${Math.round(resumen.margen)}%
+- Servicios: ${resumen.servicios}
+- Promedio por servicio: ${fmt(resumen.promedioServicio)}
+- Dias trabajados: ${resumen.diasConServicio}
+- Dias con gastos y sin servicio: ${resumen.diasSinServicioConGasto}
+- Gasto mas fuerte: ${topGasto}
+- Servicio mas rentable: ${topServicio}
+- Deuda pendiente: ${fmt(resumen.deudaPendiente)}
+- Ultimo servicio registrado: ${ultimoServicio}
+- Comparacion con periodo anterior: ${diagnostico.delta.text}
+
+Escribe maximo 120 palabras en 3 parrafos cortos:
+1. Veredicto honesto.
+2. Que debo corregir hoy.
+3. Cierre motivador, firme y con energia.`;
 
   try {
-    const respuesta = await callGemini(prompt);
-    if(box) box.style.display = 'block';
-    if(txt) txt.innerHTML = respuesta.replace(/\n/g, '<br>');
-    if(btn) btn.innerHTML = '🔥 Reproducir discurso';
-    if(regen) regen.style.display = 'block';
+    if (key) respuesta = await callGemini(prompt);
+    if (!respuesta) respuesta = mentorFallback(resumen, hoy, diagnostico);
+    if (box) box.style.display = 'block';
+    if (txt) txt.innerHTML = gfHtml(respuesta).replace(/\n/g, '<br>');
+    if (btn) btn.innerHTML = 'Reproducir discurso';
+    if (regen) regen.style.display = 'block';
+    if (stop) stop.style.display = 'block';
     state.ultimoDiscursoAI = respuesta;
     saveAll();
     reproducirDiscurso(respuesta);
   } catch (e) {
-    if(btn) btn.innerHTML = '🔥 Generar Discurso Brutal';
-    toast('Error al contactar al mentor AI', 'error');
+    respuesta = mentorFallback(resumen, hoy, diagnostico);
+    if (box) box.style.display = 'block';
+    if (txt) txt.innerHTML = gfHtml(respuesta).replace(/\n/g, '<br>');
+    if (btn) btn.innerHTML = 'Reproducir discurso';
+    if (regen) regen.style.display = 'block';
+    if (stop) stop.style.display = 'block';
+    state.ultimoDiscursoAI = respuesta;
+    saveAll();
+    reproducirDiscurso(respuesta);
   }
 }
 
-
-
 function renderGraficos(){
   const isMensual = (state.graficosVista !== 'semanal');
-  let txsParaAnalisis = [];
-  let rangoTexto = '';
-
-  if (isMensual) {
-    txsParaAnalisis = filteredTx();
-    rangoTexto = monthName();
-  } else {
-    const now = new Date();
-    const weekAgo = new Date();
-    weekAgo.setDate(now.getDate() - 7);
-    txsParaAnalisis = (state.transactions||[]).filter(t => {
-      const d = new Date(t.date + 'T00:00:00');
-      return d >= weekAgo && d <= now;
-    });
-    rangoTexto = 'Últimos 7 días';
-  }
-
-  // Análisis de Servicios y Ganancia
-  const svcStats = {};
-  txsParaAnalisis.forEach(t => {
-    if (t.type === 'ingreso' && (t.vinculadoServicioId || t._notionTrabajo || t.origenServicioMaterial || t._importadoDeNotion)) {
-      const g = getGananciaServicio(t);
-      if (g !== null) {
-        const id = t.vinculadoServicioId || t._notionRowId || t.id;
-        const nombreSvc = t.category || 'Servicio';
-        if (!svcStats[id]) {
-          svcStats[id] = { nombre: nombreSvc, ganancia: g, count: 1 };
-        }
-      }
-    }
-  });
-
-  const aggByName = {};
-  Object.values(svcStats).forEach(s => {
-    if (!aggByName[s.nombre]) aggByName[s.nombre] = { nombre: s.nombre, count: 0, gananciaTotal: 0 };
-    aggByName[s.nombre].count += 1;
-    aggByName[s.nombre].gananciaTotal += s.ganancia;
-  });
-
-  let arrSvc = Object.values(aggByName);
-  const totalCount = arrSvc.reduce((sum, s) => sum + s.count, 0);
-  const totalGanancia = arrSvc.reduce((sum, s) => sum + s.gananciaTotal, 0);
-  const promedioSvc = totalCount > 0 ? (totalGanancia / totalCount) : 0;
-
-  // Días sin servicios pero con gastos
-  const diasPorFecha = {};
-  txsParaAnalisis.forEach(t => {
-    if (!diasPorFecha[t.date]) diasPorFecha[t.date] = { tieneServicio: false, tieneGasto: false };
-    if (t.type === 'ingreso' && (t.vinculadoServicioId || t._notionTrabajo || t._importadoDeNotion)) {
-      const g = getGananciaServicio(t);
-      if (g !== null) diasPorFecha[t.date].tieneServicio = true;
-    }
-    if (t.type === 'egreso') diasPorFecha[t.date].tieneGasto = true;
-  });
-  const diasSinServicio = Object.values(diasPorFecha).filter(d => !d.tieneServicio && d.tieneGasto).length;
-  const diasConServicio = Object.values(diasPorFecha).filter(d => d.tieneServicio).length;
-
-  arrSvc.sort((a, b) => b.count - a.count);
-  const topFrecuente = arrSvc[0] || null;
-  
-  arrSvc.sort((a, b) => b.gananciaTotal - a.gananciaTotal);
-  const topGanancia = arrSvc[0] || null;
+  const rango = gfGetRange(state.graficosVista);
+  const resumen = gfBuildSummary(rango);
+  const hoy = gfBuildSummary(gfGetTodayRange());
+  const previo = gfBuildSummary(gfPreviousRange(rango));
+  const diagnostico = gfDiagnostico(resumen, previo);
+  const topGastoTxt = resumen.topGasto ? gfHtml(resumen.topGasto.nombre) : 'Sin egresos';
+  const topServicioTxt = resumen.topServicio ? gfHtml(resumen.topServicio.nombre) : 'Sin servicios';
+  const deudaSub = resumen.deudaVsGanancia === null ? 'sin ganancia para comparar' : `${resumen.deudaVsGanancia.toFixed(1)}x la ganancia del periodo`;
 
   return `
-    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:14px">Gráficos y Rendimiento</div>
-    
+    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:14px">Graficos y Rendimiento</div>
+
     <div style="display:flex;background:#F1F5F9;border-radius:10px;padding:4px;margin-bottom:14px">
       <button onclick="toggleGraficosVista('mensual')" style="flex:1;padding:8px;border-radius:8px;border:none;background:${isMensual?'#fff':'transparent'};color:${isMensual?'var(--gold)':'var(--muted)'};font-weight:${isMensual?'bold':'normal'};box-shadow:${isMensual?'0 2px 4px rgba(0,0,0,0.05)':'none'};cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;transition:all 0.2s">Mensual</button>
       <button onclick="toggleGraficosVista('semanal')" style="flex:1;padding:8px;border-radius:8px;border:none;background:${!isMensual?'#fff':'transparent'};color:${!isMensual?'var(--gold)':'var(--muted)'};font-weight:${!isMensual?'bold':'normal'};box-shadow:${!isMensual?'0 2px 4px rgba(0,0,0,0.05)':'none'};cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;transition:all 0.2s">Semanal</button>
     </div>
 
-    ${isMensual ? `<div class="month-nav"><button onclick="prevMonth()"><</button><span>${rangoTexto}</span><button onclick="nextMonth()">></button></div>` : `<div style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:14px;font-weight:600">${rangoTexto}</div>`}
+    ${isMensual ? `<div class="month-nav"><button onclick="prevMonth()"><</button><span>${rango.label}</span><button onclick="nextMonth()">></button></div>` : `<div style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:14px;font-weight:600">${rango.label}</div>`}
 
-    <div class="card" style="margin-bottom:12px;background:linear-gradient(135deg,#FFFBEB,#F8FAFC);border:1px solid #C9A84C33">
-      <div class="section-title" style="color:var(--gold)">Rendimiento de Servicios</div>
-      <div class="section-sub">${rangoTexto}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
-        <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #e2e8f0">
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Ganancia Total Neta</div>
-          <div style="font-family:'Playfair Display',serif;font-size:18px;color:#099268">${fmt(totalGanancia)}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px">${totalCount} servicios</div>
+    <div class="card" style="margin-bottom:12px;background:#0F172A;border:1px solid #1E293B;color:#F8FAFC">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px">
+        <div>
+          <div style="font-size:10px;text-transform:uppercase;color:#94A3B8;font-weight:800;margin-bottom:4px">Hoy</div>
+          <div style="font-family:'Playfair Display',serif;font-size:22px;color:${hoy.ganancia>=0?'#86EFAC':'#FCA5A5'};font-weight:800">${fmtSign(hoy.ganancia)}</div>
+          <div style="font-size:11px;color:#CBD5E1;margin-top:3px">${hoy.servicios} servicio(s) registrados hoy</div>
         </div>
-        <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #e2e8f0">
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Ganancia Promedio</div>
-          <div style="font-family:'Playfair Display',serif;font-size:18px;color:#2E86AB">${fmt(promedioSvc)}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px">por servicio</div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;font-weight:800">Balance rapido</div>
+          <div style="font-size:12px;color:#CBD5E1;margin-top:5px">Ing. ${fmt(hoy.ingresos)}</div>
+          <div style="font-size:12px;color:#CBD5E1">Egr. ${fmt(hoy.egresos)}</div>
         </div>
       </div>
-      
-      ${totalCount > 0 ? `
-      <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;padding:10px;border-radius:8px;border:1px solid #f1f5f9">
-          <div style="display:flex;align-items:center;gap:8px">
-            <div style="width:28px;height:28px;border-radius:6px;background:#F0F9FF;color:#0284C7;display:flex;align-items:center;justify-content:center;font-size:14px">🔥</div>
-            <div>
-              <div style="font-size:10px;color:var(--muted)">Más Frecuente</div>
-              <div style="font-size:12px;font-weight:600;color:var(--text)">${topFrecuente.nombre}</div>
-            </div>
-          </div>
-          <div style="font-size:12px;font-weight:bold;color:#0284C7">${topFrecuente.count} veces</div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;padding:10px;border-radius:8px;border:1px solid #f1f5f9">
-          <div style="display:flex;align-items:center;gap:8px">
-            <div style="width:28px;height:28px;border-radius:6px;background:#ECFDF5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:14px">💎</div>
-            <div>
-              <div style="font-size:10px;color:var(--muted)">Mayor Ganancia</div>
-              <div style="font-size:12px;font-weight:600;color:var(--text)">${topGanancia.nombre}</div>
-            </div>
-          </div>
-          <div style="font-size:12px;font-weight:bold;color:#059669">${fmt(topGanancia.gananciaTotal)}</div>
-        </div>
-      </div>` : ''}
+      <div style="font-size:12px;line-height:1.45;color:#E2E8F0;background:rgba(255,255,255,.06);border-radius:10px;padding:9px">
+        ${hoy.ganancia > 0 ? 'Buen inicio: hoy estas sumando. Ahora protege esa ganancia y busca otro cierre.' : hoy.egresos > 0 ? 'Hoy hay salida de dinero. Necesitas una entrada que compense antes de cerrar el dia.' : 'Aun no hay movimiento fuerte hoy. El tablero esta esperando tu primer registro.'}
+      </div>
     </div>
 
-    ${(diasSinServicio > 0 || diasConServicio > 0) ? `
-    <div class="card" style="margin-bottom:12px;border:1px solid #FED7AA;background:#FFF7ED">
-      <div class="section-title" style="color:#C2410C">📅 Actividad del periodo</div>
-      <div class="section-sub">${rangoTexto}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
-        <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #FED7AA">
-          <div style="font-size:22px;margin-bottom:4px">💪</div>
-          <div style="font-family:'Playfair Display',serif;font-size:20px;color:#059669;font-weight:700">${diasConServicio}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px">días trabajados</div>
+    <div class="card" style="margin-bottom:12px;background:${diagnostico.bg};border:1px solid ${diagnostico.tono}33">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px">
+        <div>
+          <div class="section-title" style="color:${diagnostico.tono}">${diagnostico.titulo}</div>
+          <div class="section-sub">${rango.label}</div>
         </div>
-        <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid ${diasSinServicio > 0 ? '#FECACA' : '#FED7AA'}">
-          <div style="font-size:22px;margin-bottom:4px">${diasSinServicio > 0 ? '⚠️' : '🎯'}</div>
-          <div style="font-family:'Playfair Display',serif;font-size:20px;color:${diasSinServicio > 0 ? '#C62828' : '#059669'};font-weight:700">${diasSinServicio}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px">días sin servicio (con gastos)</div>
-        </div>
+        <div style="font-size:11px;font-weight:900;color:${diagnostico.delta.color};background:#fff;border:1px solid ${diagnostico.delta.color}22;border-radius:999px;padding:5px 8px;white-space:nowrap">${diagnostico.delta.text}</div>
       </div>
-      ${diasSinServicio > 0 ? `<div style="margin-top:10px;font-size:11px;color:#C2410C;background:#FEF3C7;border-radius:8px;padding:8px;line-height:1.5">⚠️ Tuviste <strong>${diasSinServicio} día${diasSinServicio>1?'s':''}</strong> sin trabajar pero con gastos. Esos gastos salen de tu bolsillo sin retorno.</div>` : `<div style="margin-top:10px;font-size:11px;color:#059669;background:#ECFDF5;border-radius:8px;padding:8px;line-height:1.5">✅ Todos los días con gastos registrados tuvieron al menos un servicio. ¡Bien!</div>`}
+      <div style="font-size:12px;line-height:1.5;color:#334155;margin-bottom:10px">${diagnostico.texto}</div>
+      <div style="font-size:12px;line-height:1.5;color:#0F172A;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:10px">
+        <b>Accion de hoy:</b> ${diagnostico.accion}<br>
+        <span style="color:${diagnostico.tono};font-weight:800">${diagnostico.motivacion}</span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;background:linear-gradient(135deg,#FFFBEB,#F8FAFC);border:1px solid #C9A84C33">
+      <div class="section-title" style="color:var(--gold)">Resumen del periodo</div>
+      <div class="section-sub">${rango.label}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+        ${gfMetricCard('Ganancia neta', fmtSign(resumen.ganancia), `Margen ${Math.round(resumen.margen)}%`, resumen.ganancia >= 0 ? '#059669' : '#C62828', '#fff')}
+        ${gfMetricCard('Promedio diario', fmtSign(resumen.promedioDiario), `${rango.days} dia(s) medidos`, resumen.promedioDiario >= 0 ? '#2E86AB' : '#C62828', '#fff')}
+        ${gfMetricCard('Servicios', resumen.servicios, `${resumen.diasConServicio} dia(s) trabajados`, '#7C3AED', '#fff')}
+        ${gfMetricCard('Prom. servicio', fmt(resumen.promedioServicio), 'ganancia por trabajo', '#C9A84C', '#fff')}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+        ${gfInsightRow('Mayor ganancia', resumen.topServicio ? fmt(resumen.topServicio.ganancia) : '-', topServicioTxt, '#059669')}
+        ${gfInsightRow('Gasto mas fuerte', resumen.topGasto ? fmt(resumen.topGasto.monto) : '-', topGastoTxt, '#C62828')}
+        ${gfInsightRow('Deuda pendiente', fmt(resumen.deudaPendiente), deudaSub, '#B45309')}
+      </div>
+    </div>
+
+    ${(resumen.diasSinServicioConGasto > 0 || resumen.diasConServicio > 0) ? `
+    <div class="card" style="margin-bottom:12px;border:1px solid #FED7AA;background:#FFF7ED">
+      <div class="section-title" style="color:#C2410C">Actividad del periodo</div>
+      <div class="section-sub">${rango.label}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+        ${gfMetricCard('Dias trabajados', resumen.diasConServicio, `${resumen.servicios} servicio(s)`, '#059669', '#fff')}
+        ${gfMetricCard('Gasto sin servicio', resumen.diasSinServicioConGasto, 'dias con fuga', resumen.diasSinServicioConGasto > 0 ? '#C62828' : '#059669', '#fff')}
+      </div>
     </div>` : ''}
 
     <div class="card" style="margin-bottom:12px;background:#1a1a1a;border:1px solid #333;color:#fff">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="font-size:20px">🤖</div>
-          <div style="font-family:'Playfair Display',serif;font-size:16px;color:#E67E22">Tu Mentor AI (Sin Filtro)</div>
+        <div>
+          <div style="font-family:'Playfair Display',serif;font-size:16px;color:#E67E22">Mentor AI honesto</div>
+          <div style="font-size:12px;color:#aaa;margin-top:3px;line-height:1.4">Analiza hoy, ${rango.label}, deuda, gastos y servicios. Directo, firme y motivador.</div>
         </div>
       </div>
-      <div style="font-size:12px;color:#aaa;margin-bottom:12px;line-height:1.4">
-        Recibe una dosis brutal de realidad financiera. Analizará tus ingresos, deudas y la última vez que trabajaste para decirte lo que necesitas escuchar.
-      </div>
-      
+
       <div id="box-mentor-ai" style="display:${state.ultimoDiscursoAI ? 'block' : 'none'};background:#2a2a2a;border-left:3px solid #E67E22;padding:12px;border-radius:0 8px 8px 0;margin-bottom:12px;font-size:13px;line-height:1.5;color:#eee">
-        <div id="txt-mentor-ai">${state.ultimoDiscursoAI ? state.ultimoDiscursoAI.replace(/\n/g, '<br>') : ''}</div>
+        <div id="txt-mentor-ai">${state.ultimoDiscursoAI ? gfHtml(state.ultimoDiscursoAI).replace(/\n/g, '<br>') : ''}</div>
       </div>
 
       <button id="btn-mentor-ai" onclick="reproducirUltimoDiscurso()" style="width:100%;background:linear-gradient(135deg, #D35400, #C0392B);color:#fff;border:none;border-radius:8px;padding:12px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.3)">
-        ${state.ultimoDiscursoAI ? '🔥 Reproducir discurso' : '🔥 Generar Discurso Brutal'}
+        ${state.ultimoDiscursoAI ? 'Reproducir discurso' : 'Generar discurso honesto'}
       </button>
-      <div id="btn-mentor-regen" style="text-align:center;margin-top:10px;display:${state.ultimoDiscursoAI ? 'block' : 'none'}">
+      <div id="btn-mentor-stop" style="text-align:center;margin-top:8px;display:${state.ultimoDiscursoAI ? 'block' : 'none'}">
+        <button onclick="detenerDiscurso()" style="background:none;border:1px solid #555;border-radius:6px;color:#ccc;font-size:11px;padding:4px 10px;cursor:pointer;">Detener voz</button>
+      </div>
+      <div id="btn-mentor-regen" style="text-align:center;margin-top:8px;display:${state.ultimoDiscursoAI ? 'block' : 'none'}">
         <button onclick="generarDiscursoMotivacional()" style="background:none;border:1px solid #555;border-radius:6px;color:#aaa;font-size:11px;padding:4px 10px;cursor:pointer;">Generar uno nuevo</button>
       </div>
     </div>
 
     <div class="card" style="margin-bottom:12px">
       <div class="section-title">Ingresos vs Egresos</div>
-      <div class="section-sub">Últimos 6 meses</div>
+      <div class="section-sub">Ultimos 6 meses</div>
       <div class="chart-wrap" style="height:180px"><canvas id="barChart"></canvas></div>
       <div style="display:flex;gap:14px;justify-content:center;margin-top:10px">
         <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><div style="width:10px;height:10px;border-radius:2px;background:var(--gold)"></div>Ingresos</div>
         <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><div style="width:10px;height:10px;border-radius:2px;background:var(--red)"></div>Egresos</div>
       </div>
     </div>
-    
+
     <div class="card" style="margin-bottom:12px">
-      <div class="section-title">¿En qué gasté?</div>
-      <div class="section-sub">${rangoTexto}</div>
+      <div class="section-title">En que gaste</div>
+      <div class="section-sub">${rango.label}</div>
       <div style="display:flex;align-items:center;gap:8px">
         <div class="chart-wrap" style="width:150px;height:150px;flex-shrink:0"><canvas id="pieChart"></canvas></div>
         <div id="pie-legend" style="flex:1;font-size:11px"></div>
       </div>
     </div>
-    
+
     <div class="card" style="background:#EFF6FF;border-color:#2E86AB33">
       <div class="section-title" style="color:var(--blue)">Progreso de deudas</div>
       <div class="section-sub">Cuotas pagadas</div>
@@ -4430,9 +4715,9 @@ function renderGraficos(){
         <div style="margin-bottom:12px">
           <div style="display:flex;justify-content:space-between;margin-bottom:5px;align-items:center">
             <span style="font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px">
-              ${d.name} 
+              ${gfHtml(d.name)}
               <span style="font-size:9px;padding:2px 6px;border-radius:6px;background:${d.tipo==='Banco'?'#F0F9FF':'#F5F3FF'};color:${d.tipo==='Banco'?'#1E40AF':'#5B21B6'};border:1px solid ${d.tipo==='Banco'?'#1E40AF22':'#7C3AED22'}">
-                ${d.tipo==='Banco'?'🏦':'👤'} ${d.tipo||'Personal'}
+                ${d.tipo==='Banco'?'Banco':'Personal'}
               </span>
             </span>
             <span style="font-size:11px;font-weight:700;color:${d.color}">${pct}%</span>
@@ -5649,37 +5934,30 @@ function buildCharts(){
     const d=new Date(state.filterYear,state.filterMonth-i,1);
     const m=d.getMonth(),y=d.getFullYear();
     bl.push(MONTHS_SHORT[m]);
-    bi.push((state.transactions||[]).filter(t=>{const td=new Date(t.date+'T00:00:00');return td.getMonth()===m&&td.getFullYear()===y&&t.type==='ingreso';}).reduce((s,t)=>s+t.amount,0));
-    be.push((state.transactions||[]).filter(t=>{const td=new Date(t.date+'T00:00:00');return td.getMonth()===m&&td.getFullYear()===y&&t.type==='egreso';}).reduce((s,t)=>s+t.amount,0));
+    const txMes=(state.transactions||[]).filter(t=>{
+      const td=new Date(t.date+'T00:00:00');
+      return td.getMonth()===m && td.getFullYear()===y && gfIsCash(t);
+    });
+    bi.push(txMes.filter(t=>t.type==='ingreso').reduce((s,t)=>s+moneyValue(t.amount),0));
+    be.push(txMes.filter(t=>t.type==='egreso').reduce((s,t)=>s+moneyValue(t.amount),0));
   }
   const barCtx=document.getElementById('barChart');
   if(barCtx){if(state.chartBar)state.chartBar.destroy();
     state.chartBar=new Chart(barCtx,{type:'bar',data:{labels:bl,datasets:[{label:'Ingresos',data:bi,backgroundColor:'#C9A84C',borderRadius:4},{label:'Egresos',data:be,backgroundColor:'#E05252',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#666',font:{size:10}}},y:{display:false}}}});}
 
-
-  let txsPie = [];
-  if (state.graficosVista === 'semanal') {
-    const now = new Date();
-    const weekAgo = new Date();
-    weekAgo.setDate(now.getDate() - 7);
-    txsPie = (state.transactions||[]).filter(t => {
-      const d = new Date(t.date + 'T00:00:00');
-      return d >= weekAgo && d <= now;
-    });
-  } else {
-    txsPie = filteredTx();
-  }
-
+  const rango = gfGetRange(state.graficosVista);
+  const txsPie = gfTransactionsForRange(rango).filter(t=>t.type==='egreso' && gfIsCash(t));
   const cats={};
-  txsPie.filter(t=>t.type==='egreso').forEach(t=>{cats[t.category]=(cats[t.category]||0)+t.amount;});
-  const pl=Object.keys(cats),pd=Object.values(cats);
+  txsPie.forEach(t=>{const cat=t.category||'Sin categoria';cats[cat]=(cats[cat]||0)+moneyValue(t.amount);});
+  const sorted=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+  const pl=sorted.map(x=>x[0]),pd=sorted.map(x=>x[1]);
   const pc=pl.map(name=>{const c=getCatByName(name,'egreso');return c?c.color:'#666';});
   const pieCtx=document.getElementById('pieChart');
   if(pieCtx){if(state.chartPie)state.chartPie.destroy();
     if(pd.length>0){
       state.chartPie=new Chart(pieCtx,{type:'doughnut',data:{labels:pl,datasets:[{data:pd,backgroundColor:pc,borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'55%'}});
       const leg=document.getElementById('pie-legend');
-      if(leg)leg.innerHTML=pl.map((l,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:50%;background:${pc[i]};flex-shrink:0"></div><span style="color:#888">${l}</span></div><span style="color:#666">${fmt(pd[i])}</span></div>`).join('');
+      if(leg)leg.innerHTML=pl.slice(0,6).map((l,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px"><div style="display:flex;align-items:center;gap:5px;min-width:0"><div style="width:8px;height:8px;border-radius:50%;background:${pc[i]};flex-shrink:0"></div><span style="color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${gfHtml(l)}</span></div><span style="color:#475569;font-weight:700;white-space:nowrap">${fmt(pd[i])}</span></div>`).join('');
     } else {
       pieCtx.parentElement.innerHTML=`<div style="text-align:center;color:var(--dim);padding:30px 0;font-size:13px">Sin egresos en este periodo</div>`;
     }
