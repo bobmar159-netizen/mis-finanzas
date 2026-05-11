@@ -2996,6 +2996,37 @@ function renderDashboard(){
     ${recentHtml}`;
 }
 
+// ── Ganancia neta de un ingreso de servicio ──────────────────────────────
+// Funciona para Notion (_notionTrabajo) y servicios cerrados desde la app.
+function getGananciaServicio(t) {
+  if (t.type !== 'ingreso') return null;
+  // Caso 1: importado de Notion con datos del trabajo
+  if (t.vinculadoServicioId) {
+    const svcId = t.vinculadoServicioId;
+    const egresos = (state.transactions||[]).filter(tx =>
+      tx.vinculadoServicioId === svcId && tx.type === 'egreso' && !tx.ocultarEnMovimientos
+    );
+    const ingresos = (state.transactions||[]).filter(tx =>
+      tx.vinculadoServicioId === svcId && tx.type === 'ingreso'
+    );
+    const totalIng = ingresos.reduce((s,tx)=>s+(+(tx.amount||0)),0);
+    const totalEgr = egresos.reduce((s,tx)=>s+(+(tx.amount||0)),0);
+    if (totalIng <= 0) return null;
+    return +(totalIng - totalEgr).toFixed(2);
+  }
+  
+  if (t._notionTrabajo) {
+    const tr = t._notionTrabajo;
+    const totalIng = (+(tr.precio1||0))+(+(tr.precio2||0))+(+(tr.precio3||0));
+    const totalEgr = (+(tr.materiales1||0))+(+(tr.materiales2||0))+(+(tr.materiales3||0))
+                   + (+(tr.comida||0))+(+(tr.otros_gastos||tr.otros||0))
+                   + (+(tr.agregados||0))+(+(tr.movilidad||0))+(+(tr.meta||0));
+    if (totalIng <= 0) return null;
+    return +(totalIng - totalEgr).toFixed(2);
+  }
+  return null;
+}
+
 function renderMovimientos(){
   if(!window._movBusqueda) window._movBusqueda='';
   if(!window._movFiltro) window._movFiltro='todos';
@@ -3051,36 +3082,6 @@ function renderMovimientos(){
       return `${parseInt(day)} ${meses[parseInt(m)-1]} ${y}`;
     }catch(e){return d;}
   };
-  // ── Ganancia neta de un ingreso de servicio ──────────────────────────────
-  // Funciona para Notion (_notionTrabajo) y servicios cerrados desde la app.
-  const getGananciaServicio = (t) => {
-    if (t.type !== 'ingreso') return null;
-    // Caso 1: importado de Notion con datos del trabajo
-    if (t.vinculadoServicioId) {
-      const svcId = t.vinculadoServicioId;
-      const egresos = (state.transactions||[]).filter(tx =>
-        tx.vinculadoServicioId === svcId && tx.type === 'egreso' && !tx.ocultarEnMovimientos
-      );
-      const ingresos = (state.transactions||[]).filter(tx =>
-        tx.vinculadoServicioId === svcId && tx.type === 'ingreso'
-      );
-      const totalIng = ingresos.reduce((s,tx)=>s+(+(tx.amount||0)),0);
-      const totalEgr = egresos.reduce((s,tx)=>s+(+(tx.amount||0)),0);
-      if (totalIng <= 0) return null;
-      return +(totalIng - totalEgr).toFixed(2);
-    }
-    
-    if (t._notionTrabajo) {
-      const tr = t._notionTrabajo;
-      const totalIng = (+(tr.precio1||0))+(+(tr.precio2||0))+(+(tr.precio3||0));
-      const totalEgr = (+(tr.materiales1||0))+(+(tr.materiales2||0))+(+(tr.materiales3||0))
-                     + (+(tr.comida||0))+(+(tr.otros_gastos||tr.otros||0))
-                     + (+(tr.agregados||0))+(+(tr.movilidad||0))+(+(tr.meta||0));
-      if (totalIng <= 0) return null;
-      return +(totalIng - totalEgr).toFixed(2);
-    }
-  };
-
 
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
