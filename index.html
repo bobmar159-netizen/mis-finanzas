@@ -2965,6 +2965,15 @@ function renderDashboard(){
 
   return `
     <div class="month-nav"><button onclick="prevMonth()">‹</button><span>${monthName()}</span><button onclick="nextMonth()">›</button></div>
+    <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:18px;padding:13px;margin-bottom:12px;box-shadow:0 12px 28px rgba(15,23,42,.05)">
+      <div style="font-size:11px;color:#64748B;text-transform:uppercase;font-weight:900;margin-bottom:10px">Gasto rápido</div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+        <button onclick="openQuickEgreso('cne_menu','Comida','Comida')" style="border:1px solid #FED7AA;background:#FFF7ED;color:#9A3412;border-radius:13px;padding:10px 6px;font-size:12px;font-weight:900;cursor:pointer">Comida</button>
+        <button onclick="openQuickEgreso('cne5','Movilidad','Movilidad')" style="border:1px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;border-radius:13px;padding:10px 6px;font-size:12px;font-weight:900;cursor:pointer">Movilidad</button>
+        <button onclick="openQuickEgreso('cne2','Gnv','GNV')" style="border:1px solid #E9D5FF;background:#FAF5FF;color:#6B21A8;border-radius:13px;padding:10px 6px;font-size:12px;font-weight:900;cursor:pointer">GNV</button>
+        <button onclick="openQuickEgreso('cne6','Otros gastos de negocio','Otros')" style="border:1px solid #E5E7EB;background:#F8FAFC;color:#475569;border-radius:13px;padding:10px 6px;font-size:12px;font-weight:900;cursor:pointer">Otros</button>
+      </div>
+    </div>
     <div class="summary-card" style="background:var(--card);border:1.5px solid var(--border);text-align:center;margin-bottom:12px;box-shadow:0 2px 12px #00000008">
       <div class="summary-label" style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.07em">Balance del mes</div>
       <div class="summary-amount" style="color:${balColor};font-size:42px;margin:4px 0">${fmtSign(bal)}</div>
@@ -3100,7 +3109,10 @@ function renderMovimientos(){
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold)">Movimientos</div>
-      <button class="btn-gold" style="padding:8px 14px;font-size:13px" onclick="openAddTx()">＋ Agregar</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="openAddTx()" style="border:none;background:#A85D5D;color:#fff;border-radius:14px;padding:10px 13px;font-size:13px;font-weight:900;box-shadow:0 10px 24px rgba(168,93,93,.16);cursor:pointer">+ Gasto</button>
+        <button onclick="openQuickIngreso()" style="border:1px solid #BBD8C8;background:#EEF7F2;color:#2F6F53;border-radius:14px;padding:10px 13px;font-size:13px;font-weight:900;cursor:pointer">+ Ingreso</button>
+      </div>
     </div>
     <div class="month-nav"><button onclick="prevMonth()">‹</button><span>${monthName()}</span><button onclick="nextMonth()">›</button></div>
     <!-- Filtros rápidos -->
@@ -6111,7 +6123,13 @@ function buildCharts(){
   if(state.chartBar && typeof state.chartBar.destroy === 'function') { state.chartBar.destroy(); state.chartBar = null; }
   if(state.chartPie && typeof state.chartPie.destroy === 'function') { state.chartPie.destroy(); state.chartPie = null; }
 }
-function openAddTx(){ openTxModal(null); }
+function openAddTx(){ openTxModal(null, {type:'egreso', date:(typeof gfLocalDateStr==='function'?gfLocalDateStr():todayStr())}); }
+function openQuickEgreso(catId, category, desc){
+  openTxModal(null, {type:'egreso', catId, category, description:desc||category, date:(typeof gfLocalDateStr==='function'?gfLocalDateStr():todayStr()), moneda:'PEN'});
+}
+function openQuickIngreso(){
+  openTxModal(null, {type:'ingreso', category:(state.catsIn||[])[0]?.name||'Ingreso', catId:(state.catsIn||[])[0]?.id||'', date:(typeof gfLocalDateStr==='function'?gfLocalDateStr():todayStr()), moneda:'PEN'});
+}
 function openPresupuesto(){ switchPage('presupuesto'); }
 function openEditTx(id){ openTxModal(state.transactions.find(t=>t.id===id)); }
 
@@ -6121,11 +6139,17 @@ function openTxModal(tx, preData){
   const isEdit=!!tx;
   const pre = preData || {};
   const defType = pre.type || 'egreso';
-  const t=tx||{type:defType,date:pre.date||todayStr(),amount:pre.amount||'',category:pre.category||state.catsEx[0]?.name||'',description:pre.description||'',cliente:pre.cliente||'',ubicacion:pre.ubicacion||''};
+  const t=tx||{type:defType,date:pre.date||todayStr(),amount:pre.amount||'',category:pre.category||(defType==='ingreso'?(state.catsIn[0]?.name||'Ingreso'):(state.catsEx[0]?.name||'Otros gastos del dia')),catId:pre.catId||'',description:pre.description||'',cliente:pre.cliente||'',ubicacion:pre.ubicacion||''};
   window._txType=t.type;
   const isNeg=state.modo==='negocio';
   document.getElementById('modal-content').innerHTML=`
-    <div class="modal-title" style="color:var(--gold)">${isEdit?'Editar':'Nuevo'} Movimiento</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px">
+      <div>
+        <div class="modal-title" style="color:${t.type==='egreso'?'#A85D5D':'#2F6F53'};margin-bottom:4px">${isEdit?'Editar':(t.type==='egreso'?'Nuevo gasto':'Nuevo ingreso')}</div>
+        <div style="font-size:12px;color:#64748B;font-weight:700">${t.type==='egreso'?'Salida de dinero':'Entrada de dinero'}</div>
+      </div>
+      <div style="width:42px;height:42px;border-radius:14px;background:${t.type==='egreso'?'#FFF1F1':'#EEF7F2'};color:${t.type==='egreso'?'#A85D5D':'#2F6F53'};display:flex;align-items:center;justify-content:center;font-weight:900">${t.type==='egreso'?'−':'+'}</div>
+    </div>
     <div class="field">
       <label class="field-label">Tipo</label>
       <div class="type-toggle">
