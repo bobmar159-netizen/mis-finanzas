@@ -253,25 +253,6 @@ body{font-family:'Inter','Roboto',sans-serif;color:var(--text)}
 .cat-type-btn.active-in{border-color:var(--gold);background:#EBF1F5;color:var(--gold)}
 .cat-type-btn.active-out{border-color:var(--red);background:#FEF2F2;color:var(--red)}
 
-.cat-ai-card{background:linear-gradient(180deg,#FFFFFF,#F7FAFC);border-color:#A8BCC955;margin-bottom:14px}
-.cat-ai-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
-.cat-ai-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--text);font-weight:700}
-.cat-ai-status{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--gold);font-weight:800;background:#EBF1F5;border:1px solid #A8BCC966;border-radius:999px;padding:4px 8px;white-space:nowrap}
-.cat-ai-fixed{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px}
-.cat-ai-block{background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px}
-.cat-ai-label{font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px}
-.cat-ai-pills{display:flex;gap:6px;flex-wrap:wrap}
-.cat-ai-pill{font-size:11px;font-weight:700;color:#2A4455;background:#EBF1F5;border:1px solid #A8BCC955;border-radius:999px;padding:5px 8px}
-.cat-ai-pill.lock{color:#633806;background:#FAEEDA;border-color:#C9A84C44}
-.cat-ai-input{width:100%;min-height:68px;resize:vertical;background:#F8FAFC;border:1.5px solid var(--border);border-radius:12px;padding:11px 12px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none}
-.cat-ai-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(61,102,119,.12)}
-.cat-ai-actions{display:flex;gap:8px;margin:9px 0}
-.cat-ai-actions button{flex:1;border-radius:10px;border:1px solid var(--border);background:#fff;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:800;padding:10px;cursor:pointer}
-.cat-ai-actions button.primary{background:var(--gold);border-color:var(--gold);color:#fff}
-.cat-ai-json{background:#0F172A;color:#DDE7F0;border-radius:12px;padding:11px;font-size:11px;line-height:1.45;white-space:pre-wrap;overflow:auto;max-height:260px;margin:0}
-@media(min-width:620px){.cat-ai-fixed{grid-template-columns:1fr 1fr}}
-
-
 /* Emoji picker */
 .emoji-section{margin-bottom:10px}
 .emoji-section-title{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
@@ -2187,44 +2168,44 @@ function iconLabel(icon){const m={'IMG:cocina':'[Cocina]','IMG:horno':'[Horno]',
 // ── Categorías NEGOCIO ──
 const DEFAULT_CATS_NEG_IN = [
   {id:'cn1',name:'Punto adicional',icon:'gas',color:'#4F7EA8',type:'ingreso'},
-  {id:'cn2',name:'Modificación de tubería',icon:'pipe',color:'#5F8E9A',type:'ingreso'},
-  {id:'cn3',name:'Instalación nueva',icon:'service',color:'#4F7F67',type:'ingreso'},
-  {id:'cn6',name:'Reparación de tubería',icon:'tool',color:'#6E8C7B',type:'ingreso'},
-  {id:'cn7',name:'Gasfitería',icon:'tool',color:'#5D8A72',type:'ingreso'},
-  {id:'cn4',name:'Conversión de artefactos',icon:'appliance',color:'#8A7EA8',type:'ingreso'},
-  {id:'cn5',name:'Conexión de artefactos',icon:'appliance',color:'#4F7EA8',type:'ingreso'},
-  {id:'cn8',name:'Documentación',icon:'document',color:'#77746D',type:'ingreso'},
+  {id:'cn2',name:'Modificacion de tuberia',icon:'pipe',color:'#5F8E9A',type:'ingreso'},
+  {id:'cn3',name:'Instalacion nueva',icon:'service',color:'#4F7F67',type:'ingreso'},
+  {id:'cn6',name:'Reparacion de tuberia',icon:'tool',color:'#6E8C7B',type:'ingreso'},
+  {id:'cn7',name:'Gasfiteria',icon:'tool',color:'#5D8A72',type:'ingreso'},
+  {id:'cn4',name:'Conversion de artefactos',icon:'appliance',color:'#8A7EA8',type:'ingreso'},
+  {id:'cn5',name:'Conexion de artefactos',icon:'appliance',color:'#4F7EA8',type:'ingreso'},
+  {id:'cn8',name:'Documentacion',icon:'document',color:'#77746D',type:'ingreso'},
   {id:'cn9',name:'Otros servicios',icon:'box',color:'#5A8E7A',type:'ingreso'},
   {id:'cn_otro_ingreso',name:'Otros ingresos',icon:'money',color:'#6E8C7B',type:'ingreso'},
   {id:'transfer_neg_in',name:'Transferencia recibida',icon:'transfer',color:'var(--gold)',type:'ingreso',system:true,hidden:true},
   {id:'transfer_neg_retiro',name:'Retiro personal',icon:'briefcase',color:'#C9A84C',type:'ingreso',system:true,hidden:true},
 ];
 const DEFAULT_CATS_NEG_EX = [
-  {id:'cne_operacion',name:'Operación',icon:'tool',color:'#6E8C7B',type:'egreso'},
+  {id:'cne_operacion',name:'Operacion',icon:'tool',color:'#6E8C7B',type:'egreso'},
   {id:'cne_personal',name:'Personal',icon:'briefcase',color:'#8A7EA8',type:'egreso'},
   {id:'cne_gaseosa',name:'Gaseosa',icon:'food',color:'#8AA6A3',type:'egreso'},
   {id:'cne_snack',name:'Snack',icon:'food',color:'#A9895C',type:'egreso'},
   {id:'cne_golosina',name:'Golosina',icon:'gift',color:'#C27D8A',type:'egreso'},
   {id:'cne_pizza',name:'Pizza',icon:'food',color:'#C56F54',type:'egreso'},
-  {id:'cne_menu',name:'Menú',icon:'food',color:'#B58B55',type:'egreso'},
-  {id:'cne5',name:'Movilidad',icon:'transport',color:'#4F7EA8',type:'egreso'},
-  {id:'cne_salud',name:'Salud',icon:'health',color:'#B96868',type:'egreso'},
+  {id:'cne_menu',name:'Menu',icon:'food',color:'#B58B55',type:'egreso'},
+  {id:'cne5',name:'* MOVILIDAD *',icon:'transport',color:'#4F7EA8',type:'egreso'},
+  {id:'cne_salud',name:'* SALUD *',icon:'health',color:'#B96868',type:'egreso'},
   {id:'cne_salud_samara',name:'Medicina Samara',icon:'health',color:'#C2596B',type:'egreso'},
   {id:'cne_salud_medicina',name:'Medicina',icon:'health',color:'#B96868',type:'egreso'},
   {id:'cne_salud_doctor',name:'Consulta doctor',icon:'health',color:'#A05070',type:'egreso'},
-  {id:'cne_edu',name:'Educación',icon:'clipboard',color:'#2E86AB',type:'egreso'},
+  {id:'cne_edu',name:'* EDUCACION *',icon:'clipboard',color:'#2E86AB',type:'egreso'},
   {id:'cne_edu_colegio',name:'Colegio',icon:'clipboard',color:'#2E86AB',type:'egreso'},
-  {id:'cne_edu_utiles',name:'Útiles',icon:'note',color:'#4A90D9',type:'egreso'},
+  {id:'cne_edu_utiles',name:'Utiles',icon:'note',color:'#4A90D9',type:'egreso'},
   {id:'cne_luz',name:'Luz',icon:'light',color:'#D09A4E',type:'egreso'},
   {id:'cne_agua',name:'Agua',icon:'water',color:'#4F7EA8',type:'egreso'},
   {id:'cne_internet_casa',name:'Internet casa',icon:'wifi',color:'#6D8C82',type:'egreso'},
-  {id:'cne_internet_movil',name:'Internet móvil',icon:'phone',color:'#7B8790',type:'egreso'},
+  {id:'cne_internet_movil',name:'Internet movil',icon:'phone',color:'#7B8790',type:'egreso'},
   {id:'cne1',name:'Materiales',icon:'cart',color:'#B9844A',type:'egreso'},
   {id:'cne3',name:'Gasolina',icon:'fuel',color:'#B96868',type:'egreso'},
   {id:'cne2',name:'Gnv',icon:'fuel',color:'#5B6E91',type:'egreso'},
-  {id:'cne7',name:'Reparación de auto',icon:'transport',color:'#77746D',type:'egreso'},
+  {id:'cne7',name:'Reparacion de auto',icon:'transport',color:'#77746D',type:'egreso'},
   {id:'cne_agregados',name:'Agregados',icon:'box',color:'#A9895C',type:'egreso'},
-  {id:'cne_documentacion',name:'Documentación',icon:'document',color:'#77746D',type:'egreso'},
+  {id:'cne_documentacion',name:'Documentacion',icon:'document',color:'#77746D',type:'egreso'},
   {id:'cne6',name:'Otros gastos de negocio',icon:'box',color:'#77746D',type:'egreso'},
   {id:'transfer_neg_out',name:'Transferencia enviada',icon:'transfer',color:'#1565C0',type:'egreso',system:true,hidden:true},
   {id:'transfer_neg_retiro_out',name:'Retiro personal',icon:'briefcase',color:'#C9A84C',type:'egreso',system:true,hidden:true},
@@ -2278,7 +2259,7 @@ function getKeys(modo){
   if(migrated) console.log('[MisFinanzas] Keys migrados a formato fnz_neg_*');
 })();
 
-const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_voice_local_v9_expert';
+const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_voice_local_v8';
 const CATEGORY_LEGACY_DEFAULT_IDS = {
   personal: {
     ingreso: ['ci1','ci2','ci3','ci4','ci5','ci6','transfer_in','transfer_retiro_in','cneg_svc'],
@@ -2770,20 +2751,21 @@ function categoryAreaLabel(cat, type){
   const isNeg = state.modo === 'negocio';
   if(!isNeg) {
     if(type === 'ingreso') return 'Ingresos';
-    if(/mercado|super|gaseosa|agua|golosina|snack|pizza|menu|comida/.test(n)) return 'Alimentación';
+    if(/mercado|super|gaseosa|agua|golosina|snack|pizza|menu|comida/.test(n)) return 'Alimentacion';
     if(/medicina|aseo|cuidado|belleza/.test(n)) return 'Salud y cuidado';
     if(/ropa|accesorio|cine|entretenimiento|salidas/.test(n)) return 'Vida diaria';
     return 'Otros';
   }
-  if(type === 'ingreso') return 'Ingresos bloqueados';
-  if(['cne1','cne_agregados'].includes(id) || /material|agregado/.test(n)) return 'Costos directos';
-  if(['cne_gaseosa','cne_snack','cne_golosina','cne_pizza','cne_menu'].includes(id) || /gaseosa|snack|golosina|pizza|menu|almuerzo|cena|desayuno|comida|alimentacion|bebida/.test(n)) return 'Alimentación';
-  if(['cne_luz','cne_agua','cne_internet_casa','cne_internet_movil'].includes(id) || /luz|agua|internet|celular/.test(n)) return 'Fijos';
-  if(['cne_salud_samara','cne_edu_colegio','cne_edu_utiles'].includes(id) || /samara|colegio|utiles|educacion/.test(n)) return 'Hija';
-  if(['cne_personal','cne_salud','cne_salud_medicina','cne_salud_doctor'].includes(id) || /personal|medicina|doctor|salud|consulta/.test(n)) return 'Personal';
-  if(/deuda|banco|finanza|tarjeta|prestamo|interes/.test(n)) return 'Finanzas';
-  if(/hogar|casa|familia|mercado/.test(n)) return 'Hogar';
-  return 'Operación';
+  if(type === 'ingreso') {
+    if(/^cn[1-8]$/.test(id) || /punto|modificacion|instalacion|reparacion|gasfiteria|conversion|conexion|documentacion/.test(n)) return 'Servicios';
+    return 'Otros ingresos';
+  }
+  if(['cne_gaseosa','cne_snack','cne_golosina','cne_pizza','cne_menu'].includes(id) || /gaseosa|snack|golosina|pizza|menu|comida|alimentacion|bebida/.test(n)) return 'Alimentacion';
+  if(['cne5','cne2','cne3','cne7'].includes(id) || /transporte|gnv|gasolina|auto|movilidad/.test(n)) return 'Movilidad y auto';
+  if(['cne1'].includes(id) || /material/.test(n)) return 'Stock y materiales';
+  if(['cne_luz','cne_agua','cne_internet_casa','cne_internet_movil'].includes(id) || /luz|agua|internet/.test(n)) return 'Servicios fijos';
+  if(['cne_operacion','cne_personal','cne_agregados','cne_documentacion'].includes(id) || /operacion|personal|agregado|documentacion/.test(n)) return 'Operacion';
+  return 'Otros';
 }
 
 function catSelectHtml(id, type, selected, selectedCatId){
@@ -3312,349 +3294,67 @@ function toggleAgendaCard(id){
   el.classList.toggle('open');
 }
 
-
-// ── FINANCE CATEGORY EXPERT ──
-const FINANCE_EXPERT_INGRESOS = [
-  'Punto adicional',
-  'Modificación de tubería',
-  'Instalación nueva',
-  'Reparación de tubería',
-  'Gasfitería',
-  'Conversión de artefactos',
-  'Conexión de artefactos',
-  'Documentación',
-  'Otros servicios',
-  'Otros ingresos'
-];
-const FINANCE_EXPERT_EGRESO_MAIN = ['Costos directos','Operación','Alimentación','Hogar','Hija','Personal','Fijos','Finanzas'];
-const FINANCE_EXPERT_VOICE_FIXES = {
-  menus:'menu', sols:'soles', sol:'soles', gasolna:'gasolina', gasolin:'gasolina',
-  materialess:'materiales', materales:'materiales', agregao:'agregado',
-  coneccion:'conexion', combersion:'conversion', comversion:'conversion',
-  tuberia:'tuberia', geeneve:'gnv', geneve:'gnv', genuve:'gnv', gnuve:'gnv', genv:'gnv'
-};
-const FINANCE_EXPERT_PROMPT = `Actua como sistema experto de organizacion financiera para un tecnico de gas natural en Lima, Peru. Responde SOLO JSON valido.
-Entrada: {"texto":"","historial":[],"categorias_existentes":[]}
-Reglas: normaliza texto a minusculas sin tildes, corrige errores de voz, convierte numeros hablados. Ingresos SOLO: Punto adicional, Modificación de tubería, Instalación nueva, Reparación de tubería, Gasfitería, Conversión de artefactos, Conexión de artefactos, Documentación, Otros servicios, Otros ingresos. Si hay duda en ingreso usa Otros servicios. Egresos principales SOLO: Costos directos, Operación, Alimentación, Hogar, Hija, Personal, Fijos, Finanzas. Costos directos protegidos: materiales/tubos/valvulas/accesorios => Materiales; agregado => Agregados. menu/almuerzo => Alimentación/Almuerzo. cena/pizza => Alimentación/Cena. gasolina/pasaje => Operación/Movilidad. Usa historial para repetir clasificaciones. Sugiere subcategoria solo si el termino se repite varias veces y no existe una clara. No crees categorias principales.
-Salida exacta: {"texto_corregido":"","tipo":"ingreso | egreso","monto":0,"categoria_principal":"","subcategoria":"","confianza":0.0,"usar_categoria_existente":true,"sugerir_nueva_subcategoria":false,"nombre_sugerido":"","alerta":""}`;
-
-function financeExpertStripAccents(s){
-  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-}
-function financeExpertNumberText(s){
-  const units = {un:1,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9};
-  const words = {
-    cero:0,diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,
-    veinte:20,veintiuno:21,veintidos:22,veintitres:23,veinticuatro:24,veinticinco:25,veintiseis:26,veintisiete:27,veintiocho:28,veintinueve:29,
-    treinta:30,cuarenta:40,cincuenta:50,sesenta:60,setenta:70,ochenta:80,noventa:90,cien:100,ciento:100,
-    doscientos:200,trescientos:300,cuatrocientos:400,quinientos:500,seiscientos:600,setecientos:700,ochocientos:800,novecientos:900,mil:1000
-  };
-  const tens = {treinta:30,cuarenta:40,cincuenta:50,sesenta:60,setenta:70,ochenta:80,noventa:90};
-  s = s.replace(/\b(treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa)\s+y\s+(un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve)\b/g,
-    (_, a, b) => String(tens[a] + units[b]));
-  s = s.replace(/\b(dos|tres|cuatro|cinco|seis|siete|ocho|nueve)\s+mil\b/g, (_, a) => String(units[a] * 1000));
-  return s.replace(/\b(cero|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieciseis|diecisiete|dieciocho|diecinueve|veinte|veintiuno|veintidos|veintitres|veinticuatro|veinticinco|veintiseis|veintisiete|veintiocho|veintinueve|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa|cien|ciento|doscientos|trescientos|cuatrocientos|quinientos|seiscientos|setecientos|ochocientos|novecientos|mil)\b/g,
-    m => words[m] !== undefined ? String(words[m]) : m);
-}
-function financeExpertNormalizeText(text){
-  let s = financeExpertStripAccents(text).replace(/[^a-z0-9\s/.]/g,' ');
-  Object.entries(FINANCE_EXPERT_VOICE_FIXES).forEach(([bad, good])=>{
-    s = s.replace(new RegExp('\\b'+bad+'\\b','g'), good);
-  });
-  s = financeExpertNumberText(s);
-  return s.replace(/\s+/g,' ').trim();
-}
-function financeExpertHas(t, kws){ return kws.some(k => t.includes(financeExpertNormalizeText(k))); }
-function financeExpertScore(t, kws){ return kws.reduce((s,k)=>s+(t.includes(financeExpertNormalizeText(k))?1:0),0); }
-function financeExpertOutputBase(text){
-  const texto_corregido = financeExpertNormalizeText(text);
-  const monto = moneyValue(extractAmount(text) || extractAmount(texto_corregido) || 0);
-  return {texto_corregido, monto};
-}
-function financeExpertDetectType(texto, monto){
-  const t = texto;
-  const egresoClaro = financeExpertHas(t, ['menu','almuerzo','cena','pizza','comida','compra','compre','pague','gaste','gasolina','gnv','pasaje','taxi','uber','materiales','tubo','valvula','accesorio','agregado','luz','agua','internet','deuda']);
-  const ingresoClaro = financeExpertHas(t, ['cobre','cobro','me pagaron','ingreso','servicio','trabajo','instale','instalacion','conecte','conexion','repare','reparacion','modificacion','conversion','punto adicional','gasfiteria','documentacion']);
-  if(egresoClaro && !ingresoClaro) return {tipo:'egreso', confianza:.86};
-  if(ingresoClaro) return {tipo:'ingreso', confianza:.84};
-  if(monto >= 250) return {tipo:'ingreso', confianza:.58};
-  return {tipo:'egreso', confianza:.55};
-}
-function financeExpertIncomeCategory(t){
-  const rules = [
-    ['Punto adicional', ['punto adicional','punto extra','punto de gas','boca nueva','salida nueva','toma adicional']],
-    ['Modificación de tubería', ['modificacion de tuberia','modificacion de red','modificar tuberia','cambio de tuberia','mover tuberia']],
-    ['Instalación nueva', ['instalacion nueva','nueva instalacion','instalar gas','obra nueva','instalacion completa','proyecto nuevo']],
-    ['Reparación de tubería', ['reparacion de tuberia','reparacion','fuga','escape de gas','tuberia rota','arreglar tuberia']],
-    ['Gasfitería', ['gasfiteria','gasfitero','plomeria','desague','cano','caño','tuberia de agua']],
-    ['Conversión de artefactos', ['conversion','convertir','converti','adaptar artefacto','cambio a gas']],
-    ['Conexión de artefactos', ['conexion','conectar','conecte','cocina','terma','horno','secadora','parrilla','calefon','artefacto']],
-    ['Documentación', ['documentacion','tramite','certificado','plano','expediente','inspeccion','habilitacion']]
-  ];
-  let best = null;
-  rules.forEach(([cat,kws])=>{
-    const score = financeExpertScore(t,kws);
-    if(score && (!best || score > best.score)) best = {cat, score};
-  });
-  if(best) return {categoria_principal:best.cat, subcategoria:'', confianza:Math.min(.97,.82+best.score*.05)};
-  if(financeExpertHas(t, ['regalo','me dieron','aporte','apoyo','otros ingresos','ingreso extra'])) {
-    return {categoria_principal:'Otros ingresos', subcategoria:'', confianza:.78};
-  }
-  return {categoria_principal:'Otros servicios', subcategoria:'', confianza:.46};
-}
-function financeExpertExpenseCategory(t){
-  if(financeExpertHas(t, ['agregado','agregados','arena','piedra','cemento'])) return {categoria_principal:'Costos directos', subcategoria:'Agregados', confianza:.96};
-  if(financeExpertHas(t, ['material','materiales','tubo','tubos','valvula','válvula','accesorio','accesorios','codo','tee','niple','teflon','sellador','abrazadera','manguera','regulador'])) return {categoria_principal:'Costos directos', subcategoria:'Materiales', confianza:.95};
-  if(financeExpertHas(t, ['almuerzo','menu','restaurante','restaurant'])) return {categoria_principal:'Alimentación', subcategoria:'Almuerzo', confianza:.9};
-  if(financeExpertHas(t, ['cena','pizza'])) return {categoria_principal:'Alimentación', subcategoria:'Cena', confianza:.88};
-  if(financeExpertHas(t, ['desayuno'])) return {categoria_principal:'Alimentación', subcategoria:'Desayuno', confianza:.88};
-  if(financeExpertHas(t, ['gaseosa','bebida','refresco','agua botella'])) return {categoria_principal:'Alimentación', subcategoria:'Bebidas', confianza:.85};
-  if(financeExpertHas(t, ['snack','snacks','galleta','papitas','golosina','dulce','chocolate'])) return {categoria_principal:'Alimentación', subcategoria:'Snacks', confianza:.84};
-  if(financeExpertHas(t, ['gasolina','gnv','combustible','pasaje','pasajes','taxi','uber','indriver','peaje','estacionamiento','cochera','movilidad','grifo'])) return {categoria_principal:'Operación', subcategoria:'Movilidad', confianza:.88};
-  if(financeExpertHas(t, ['reparacion de auto','taller','llanta','aceite','frenos','soat','revision tecnica'])) return {categoria_principal:'Operación', subcategoria:'Mantenimiento vehicular', confianza:.86};
-  if(financeExpertHas(t, ['herramienta','herramientas','equipo','instrumento','mantenimiento negocio'])) return {categoria_principal:'Operación', subcategoria:'Herramientas', confianza:.8};
-  if(financeExpertHas(t, ['luz','enel','agua','sedapal','internet','wifi','celular','plan movil','telefono'])) {
-    const sub = financeExpertHas(t,['luz','enel']) ? 'Luz' : financeExpertHas(t,['agua','sedapal']) ? 'Agua' : financeExpertHas(t,['celular','plan movil','telefono']) ? 'Celular' : 'Internet';
-    return {categoria_principal:'Fijos', subcategoria:sub, confianza:.87};
-  }
-  if(financeExpertHas(t, ['samara','colegio','utiles','útiles','pension colegio','medicina samara'])) {
-    const sub = financeExpertHas(t,['colegio','pension']) ? 'Colegio' : financeExpertHas(t,['utiles','útiles']) ? 'Útiles' : 'Salud';
-    return {categoria_principal:'Hija', subcategoria:sub, confianza:.82};
-  }
-  if(financeExpertHas(t, ['deuda','banco','tarjeta','prestamo','interes','comision bancaria'])) return {categoria_principal:'Finanzas', subcategoria:'Deudas', confianza:.82};
-  if(financeExpertHas(t, ['personal','ayudante','empleado','jornal','mano de obra'])) return {categoria_principal:'Personal', subcategoria:'Personal', confianza:.82};
-  if(financeExpertHas(t, ['casa','hogar','mercado','super','limpieza','aseo'])) return {categoria_principal:'Hogar', subcategoria:'Casa', confianza:.68};
-  if(financeExpertHas(t, ['documentacion','tramite','papeles','certificado'])) return {categoria_principal:'Operación', subcategoria:'Documentación', confianza:.72};
-  return {categoria_principal:'Operación', subcategoria:'Otros gastos', confianza:.42};
-}
-function financeExpertHistoryItems(historial){
-  const local = (state?.transactions || []).slice(-80).map(t=>({
-    texto_corregido: t.textoCorregidoCategoria || t.description || t.category || '',
-    tipo: t.type,
-    categoria_principal: t.categoriaPrincipal || '',
-    subcategoria: t.subcategoria || ''
-  }));
-  return [...(Array.isArray(historial)?historial:[]), ...local];
-}
-function financeExpertTokens(t){
-  const stop = new Set('soles sol gasto gaste pague compre cobre cobro ingreso egreso por para del de la el los las un una en con hoy ayer manana mañana servicio trabajo'.split(' '));
-  return financeExpertNormalizeText(t).split(/\s+/).filter(w=>w.length>3 && !stop.has(w) && !/^\d+$/.test(w));
-}
-function financeExpertHistoryMatch(texto, historial){
-  const tokens = financeExpertTokens(texto);
-  if(tokens.length === 0) return null;
-  let best = null;
-  financeExpertHistoryItems(historial).forEach(h=>{
-    if(!h || !h.categoria_principal) return;
-    const ht = financeExpertTokens(h.texto_corregido || h.descripcion || h.description || '');
-    const overlap = tokens.filter(x=>ht.includes(x)).length;
-    if(overlap >= 2 && (!best || overlap > best.overlap)) best = {...h, overlap};
-  });
-  return best;
-}
-function financeExpertRepeatedSuggestion(texto, historial, categoria, subcategoria){
-  if(categoria === 'Costos directos') return {suggest:false, name:''};
-  const t = financeExpertNormalizeText(texto);
-  const candidates = [
-    ['peaje','Peajes'], ['estacionamiento','Estacionamientos'], ['cochera','Cocheras'],
-    ['flete','Fletes'], ['delivery','Delivery'], ['parqueo','Parqueos']
-  ];
-  const found = candidates.find(([raw])=>t.includes(raw));
-  if(!found) return {suggest:false, name:''};
-  const [raw, name] = found;
-  const exists = [...(state.catsEx||[]), ...(state.catsIn||[])].some(c=>financeExpertNormalizeText(c.name).includes(financeExpertNormalizeText(raw)));
-  if(exists) return {suggest:false, name:''};
-  const count = financeExpertHistoryItems(historial).filter(h=>financeExpertNormalizeText(h.texto_corregido || h.description || h.descripcion || '').includes(raw)).length + 1;
-  return count >= 3 ? {suggest:true, name} : {suggest:false, name:''};
-}
-function financeExpertAlert(tipo, monto, categoria, subcategoria){
-  const today = todayStr();
-  const duplicate = (state.transactions || []).some(t=>t.type===tipo && t.date===today && Math.abs(moneyValue(t.amount)-monto)<0.01 && normSimpleText(t.categoriaPrincipal||t.category||'')===normSimpleText(categoria || t.category || ''));
-  if(duplicate && monto>0) return 'posible gasto duplicado';
-  const txs = (state.transactions || []).filter(t=>t.type===tipo);
-  if(txs.length >= 20){
-    const count = txs.filter(t=>normSimpleText(t.categoriaPrincipal||t.category||'')===normSimpleText(categoria)).length;
-    if(count / txs.length > .6) return 'categoría muy saturada';
-  }
-  return '';
-}
-function financeExpertClassify(input){
-  const payload = typeof input === 'string' ? {texto:input} : (input || {});
-  const raw = payload.texto || '';
-  const base = financeExpertOutputBase(raw);
-  const typeGuess = financeExpertDetectType(base.texto_corregido, base.monto);
-  let cat = typeGuess.tipo === 'ingreso' ? financeExpertIncomeCategory(base.texto_corregido) : financeExpertExpenseCategory(base.texto_corregido);
-  const hist = financeExpertHistoryMatch(base.texto_corregido, payload.historial);
-  if(hist && hist.tipo === typeGuess.tipo){
-    cat = {categoria_principal:hist.categoria_principal, subcategoria:hist.subcategoria || '', confianza:Math.max(cat.confianza, .86)};
-  }
-  const suggestion = financeExpertRepeatedSuggestion(base.texto_corregido, payload.historial, cat.categoria_principal, cat.subcategoria);
-  const confianza = Math.max(.1, Math.min(.99, +(((cat.confianza || .5) + (typeGuess.confianza || .5)) / 2).toFixed(2)));
-  return {
-    texto_corregido: base.texto_corregido,
-    tipo: typeGuess.tipo,
-    monto: +(base.monto || 0),
-    categoria_principal: cat.categoria_principal,
-    subcategoria: cat.subcategoria || '',
-    confianza,
-    usar_categoria_existente: true,
-    sugerir_nueva_subcategoria: suggestion.suggest,
-    nombre_sugerido: suggestion.name,
-    alerta: financeExpertAlert(typeGuess.tipo, base.monto, cat.categoria_principal, cat.subcategoria)
-  };
-}
-function financeExpertExistingCategories(){
-  return [...(state.catsIn||[]), ...(state.catsEx||[])].filter(c=>!c.hidden&&!c.system).map(c=>({
-    nombre:c.name, tipo:c.type, grupo:categoryAreaLabel(c,c.type)
-  }));
-}
-function financeExpertHistoryForPrompt(){
-  return (state.transactions || []).slice(-40).map(t=>({
-    texto_corregido:t.textoCorregidoCategoria || t.description || '',
-    tipo:t.type,
-    categoria_principal:t.categoriaPrincipal || '',
-    subcategoria:t.subcategoria || t.category || ''
-  }));
-}
-function financeExpertFindCat(list, ids, names){
-  const all = list || [];
-  for(const id of ids || []){ const c = all.find(x=>x.id===id); if(c) return c; }
-  for(const name of names || []){ const n = normSimpleText(name); const c = all.find(x=>normSimpleText(x.name)===n); if(c) return c; }
-  return null;
-}
-function financeExpertResolveAppCategory(expert, rawText=''){
-  if(!expert) return null;
-  const t = financeExpertNormalizeText(rawText || expert.texto_corregido || '');
-  if(expert.tipo === 'ingreso'){
-    return financeExpertFindCat(state.catsIn, [], [expert.categoria_principal])
-      || financeExpertFindCat(DEFAULT_CATS_NEG_IN, [], [expert.categoria_principal])
-      || financeExpertFindCat(state.catsIn, ['cn9'], ['Otros servicios']);
-  }
-  const main = normSimpleText(expert.categoria_principal);
-  const sub = normSimpleText(expert.subcategoria);
-  if(main === 'costos directos') {
-    if(sub.includes('agregado')) return financeExpertFindCat(state.catsEx, ['cne_agregados'], ['Agregados']);
-    return financeExpertFindCat(state.catsEx, ['cne1'], ['Materiales']);
-  }
-  if(main === 'alimentacion'){
-    if(t.includes('gaseosa')||t.includes('bebida')) return financeExpertFindCat(state.catsEx, ['cne_gaseosa'], ['Gaseosa']);
-    if(t.includes('golosina')||t.includes('dulce')||t.includes('chocolate')) return financeExpertFindCat(state.catsEx, ['cne_golosina'], ['Golosina']);
-    if(t.includes('snack')||t.includes('galleta')||t.includes('papita')) return financeExpertFindCat(state.catsEx, ['cne_snack'], ['Snack']);
-    if(t.includes('pizza')) return financeExpertFindCat(state.catsEx, ['cne_pizza'], ['Pizza']);
-    return financeExpertFindCat(state.catsEx, ['cne_menu'], ['Menú','Menu']);
-  }
-  if(main === 'operacion'){
-    if(t.includes('gnv')) return financeExpertFindCat(state.catsEx, ['cne2'], ['Gnv']);
-    if(t.includes('gasolina')||t.includes('combustible')||t.includes('grifo')) return financeExpertFindCat(state.catsEx, ['cne3'], ['Gasolina']);
-    if(sub.includes('mantenimiento')) return financeExpertFindCat(state.catsEx, ['cne7'], ['Reparación de auto']);
-    if(sub.includes('documentacion')) return financeExpertFindCat(state.catsEx, ['cne_documentacion'], ['Documentación']);
-    if(sub.includes('herramienta')) return financeExpertFindCat(state.catsEx, ['cne_operacion'], ['Operación']);
-    return financeExpertFindCat(state.catsEx, ['cne5'], ['Movilidad']);
-  }
-  if(main === 'fijos'){
-    if(sub.includes('luz')) return financeExpertFindCat(state.catsEx, ['cne_luz'], ['Luz']);
-    if(sub.includes('agua')) return financeExpertFindCat(state.catsEx, ['cne_agua'], ['Agua']);
-    if(sub.includes('celular')) return financeExpertFindCat(state.catsEx, ['cne_internet_movil'], ['Internet móvil']);
-    return financeExpertFindCat(state.catsEx, ['cne_internet_casa'], ['Internet casa']);
-  }
-  if(main === 'hija'){
-    if(sub.includes('colegio')) return financeExpertFindCat(state.catsEx, ['cne_edu_colegio'], ['Colegio']);
-    if(sub.includes('util')) return financeExpertFindCat(state.catsEx, ['cne_edu_utiles'], ['Útiles','Utiles']);
-    return financeExpertFindCat(state.catsEx, ['cne_salud_samara'], ['Medicina Samara']);
-  }
-  if(main === 'personal'){
-    return financeExpertFindCat(state.catsEx, ['cne_personal','cne_salud_medicina','cne_salud_doctor'], ['Personal','Medicina','Consulta doctor']);
-  }
-  return financeExpertFindCat(state.catsEx, ['cne6'], ['Otros gastos de negocio']);
-}
-function renderFinanceExpertPanel(){
-  const sample = financeExpertClassify({texto:'menus veinte sols', historial:[], categorias_existentes:financeExpertExistingCategories()});
-  return `
-    <div class="card cat-ai-card">
-      <div class="cat-ai-head">
-        <div class="cat-ai-title">Sistema experto</div>
-        <div class="cat-ai-status">JSON estricto</div>
-      </div>
-      <div class="cat-ai-fixed">
-        <div class="cat-ai-block">
-          <div class="cat-ai-label">Ingresos bloqueados</div>
-          <div class="cat-ai-pills">${FINANCE_EXPERT_INGRESOS.map(x=>`<span class="cat-ai-pill lock">${esc(x)}</span>`).join('')}</div>
-        </div>
-        <div class="cat-ai-block">
-          <div class="cat-ai-label">Egresos principales</div>
-          <div class="cat-ai-pills">${FINANCE_EXPERT_EGRESO_MAIN.map(x=>`<span class="cat-ai-pill">${esc(x)}</span>`).join('')}</div>
-        </div>
-      </div>
-      <textarea id="cat-ai-text" class="cat-ai-input" placeholder="Ej: menus veinte sols">menus veinte sols</textarea>
-      <div class="cat-ai-actions">
-        <button class="primary" onclick="probarClasificadorCategorias()">Probar JSON</button>
-        <button onclick="copiarPromptClasificadorCategorias()">Copiar prompt</button>
-      </div>
-      <pre id="cat-ai-json" class="cat-ai-json">${esc(JSON.stringify(sample,null,2))}</pre>
-    </div>`;
-}
-function probarClasificadorCategorias(){
-  const input = document.getElementById('cat-ai-text');
-  const out = document.getElementById('cat-ai-json');
-  if(!input || !out) return;
-  const result = financeExpertClassify({
-    texto: input.value,
-    historial: financeExpertHistoryForPrompt(),
-    categorias_existentes: financeExpertExistingCategories()
-  });
-  out.textContent = JSON.stringify(result, null, 2);
-}
-function copiarPromptClasificadorCategorias(){
-  const payload = FINANCE_EXPERT_PROMPT;
-  const done = () => toast('Prompt copiado');
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(payload).then(done).catch(()=>financeExpertFallbackCopy(payload, done));
-  } else {
-    financeExpertFallbackCopy(payload, done);
-  }
-}
-function financeExpertFallbackCopy(text, done){
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.select();
-  try{ document.execCommand('copy'); done && done(); }catch(e){ toast('No se pudo copiar','error'); }
-  ta.remove();
-}
-
 // ── CATEGORIES PAGE ──
 let catPageType = 'ingreso';
 function renderCategorias(){
-  const list = (catPageType==='ingreso'?state.catsIn:state.catsEx).filter(c=>!c.hidden && !c.system);
+  const ingresos = (state.catsIn || []).filter(c => !c.hidden && !c.system);
+  const egresos = (state.catsEx || []).filter(c => !c.hidden && !c.system);
+  const list = catPageType === 'ingreso' ? ingresos : egresos;
+  const activeColor = catPageType === 'ingreso' ? '#4F8A6D' : '#A85D5D';
+  const activeSoft = catPageType === 'ingreso' ? '#EEF7F2' : '#FFF1F1';
+  const title = catPageType === 'ingreso' ? 'Ingresos' : 'Egresos';
+
+  const chip = c => `
+    <div onclick="openEditCat('${c.id}')" style="position:relative;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:14px;padding:12px;min-height:82px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 8px 24px rgba(15,23,42,.04);cursor:pointer">
+      <button onclick="event.stopPropagation();deleteCat('${c.id}')" title="Eliminar" style="position:absolute;top:8px;right:8px;width:24px;height:24px;border:none;border-radius:8px;background:#F8FAFC;color:#94A3B8;font-size:13px;line-height:1;cursor:pointer">×</button>
+      <div style="width:38px;height:38px;border-radius:12px;background:${c.color}18;border:1px solid ${c.color}33;display:flex;align-items:center;justify-content:center;font-size:20px">${iconHtml(c.icon)}</div>
+      <div style="display:flex;align-items:end;justify-content:space-between;gap:10px;margin-top:10px">
+        <div style="min-width:0;font-size:13px;font-weight:800;color:#1F2937;line-height:1.2;overflow:hidden;text-overflow:ellipsis">${gfHtml(c.name)}</div>
+        <div style="width:8px;height:8px;border-radius:50%;background:${c.color};flex-shrink:0"></div>
+      </div>
+    </div>`;
+
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold)">Categorías</div>
-      <button class="btn-gold" style="padding:8px 14px;font-size:13px" onclick="openAddCat()">＋ Nueva</button>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:16px">
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-size:24px;color:#20352B;font-weight:900;line-height:1">Categorías</div>
+        <div style="font-size:12px;color:#64748B;margin-top:5px">${title} del negocio</div>
+      </div>
+      <button class="btn-gold" style="padding:10px 16px;font-size:13px;border-radius:14px;background:#4F8A6D;box-shadow:0 10px 24px rgba(79,138,109,.18)" onclick="openAddCat()">+ Nueva</button>
     </div>
-    <div class="cat-type-toggle">
-      <button class="cat-type-btn ${catPageType==='ingreso'?'active-in':''}" onclick="setCatType('ingreso')">↑ Ingresos</button>
-      <button class="cat-type-btn ${catPageType==='egreso'?'active-out':''}" onclick="setCatType('egreso')">↓ Egresos</button>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <button onclick="setCatType('ingreso')" style="border:1px solid ${catPageType==='ingreso'?'#BBD8C8':'#E5E7EB'};background:${catPageType==='ingreso'?'#EEF7F2':'#FFFFFF'};color:${catPageType==='ingreso'?'#2F6F53':'#64748B'};border-radius:14px;padding:13px 10px;font-weight:900;font-size:13px;box-shadow:${catPageType==='ingreso'?'0 8px 20px rgba(79,138,109,.08)':'none'};cursor:pointer">Ingresos</button>
+      <button onclick="setCatType('egreso')" style="border:1px solid ${catPageType==='egreso'?'#F0C4C4':'#E5E7EB'};background:${catPageType==='egreso'?'#FFF1F1':'#FFFFFF'};color:${catPageType==='egreso'?'#9D3E3E':'#64748B'};border-radius:14px;padding:13px 10px;font-weight:900;font-size:13px;box-shadow:${catPageType==='egreso'?'0 8px 20px rgba(168,93,93,.08)':'none'};cursor:pointer">Egresos</button>
     </div>
-    ${state.modo==='negocio'?renderFinanceExpertPanel():''}
-    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">${list.length} categoría${list.length!==1?'s':''} · Mantén presionado para eliminar</div>
-    <div class="cat-grid">
-      ${list.map(c=>`
-        <div class="cat-chip" onclick="openEditCat('${c.id}')">
-          <button class="cat-chip-del" onclick="event.stopPropagation();deleteCat('${c.id}')">✕</button>
-          <div style="width:48px;height:48px;border-radius:12px;background:${c.color}15;border:1px solid ${c.color}44;display:flex;align-items:center;justify-content:center;font-size:24px">${iconHtml(c.icon)}</div>
-          <div class="cat-chip-name" style="color:var(--text)">${c.name}</div>
-          <div style="width:8px;height:8px;border-radius:50%;background:${c.color}"></div>
-        </div>`).join('')}
-      <div class="cat-chip" style="border-style:dashed;opacity:.5" onclick="openAddCat()">
-        <div style="width:48px;height:48px;border-radius:12px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--muted)">＋</div>
-        <div class="cat-chip-name" style="color:var(--muted)">Nueva</div>
+
+    <div style="background:#0F172A;border:1px solid #1E293B;border-radius:18px;padding:16px;margin-bottom:14px;color:#F8FAFC;box-shadow:0 16px 35px rgba(15,23,42,.12)">
+      <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start">
+        <div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#94A3B8;font-weight:900;margin-bottom:6px">Organización</div>
+          <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:900;line-height:1">${list.length}</div>
+          <div style="font-size:12px;color:#CBD5E1;margin-top:5px">${title.toLowerCase()} activos</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#94A3B8;font-weight:900;margin-bottom:6px">Total</div>
+          <div style="font-size:14px;font-weight:900;color:#E7C76A">${ingresos.length} in · ${egresos.length} eg</div>
+        </div>
       </div>
     </div>
-    <div class="card" style="background:#FFFBEB;border-color:#C9A84C33;margin-top:4px">
-      <div style="font-size:12px;color:var(--muted);line-height:1.6">
-        💡 <strong style="color:var(--text)">Tip:</strong> Crea categorías personalizadas para clasificar mejor tus ${catPageType==='ingreso'?'ingresos':'gastos'}. Elige un emoji y color que te ayuden a identificarlas rápido.
+
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px">
+      ${list.map(chip).join('')}
+      <div onclick="openAddCat()" style="background:${activeSoft};border:1px dashed ${activeColor}66;border-radius:14px;padding:12px;min-height:82px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:${activeColor};font-weight:900;cursor:pointer">
+        <div style="width:34px;height:34px;border-radius:12px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:22px">+</div>
+        <div style="font-size:13px">Nueva categoría</div>
+      </div>
+    </div>
+
+    <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;padding:14px;box-shadow:0 10px 25px rgba(15,23,42,.04)">
+      <div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:900;margin-bottom:10px">Resumen</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="border-radius:12px;background:#EEF7F2;padding:12px"><div style="font-size:11px;color:#4F8A6D;font-weight:900">Ingresos</div><div style="font-size:20px;font-family:'Playfair Display',serif;color:#2F6F53;font-weight:900">${ingresos.length}</div></div>
+        <div style="border-radius:12px;background:#FFF1F1;padding:12px"><div style="font-size:11px;color:#A85D5D;font-weight:900">Egresos</div><div style="font-size:20px;font-family:'Playfair Display',serif;color:#9D3E3E;font-weight:900">${egresos.length}</div></div>
       </div>
     </div>`;
 }
@@ -5098,116 +4798,116 @@ function renderGraficos(){
   const enfoque = enfoqueSemanal ? data.resumen_semana : data.resumen_mes;
   const progressPct = Math.max(0, Math.min(100, Math.round(json.meta.progreso * 100)));
   const estadoColor = gfcEstadoColor(json.header.estado);
-  const alertasHtml = json.alertas.length
-    ? json.alertas.map(a => `<div style="background:#fff;border-left:4px solid #C62828;border-radius:8px;padding:9px 10px;font-size:12px;color:#7F1D1D;font-weight:700;margin-bottom:7px">${gfHtml(a)}</div>`).join('')
-    : `<div style="background:#ECFDF5;border:1px solid #BBF7D0;border-radius:8px;padding:10px;font-size:12px;color:#047857;font-weight:800">Sin alertas criticas ahora.</div>`;
+  const estadoSoft = json.header.estado === 'verde' ? '#ECFDF5' : json.header.estado === 'rojo' ? '#FEF2F2' : '#FFFBEB';
+  const estadoText = json.header.estado === 'verde' ? '#047857' : json.header.estado === 'rojo' ? '#B91C1C' : '#B45309';
   const maxHist = Math.max(1, ...data.historial_ultimos_7_dias.map(x => Math.abs(x.ganancia)));
-  const histHtml = data.historial_ultimos_7_dias.map(x => gfcMiniBar(x.fecha.slice(5), x.ganancia, maxHist, x.ganancia >= 0 ? '#059669' : '#C62828')).join('');
-  const topDistricts = data.ganancia_por_distrito.slice(0, 3).map(x => gfcMiniBar(x.nombre, x.ganancia, Math.max(1, data.ganancia_por_distrito[0]?.ganancia || 1), '#2E86AB')).join('') || '<div style="font-size:12px;color:#64748B">Sin distritos con ganancia registrada.</div>';
-  const topServices = data.ganancia_por_servicio.slice(0, 3).map(x => gfcMiniBar(x.nombre, x.ganancia, Math.max(1, data.ganancia_por_servicio[0]?.ganancia || 1), '#C9A84C')).join('') || '<div style="font-size:12px;color:#64748B">Sin servicios rentables registrados.</div>';
+  const alertCount = json.alertas.length;
+  const principal = json.header.estado === 'verde'
+    ? 'Mantén el ritmo y protege la ganancia.'
+    : json.header.estado === 'rojo'
+      ? 'Necesitas producir antes de seguir gastando.'
+      : 'Estás cerca, pero el día todavía no está cerrado.';
+  const hist = data.historial_ultimos_7_dias.map(x => {
+    const h = Math.max(8, Math.min(72, Math.round((Math.abs(x.ganancia) / maxHist) * 72)));
+    const c = x.ganancia >= 0 ? '#4F8A6D' : '#C45454';
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0">
+      <div style="height:76px;display:flex;align-items:flex-end;width:100%">
+        <div title="${gfcMoneyText(x.ganancia)}" style="height:${h}px;background:${c};border-radius:9px 9px 3px 3px;width:100%"></div>
+      </div>
+      <div style="font-size:10px;color:#64748B;font-weight:800">${x.fecha.slice(8)}</div>
+    </div>`;
+  }).join('');
+  const alertas = alertCount ? json.alertas.slice(0, 3).map(a => `<div style="font-size:12px;line-height:1.35;color:#7F1D1D;background:#FFF7F7;border:1px solid #FECACA;border-radius:12px;padding:10px;font-weight:800">${gfHtml(a)}</div>`).join('') : `<div style="font-size:12px;color:#047857;background:#ECFDF5;border:1px solid #BBF7D0;border-radius:12px;padding:10px;font-weight:900">Sin alertas críticas.</div>`;
+  const bestDistrict = data.ganancia_por_distrito[0];
+  const bestService = data.ganancia_por_servicio[0];
 
   return `
-    <div style="font-family:'Playfair Display',serif;font-size:19px;color:var(--gold);margin-bottom:12px">Panel de control</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px">
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-size:24px;color:#20352B;font-weight:900;line-height:1">Control financiero</div>
+        <div style="font-size:12px;color:#64748B;margin-top:5px">${data.fecha_actual} · ${data.hora_actual}</div>
+      </div>
+      <button onclick="openGraficosMetas()" title="Metas" style="width:42px;height:42px;border:none;border-radius:14px;background:#FFFFFF;color:#47606A;box-shadow:0 10px 24px rgba(15,23,42,.08);font-weight:900;cursor:pointer">⚙</button>
+    </div>
 
-    <div class="card" style="margin-bottom:12px;background:#0F172A;border:1px solid #1E293B;color:#F8FAFC">
-      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:10px">
+    <div style="background:#0F172A;border:1px solid #1E293B;border-radius:22px;padding:18px;margin-bottom:14px;color:#F8FAFC;box-shadow:0 18px 42px rgba(15,23,42,.18)">
+      <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px">
         <div style="min-width:0">
-          <div style="font-size:10px;text-transform:uppercase;color:#CBD5E1;font-weight:900;margin-bottom:5px">Estado del dia</div>
-          <div style="font-family:'Playfair Display',serif;font-size:24px;color:${estadoColor};font-weight:900;line-height:1.05">${json.header.titulo}</div>
-          <div style="font-size:12px;color:#E2E8F0;line-height:1.35;margin-top:7px">${json.header.mensaje}</div>
+          <div style="display:inline-flex;align-items:center;border-radius:999px;background:${estadoSoft};color:${estadoText};padding:6px 10px;font-size:11px;font-weight:900;margin-bottom:12px">${json.header.titulo}</div>
+          <div style="font-family:'Playfair Display',serif;font-size:34px;font-weight:900;line-height:.95;color:${estadoColor}">${gfcMoneyText(json.resumen_dia.ganancia)}</div>
+          <div style="font-size:13px;color:#CBD5E1;margin-top:8px;line-height:1.35">${principal}</div>
         </div>
-        <button onclick="openGraficosMetas()" title="Ajustar metas" style="width:38px;height:38px;border:none;border-radius:10px;background:#1E293B;color:#F8FAFC;font-weight:900;cursor:pointer">⚙</button>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;font-weight:900">Servicios</div>
+          <div style="font-family:'Playfair Display',serif;font-size:30px;font-weight:900;color:#FFFFFF">${json.resumen_dia.servicios}</div>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(255,255,255,.06);border-radius:8px;padding:9px 10px;font-size:12px;color:#F8FAFC;font-weight:800">
-        <span>${json.header.resumen}</span>
-        <span>${data.fecha_actual}</span>
-      </div>
-    </div>
-
-    <div style="display:flex;background:#F1F5F9;border-radius:10px;padding:4px;margin-bottom:12px">
-      <button onclick="toggleGraficosVista('semanal')" style="flex:1;padding:8px;border-radius:8px;border:none;background:${enfoqueSemanal?'#fff':'transparent'};color:${enfoqueSemanal?'var(--gold)':'var(--muted)'};font-weight:800;box-shadow:${enfoqueSemanal?'0 2px 4px rgba(0,0,0,.06)':'none'};cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">Semanal</button>
-      <button onclick="toggleGraficosVista('mensual')" style="flex:1;padding:8px;border-radius:8px;border:none;background:${!enfoqueSemanal?'#fff':'transparent'};color:${!enfoqueSemanal?'var(--gold)':'var(--muted)'};font-weight:800;box-shadow:${!enfoqueSemanal?'0 2px 4px rgba(0,0,0,.06)':'none'};cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">Mensual</button>
-    </div>
-
-    <div class="card" style="margin-bottom:12px;border:1px solid ${estadoColor}33;background:#F8FAFC">
-      <div class="section-title" style="color:${estadoColor}">Resumen rapido</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px">
-        ${gfcPanelMetric('Ganancia hoy', gfcMoneyText(json.resumen_dia.ganancia), `${json.resumen_dia.servicios} servicio(s)`, json.resumen_dia.ganancia >= 0 ? '#059669' : '#C62828')}
-        ${gfcPanelMetric('Gastos hoy', gfcMoneyText(json.resumen_dia.gastos), `Ingresos ${gfcMoneyText(json.resumen_dia.ingresos)}`, '#C62828')}
-        ${gfcPanelMetric(enfoqueSemanal ? 'Ganancia semana' : 'Ganancia mes', gfcMoneyText(enfoque.ganancia), `${enfoque.servicios} servicio(s)`, enfoque.ganancia >= 0 ? '#059669' : '#C62828')}
-        ${gfcPanelMetric(enfoqueSemanal ? 'Gastos semana' : 'Gastos mes', gfcMoneyText(enfoque.egresos), enfoque.range.label, '#B45309')}
+      <div style="height:9px;border-radius:99px;background:#1E293B;overflow:hidden;margin-bottom:10px"><div style="height:100%;width:${progressPct}%;background:${estadoColor};border-radius:99px"></div></div>
+      <div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#CBD5E1;font-weight:800">
+        <span>${progressPct}% de meta diaria</span>
+        <span>${gfcMoneyText(json.meta.meta_diaria)}</span>
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <button onclick="toggleGraficosVista('semanal')" style="border:1px solid ${enfoqueSemanal?'#BBD8C8':'#E5E7EB'};background:${enfoqueSemanal?'#EEF7F2':'#FFFFFF'};color:${enfoqueSemanal?'#2F6F53':'#64748B'};border-radius:14px;padding:12px 10px;font-weight:900;font-size:13px;box-shadow:${enfoqueSemanal?'0 8px 20px rgba(79,138,109,.08)':'none'};cursor:pointer">Semana</button>
+      <button onclick="toggleGraficosVista('mensual')" style="border:1px solid ${!enfoqueSemanal?'#BBD8C8':'#E5E7EB'};background:${!enfoqueSemanal?'#EEF7F2':'#FFFFFF'};color:${!enfoqueSemanal?'#2F6F53':'#64748B'};border-radius:14px;padding:12px 10px;font-weight:900;font-size:13px;box-shadow:${!enfoqueSemanal?'0 8px 20px rgba(79,138,109,.08)':'none'};cursor:pointer">Mes</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:14px">
+      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;padding:12px;box-shadow:0 10px 25px rgba(15,23,42,.04)"><div style="font-size:10px;color:#64748B;text-transform:uppercase;font-weight:900">Ganancia</div><div style="font-size:18px;font-family:'Playfair Display',serif;color:${enfoque.ganancia>=0?'#2F6F53':'#B91C1C'};font-weight:900;margin-top:5px">${gfcMoneyText(enfoque.ganancia)}</div></div>
+      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;padding:12px;box-shadow:0 10px 25px rgba(15,23,42,.04)"><div style="font-size:10px;color:#64748B;text-transform:uppercase;font-weight:900">Gastos</div><div style="font-size:18px;font-family:'Playfair Display',serif;color:#A85D5D;font-weight:900;margin-top:5px">${gfcMoneyText(enfoque.egresos)}</div></div>
+      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;padding:12px;box-shadow:0 10px 25px rgba(15,23,42,.04)"><div style="font-size:10px;color:#64748B;text-transform:uppercase;font-weight:900">Trabajos</div><div style="font-size:18px;font-family:'Playfair Display',serif;color:#20352B;font-weight:900;margin-top:5px">${enfoque.servicios}</div></div>
+    </div>
+
+    <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:18px;padding:15px;margin-bottom:14px;box-shadow:0 12px 30px rgba(15,23,42,.05)">
+      <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px">
+        <div><div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:900">Siguiente acción</div><div style="font-size:16px;color:#111827;font-weight:900;margin-top:4px">${gfHtml(json.recomendaciones.servicios_objetivo)}</div></div>
+        <div style="text-align:right"><div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:900">Mínimo</div><div style="font-size:16px;color:#2F6F53;font-weight:900;margin-top:4px">${gfHtml(json.recomendaciones.ingreso_objetivo)}</div></div>
+      </div>
+      <div style="font-size:13px;color:#334155;line-height:1.45;background:#F8FAFC;border-radius:14px;padding:12px;font-weight:700">${gfHtml(json.recomendaciones.accion)}</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:18px;padding:14px;box-shadow:0 10px 25px rgba(15,23,42,.04)">
+        <div style="font-size:12px;color:#B45309;text-transform:uppercase;font-weight:900">Deuda</div>
+        <div style="font-size:19px;font-family:'Playfair Display',serif;color:#9A3412;font-weight:900;margin-top:5px">${gfcMoneyText(json.deudas.cuota_mensual)}</div>
+        <div style="font-size:11px;color:#9A3412;margin-top:4px;font-weight:800">${json.deudas.estado}</div>
+      </div>
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:18px;padding:14px;box-shadow:0 10px 25px rgba(15,23,42,.04)">
+        <div style="font-size:12px;color:#1D4ED8;text-transform:uppercase;font-weight:900">Proyección</div>
+        <div style="font-size:19px;font-family:'Playfair Display',serif;color:#1D4ED8;font-weight:900;margin-top:5px">${gfcMoneyText(json.proyeccion.mejorada)}</div>
+        <div style="font-size:11px;color:#1D4ED8;margin-top:4px;font-weight:800">ritmo +30%</div>
+      </div>
+    </div>
+
+    <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:18px;padding:15px;margin-bottom:14px;box-shadow:0 12px 30px rgba(15,23,42,.05)">
+      <div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:900;margin-bottom:12px">Últimos 7 días</div>
+      <div style="display:flex;gap:7px;align-items:flex-end">${hist}</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:18px;padding:14px;box-shadow:0 10px 25px rgba(15,23,42,.04)"><div style="font-size:11px;color:#64748B;text-transform:uppercase;font-weight:900">Zona fuerte</div><div style="font-size:14px;color:#111827;font-weight:900;margin-top:6px;line-height:1.25">${gfHtml(bestDistrict?.nombre || 'Sin datos')}</div><div style="font-size:12px;color:#2F6F53;font-weight:900;margin-top:5px">${bestDistrict ? gfcMoneyText(bestDistrict.ganancia) : '-'}</div></div>
+      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:18px;padding:14px;box-shadow:0 10px 25px rgba(15,23,42,.04)"><div style="font-size:11px;color:#64748B;text-transform:uppercase;font-weight:900">Servicio fuerte</div><div style="font-size:14px;color:#111827;font-weight:900;margin-top:6px;line-height:1.25">${gfHtml(bestService?.nombre || 'Sin datos')}</div><div style="font-size:12px;color:#2F6F53;font-weight:900;margin-top:5px">${bestService ? gfcMoneyText(bestService.ganancia) : '-'}</div></div>
+    </div>
+
+    <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:18px;padding:15px;margin-bottom:14px;box-shadow:0 12px 30px rgba(15,23,42,.05)">
+      <div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:900;margin-bottom:10px">Alertas</div>
+      <div style="display:flex;flex-direction:column;gap:8px">${alertas}</div>
+    </div>
+
+    <div style="background:#171717;border:1px solid #2A2A2A;border-radius:20px;padding:16px;margin-bottom:12px;color:#FFFFFF;box-shadow:0 18px 42px rgba(0,0,0,.16)">
+      <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;align-items:flex-start">
         <div>
-          <div class="section-title">Progreso vs meta</div>
-          <div class="section-sub">${gfcMoneyText(json.resumen_dia.ganancia)} de ${gfcMoneyText(json.meta.meta_diaria)}</div>
+          <div style="font-family:'Playfair Display',serif;font-size:18px;color:#F2B66D;font-weight:900">Mentor</div>
+          <div style="font-size:12px;color:#BDBDBD;margin-top:4px">Directo, exigente y accionable.</div>
         </div>
-        <div style="font-size:22px;font-family:'Playfair Display',serif;font-weight:900;color:${estadoColor}">${progressPct}%</div>
+        <button onclick="detenerDiscurso()" title="Detener voz" style="width:34px;height:34px;border:1px solid #444;background:#222;color:#CCC;border-radius:11px;cursor:pointer">■</button>
       </div>
-      <div class="progress-bar" style="height:10px"><div class="progress-fill" style="width:${Math.min(100, progressPct)}%;background:${estadoColor}"></div></div>
-    </div>
-
-    <div class="card" style="margin-bottom:12px;border:1px solid #FCA5A533;background:#FEF2F2">
-      <div class="section-title" style="color:#C62828">Alertas automaticas</div>
-      <div style="margin-top:9px">${alertasHtml}</div>
-    </div>
-
-    <div class="card" style="margin-bottom:12px;background:#FFF7ED;border:1px solid #FED7AA">
-      <div class="section-title" style="color:#B45309">Deudas</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px">
-        ${gfcPanelMetric('Deuda total', gfcMoneyText(json.deudas.total), 'saldo estimado', '#C62828')}
-        ${gfcPanelMetric('Cuota mensual', gfcMoneyText(json.deudas.cuota_mensual), json.deudas.estado, '#B45309')}
-      </div>
-      <div style="background:#fff;border:1px solid #FED7AA;border-radius:8px;padding:10px;margin-top:10px;font-size:12px;color:#7C2D12;line-height:1.45;font-weight:700">
-        ${gfHtml(json.deudas.mensaje)} ${json.deudas.faltante > 0 ? 'Faltante: ' + gfcMoneyText(json.deudas.faltante) + '.' : ''}
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:12px;background:#EFF6FF;border:1px solid #BFDBFE">
-      <div class="section-title" style="color:#1D4ED8">Proyeccion</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px">
-        ${gfcPanelMetric('Ritmo actual', gfcMoneyText(json.proyeccion.actual), `${data.dias_restantes_mes} dia(s) restantes`, '#1D4ED8')}
-        ${gfcPanelMetric('Ritmo +30%', gfcMoneyText(json.proyeccion.mejorada), `Necesario ${gfcMoneyText(json.proyeccion.necesario)}`, '#059669')}
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:12px">
-      <div class="section-title">Inteligencia de negocio</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
-        <div style="min-width:0"><div style="font-size:11px;color:#64748B;font-weight:900;text-transform:uppercase;margin-bottom:8px">Zonas</div>${topDistricts}</div>
-        <div style="min-width:0"><div style="font-size:11px;color:#64748B;font-weight:900;text-transform:uppercase;margin-bottom:8px">Servicios</div>${topServices}</div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:12px;background:#0F172A;border:1px solid #1E293B;color:#F8FAFC">
-      <div style="font-family:'Playfair Display',serif;font-size:16px;color:#F8FAFC;margin-bottom:9px">Accion inmediata</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px">
-        <div style="background:#1E293B;border-radius:8px;padding:10px"><div style="font-size:10px;color:#94A3B8;text-transform:uppercase;font-weight:900">Servicios</div><div style="font-size:14px;color:#F8FAFC;font-weight:900;margin-top:4px">${gfHtml(json.recomendaciones.servicios_objetivo)}</div></div>
-        <div style="background:#1E293B;border-radius:8px;padding:10px"><div style="font-size:10px;color:#94A3B8;text-transform:uppercase;font-weight:900">Ingreso minimo</div><div style="font-size:14px;color:#F8FAFC;font-weight:900;margin-top:4px">${gfHtml(json.recomendaciones.ingreso_objetivo)}</div></div>
-      </div>
-      <div style="background:rgba(255,255,255,.06);border-radius:8px;padding:10px;font-size:12px;line-height:1.45;color:#E2E8F0;font-weight:700">${gfHtml(json.recomendaciones.accion)}</div>
-    </div>
-
-    <div class="card" style="margin-bottom:12px">
-      <div class="section-title">Ultimos 7 dias</div>
-      <div style="margin-top:10px">${histHtml}</div>
-    </div>
-
-    <div class="card" style="margin-bottom:12px;background:#1A1A1A;border:1px solid #333;color:#fff">
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px">
-        <div>
-          <div style="font-family:'Playfair Display',serif;font-size:16px;color:#E67E22">Mentor IA modo hombre</div>
-          <div style="font-size:12px;color:#BDBDBD;margin-top:3px;line-height:1.35">Honesto, directo y enfocado en accion.</div>
-        </div>
-      </div>
-      <div id="box-mentor-ai" style="display:block;background:#242424;border-left:3px solid #E67E22;padding:12px;border-radius:0 8px 8px 0;margin-bottom:12px;font-size:13px;line-height:1.5;color:#eee">
+      <div id="box-mentor-ai" style="display:block;background:#222;border-left:3px solid #F2B66D;border-radius:0 14px 14px 0;padding:12px;margin-bottom:12px;font-size:13px;line-height:1.5;color:#EEE">
         <div id="txt-mentor-ai">${gfHtml(json.mentor)}</div>
       </div>
-      <button id="btn-mentor-ai" onclick="reproducirUltimoDiscurso()" style="width:100%;background:linear-gradient(135deg,#D35400,#C0392B);color:#fff;border:none;border-radius:8px;padding:12px;font-family:'DM Sans',sans-serif;font-weight:800;font-size:13px;cursor:pointer">Reproducir discurso</button>
-      <button onclick="detenerDiscurso()" style="width:100%;margin-top:8px;background:none;border:1px solid #555;border-radius:8px;color:#ccc;font-size:12px;padding:8px;cursor:pointer">Detener voz</button>
+      <button id="btn-mentor-ai" onclick="reproducirUltimoDiscurso()" style="width:100%;background:#D87332;color:#fff;border:none;border-radius:14px;padding:12px;font-family:'DM Sans',sans-serif;font-weight:900;font-size:13px;cursor:pointer">Escuchar mentor</button>
     </div>`;
 }
 
@@ -6155,36 +5855,36 @@ function _mapearCategoriaNotion(texto) {
   const t = texto.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   // ★ Valores exactos del CSV de Notion (mayúsculas normalizadas)
   if (t === 'punto adicional')  return 'Punto adicional';
-  if (t === 'conexion')         return 'Conexión de artefactos';
-  if (t === 'conversion')       return 'Conversión de artefactos';
-  if (t === 'modificacion')     return 'Modificación de tubería';
-  if (t === 'reparacion')       return 'Reparación de tubería';
-  if (t === 'instalacion nueva')return 'Instalación nueva';
-  if (t === 'instalacion')      return 'Instalación nueva';
-  if (t === 'gasfiteria')       return 'Gasfitería';
-  if (t === 'documentacion')    return 'Documentación';
-  if (t === 'terma')            return 'Conexión de artefactos';
-  if (t === 'cocina')           return 'Conexión de artefactos';
-  if (t === 'horno')            return 'Conexión de artefactos';
-  if (t === 'parrilla')         return 'Conexión de artefactos';
-  if (t === 'secadora')         return 'Conexión de artefactos';
-  if (t === 'calefon')          return 'Conexión de artefactos';
+  if (t === 'conexion')         return 'Conexion de artefactos';
+  if (t === 'conversion')       return 'Conversion de artefactos';
+  if (t === 'modificacion')     return 'Modificacion de tuberia';
+  if (t === 'reparacion')       return 'Reparacion de tuberia';
+  if (t === 'instalacion nueva')return 'Instalacion nueva';
+  if (t === 'instalacion')      return 'Instalacion nueva';
+  if (t === 'gasfiteria')       return 'Gasfiteria';
+  if (t === 'documentacion')    return 'Documentacion';
+  if (t === 'terma')            return 'Conexion de artefactos';
+  if (t === 'cocina')           return 'Conexion de artefactos';
+  if (t === 'horno')            return 'Conexion de artefactos';
+  if (t === 'parrilla')         return 'Conexion de artefactos';
+  if (t === 'secadora')         return 'Conexion de artefactos';
+  if (t === 'calefon')          return 'Conexion de artefactos';
   if (t === 'rejilla')          return 'Otros servicios';
-  if (t === 'gestion')          return 'Documentación';
+  if (t === 'gestion')          return 'Documentacion';
   // Búsqueda parcial como respaldo
   if (t.includes('punto adi'))  return 'Punto adicional';
-  if (t.includes('conexion'))   return 'Conexión de artefactos';
-  if (t.includes('conversion')) return 'Conversión de artefactos';
-  if (t.includes('modific'))    return 'Modificación de tubería';
-  if (t.includes('reparac'))    return 'Reparación de tubería';
-  if (t.includes('instalac'))   return 'Instalación nueva';
-  if (t.includes('gasfiter'))   return 'Gasfitería';
-  if (t.includes('document'))   return 'Documentación';
-  if (t.includes('terma') || t.includes('calefon')) return 'Conexión de artefactos';
-  if (t.includes('cocina'))     return 'Conexión de artefactos';
-  if (t.includes('horno'))      return 'Conexión de artefactos';
-  if (t.includes('parrilla'))   return 'Conexión de artefactos';
-  if (t.includes('secadora'))   return 'Conexión de artefactos';
+  if (t.includes('conexion'))   return 'Conexion de artefactos';
+  if (t.includes('conversion')) return 'Conversion de artefactos';
+  if (t.includes('modific'))    return 'Modificacion de tuberia';
+  if (t.includes('reparac'))    return 'Reparacion de tuberia';
+  if (t.includes('instalac'))   return 'Instalacion nueva';
+  if (t.includes('gasfiter'))   return 'Gasfiteria';
+  if (t.includes('document'))   return 'Documentacion';
+  if (t.includes('terma') || t.includes('calefon')) return 'Conexion de artefactos';
+  if (t.includes('cocina'))     return 'Conexion de artefactos';
+  if (t.includes('horno'))      return 'Conexion de artefactos';
+  if (t.includes('parrilla'))   return 'Conexion de artefactos';
+  if (t.includes('secadora'))   return 'Conexion de artefactos';
   return texto.trim(); // devolver original si no hay mapeo
 }
 
@@ -9617,13 +9317,13 @@ const AGENDA_PAGO = {
 
 const AGENDA_SERVICIOS = [
   'Punto adicional',
-  'Modificación de tubería',
-  'Instalación nueva',
-  'Reparación de tubería',
-  'Gasfitería',
-  'Conversión de artefactos',
-  'Conexión de artefactos',
-  'Documentación',
+  'Modificacion de tuberia',
+  'Instalacion nueva',
+  'Reparacion de tuberia',
+  'Gasfiteria',
+  'Conversion de artefactos',
+  'Conexion de artefactos',
+  'Documentacion',
   'Otros servicios',
 ];
 
@@ -11381,29 +11081,29 @@ function parseAgendaVoz(text){
     // Extractor directo: mapa de palabras clave → label
     const SERVICIO_DIRECTO = [
       // ── Artefactos concretos primero (evitan falsos match con "conexion de cocina") ──
-      { keys:['cocina','cocinilla','cocina a gas','instalar cocina','servicio cocina','cobré cocina','por cocina'], label:'Conexión de artefactos' },
-      { keys:['horno','horno a gas','horno de gas','instalar horno','servicio horno','por horno'], label:'Conexión de artefactos' },
-      { keys:['terma','terma a gas','terma de gas','instalar terma','servicio terma','cobré terma','por terma'], label:'Conexión de artefactos' },
-      { keys:['secadora','secadora a gas','instalar secadora','servicio secadora'], label:'Conexión de artefactos' },
-      { keys:['calefon','calefón','calefon a gas','instalar calefon','servicio calefon'], label:'Conexión de artefactos' },
-      { keys:['parrilla','parrilla a gas','instalar parrilla','servicio parrilla'], label:'Conexión de artefactos' },
+      { keys:['cocina','cocinilla','cocina a gas','instalar cocina','servicio cocina','cobré cocina','por cocina'], label:'Conexion de artefactos' },
+      { keys:['horno','horno a gas','horno de gas','instalar horno','servicio horno','por horno'], label:'Conexion de artefactos' },
+      { keys:['terma','terma a gas','terma de gas','instalar terma','servicio terma','cobré terma','por terma'], label:'Conexion de artefactos' },
+      { keys:['secadora','secadora a gas','instalar secadora','servicio secadora'], label:'Conexion de artefactos' },
+      { keys:['calefon','calefón','calefon a gas','instalar calefon','servicio calefon'], label:'Conexion de artefactos' },
+      { keys:['parrilla','parrilla a gas','instalar parrilla','servicio parrilla'], label:'Conexion de artefactos' },
       // ── Servicios de instalación y reparación ──
       { keys:['punto adicional','punto extra','punto de gas','boca nueva','boca de gas','salida nueva','toma nueva','un punto adicional','servicio punto adicional','hacer un punto','poner un punto','un punto','hacer punto','poner punto','nuevo punto','instalar punto'], label:'Punto adicional' },
-      { keys:['modificacion de red','modificacion red','modificar red','cambio de red','rediseño de red','modificacion','modificar la red','mod de red','servicio modificacion','modificacion interna'], label:'Modificación de tubería' },
-      { keys:['instalacion nueva','instalacion de gas','obra nueva','proyecto nuevo','instalacion completa','instalar gas nuevo'], label:'Instalación nueva' },
+      { keys:['modificacion de red','modificacion red','modificar red','cambio de red','rediseño de red','modificacion','modificar la red','mod de red','servicio modificacion','modificacion interna'], label:'Modificacion de tuberia' },
+      { keys:['instalacion nueva','instalacion de gas','obra nueva','proyecto nuevo','instalacion completa','instalar gas nuevo'], label:'Instalacion nueva' },
       { keys:['conversion de artefacto','conversion a gas','converti artefacto','convertir artefacto','adaptar artefacto',
                'combersion','comversion','combersión','comversión','combercion','convercion','conbersion','conbersión',
                // ★ Claves cortas — solo la palabra sola ya es suficiente
                'conversion','conversión','hice una conversion','hice una conversión',
-               'hice conversion','hice conversión','realice conversion','realicé conversión'], label:'Conversión de artefactos' },
+               'hice conversion','hice conversión','realice conversion','realicé conversión'], label:'Conversion de artefactos' },
       { keys:['conexion de artefacto','conectar artefacto','conexion nueva de artefacto',
                'coneccion','conección','coneccion de artefacto','konexion','conectar nueva','hice la conexion','hice la coneccion',
                // ★ Claves cortas
                'conexion','conexión','hice la conexión','hice conexion','hice conexión',
-               'realice conexion','realicé conexión','nueva conexion','nueva conexión'], label:'Conexión de artefactos' },
-      { keys:['reparacion de tuberia','reparar tuberia','tuberia rota','fuga de gas','escape de gas','arreglar tuberia','perdida de gas'], label:'Reparación de tubería' },
-      { keys:['gasfiteria','gasfitería','desague','plomeria','tuberia de agua','trabajo de agua','gasfiter'], label:'Gasfitería' },
-      { keys:['documentacion','documentación','tramite','certificado','planos','expediente','inspeccion','habilitacion'], label:'Documentación' },
+               'realice conexion','realicé conexión','nueva conexion','nueva conexión'], label:'Conexion de artefactos' },
+      { keys:['reparacion de tuberia','reparar tuberia','tuberia rota','fuga de gas','escape de gas','arreglar tuberia','perdida de gas'], label:'Reparacion de tuberia' },
+      { keys:['gasfiteria','gasfitería','desague','plomeria','tuberia de agua','trabajo de agua','gasfiter'], label:'Gasfiteria' },
+      { keys:['documentacion','documentación','tramite','certificado','planos','expediente','inspeccion','habilitacion'], label:'Documentacion' },
       { keys:['construccion','construcción','construcion'], label:'_GEMINI_DECIDE' },
     ];
     for(const s of SERVICIO_DIRECTO){
@@ -14189,16 +13889,16 @@ const SERVICIOS_NEGOCIO = [
          'toma adicional','derivación nueva','derivacion nueva','derivación adicional',
          'cobré hoy por punto','punto gas natural','cobré un punto adicional',
          'servicio punto adicional','servicio de punto','un punto','el punto'] },
-  { id:'modificacion_red',  label:'Modificación de tubería',
+  { id:'modificacion_red',  label:'Modificacion de tuberia',
     kws:['modificacion de red','modificación de red','modifique la red','modifiqué la red',
          'cambio de red','modificacion interna','modificación interna','rediseño de red',
          'cambie la tuberia','cambié la tubería','modificar red','modificacion',
          'servicio modificacion','modificar la instalacion','modificar instalacion'] },
-  { id:'instalacion_nueva', label:'Instalación nueva',
+  { id:'instalacion_nueva', label:'Instalacion nueva',
     kws:['instalacion nueva','instalación nueva','nueva instalacion',
          'nueva instalación','instalacion de gas','instalación de gas','instalacion completa',
          'proyecto nuevo','obra nueva','instalar gas'] },
-  { id:'conversion_artefacto', label:'Conversión de artefactos',
+  { id:'conversion_artefacto', label:'Conversion de artefactos',
     kws:['conversion de artefacto','conversión de artefacto','converti','convertí',
          'conversion a gas','conversión a gas','converti cocina','convertí cocina',
          'conversion de horno','converti artefacto','adaptar artefacto',
@@ -14206,7 +13906,7 @@ const SERVICIOS_NEGOCIO = [
          'hice una conversion','hice una conversión','realice conversion','realicé conversión',
          'combersion','comversion','combersión','comversión',
          'combercion','convercion','conbersion','conbersión'] },
-  { id:'conexion_artefacto',label:'Conexión de artefactos',
+  { id:'conexion_artefacto',label:'Conexion de artefactos',
     kws:['conexion de artefacto','conexión de artefacto','conecte','conecté','conectar artefacto',
          'conexion de cocina','conexión de cocina','conecte el artefacto','conectar equipo',
          'conecte la cocina','conecté la cocina','conexion nueva de artefacto',
@@ -14214,16 +13914,16 @@ const SERVICIOS_NEGOCIO = [
          'hice la conexion','hice la conexión','nueva conexion','nueva conexión',
          'coneccion','conección','konexion','coneccion de artefacto',
          'coneccion de cocina','coneccion nueva','conectar nueva','hice la coneccion'] },
-  { id:'reparacion_tuberia',label:'Reparación de tubería',
+  { id:'reparacion_tuberia',label:'Reparacion de tuberia',
     kws:['reparacion de tuberia','reparación de tubería','repare','reparé','tuberia rota',
          'tubería rota','fuga de gas','filtración de gas','filtracion de gas',
          'arregle la tuberia','arreglé la tubería','perdida de gas','pérdida de gas',
          'escape de gas','reparar tuberia'] },
-  { id:'gasfiteria',        label:'Gasfitería',
+  { id:'gasfiteria',        label:'Gasfiteria',
     kws:['gasfiteria','gasfitería','desague','desagüe','caño','cano','plomeria','plomería',
          'tuberia de agua','tubería de agua','instalacion de agua','trabajo de agua',
          'gasfiter','gasfitero'] },
-  { id:'documentacion',     label:'Documentación',
+  { id:'documentacion',     label:'Documentacion',
     kws:['documentacion','documentación','tramite','trámite','certificado','certificacion',
          'plano','planos','expediente','habilitacion','habilitación','conformidad',
          'inspeccion','inspección','revision de planos','firma de documentos'] },
@@ -14451,42 +14151,36 @@ function isAgendaCommand(text){
 }
 
 function parseVoiceCommand(text) {
-  const esNegocio   = state.modo === 'negocio';
-  const expert      = esNegocio ? financeExpertClassify({
-    texto: text,
-    historial: financeExpertHistoryForPrompt(),
-    categorias_existentes: financeExpertExistingCategories()
-  }) : null;
-  const amount      = expert?.monto || extractAmount(text);
-  let type          = expert?.tipo || detectType(text);
+  const amount      = extractAmount(text);
+  const type        = detectType(text);
   const date        = extractDate(text);
   const cliente     = extractCliente(text);
   const servicioNeg = detectServicioNegocio(text);
   const t           = nrm(text);
+  const esNegocio   = state.modo === 'negocio';
 
-  let cat = expert ? financeExpertResolveAppCategory(expert, text) : null;
+  let cat;
 
   if (esNegocio) {
     // ── MODO NEGOCIO: clasificación automática, sin preguntas ──
-    if (!cat) {
     if (type === 'ingreso') {
       // Detectar cuál de los 8 servicios es
       if (servicioNeg) {
         const nombres = {
           'punto_adicional':    'Punto adicional',
-          'modificacion_red':   'Modificación de tubería',
-          'instalacion_nueva':  'Instalación nueva',
-          'conversion_artefacto':'Conversión de artefactos',
-          'conexion_artefacto': 'Conexión de artefactos',
-          'reparacion_tuberia': 'Reparación de tubería',
-          'gasfiteria':         'Gasfitería',
-          'documentacion':      'Documentación',
-          'cocina_artefacto':   'Conexión de artefactos',
-          'horno_artefacto':    'Conexión de artefactos',
-          'terma_artefacto':    'Conexión de artefactos',
-          'secadora_artefacto': 'Conexión de artefactos',
-          'cafelon_artefacto':  'Conexión de artefactos',
-          'parrilla_artefacto': 'Conexión de artefactos',
+          'modificacion_red':   'Modificacion de tuberia',
+          'instalacion_nueva':  'Instalacion nueva',
+          'conversion_artefacto':'Conversion de artefactos',
+          'conexion_artefacto': 'Conexion de artefactos',
+          'reparacion_tuberia': 'Reparacion de tuberia',
+          'gasfiteria':         'Gasfiteria',
+          'documentacion':      'Documentacion',
+          'cocina_artefacto':   'Conexion de artefactos',
+          'horno_artefacto':    'Conexion de artefactos',
+          'terma_artefacto':    'Conexion de artefactos',
+          'secadora_artefacto': 'Conexion de artefactos',
+          'cafelon_artefacto':  'Conexion de artefactos',
+          'parrilla_artefacto': 'Conexion de artefactos',
         };
         const nombre = nombres[servicioNeg.id];
         cat = state.catsIn.find(c=>c.name===nombre) || state.catsIn.find(c=>c.id==='cn9') || state.catsIn.filter(c=>!c.hidden&&!c.system).slice(-1)[0];
@@ -14534,7 +14228,6 @@ function parseVoiceCommand(text) {
       else
         cat = state.catsEx.find(c=>c.id==='cne6') || state.catsEx[0];
     }
-    }
   } else {
     // ── MODO PERSONAL: lógica anterior ──
     if (servicioNeg && type === 'ingreso') {
@@ -14568,11 +14261,6 @@ function parseVoiceCommand(text) {
   const ubicacion = extractUbicacion(text);
   return { amount, type, cat, desc, date, serviceMatch,
            cliente, ubicacion, servicioNeg, negocio: esNegocio,
-           expert,
-           categoriaPrincipal: expert?.categoria_principal || '',
-           subcategoria: expert?.subcategoria || '',
-           confianzaCategoria: expert?.confianza || 0,
-           alertaCategoria: expert?.alerta || '',
            needsNegocioConfirm, raw: text };
 }
 
@@ -16687,14 +16375,14 @@ Para MOVIMIENTO:
 {"tipo":"movimiento","type":"ingreso|egreso","amount":numero_o_null,"category":"nombre categoria","description":"descripcion breve","date":"YYYY-MM-DD","cliente":"nombre o null","ubicacion":"distrito Lima o null","negocio":true_si_es_del_negocio}
 
 Para AGENDA:
-{"tipo":"agenda","subtipo":"visita|trabajo","fecha":"YYYY-MM-DD","hora":"HH:MM o null","cliente":"nombre o null","servicio":"${isNeg?'Punto adicional|Modificación de tubería|Instalación nueva|Reparación de tubería|Gasfitería|Conversión de artefactos|Conexión de artefactos|Documentación|Otros servicios':'null'}","precio":numero_o_null,"ubicacion":"distrito Lima o null","notas":"notas o null"}
+{"tipo":"agenda","subtipo":"visita|trabajo","fecha":"YYYY-MM-DD","hora":"HH:MM o null","cliente":"nombre o null","servicio":"${isNeg?'Punto adicional|Modificacion de tuberia|Instalacion nueva|Reparacion de tuberia|Gasfiteria|Conversion de artefactos|Conexion de artefactos|Documentacion|Otros servicios':'null'}","precio":numero_o_null,"ubicacion":"distrito Lima o null","notas":"notas o null"}
 
 Categorías para ${isNeg?'NEGOCIO':'PERSONAL'}:
 ${isNeg?
-'Ingresos: Punto adicional, Modificación de tubería, Instalación nueva, Reparación de tubería, Gasfitería, Conversión de artefactos, Conexión de artefactos, Documentación, Otros servicios. Egresos: Operacion, Personal, Transporte, Luz, Agua, Internet casa, Internet movil, Materiales, Gasolina, GNV, Reparacion de auto, Agregados, Documentación, Otros gastos de negocio':
+'Ingresos: Punto adicional, Modificacion de tuberia, Instalacion nueva, Reparacion de tuberia, Gasfiteria, Conversion de artefactos, Conexion de artefactos, Documentacion, Otros servicios. Egresos: Operacion, Personal, Transporte, Luz, Agua, Internet casa, Internet movil, Materiales, Gasolina, GNV, Reparacion de auto, Agregados, Documentacion, Otros gastos de negocio':
 'Ingresos: Sueldo / Salario, Bonos / Gratificaciones, Propinas, Comisiones, Venta de articulos personales, Reembolsos. Egresos: Compras del mercado, Compras al super, Gaseosa, Agua, Golosinas, Snack, Pizza, Salidas, Menu, Entretenimiento, Medicina, Productos de aseo, Cuidado personal, Belleza, Ropa, Accesorios, Cine, Otros gastos del dia'}
 
-Para fechas relativas usa hoy (${hoy}) como referencia. "este sábado" = próximo sábado. "construccion" es ambiguo: analizar contexto para determinar si es "Instalación nueva", "Punto adicional", "Modificación de tubería" u otro servicio.
+Para fechas relativas usa hoy (${hoy}) como referencia. "este sábado" = próximo sábado. "construccion" es ambiguo: analizar contexto para determinar si es "Instalacion nueva", "Punto adicional", "Modificacion de tuberia" u otro servicio.
 
 REGLAS IMPORTANTES:
 - "cliente": conservar el tratamiento abreviado + nombre. Ejemplos: "señor Mario" → "Sr. Mario", "la señora Leonor" → "Sra. Leonor", "don Carlos" → "Sr. Carlos". NUNCA pongas "el", "la" solos sin tratamiento. "don", "doña" como cliente — solo el nombre.
@@ -17000,7 +16688,7 @@ async function rellenarAgendaConGemini(text, tipoDetectado, localData){
   const manana = new Date(ahora); manana.setDate(ahora.getDate()+1);
   const mananaStr = manana.getFullYear()+'-'+String(manana.getMonth()+1).padStart(2,'0')+'-'+String(manana.getDate()).padStart(2,'0');
 
-  const serviciosOk = 'Punto adicional|Modificación de tubería|Instalación nueva|Reparación de tubería|Gasfitería|Conversión de artefactos|Conexión de artefactos|Documentación|Otros servicios';
+  const serviciosOk = 'Punto adicional|Modificacion de tuberia|Instalacion nueva|Reparacion de tuberia|Gasfiteria|Conversion de artefactos|Conexion de artefactos|Documentacion|Otros servicios';
 
   const prompt = `Sos el asistente de agenda de un gasfitero en Lima, Perú.
 Hoy es ${hoy} (${diaSemana}). Mañana es ${mananaStr}.
@@ -17274,10 +16962,6 @@ function processVoiceResultManual(text) {
   if (parsed.servicioNeg) {
     negBadge.textContent = `Servicio: ${parsed.servicioNeg.label}`;
     negBadge.style.display = 'block';
-  } else if (parsed.expert) {
-    const rutaCat = parsed.expert.subcategoria ? `${parsed.expert.categoria_principal} / ${parsed.expert.subcategoria}` : parsed.expert.categoria_principal;
-    negBadge.textContent = `Ruta: ${rutaCat} · ${Math.round((parsed.expert.confianza||0)*100)}%`;
-    negBadge.style.display = 'block';
   } else { negBadge.style.display = 'none'; }
 
   // Servicio de casa vinculado
@@ -17487,11 +17171,6 @@ function saveMicTx() {
     cliente:      micParsed?.cliente      ||null,
     servicioTipo: micParsed?.servicioNeg?.label||null,
     negocio:      state.modo === 'negocio' || !!(micParsed?.negocio),
-    categoriaPrincipal: micParsed?.categoriaPrincipal || micParsed?.expert?.categoria_principal || null,
-    subcategoria:       micParsed?.subcategoria || micParsed?.expert?.subcategoria || null,
-    confianzaCategoria: micParsed?.confianzaCategoria || micParsed?.expert?.confianza || null,
-    alertaCategoria:    micParsed?.alertaCategoria || micParsed?.expert?.alerta || null,
-    textoCorregidoCategoria: micParsed?.expert?.texto_corregido || null,
   };
   const entraAStockValor = tx.type === 'egreso' && state.modo === 'negocio' && isMaterialesCategory(tx.catId, tx.category);
   if(entraAStockValor){
@@ -19784,9 +19463,9 @@ async function exportarNotaA4WhatsApp(notaId){
 // ══════════════════════════════════════════════════════════════════════
 
 const TIPOS_SERVICIO_GAS = [
-  'Punto adicional','Modificación de tubería','Instalación nueva',
-  'Reparación de tubería','Gasfitería','Conversión de artefactos',
-  'Conexión de artefactos','Documentación','Otros servicios'
+  'Punto adicional','Modificacion de tuberia','Instalacion nueva',
+  'Reparacion de tuberia','Gasfiteria','Conversion de artefactos',
+  'Conexion de artefactos','Documentacion','Otros servicios'
 ];
 
 // ── FASE 1: Render principal de Inventario ──────────────────────────
@@ -22340,12 +22019,12 @@ function renderNotas(){
     <div class="np-hero">
       <div class="np-kicker">Cuaderno de trabajo</div>
       <div class="np-title">Notas</div>
-      <div class="np-sub">Tres espacios: notas y listas editables, reunion IA y documentacion. Documentación queda intacta por ahora.</div>
+      <div class="np-sub">Tres espacios: notas y listas editables, reunion IA y documentacion. Documentacion queda intacta por ahora.</div>
       <div class="np-quick">
         <div class="np-q" onclick="npOpenDoc(null)"><div class="np-q-ic">${appIcon('note')}</div><div><b>Notas</b><span>Block premium, cuadros, tablas y colores</span></div></div>
         <div class="np-q" onclick="npOpenVoiceCapture('list')"><div class="np-q-ic">${appIcon('mic')}</div><div><b>Lista por voz</b><span>Checks automaticos, precios y suma</span></div></div>
         <div class="np-q" onclick="npOpenVoiceCapture('meeting')"><div class="np-q-ic">${appIcon('document')}</div><div><b>Reunion IA</b><span>Dictado largo, resumen y pendientes</span></div></div>
-        <div class="np-q" onclick="toast('Documentación la trabajaremos despues, sin tocarla ahora')"><div class="np-q-ic">${appIcon('clipboard')}</div><div><b>Documentación</b><span>Se mantiene sin cambios en esta parte</span></div></div>
+        <div class="np-q" onclick="toast('Documentacion la trabajaremos despues, sin tocarla ahora')"><div class="np-q-ic">${appIcon('clipboard')}</div><div><b>Documentacion</b><span>Se mantiene sin cambios en esta parte</span></div></div>
       </div>
       <div class="np-quick" style="margin-top:9px">
         <div class="np-q" onclick="npShowTemplates()"><div class="np-q-ic">${appIcon('clipboard')}</div><div><b>Plantillas</b><span>Crear o usar formatos guardados</span></div></div>
