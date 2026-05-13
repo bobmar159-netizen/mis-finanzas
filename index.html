@@ -191,9 +191,10 @@ body{font-family:'Inter','Roboto',sans-serif;color:var(--text)}
 .cierre-section{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .cierre-section-title{font-size:12px;font-weight:800;color:var(--text)}
 .cierre-section-note{font-size:11px;color:var(--muted);line-height:1.35}
-.cierre-service-row{border-top:1px solid #EEF1F3;padding-top:8px;margin-top:8px}
-.cierre-service-row:first-of-type{border-top:none;padding-top:0;margin-top:0}
+.cierre-service-card{background:#fff;border:1px solid #E6E8EB;border-radius:14px;padding:10px 11px;box-shadow:0 3px 14px rgba(26,44,53,0.04)}
 .cierre-service-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.cierre-service-expenses{border-top:1px dashed #DDE5EA;margin-top:9px;padding-top:9px}
+.cierre-service-total{display:flex;justify-content:space-between;align-items:center;background:#F8FAFB;border:1px solid #E6E8EB;border-radius:11px;margin-top:8px;padding:8px 10px;font-size:12px;font-weight:850}
 .cierre-num{width:22px;height:22px;border-radius:8px;background:#F1F4F6;color:#6E8FA0;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
 .cierre-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .cierre-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
@@ -2537,7 +2538,7 @@ function isStockValueTx(t){
   // Entrada al stock (compra de materiales registrada como egreso)
   if(t.ocultarEnMovimientos || t.afectaStockValor || t.stockOperacion === 'entrada_valor' || t.stockValorOnly || t.stockCompraId) return true;
   // Uso de stock al cerrar servicio (no es flujo de caja, es solo reduccion de inventario)
-  if(t.noCashFlow && (t.materialUsoServicio || t.origenServicioMaterial || t.stockOperacion === 'uso_valor')) return true;
+  if(t.materialUsoServicio || t.origenServicioMaterial || t.stockOperacion === 'uso_valor' || t.stockOperacion === 'devolucion_valor') return true;
   return false;
 }
 
@@ -2545,6 +2546,7 @@ function isCashFlowTx(t){
   // No es flujo de caja si: esta marcado como noCashFlow, o es exclusivamente para el stock
   if(!t) return true;
   if(t.noCashFlow) return false;
+  if(t.materialUsoServicio || t.origenServicioMaterial || t.stockOperacion === 'uso_valor' || t.stockOperacion === 'devolucion_valor') return false;
   if(t.stockValorOnly || t.ocultarEnMovimientos) return false;
   return true;
 }
@@ -5794,7 +5796,7 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
         nuevasTx.push({id:svId,type:'ingreso',amount:s.precio,category:servicio,catId:_getCatIdByName(servicio),description:servicio+(clienteLimpio&&clienteLimpio!=='(Sin cliente)'?' - '+clienteLimpio:'')+(obsFiltrado?' - '+obsFiltrado:''),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,formaPago:forma,negocio:true,moneda:'PEN',vinculadoServicioId:svId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null});
         txImportadas++;
 
-        if(s.mat>0){ nuevasTx.push({id:nId+'-mat'+s.idx,type:'egreso',amount:s.mat,category:'Materiales',catId:'cne1',description:'Materiales usados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:svId,origenServicioMaterial:true,materialUsoServicio:true,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMat++; }
+        if(s.mat>0){ nuevasTx.push({id:nId+'-mat'+s.idx,type:'egreso',amount:s.mat,category:'Materiales',catId:'cne1',description:'Materiales usados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:svId,origenServicioMaterial:true,materialUsoServicio:true,noCashFlow:true,stockOperacion:'uso_valor',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMat++; }
       });
 
       const mainSvcId = (precio1>0) ? nId+'-svc1' : ((precio2>0) ? nId+'-svc2' : ((precio3>0) ? nId+'-svc3' : null));
@@ -9483,6 +9485,7 @@ function renderAgenda(){
           <span style="font-size:14px;font-weight:800;color:#9A6B00">-${fmt(item.stockValorConsumido)}</span>
         </div>`
       : '';
+    const cierreBtnLabel = isServicioFinalizado(item) ? 'Editar cierre' : 'Finalizar y Cobrar';
 
     const accionesHtml = `
       <div class="ag-card-actions" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 4px">
@@ -9492,7 +9495,7 @@ function renderAgenda(){
           onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','se_desanimo')">✗ Desanimó</button>
         ${!isVisita
           ? `<button class="ag-act-btn" style="background:#EBF1F5;border:1px solid #A8BCC9;color:#2A4455;grid-column: span 2;padding:12px;font-size:12px;font-weight:800;border-radius:10px;cursor:pointer"
-              onclick="event.stopPropagation();abrirModalCobro('${item.id}')">✓ Finalizar y Cobrar</button>`
+              onclick="event.stopPropagation();abrirModalCobro('${item.id}')">✓ ${cierreBtnLabel}</button>`
           : `<button class="ag-act-btn" style="background:#FFF3E0;border:1px solid #FFCC80;color:#BF360C;grid-column: span 2;padding:12px;font-size:12px;font-weight:800;border-radius:10px;cursor:pointer"
               onclick="event.stopPropagation();convertirVisitaATrabajo('${item.id}')">🔨 Agendó Construcción</button>`}
       </div>`;
@@ -9556,9 +9559,10 @@ function renderAgenda(){
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold)">Agenda</div>
-      <div style="display:flex;gap:6px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
         <button onclick="openAddAgenda('visita')" style="background:#EAF1F6;border:1px solid #3D667744;color:#2A4F60;border-radius:10px;padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">＋ Visita</button>
         <button onclick="openAddAgenda('trabajo')" style="background:#FFF2E8;border:1px solid #F47C3C44;color:#C8520A;border-radius:10px;padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">🔥 Trabajo</button>
+        <button onclick="openRegistrarServicioDirecto()" style="background:#EDF7F2;border:1px solid #2F7D6444;color:#2F6F53;border-radius:10px;padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer">＋ Registrar</button>
       </div>
     </div>
     ${semanaHtml}
@@ -10344,15 +10348,32 @@ window._saveCobroStateToItem = function(id) {
   if(!item) return;
   [1,2,3].forEach(i => {
     item['servicio'+i] = document.getElementById('cobro-svc'+i)?.value||item['servicio'+i]||'';
-    item['precio'+i] = parseFloat(document.getElementById('cobro-precio'+i)?.value)||item['precio'+i]||0;
-    item['materiales'+i] = parseFloat(document.getElementById('cobro-mat'+i)?.value)||item['materiales'+i]||0;
+    item['precio'+i] = moneyValue(document.getElementById('cobro-precio'+i)?.value);
+    item['materiales'+i] = moneyValue(document.getElementById('cobro-mat'+i)?.value);
+    item['comida'+i] = moneyValue(document.getElementById('cobro-comida'+i)?.value);
+    item['movilidad'+i] = moneyValue(document.getElementById('cobro-movilidad'+i)?.value);
+    item['agregados'+i] = moneyValue(document.getElementById('cobro-agregados'+i)?.value);
+    item['otros_gastos'+i] = moneyValue(document.getElementById('cobro-otrosgastos'+i)?.value);
+    item['meta'+i] = moneyValue(document.getElementById('cobro-meta'+i)?.value);
   });
-  item.movilidad = parseFloat(document.getElementById('cobro-movilidad')?.value)||item.movilidad||0;
-  item.agregados = parseFloat(document.getElementById('cobro-otros')?.value)||item.agregados||0;
-  item.comida = parseFloat(document.getElementById('cobro-comida')?.value)||item.comida||0;
-  item.otros = parseFloat(document.getElementById('cobro-otrosgastos')?.value)||item.otros||0;
-  item.meta = parseFloat(document.getElementById('cobro-meta')?.value)||item.meta||0;
+  item.servicio = item.servicio1 || item.servicio || '';
+  item.precio = moneyValue(item.precio1) + moneyValue(item.precio2) + moneyValue(item.precio3);
+  item.comida = moneyValue(item.comida1) + moneyValue(item.comida2) + moneyValue(item.comida3);
+  item.movilidad = moneyValue(item.movilidad1) + moneyValue(item.movilidad2) + moneyValue(item.movilidad3);
+  item.agregados = moneyValue(item.agregados1) + moneyValue(item.agregados2) + moneyValue(item.agregados3);
+  item.otros_gastos = moneyValue(item.otros_gastos1) + moneyValue(item.otros_gastos2) + moneyValue(item.otros_gastos3);
+  item.otros = item.otros_gastos;
+  item.meta = moneyValue(item.meta1) + moneyValue(item.meta2) + moneyValue(item.meta3);
+  item.fecha = document.getElementById('cobro-fecha')?.value || item.fecha || todayStr();
+  item.cliente = document.getElementById('cobro-cliente')?.value?.trim() || item.cliente || '';
+  item.telefono = document.getElementById('cobro-telefono')?.value?.trim() || item.telefono || '';
   item.ubicacion = document.getElementById('cobro-distrito')?.value||item.ubicacion||'';
+  item.observaciones = document.getElementById('cobro-notas')?.value?.trim() || item.observaciones || '';
+  item.pagoEfectivo = moneyValue(document.getElementById('pago-efectivo')?.value);
+  item.pagoYape = moneyValue(document.getElementById('pago-yape')?.value);
+  item.pagoPlin = moneyValue(document.getElementById('pago-plin')?.value);
+  item.pagoTransf = moneyValue(document.getElementById('pago-transferencia')?.value);
+  item.pagoAcuenta = moneyValue(document.getElementById('pago-acuenta')?.value);
 };
 
 function getGastosSugeridosCierre(item){
@@ -10409,10 +10430,145 @@ function renderGastosSugeridosCierre(item){
   </div>`;
 }
 
+function _cierreExpenseValue(item, key, slot){
+  const direct = item?.[key + slot];
+  if(direct !== undefined && direct !== null && direct !== '') return moneyValue(direct);
+  if(slot !== 1) return 0;
+  if(key === 'comida') return moneyValue(item?.comidaManualCierre ?? item?.comida);
+  if(key === 'movilidad') return moneyValue(item?.movilidadManualCierre ?? item?.movilidad);
+  if(key === 'otros_gastos') return moneyValue(item?.otros_gastos ?? item?.otros);
+  return moneyValue(item?.[key]);
+}
+
+function _normalizeMaterialUsoRow(row){
+  if(!row || !row.material_id) return null;
+  const mat = getMaterialById(row.material_id);
+  return {
+    material_id: row.material_id,
+    nombre: row.nombre || row.material || mat?.nombre || 'Material',
+    unidad: row.unidad || mat?.unidad || 'unidad',
+    cantidad: moneyValue(row.cantidad),
+    costo: moneyValue(row.costo ?? row.costo_unitario_usado ?? row.precio_unitario ?? mat?.costo_actual),
+    stock: moneyValue(mat?.stock_actual)
+  };
+}
+
+function _consolidarMaterialRows(rows){
+  const map = new Map();
+  (rows || []).forEach(row => {
+    const r = _normalizeMaterialUsoRow(row);
+    if(!r || r.cantidad <= 0) return;
+    const key = String(r.material_id);
+    const prev = map.get(key);
+    if(prev){
+      prev.cantidad = +(prev.cantidad + r.cantidad).toFixed(4);
+      if(!prev.costo) prev.costo = r.costo;
+    } else {
+      map.set(key, {...r});
+    }
+  });
+  return [...map.values()];
+}
+
+function _movMaterialPerteneceSlot(mov, agendaId, slot){
+  if(!mov || mov.tipo !== 'uso') return false;
+  if(String(mov.id_servicio || '') !== String(agendaId || '')) return false;
+  const s = mov.servicio_slot ?? mov.slot ?? mov.slot_servicio;
+  if(s === undefined || s === null || s === '') return Number(slot) === 1;
+  return String(s) === String(slot);
+}
+
+function getMaterialesUsadosServicio(item, slot=1){
+  if(!item) return [];
+  const directKey = 'materialesUsados' + slot;
+  const hasDirect = Object.prototype.hasOwnProperty.call(item, directKey);
+  const direct = hasDirect
+    ? (Array.isArray(item[directKey]) ? item[directKey] : [])
+    : (Array.isArray(item.materialesUsadosPorServicio?.[slot]) ? item.materialesUsadosPorServicio[slot] : []);
+  if(hasDirect || direct.length) return _consolidarMaterialRows(direct);
+
+  ensureLazyData('movimientosMateriales');
+  const legacy = (state.movimientosMateriales || []).filter(m => _movMaterialPerteneceSlot(m, item.id, slot));
+  return _consolidarMaterialRows(legacy);
+}
+
+function guardarMaterialesUsadosServicio(item, slot, rows){
+  if(!item) return;
+  const clean = _consolidarMaterialRows(rows).map(r => ({
+    material_id: r.material_id,
+    nombre: r.nombre,
+    unidad: r.unidad,
+    cantidad: r.cantidad,
+    costo: r.costo
+  }));
+  item['materialesUsados' + slot] = clean;
+  if(!item.materialesUsadosPorServicio) item.materialesUsadosPorServicio = {};
+  item.materialesUsadosPorServicio[String(slot)] = clean;
+}
+
+function revertirMaterialesUsadosServicio(item){
+  if(!item?.id) return;
+  ensureLazyData('inventario');
+  ensureLazyData('movimientosMateriales');
+  const touched = new Set();
+  [1,2,3].forEach(slot => {
+    getMaterialesUsadosServicio(item, slot).forEach(r => {
+      const idx = (state.inventario || []).findIndex(m => String(m.id) === String(r.material_id));
+      if(idx >= 0){
+        state.inventario[idx].stock_actual = moneyValue(state.inventario[idx].stock_actual) + moneyValue(r.cantidad);
+        touched.add(idx);
+      }
+    });
+  });
+  touched.forEach(idx => syncMaterialToSheets(state.inventario[idx]));
+  state.movimientosMateriales = (state.movimientosMateriales || []).filter(m => !(m?.tipo === 'uso' && String(m.id_servicio || '') === String(item.id)));
+}
+
+function limpiarRegistroRapidoDraft(){
+  const id = window._registroServicioDraftId || '';
+  if(!id) return;
+  const item = (state.agenda || []).find(x => String(x.id) === String(id));
+  if(item && item._registroRapido && !isServicioFinalizado(item)){
+    revertirMaterialesUsadosServicio(item);
+    state.agenda = (state.agenda || []).filter(x => String(x.id) !== String(id));
+    saveAll();
+    if(state.page === 'agenda') render();
+  }
+  window._registroServicioDraftId = '';
+}
+
+function openRegistrarServicioDirecto(){
+  limpiarRegistroRapidoDraft();
+  const id = 'reg_' + Date.now();
+  const item = {
+    id,
+    tipo: 'trabajo',
+    cliente: '',
+    fecha: todayStr(),
+    hora: '',
+    servicio: '',
+    servicio1: '',
+    servicio2: '',
+    servicio3: '',
+    precio: 0,
+    estado: 'pendiente',
+    ubicacion: '',
+    telefono: '',
+    notas: '',
+    _registroRapido: true
+  };
+  state.agenda = state.agenda || [];
+  state.agenda.unshift(item);
+  window._registroServicioDraftId = id;
+  abrirModalCobro(id);
+}
+
 function abrirModalCobro(id){
   window._cobroAgendaId = id;
   const item = (state.agenda||[]).find(x => x.id === id);
   if(!item) return;
+  const esFinalizado = isServicioFinalizado(item);
+  const esRegistroRapido = !!item._registroRapido;
 
   const getVal = (key, i) => item[key+i] || (i===1 ? item.servicio||'' : '');
   const getNum = (key, i) => {
@@ -10420,33 +10576,34 @@ function abrirModalCobro(id){
     if (i===1 && key==='precio' && item.precio) return item.precio;
     return '';
   };
+  const getExpenseNum = (key, i) => {
+    const v = _cierreExpenseValue(item, key, i);
+    return v ? v : '';
+  };
 
   const svcOpts = (presel='') => '<option value="">-- ninguno --</option>' +
     AGENDA_SERVICIOS.map(s => '<option value="' + s + '" ' + (s === presel ? 'selected' : '') + '>' + s + '</option>').join('');
+  const totalAcordado = moneyValue(item.precio1 || item.precio) + moneyValue(item.precio2) + moneyValue(item.precio3);
+  const primaryLabel = esRegistroRapido ? 'Registrar y sincronizar' : esFinalizado ? 'Guardar cambios' : 'Finalizar y sincronizar';
+  const titleLabel = esRegistroRapido ? 'Registrar servicio directo' : esFinalizado ? 'Editar cierre de servicio' : 'Cerrar servicio';
 
   document.getElementById('modal-content').innerHTML = `
     <div class="cierre-wrap cierre-compact">
       <div class="cierre-head">
         <div>
-          <div class="cierre-kicker">Cliente</div>
+          <div class="cierre-kicker">${titleLabel}</div>
           <div class="cierre-client">${item.cliente||'Cliente sin nombre'}</div>
           <div class="cierre-meta">${item.ubicacion||'Sin ubicacion'} · Stock valorizado: ${fmt(state.stockValorGeneral||0)}</div>
         </div>
         <div style="text-align:right">
           <div class="cierre-kicker">Acordado</div>
-          <div class="cierre-amount">${fmt(item.precio||0)}</div>
+          <div class="cierre-amount">${fmt(totalAcordado||item.precio||0)}</div>
         </div>
       </div>
 
-      <div class="cierre-card">
-        <div class="cierre-section">
-          <div>
-            <div class="cierre-section-title">Servicios y costos</div>
-  
-          </div>
-        </div>
+      <div class="cierre-section-title" style="padding:0 2px">Servicios con sus gastos</div>
         ${[1,2,3].map(i => `
-          <div class="cierre-service-row">
+          <div class="cierre-service-card">
             <div class="cierre-service-head">
               <span class="cierre-num">${i}</span>
               <select id="cobro-svc${i}" class="cierre-select" onchange="updateCobroTotals()">
@@ -10463,10 +10620,21 @@ function abrirModalCobro(id){
                 <input id="cobro-mat${i}" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${getNum('materiales', i)}" oninput="updateCobroTotals()">
               </div>
             </div>
+            <div class="cierre-service-expenses">
+              <div class="cierre-section-title" style="font-size:11px;margin-bottom:8px">Gastos de este servicio</div>
+              <div class="cierre-grid-3">
+                <div class="cierre-field"><label>Comida</label><input id="cobro-comida${i}" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${getExpenseNum('comida', i)}" oninput="updateCobroTotals()"></div>
+                <div class="cierre-field"><label>Movilidad</label><input id="cobro-movilidad${i}" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${getExpenseNum('movilidad', i)}" oninput="updateCobroTotals()"></div>
+                <div class="cierre-field"><label>Agregados</label><input id="cobro-agregados${i}" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${getExpenseNum('agregados', i)}" oninput="updateCobroTotals()"></div>
+              </div>
+              <div class="cierre-grid-2" style="margin-top:8px">
+                <div class="cierre-field"><label>Otros</label><input id="cobro-otrosgastos${i}" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${getExpenseNum('otros_gastos', i)}" oninput="updateCobroTotals()"></div>
+                <div class="cierre-field"><label>Meta S/</label><input id="cobro-meta${i}" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${getExpenseNum('meta', i)}" oninput="updateCobroTotals()"></div>
+              </div>
+              <div class="cierre-service-total"><span>Neto servicio ${i}</span><b id="cobro-serv-net${i}">S/ 0.00</b></div>
+            </div>
           </div>
         `).join('')}
-
-      </div>
 
       <div class="cierre-card">
         <div class="cierre-section">
@@ -10503,20 +10671,18 @@ function abrirModalCobro(id){
       </div>
 
       <div class="cierre-card">
-        <div class="cierre-section-title" style="margin-bottom:12px">Otros datos del cierre</div>
-        <div class="cierre-grid-3">
-          <div class="cierre-field"><label>Comida</label><input id="cobro-comida" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.comida||''}" oninput="updateCobroTotals()"></div>
-          <div class="cierre-field"><label>Movilidad</label><input id="cobro-movilidad" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.movilidad||''}" oninput="updateCobroTotals()"></div>
-          <div class="cierre-field"><label>Agregados</label><input id="cobro-otros" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.agregados||''}" oninput="updateCobroTotals()"></div>
-          <div class="cierre-field"><label>Otros</label><input id="cobro-otrosgastos" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.otros||''}" oninput="updateCobroTotals()"></div>
+        <div class="cierre-section-title" style="margin-bottom:12px">Datos del servicio</div>
+        <div class="cierre-grid-2">
+          <div class="cierre-field"><label>Fecha</label><input id="cobro-fecha" class="cierre-input" type="date" value="${item.fecha||todayStr()}"></div>
+          <div class="cierre-field"><label>Cliente</label><input id="cobro-cliente" class="cierre-input" type="text" value="${item.cliente||''}" placeholder="Cliente"></div>
         </div>
         <div class="cierre-grid-2" style="margin-top:10px">
+          <div class="cierre-field"><label>Telefono</label><input id="cobro-telefono" class="cierre-input" type="tel" inputmode="tel" value="${item.telefono||''}" placeholder="987654321"></div>
           <div class="cierre-field"><label>Distrito</label><input id="cobro-distrito" class="cierre-input" type="text" value="${item.ubicacion||''}"></div>
-          <div class="cierre-field"><label>Meta S/</label><input id="cobro-meta" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.meta||''}"></div>
         </div>
         <div class="cierre-field" style="margin-top:10px">
           <label>Observaciones</label>
-          <textarea id="cobro-notas" class="cierre-textarea" placeholder="Notas breves del servicio...">${item.notas||''}</textarea>
+          <textarea id="cobro-notas" class="cierre-textarea" placeholder="Notas breves del servicio...">${item.observaciones||item.notas||''}</textarea>
         </div>
       </div>
 
@@ -10530,7 +10696,7 @@ function abrirModalCobro(id){
 
       <div class="btn-row" style="margin-top:0">
         <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
-        <button class="cierre-primary" onclick="guardarFinalizacion('${id}')">Finalizar y sincronizar</button>
+        <button class="cierre-primary" onclick="guardarFinalizacion('${id}')">${primaryLabel}</button>
       </div>
     </div>
   `;
@@ -10539,10 +10705,26 @@ function abrirModalCobro(id){
 }
 
 window.updateCobroTotals = function() {
-  const p1 = moneyValue(document.getElementById('cobro-precio1')?.value);
-  const p2 = moneyValue(document.getElementById('cobro-precio2')?.value);
-  const p3 = moneyValue(document.getElementById('cobro-precio3')?.value);
-  const totalPrecio = p1 + p2 + p3;
+  let totalPrecio = 0;
+  let totalGastos = 0;
+  [1,2,3].forEach(i => {
+    const precio = moneyValue(document.getElementById('cobro-precio'+i)?.value);
+    const materiales = moneyValue(document.getElementById('cobro-mat'+i)?.value);
+    const comida = moneyValue(document.getElementById('cobro-comida'+i)?.value);
+    const movilidad = moneyValue(document.getElementById('cobro-movilidad'+i)?.value);
+    const agregados = moneyValue(document.getElementById('cobro-agregados'+i)?.value);
+    const otros = moneyValue(document.getElementById('cobro-otrosgastos'+i)?.value);
+    const meta = moneyValue(document.getElementById('cobro-meta'+i)?.value);
+    const gastos = materiales + comida + movilidad + agregados + otros + meta;
+    const neto = precio - gastos;
+    totalPrecio += precio;
+    totalGastos += gastos;
+    const netEl = document.getElementById('cobro-serv-net'+i);
+    if(netEl){
+      netEl.textContent = (neto < 0 ? '-' : '') + fmt(Math.abs(neto));
+      netEl.style.color = neto < 0 ? '#C62828' : '#2F6F53';
+    }
+  });
   const ids = ['pago-efectivo','pago-yape','pago-plin','pago-transferencia','pago-acuenta'];
   const totalPagado = ids.reduce((s, id) => s + (moneyValue(document.getElementById(id)?.value)), 0);
   const falta = totalPrecio - totalPagado;
@@ -10562,9 +10744,18 @@ async function guardarFinalizacion(id){
   if(!item) return;
   const yaFinalizadoAntes = item.estado === 'se_finalizo' || item.estado === 'finalizado' || !!item.estadoPago;
 
+  const gastosServicio = [1,2,3].map(i => ({
+    comida: moneyValue(document.getElementById('cobro-comida'+i)?.value),
+    movilidad: moneyValue(document.getElementById('cobro-movilidad'+i)?.value),
+    agregados: moneyValue(document.getElementById('cobro-agregados'+i)?.value),
+    otros_gastos: moneyValue(document.getElementById('cobro-otrosgastos'+i)?.value),
+    meta: moneyValue(document.getElementById('cobro-meta'+i)?.value)
+  }));
+  const sumGasto = key => gastosServicio.reduce((s,g)=>s + moneyValue(g[key]), 0);
   const cobroObj = {
-    otros_gastos: moneyValue(document.getElementById('cobro-otrosgastos')?.value),
-    comida: moneyValue(document.getElementById('cobro-comida')?.value),
+    fecha: document.getElementById('cobro-fecha')?.value || item.fecha || todayStr(),
+    cliente: document.getElementById('cobro-cliente')?.value?.trim() || item.cliente || '',
+    telefono: document.getElementById('cobro-telefono')?.value?.trim() || item.telefono || '',
     svc1: document.getElementById('cobro-svc1')?.value||'',
     precio1: moneyValue(document.getElementById('cobro-precio1')?.value),
     materiales1: moneyValue(document.getElementById('cobro-mat1')?.value),
@@ -10574,14 +10765,19 @@ async function guardarFinalizacion(id){
     svc3: document.getElementById('cobro-svc3')?.value||'',
     precio3: moneyValue(document.getElementById('cobro-precio3')?.value),
     materiales3: moneyValue(document.getElementById('cobro-mat3')?.value),
+    comida1: gastosServicio[0].comida, movilidad1: gastosServicio[0].movilidad, agregados1: gastosServicio[0].agregados, otros_gastos1: gastosServicio[0].otros_gastos, meta1: gastosServicio[0].meta,
+    comida2: gastosServicio[1].comida, movilidad2: gastosServicio[1].movilidad, agregados2: gastosServicio[1].agregados, otros_gastos2: gastosServicio[1].otros_gastos, meta2: gastosServicio[1].meta,
+    comida3: gastosServicio[2].comida, movilidad3: gastosServicio[2].movilidad, agregados3: gastosServicio[2].agregados, otros_gastos3: gastosServicio[2].otros_gastos, meta3: gastosServicio[2].meta,
     pagoEfectivo: moneyValue(document.getElementById('pago-efectivo')?.value),
     pagoYape: moneyValue(document.getElementById('pago-yape')?.value),
     pagoPlin: moneyValue(document.getElementById('pago-plin')?.value),
     pagoTransf: moneyValue(document.getElementById('pago-transferencia')?.value),
     pagoAcuenta: moneyValue(document.getElementById('pago-acuenta')?.value),
-    movilidad: moneyValue(document.getElementById('cobro-movilidad')?.value),
-    agregados: moneyValue(document.getElementById('cobro-otros')?.value),
-    meta: moneyValue(document.getElementById('cobro-meta')?.value),
+    comida: sumGasto('comida'),
+    movilidad: sumGasto('movilidad'),
+    agregados: sumGasto('agregados'),
+    otros_gastos: sumGasto('otros_gastos'),
+    meta: sumGasto('meta'),
     distrito: document.getElementById('cobro-distrito')?.value?.trim()||item.ubicacion||'',
     observaciones: document.getElementById('cobro-notas')?.value?.trim()||''
   };
@@ -10608,14 +10804,18 @@ async function guardarFinalizacion(id){
   cobroObj.movilidad_manual = movilidadManual;
   cobroObj.movilidad_vinculada = totalMovilidadVinculada;
   cobroObj.movilidad = +(movilidadManual + totalMovilidadVinculada).toFixed(2);
-  const agDesc = (cobroObj.svc1 || item.servicio || 'Servicio') + ' — ' + (item.cliente || '');
-  const fechasCierre = new Set([item.fecha, todayStr()].filter(Boolean));
+  const agDesc = (cobroObj.svc1 || item.servicio || 'Servicio') + ' — ' + (cobroObj.cliente || item.cliente || '');
+  const fechasCierre = new Set([cobroObj.fecha, item.fecha, todayStr()].filter(Boolean));
 
+  item.fecha = cobroObj.fecha;
+  item.cliente = cobroObj.cliente;
+  item.telefono = cobroObj.telefono;
   item.estado = 'se_finalizo';
   item.montoPagado = totalPagado;
   item.montoPendienteCobro = Math.max(totalPrecio - totalPagado, 0);
   if (cobroObj.distrito) item.ubicacion = cobroObj.distrito;
-  if (cobroObj.observaciones) item.notas = (item.notas ? item.notas + ' · ' : '') + cobroObj.observaciones;
+  item.observaciones = cobroObj.observaciones;
+  if (cobroObj.observaciones) item.notas = cobroObj.observaciones;
 
   if (totalPagado >= totalPrecio) item.estadoPago = 'completo';
   else if (totalPagado > 0)       item.estadoPago = 'parcial';
@@ -10624,12 +10824,21 @@ async function guardarFinalizacion(id){
   item.servicio1 = cobroObj.svc1 || '';
   item.servicio2 = cobroObj.svc2 || '';
   item.servicio3 = cobroObj.svc3 || '';
+  item.servicio = cobroObj.svc1 || item.servicio || '';
   item.precio1 = cobroObj.precio1;
   item.precio2 = cobroObj.precio2;
   item.precio3 = cobroObj.precio3;
+  item.precio = totalPrecio;
   item.materiales1 = cobroObj.materiales1;
   item.materiales2 = cobroObj.materiales2;
   item.materiales3 = cobroObj.materiales3;
+  [1,2,3].forEach(i => {
+    item['comida'+i] = cobroObj['comida'+i];
+    item['movilidad'+i] = cobroObj['movilidad'+i];
+    item['agregados'+i] = cobroObj['agregados'+i];
+    item['otros_gastos'+i] = cobroObj['otros_gastos'+i];
+    item['meta'+i] = cobroObj['meta'+i];
+  });
   item.comidaManualCierre = comidaManual;
   item.comidaVinculada = totalComidaVinculada;
   item.comida = cobroObj.comida;
@@ -10646,6 +10855,14 @@ async function guardarFinalizacion(id){
   item.pagoTransf = cobroObj.pagoTransf;
   item.pagoAcuenta = cobroObj.pagoAcuenta;
   item.finalizadoAt = new Date().toISOString();
+  if(item._movimientosMaterialesPendientes){
+    (state.movimientosMateriales || [])
+      .filter(m => m?.tipo && String(m.id_servicio || '') === String(item.id))
+      .forEach(m => syncMovimientoToSheets(m));
+    item._movimientosMaterialesPendientes = false;
+  }
+  item._registroRapido = false;
+  if(String(window._registroServicioDraftId || '') === String(item.id)) window._registroServicioDraftId = '';
   item.gastosVinculados = gastosVinculadosIds;
   item.gastosVinculadosTotal = totalGastosVinculados;
   item.gastosVinculadosResumen = gastosVinculados.map(t => `${t.category}: ${fmt(t.amount)}`).join(' · ');
@@ -10756,7 +10973,7 @@ async function guardarFinalizacion(id){
   if (crearMovimientosCierre && cobroObj.otros_gastos > 0) { const txId=rowId+'-otg'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   // Materiales usados en el servicio: reducen el stock valorizado pero NO afectan la caja
   // (la caja ya se movio cuando se compraron los materiales). Se ocultan de movimientos.
-  if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
+  if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.meta > 0) { const txId=rowId+'-met'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.meta, category:'Meta', catId:'cne_meta', description:'Meta - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if(crearMovimientosCierre) item.cierreTxIds = nuevosCierreTxIds;
@@ -12875,6 +13092,7 @@ function showModal(){
 function closeModal(e){
   // Si viene de overlay: solo cerrar si tocaron el fondo, no el contenido
   if(e && e.target && e.target.id !== 'modal') return;
+  limpiarRegistroRapidoDraft();
   document.getElementById('modal').style.display='none';
   document.body.style.overflow='';
 }
@@ -20090,12 +20308,22 @@ function getPlantillaPorTipo(tipoServicio){
 
 // ── FASE 3-7: Formulario de materiales usados ───────────────────────
 function openMatUsadosForm(agendaId, slot = 1){
+  ensureLazyData('inventario');
+  ensureLazyData('plantillas');
+  ensureLazyData('movimientosMateriales');
   window._currentMatSlot = slot;
   const item = (state.agenda||[]).find(x=>x.id===agendaId);
   const tipoServicio = document.getElementById('cobro-svc'+slot)?.value || item?.['servicio'+slot] || item?.servicio || '';
+  window._currentMatTipoServicio = tipoServicio;
   const plantilla = getPlantillaPorTipo(tipoServicio);
+  const prevRows = getMaterialesUsadosServicio(item, slot);
+  const hasSavedRows = !!item && Object.prototype.hasOwnProperty.call(item, 'materialesUsados' + slot);
+  const useSavedRows = hasSavedRows || prevRows.length > 0;
 
-  window._matUsadosTemp = plantilla.map(p=>{
+  window._matUsadosTemp = useSavedRows ? prevRows.map(r=>{
+    const mat = getMaterialById(r.material_id);
+    return { ...r, stock: moneyValue(mat?.stock_actual) + moneyValue(r.cantidad), costo: moneyValue(r.costo || mat?.costo_actual) };
+  }) : plantilla.map(p=>{
     const mat = getMaterialById(p.material_id);
     return { material_id:p.material_id, nombre:mat?.nombre||p.material, unidad:mat?.unidad||'unidad', cantidad:p.cantidad_default, costo:mat?.costo_actual||0, stock:mat?.stock_actual||0 };
   });
@@ -20176,8 +20404,7 @@ function _renderMatUsadosForm(agendaId, tipoServicio){
 function _removeMatRow(i){
   window._matUsadosTemp.splice(i,1);
   const agId = window._cobroAgendaId||'';
-  const item = (state.agenda||[]).find(x=>x.id===agId);
-  _renderMatUsadosForm(agId, item?.servicio||'');
+  _renderMatUsadosForm(agId, window._currentMatTipoServicio||'');
 }
 
 function _updateMatRow(i, field, val){
@@ -20185,8 +20412,7 @@ function _updateMatRow(i, field, val){
   window._matUsadosTemp[i][field] = parseFloat(val)||0;
   // Re-render to update totals and validation
   const agId = window._cobroAgendaId||'';
-  const item = (state.agenda||[]).find(x=>x.id===agId);
-  _renderMatUsadosForm(agId, item?.servicio||'');
+  _renderMatUsadosForm(agId, window._currentMatTipoServicio||'');
 }
 
 function _addMatRow(){
@@ -20201,42 +20427,73 @@ function _addMatRow(){
   if(existing){ existing.cantidad+=1; }
   else { window._matUsadosTemp.push({ material_id:matId, nombre:mat.nombre, unidad:mat.unidad, cantidad:1, costo:mat.costo_actual, stock:mat.stock_actual }); }
   const agId = window._cobroAgendaId||'';
-  const item = (state.agenda||[]).find(x=>x.id===agId);
-  _renderMatUsadosForm(agId, item?.servicio||'');
+  _renderMatUsadosForm(agId, window._currentMatTipoServicio||'');
 }
 
 // ── FASE 5-8: Confirmar uso — validar, descontar, guardar historial ──
 function _confirmarMatUsados(agendaId){
-  const rows = window._matUsadosTemp||[];
-  // FASE 5: Validar stock
-  const insuf = rows.filter(r=>r.cantidad>r.stock);
-  if(insuf.length){ toast('Stock insuficiente en: '+insuf.map(r=>r.nombre).join(', '),'error'); return; }
+  const item = (state.agenda||[]).find(x => x.id === agendaId);
+  const slot = window._currentMatSlot || 1;
+  const rows = _consolidarMaterialRows(window._matUsadosTemp||[]);
+  const prevRows = getMaterialesUsadosServicio(item, slot);
+  const prevById = new Map(prevRows.map(r => [String(r.material_id), r]));
+  const newById = new Map(rows.map(r => [String(r.material_id), r]));
+  const deltas = new Map();
 
-  const totalCosto = rows.reduce((s,r)=>s+(r.cantidad*r.costo),0);
+  prevRows.forEach(r => deltas.set(String(r.material_id), -moneyValue(r.cantidad)));
+  rows.forEach(r => {
+    const id = String(r.material_id);
+    deltas.set(id, +(moneyValue(deltas.get(id)) + moneyValue(r.cantidad)).toFixed(4));
+  });
 
-  // FASE 6: Descontar stock
-  rows.forEach(r=>{
-    const idx = state.inventario.findIndex(m=>m.id===r.material_id);
-    if(idx>=0){
-      state.inventario[idx].stock_actual = Math.max(0, state.inventario[idx].stock_actual - r.cantidad);
-      syncMaterialToSheets(state.inventario[idx]);
+  const insuf = [];
+  deltas.forEach((delta, matId) => {
+    if(delta <= 0) return;
+    const mat = getMaterialById(matId);
+    if(!mat || moneyValue(mat.stock_actual) < delta){
+      insuf.push((newById.get(matId) || prevById.get(matId))?.nombre || mat?.nombre || matId);
     }
   });
+  if(insuf.length){ toast('Stock insuficiente en: '+insuf.join(', '),'error'); return; }
 
-  // FASE 8: Guardar historial
+  const totalCosto = rows.reduce((s,r)=>s+(moneyValue(r.cantidad)*moneyValue(r.costo)),0);
   const fecha = todayStr();
-  rows.forEach(r=>{
-    const reg = { id:'mu_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), tipo:'uso', id_servicio:agendaId, material_id:r.material_id, material:r.nombre, cantidad:r.cantidad, costo_unitario_usado:r.costo, costo_total:r.cantidad*r.costo, fecha };
-    state.movimientosMateriales = state.movimientosMateriales||[];
-    state.movimientosMateriales.push(reg);
-    syncMovimientoToSheets(reg);
-  });
+  const touched = new Set();
+  state.movimientosMateriales = state.movimientosMateriales||[];
 
-  // FASE 7: Actualizar la agenda y volver al form de cobro
-  const item = (state.agenda||[]).find(x => x.id === agendaId);
+  deltas.forEach((delta, matId) => {
+    if(Math.abs(delta) < 0.0001) return;
+    const idx = state.inventario.findIndex(m=>String(m.id)===String(matId));
+    const rowInfo = newById.get(matId) || prevById.get(matId) || {};
+    if(idx>=0){
+      state.inventario[idx].stock_actual = Math.max(0, +(moneyValue(state.inventario[idx].stock_actual) - delta).toFixed(4));
+      touched.add(idx);
+    }
+    const cantidad = Math.abs(delta);
+    const costo = moneyValue(rowInfo.costo || state.inventario[idx]?.costo_actual);
+    const reg = {
+      id:'mu_'+Date.now()+'_'+slot+'_'+Math.random().toString(36).slice(2,6),
+      tipo: delta > 0 ? 'uso' : 'devolucion',
+      id_servicio: agendaId,
+      servicio_slot: slot,
+      uso_key: agendaId+':'+slot,
+      material_id: matId,
+      material: rowInfo.nombre || state.inventario[idx]?.nombre || 'Material',
+      cantidad,
+      unidad: rowInfo.unidad || state.inventario[idx]?.unidad || 'unidad',
+      costo_unitario_usado: costo,
+      costo_total: +(cantidad*costo).toFixed(2),
+      fecha
+    };
+    state.movimientosMateriales.push(reg);
+    if(!item?._registroRapido) syncMovimientoToSheets(reg);
+  });
+  touched.forEach(idx => syncMaterialToSheets(state.inventario[idx]));
+
   if(item) {
-    const slot = window._currentMatSlot || 1;
-    item['materiales'+slot] = totalCosto;
+    guardarMaterialesUsadosServicio(item, slot, rows);
+    item['materiales'+slot] = +totalCosto.toFixed(2);
+    if(item._registroRapido) item._movimientosMaterialesPendientes = true;
     saveAll();
     // Volver a abrir el modal de cobro exactamente donde nos quedamos
     abrirModalCobro(agendaId);
@@ -20244,7 +20501,8 @@ function _confirmarMatUsados(agendaId){
     saveAll();
     closeModal();
   }
-  toast(`✅ ${rows.length} materiales descontados · S/ ${totalCosto.toFixed(2)}`);
+  const huboCambio = [...deltas.values()].some(v => Math.abs(v) >= 0.0001);
+  toast(huboCambio ? `✅ Stock actualizado · S/ ${totalCosto.toFixed(2)}` : `✓ Materiales sin cambios · S/ ${totalCosto.toFixed(2)}`);
 
   // Alertas de stock bajo
   rows.forEach(r=>{
