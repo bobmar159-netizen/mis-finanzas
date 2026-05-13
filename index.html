@@ -1996,22 +1996,22 @@ const DEFAULT_CATS_EX = [
   {id:'ce_pizza',name:'Pizza',icon:'food',color:'#C56F54',type:'egreso'},
   {id:'ce_salidas',name:'Salidas',icon:'play',color:'#7A83A6',type:'egreso'},
   {id:'ce_menu',name:'Menu',icon:'food',color:'#B58B55',type:'egreso'},
-  {id:'ce_edu',name:'* EDUCACION *',icon:'clipboard',color:'#2E86AB',type:'egreso'},
+  {id:'ce_edu',name:'Educacion',icon:'clipboard',color:'#2E86AB',type:'egreso'},
   {id:'ce_edu_colegio',name:'Colegio',icon:'clipboard',color:'#2E86AB',type:'egreso'},
   {id:'ce_edu_utiles',name:'Utiles',icon:'note',color:'#4A90D9',type:'egreso'},
   {id:'ce5',name:'Entretenimiento',icon:'play',color:'#8A7EA8',type:'egreso'},
-  {id:'ce3',name:'* SALUD *',icon:'health',color:'#B96868',type:'egreso'},
+  {id:'ce3',name:'Salud',icon:'health',color:'#B96868',type:'egreso'},
   {id:'ce_salud_samara',name:'Medicina Samara',icon:'health',color:'#C2596B',type:'egreso'},
   {id:'ce_salud_medicina',name:'Medicina',icon:'health',color:'#B96868',type:'egreso'},
   {id:'ce_salud_doctor',name:'Consulta doctor',icon:'health',color:'#A05070',type:'egreso'},
-  {id:'ce_movilidad',name:'* MOVILIDAD *',icon:'transport',color:'#4F7EA8',type:'egreso'},
+  {id:'ce_movilidad',name:'Movilidad',icon:'transport',color:'#4F7EA8',type:'egreso'},
   {id:'ce_aseo',name:'Productos de aseo',icon:'box',color:'#6D8C82',type:'egreso'},
   {id:'ce_cuidado',name:'Cuidado personal',icon:'health',color:'#8C7AA3',type:'egreso'},
   {id:'ce_belleza',name:'Belleza',icon:'gift',color:'#B97C9A',type:'egreso'},
   {id:'ce7',name:'Ropa',icon:'clothes',color:'#8B7668',type:'egreso'},
   {id:'ce_accesorios',name:'Accesorios',icon:'box',color:'#7B8790',type:'egreso'},
   {id:'ce_cine',name:'Cine',icon:'play',color:'#6D7FA3',type:'egreso'},
-  {id:'ce10',name:'Otros gastos del dia',icon:'box',color:'#77746D',type:'egreso'},
+  {id:'ce10',name:'Otros gastos personales',icon:'box',color:'#77746D',type:'egreso'},
   {id:'ce9',name:'Deuda',icon:'bank',color:'#B96868',type:'egreso',system:true,hidden:true},
   {id:'ce6',name:'Servicios del hogar',icon:'light',color:'#D09A4E',type:'egreso',system:true,hidden:true},
   {id:'transfer_out',name:'Transferencia enviada',icon:'transfer',color:'#1565C0',type:'egreso',system:true,hidden:true},
@@ -2189,12 +2189,12 @@ const DEFAULT_CATS_NEG_EX = [
   {id:'cne_golosina',name:'Golosina',icon:'gift',color:'#C27D8A',type:'egreso'},
   {id:'cne_pizza',name:'Pizza',icon:'food',color:'#C56F54',type:'egreso'},
   {id:'cne_menu',name:'Menu',icon:'food',color:'#B58B55',type:'egreso'},
-  {id:'cne5',name:'* MOVILIDAD *',icon:'transport',color:'#4F7EA8',type:'egreso'},
-  {id:'cne_salud',name:'* SALUD *',icon:'health',color:'#B96868',type:'egreso'},
+  {id:'cne5',name:'Movilidad',icon:'transport',color:'#4F7EA8',type:'egreso'},
+  {id:'cne_salud',name:'Salud',icon:'health',color:'#B96868',type:'egreso'},
   {id:'cne_salud_samara',name:'Medicina Samara',icon:'health',color:'#C2596B',type:'egreso'},
   {id:'cne_salud_medicina',name:'Medicina',icon:'health',color:'#B96868',type:'egreso'},
   {id:'cne_salud_doctor',name:'Consulta doctor',icon:'health',color:'#A05070',type:'egreso'},
-  {id:'cne_edu',name:'* EDUCACION *',icon:'clipboard',color:'#2E86AB',type:'egreso'},
+  {id:'cne_edu',name:'Educacion',icon:'clipboard',color:'#2E86AB',type:'egreso'},
   {id:'cne_edu_colegio',name:'Colegio',icon:'clipboard',color:'#2E86AB',type:'egreso'},
   {id:'cne_edu_utiles',name:'Utiles',icon:'note',color:'#4A90D9',type:'egreso'},
   {id:'cne_luz',name:'Luz',icon:'light',color:'#D09A4E',type:'egreso'},
@@ -2260,7 +2260,7 @@ function getKeys(modo){
   if(migrated) console.log('[MisFinanzas] Keys migrados a formato fnz_neg_*');
 })();
 
-const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_voice_local_v8';
+const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_scope_sheets_v9';
 const CATEGORY_LEGACY_DEFAULT_IDS = {
   personal: {
     ingreso: ['ci1','ci2','ci3','ci4','ci5','ci6','transfer_in','transfer_retiro_in','cneg_svc'],
@@ -2752,9 +2752,11 @@ function categoryAreaLabel(cat, type){
   const n = normSimpleText(cat?.name || '');
   const isNeg = state.modo === 'negocio';
   if(!isNeg) {
-    if(type === 'ingreso') return 'Ingresos';
+    if(type === 'ingreso') return 'Ingresos personales';
     if(/mercado|super|gaseosa|agua|golosina|snack|pizza|menu|comida/.test(n)) return 'Alimentacion';
-    if(/medicina|aseo|cuidado|belleza/.test(n)) return 'Salud y cuidado';
+    if(['ce_movilidad'].includes(id) || /movilidad|transporte|taxi|pasaje/.test(n)) return 'Movilidad';
+    if(['ce_edu','ce_edu_colegio','ce_edu_utiles'].includes(id) || /educacion|colegio|utiles/.test(n)) return 'Educacion';
+    if(/medicina|salud|aseo|cuidado|belleza|consulta/.test(n)) return 'Salud y cuidado';
     if(/ropa|accesorio|cine|entretenimiento|salidas/.test(n)) return 'Vida diaria';
     return 'Otros';
   }
@@ -2770,17 +2772,98 @@ function categoryAreaLabel(cat, type){
   return 'Otros';
 }
 
-function catSelectHtml(id, type, selected, selectedCatId){
-  const isNeg = state.modo === 'negocio';
+function getCatsForScope(type, scope){
+  const modo = scope || state.modo || 'negocio';
+  const isNeg = modo === 'negocio';
+  if(modo === state.modo){
+    return type === 'ingreso' ? (state.catsIn || []) : (state.catsEx || []);
+  }
+  ensureCategoryDefaultsForScope(modo);
+  const k = getKeys(modo);
+  const fallback = isNeg
+    ? (type === 'ingreso' ? DEFAULT_CATS_NEG_IN : DEFAULT_CATS_NEG_EX)
+    : (type === 'ingreso' ? DEFAULT_CATS_IN : DEFAULT_CATS_EX);
+  return load(type === 'ingreso' ? k.catsIn : k.catsEx, fallback);
+}
+
+function ensureCategoryDefaultsForScope(scope){
+  const modo = scope || 'negocio';
+  const isNeg = modo === 'negocio';
+  const marker = isNeg ? 'fnz_neg_category_defaults_version' : 'fnz_category_defaults_version';
+  if(localStorage.getItem(marker) === CATEGORY_DEFAULT_VERSION) return;
+  const k = getKeys(modo);
+  const legacy = CATEGORY_LEGACY_DEFAULT_IDS[modo] || {ingreso:[], egreso:[]};
+  const inDefaults = isNeg ? DEFAULT_CATS_NEG_IN : DEFAULT_CATS_IN;
+  const exDefaults = isNeg ? DEFAULT_CATS_NEG_EX : DEFAULT_CATS_EX;
+  save(k.catsIn, syncCategoryList(load(k.catsIn, inDefaults), inDefaults, legacy.ingreso, true));
+  save(k.catsEx, syncCategoryList(load(k.catsEx, exDefaults), exDefaults, legacy.egreso, true));
+  localStorage.setItem(marker, CATEGORY_DEFAULT_VERSION);
+}
+
+function getCatDefaultsForScope(type, scope){
+  const modo = scope || state.modo || 'negocio';
+  const isNeg = modo === 'negocio';
+  return isNeg
+    ? (type === 'ingreso' ? DEFAULT_CATS_NEG_IN : DEFAULT_CATS_NEG_EX)
+    : (type === 'ingreso' ? DEFAULT_CATS_IN : DEFAULT_CATS_EX);
+}
+
+function txSheetModo(tx, fallback){
+  const catId = String(tx?.catId || '');
+  if(tx?.negocio === true) return 'negocio';
+  if(tx?.negocio === false) return 'personal';
+  if(/^(cn|cne|cneg_|transfer_neg)/.test(catId)) return 'negocio';
+  if(/^(ci|ce|transfer_)/.test(catId)) return 'personal';
+  return fallback || state.modo || 'negocio';
+}
+
+function allStoredTransactions(){
+  const neg = (state.modo === 'negocio' ? (state.transactions || []) : load(getKeys('negocio').tx, []))
+    .map(t => ({...t, negocio:t?.negocio === false ? false : true}));
+  const per = (state.modo === 'personal' ? (state.transactions || []) : load(getKeys('personal').tx, []))
+    .map(t => ({...t, negocio:false}));
+  const seen = new Set();
+  return [...neg, ...per].filter(t => {
+    const id = String(t?.id || '');
+    if(!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+function allCatsForLookup(){
+  return [
+    ...getCatsForScope('ingreso','negocio'), ...getCatsForScope('egreso','negocio'),
+    ...getCatsForScope('ingreso','personal'), ...getCatsForScope('egreso','personal'),
+    ...DEFAULT_CATS_NEG_IN, ...DEFAULT_CATS_NEG_EX,
+    ...DEFAULT_CATS_IN, ...DEFAULT_CATS_EX
+  ];
+}
+
+function categoryAreaLabelForScope(cat, type, scope){
+  const prev = state.modo;
+  state.modo = scope || prev;
+  const label = categoryAreaLabel(cat, type);
+  state.modo = prev;
+  return label;
+}
+
+function catSelectHtml(id, type, selected, selectedCatId, scope){
+  const modo = scope || state.modo || 'negocio';
+  const isNeg = modo === 'negocio';
   let cats;
   if(type==='ingreso'){
+    const base = getCatsForScope('ingreso', modo);
+    const defs = getCatDefaultsForScope('ingreso', modo);
     cats = isNeg
-      ? [...state.catsIn, ...DEFAULT_CATS_NEG_IN.filter(d => !state.catsIn.some(c=>c.id===d.id))]
-      : state.catsIn;
+      ? [...base, ...defs.filter(d => !base.some(c=>c.id===d.id))]
+      : base;
   } else {
+    const base = getCatsForScope('egreso', modo);
+    const defs = getCatDefaultsForScope('egreso', modo);
     cats = isNeg
-      ? [...state.catsEx, ...DEFAULT_CATS_NEG_EX.filter(d => !state.catsEx.some(c=>c.id===d.id))]
-      : state.catsEx;
+      ? [...base, ...defs.filter(d => !base.some(c=>c.id===d.id))]
+      : base;
   }
   cats = cats.filter(c=>(!c.hidden && !c.system) || (selectedCatId && c.id===selectedCatId) || c.id===selected || c.name===selected);
   const seen = new Set();
@@ -2790,7 +2873,7 @@ function catSelectHtml(id, type, selected, selectedCatId){
   const selNorm = norm(selected);
   const groups = new Map();
   cats.forEach(c => {
-    const g = categoryAreaLabel(c, type);
+    const g = categoryAreaLabelForScope(c, type, modo);
     if(!groups.has(g)) groups.set(g, []);
     groups.get(g).push(c);
   });
@@ -4214,7 +4297,7 @@ function renderServicios(){
 }
 
 function toggleGraficosVista(v) {
-  state.graficosVista = (v === 'semanal') ? 'semanal' : 'mensual';
+  state.graficosVista = ['diario', 'semanal', 'mensual'].includes(v) ? v : 'semanal';
   saveAll();
   render();
 }
@@ -4306,14 +4389,17 @@ function gfGetTodayRange() {
 
 function gfGetRange(vista = state.graficosVista) {
   const now = new Date();
-  if (vista === 'semanal') {
-    const start = new Date(now);
-    start.setDate(start.getDate() - 6);
-    return gfcRange('semanal', start, now, 'Ultimos 7 dias');
+  if (vista === 'diario') {
+    return gfcRange('diario', now, now, 'Hoy');
   }
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  return gfcRange('mensual', start, end, MONTHS_FULL[now.getMonth()] + ' ' + now.getFullYear());
+  if (vista === 'mensual') {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return gfcRange('mensual', start, end, MONTHS_FULL[now.getMonth()] + ' ' + now.getFullYear());
+  }
+  const start = new Date(now);
+  start.setDate(start.getDate() - 6);
+  return gfcRange('semanal', start, now, 'Ultimos 7 dias');
 }
 
 function gfTransactionsForRange(range) {
@@ -4703,9 +4789,71 @@ function mentorLoadVoices() {
   });
 }
 
-async function reproducirDiscurso(texto) {
+function getElevenLabsConfig() {
+  return {
+    enabled: localStorage.getItem('fnz_eleven_enabled') === '1',
+    key: localStorage.getItem('fnz_eleven_key') || '',
+    voiceId: localStorage.getItem('fnz_eleven_voice_id') || '',
+    modelId: localStorage.getItem('fnz_eleven_model_id') || 'eleven_multilingual_v2',
+    stability: moneyValue(localStorage.getItem('fnz_eleven_stability') || 0.42),
+    similarity: moneyValue(localStorage.getItem('fnz_eleven_similarity') || 0.82),
+    style: moneyValue(localStorage.getItem('fnz_eleven_style') || 0.18)
+  };
+}
+
+function mentorTextoParaVoz(texto) {
+  return String(texto || '')
+    .replace(/\s+/g, ' ')
+    .replace(/Escuchame bien\.?/i, 'Mira.')
+    .replace(/No negocies con la pereza ni con la comodidad\.?/i, 'Ve paso a paso, pero no te sueltes.')
+    .replace(/La deuda no espera a que tengas ganas; la deuda cobra igual\.?/i, 'La deuda sigue corriendo, así que hoy conviene moverse con calma y precisión.')
+    .trim();
+}
+
+async function reproducirDiscursoElevenLabs(texto, cfg = getElevenLabsConfig()) {
+  if (!cfg.enabled || !cfg.key || !cfg.voiceId) return false;
+  const clean = mentorTextoParaVoz(texto).slice(0, 2400);
+  if (!clean) return false;
+  const res = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + encodeURIComponent(cfg.voiceId), {
+    method: 'POST',
+    headers: {
+      'Accept': 'audio/mpeg',
+      'Content-Type': 'application/json',
+      'xi-api-key': cfg.key
+    },
+    body: JSON.stringify({
+      text: clean,
+      model_id: cfg.modelId || 'eleven_multilingual_v2',
+      voice_settings: {
+        stability: Math.max(0, Math.min(1, cfg.stability || 0.42)),
+        similarity_boost: Math.max(0, Math.min(1, cfg.similarity || 0.82)),
+        style: Math.max(0, Math.min(1, cfg.style || 0.18)),
+        use_speaker_boost: true
+      }
+    })
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { detail = await res.text(); } catch(e) {}
+    throw new Error('ElevenLabs ' + res.status + ' ' + detail.slice(0, 120));
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  window._mentorAudio = audio;
+  window._mentorAudioUrl = url;
+  audio.onended = () => {
+    if (window._mentorAudioUrl === url) {
+      URL.revokeObjectURL(url);
+      window._mentorAudioUrl = null;
+    }
+  };
+  await audio.play();
+  return true;
+}
+
+async function reproducirDiscursoNavegador(texto) {
   if (!('speechSynthesis' in window)) return toast('Tu navegador no soporta audio', 'error');
-  detenerDiscurso();
   const chunks = mentorChunks(texto);
   if (!chunks.length) return;
   const voices = await mentorLoadVoices();
@@ -4718,8 +4866,8 @@ async function reproducirDiscurso(texto) {
     const msg = new SpeechSynthesisUtterance(player.chunks[player.index]);
     msg.lang = voice?.lang || 'es-PE';
     if (voice) msg.voice = voice;
-    msg.rate = 0.98;
-    msg.pitch = 0.62;
+    msg.rate = 0.96;
+    msg.pitch = 0.72;
     msg.volume = 1;
     msg.onend = () => {
       player.index += 1;
@@ -4735,12 +4883,34 @@ async function reproducirDiscurso(texto) {
   speakNext();
 }
 
+async function reproducirDiscurso(texto) {
+  detenerDiscurso();
+  const cfg = getElevenLabsConfig();
+  if (cfg.enabled && cfg.key && cfg.voiceId) {
+    try {
+      toast('Generando voz natural...', 'info');
+      await reproducirDiscursoElevenLabs(texto, cfg);
+      return;
+    } catch (e) {
+      console.warn('ElevenLabs fallback:', e);
+      toast('ElevenLabs no respondió; usando voz del navegador', 'error');
+    }
+  }
+  reproducirDiscursoNavegador(texto);
+}
+
 function detenerDiscurso() {
   if (window._mentorSpeechPlayer) window._mentorSpeechPlayer.cancelled = true;
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-}
-
-function reproducirUltimoDiscurso() {
+  if (window._mentorAudio) {
+    try { window._mentorAudio.pause(); window._mentorAudio.currentTime = 0; } catch(e) {}
+    window._mentorAudio = null;
+  }
+  if (window._mentorAudioUrl) {
+    try { URL.revokeObjectURL(window._mentorAudioUrl); } catch(e) {}
+    window._mentorAudioUrl = null;
+  }
+}function reproducirUltimoDiscurso() {
   const json = gfcBuildPanelJson();
   const box = document.getElementById('box-mentor-ai');
   const txt = document.getElementById('txt-mentor-ai');
@@ -4805,123 +4975,252 @@ function gfcEstadoColor(estado) {
   return estado === 'verde' ? '#059669' : estado === 'rojo' ? '#C62828' : '#B45309';
 }
 
-function renderGraficos(){
-  const data = gfcBuildInputs();
-  const json = gfcBuildPanelJson(data);
-  const enfoqueSemanal = state.graficosVista === 'semanal';
-  const enfoque = enfoqueSemanal ? data.resumen_semana : data.resumen_mes;
-  const progressPct = Math.max(0, Math.min(100, Math.round(json.meta.progreso * 100)));
-  const estadoColor = gfcEstadoColor(json.header.estado);
-  const estadoSoft = json.header.estado === 'verde' ? '#ECFDF5' : json.header.estado === 'rojo' ? '#FEF2F2' : '#FFFBEB';
-  const estadoText = json.header.estado === 'verde' ? '#047857' : json.header.estado === 'rojo' ? '#B91C1C' : '#B45309';
-  const maxHist = Math.max(1, ...data.historial_ultimos_7_dias.map(x => Math.abs(x.ganancia)));
-  const alertCount = json.alertas.length;
-  const principal = json.header.estado === 'verde'
-    ? 'Mantén el ritmo y protege la ganancia.'
-    : json.header.estado === 'rojo'
-      ? 'Necesitas producir antes de seguir gastando.'
-      : 'Estás cerca, pero el día todavía no está cerrado.';
-  const hist = data.historial_ultimos_7_dias.map(x => {
-    const h = Math.max(8, Math.min(72, Math.round((Math.abs(x.ganancia) / maxHist) * 72)));
-    const c = x.ganancia >= 0 ? '#4F8A6D' : '#C45454';
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0">
-      <div style="height:76px;display:flex;align-items:flex-end;width:100%">
-        <div title="${gfcMoneyText(x.ganancia)}" style="height:${h}px;background:${c};border-radius:9px 9px 3px 3px;width:100%"></div>
+function gfcVistaLabel(v) {
+  return v === 'diario' ? 'Día' : v === 'mensual' ? 'Mes' : 'Semana';
+}
+
+function gfcActiveSummary(data, vista = state.graficosVista) {
+  if (vista === 'diario') return data.resumen_hoy;
+  if (vista === 'mensual') return data.resumen_mes;
+  return data.resumen_semana;
+}
+
+function gfcCategoryBreakdown(summary) {
+  const acc = {};
+  (summary?.txs || []).forEach(t => {
+    if (!t || t.type !== 'egreso' || !gfIsCash(t)) return;
+    const cat = String(t.category || 'Sin categoria').trim() || 'Sin categoria';
+    acc[cat] = (acc[cat] || 0) + moneyValue(t.amount);
+  });
+  return Object.entries(acc)
+    .map(([nombre, monto]) => ({ nombre, monto }))
+    .sort((a, b) => b.monto - a.monto);
+}
+
+function gfcDebtBreakdown() {
+  const deudas = (state.debts || []).map(d => {
+    const restantes = Math.max(0, moneyValue(d.cuotasTotales) - moneyValue(d.cuotasPagadas));
+    return {
+      nombre: d.name || 'Deuda',
+      saldo: restantes * moneyValue(d.cuotaMonto),
+      cuota: restantes > 0 ? moneyValue(d.cuotaMonto) : 0
+    };
+  });
+  const prestamos = (state.prestamos || []).map(p => ({
+    nombre: p.nombre || 'Prestamo',
+    saldo: moneyValue(p.capitalPendiente),
+    cuota: moneyValue(p.capitalPendiente) * moneyValue(p.tasaMensual) / 100
+  }));
+  const personales = (state.prestamosPersonales || [])
+    .filter(p => !p.tipo || p.tipo === 'debo')
+    .map(p => ({
+      nombre: p.nombre || 'Prestamo personal',
+      saldo: moneyValue(p.capitalPendiente),
+      cuota: gfcCalcCuotaPersonal(p)
+    }));
+  return [...deudas, ...prestamos, ...personales]
+    .filter(x => x.saldo > 0 || x.cuota > 0)
+    .sort((a, b) => b.saldo - a.saldo);
+}
+
+function gfcRecentChanges(limit = 4) {
+  const out = [];
+  (state.transactions || []).slice(0, 80).forEach(t => {
+    if (!t || out.length >= limit) return;
+    const linked = t.vinculadoServicioId ? 'Servicio' : (t.type === 'ingreso' ? 'Ingreso' : 'Movimiento');
+    out.push({
+      icon: t.type === 'ingreso' ? '+' : '-',
+      title: linked + ' actualizado',
+      detail: [t.date, t.category || t.description || 'Sin detalle', gfcMoneyText(t.amount)].filter(Boolean).join(' · '),
+      color: t.type === 'ingreso' ? '#0F766E' : '#B45309'
+    });
+  });
+  if (out.length < limit) {
+    (state.debts || []).slice(0, limit - out.length).forEach(d => out.push({
+      icon: 'D',
+      title: 'Deuda en seguimiento',
+      detail: [d.name || 'Deuda', 'cuota ' + gfcMoneyText(d.cuotaMonto || 0)].join(' · '),
+      color: '#B91C1C'
+    }));
+  }
+  if (!out.length) out.push({ icon: 'OK', title: 'Sin movimientos recientes', detail: 'Cuando edites o borres datos, este resumen se recalcula.', color: '#64748B' });
+  return out.slice(0, limit);
+}
+
+function gfcCard(label, value, sub, color, bg = '#FFFFFF') {
+  return `<div style="background:${bg};border:1px solid #E5E7EB;border-radius:8px;padding:12px;box-shadow:0 10px 24px rgba(15,23,42,.045);min-width:0">
+    <div style="font-size:10px;color:#64748B;text-transform:uppercase;font-weight:900;letter-spacing:.03em">${label}</div>
+    <div style="font-size:20px;font-family:'Playfair Display',serif;color:${color};font-weight:900;margin-top:6px;line-height:1.05">${value}</div>
+    <div style="font-size:11px;color:#64748B;margin-top:5px;line-height:1.25;font-weight:700">${sub || ''}</div>
+  </div>`;
+}
+
+function gfcSparkBars(hist) {
+  const max = Math.max(1, ...hist.map(x => Math.max(Math.abs(x.ganancia), x.gastos || 0)));
+  return hist.map(x => {
+    const ingresoH = Math.max(6, Math.round(Math.max(0, x.ganancia + x.gastos) / max * 76));
+    const gastoH = Math.max(4, Math.round((x.gastos || 0) / max * 76));
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0">
+      <div style="height:82px;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px">
+        <div title="Ingresos" style="height:${ingresoH}px;width:42%;max-width:18px;background:#2563EB;border-radius:7px 7px 2px 2px"></div>
+        <div title="Egresos" style="height:${gastoH}px;width:42%;max-width:18px;background:#F59E0B;border-radius:7px 7px 2px 2px"></div>
       </div>
-      <div style="font-size:10px;color:#64748B;font-weight:800">${x.fecha.slice(8)}</div>
+      <div style="font-size:10px;color:#64748B;font-weight:900">${x.fecha.slice(8)}</div>
     </div>`;
   }).join('');
-  const alertas = alertCount ? json.alertas.slice(0, 3).map(a => `<div style="font-size:12px;line-height:1.35;color:#7F1D1D;background:#FFF7F7;border:1px solid #FECACA;border-radius:12px;padding:10px;font-weight:800">${gfHtml(a)}</div>`).join('') : `<div style="font-size:12px;color:#047857;background:#ECFDF5;border:1px solid #BBF7D0;border-radius:12px;padding:10px;font-weight:900">Sin alertas críticas.</div>`;
+}
+
+function gfcBarsList(items, color, emptyText) {
+  if (!items.length) return `<div style="font-size:12px;color:#94A3B8;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:8px;padding:13px;text-align:center;font-weight:800">${emptyText}</div>`;
+  const max = Math.max(1, ...items.map(x => moneyValue(x.monto ?? x.ganancia ?? x.saldo ?? 0)));
+  return items.slice(0, 5).map(item => {
+    const value = moneyValue(item.monto ?? item.ganancia ?? item.saldo ?? 0);
+    const pct = Math.max(4, Math.min(100, Math.round(value / max * 100)));
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#334155;font-weight:850;margin-bottom:5px">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${gfHtml(item.nombre)}</span>
+        <span style="white-space:nowrap">${gfcMoneyText(value)}</span>
+      </div>
+      <div style="height:8px;background:#E2E8F0;border-radius:99px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${color};border-radius:99px"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function gfcRingChart(items) {
+  const top = items.slice(0, 4);
+  const total = top.reduce((s, x) => s + moneyValue(x.monto), 0);
+  if (!total) return '<div style="height:118px;display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:12px;font-weight:800">Sin egresos</div>';
+  const colors = ['#F59E0B', '#EF4444', '#2563EB', '#14B8A6'];
+  let offset = 25;
+  const circles = top.map((x, i) => {
+    const len = Math.max(1, moneyValue(x.monto) / total * 100);
+    const dash = `${len} ${100 - len}`;
+    const c = `<circle cx="58" cy="58" r="42" fill="none" stroke="${colors[i]}" stroke-width="14" stroke-dasharray="${dash}" stroke-dashoffset="${offset}" pathLength="100" stroke-linecap="round"/>`;
+    offset -= len;
+    return c;
+  }).join('');
+  return `<div style="display:grid;grid-template-columns:118px 1fr;gap:12px;align-items:center">
+    <svg width="118" height="118" viewBox="0 0 116 116" style="transform:rotate(-90deg)">
+      <circle cx="58" cy="58" r="42" fill="none" stroke="#E2E8F0" stroke-width="14"/>
+      ${circles}
+    </svg>
+    <div>${top.map((x, i) => `<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;font-size:11px;color:#475569;font-weight:850"><span style="width:9px;height:9px;border-radius:50%;background:${colors[i]}"></span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${gfHtml(x.nombre)}</span></div>`).join('')}</div>
+  </div>`;
+}
+
+
+function renderGraficos(){
+  if (!['diario', 'semanal', 'mensual'].includes(state.graficosVista)) state.graficosVista = 'semanal';
+  const data = gfcBuildInputs();
+  const json = gfcBuildPanelJson(data);
+  const vista = state.graficosVista;
+  const enfoque = gfcActiveSummary(data, vista);
+  const vistaLabel = gfcVistaLabel(vista);
+  const progressPct = Math.max(0, Math.min(100, Math.round(json.meta.progreso * 100)));
+  const estadoColor = gfcEstadoColor(json.header.estado);
+  const categoryItems = gfcCategoryBreakdown(enfoque);
+  const debtItems = gfcDebtBreakdown();
+  const totalDebt = gfcDebtTotal();
+  const cuotaDebt = gfcDebtMonthlyPayment();
+  const debtRatio = cuotaDebt > 0 ? data.resumen_mes.ganancia / cuotaDebt : 999;
+  const debtState = gfcDebtState(debtRatio, cuotaDebt);
   const bestDistrict = data.ganancia_por_distrito[0];
   const bestService = data.ganancia_por_servicio[0];
+  const recent = gfcRecentChanges();
+  const netColor = enfoque.ganancia >= 0 ? '#047857' : '#B91C1C';
+  const rangeSub = vista === 'diario' ? 'movimiento de hoy' : vista === 'mensual' ? data.resumen_mes.range.label : 'ultimos 7 dias';
+  const mentorPreview = json.header.estado === 'verde'
+    ? 'Vas bien. Protege la ganancia, separa deuda y repite lo que funciono.'
+    : json.header.estado === 'rojo'
+      ? 'Hoy necesita accion concreta: cobrar, cerrar o cortar gasto antes de seguir avanzando.'
+      : 'Hay avance, pero todavia falta cerrar mejor el dia.';
 
   return `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px">
-      <div>
-        <div style="font-family:'Playfair Display',serif;font-size:24px;color:#20352B;font-weight:900;line-height:1">Control financiero</div>
-        <div style="font-size:12px;color:#64748B;margin-top:5px">${data.fecha_actual} · ${data.hora_actual}</div>
-      </div>
-      <button onclick="openGraficosMetas()" title="Metas" style="width:42px;height:42px;border:none;border-radius:14px;background:#FFFFFF;color:#47606A;box-shadow:0 10px 24px rgba(15,23,42,.08);font-weight:900;cursor:pointer">⚙</button>
-    </div>
-
-    <div style="background:#0F172A;border:1px solid #1E293B;border-radius:22px;padding:18px;margin-bottom:14px;color:#F8FAFC;box-shadow:0 18px 42px rgba(15,23,42,.18)">
-      <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px">
-        <div style="min-width:0">
-          <div style="display:inline-flex;align-items:center;border-radius:999px;background:${estadoSoft};color:${estadoText};padding:6px 10px;font-size:11px;font-weight:900;margin-bottom:12px">${json.header.titulo}</div>
-          <div style="font-family:'Playfair Display',serif;font-size:34px;font-weight:900;line-height:.95;color:${estadoColor}">${gfcMoneyText(json.resumen_dia.ganancia)}</div>
-          <div style="font-size:13px;color:#CBD5E1;margin-top:8px;line-height:1.35">${principal}</div>
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;font-weight:900">Servicios</div>
-          <div style="font-family:'Playfair Display',serif;font-size:30px;font-weight:900;color:#FFFFFF">${json.resumen_dia.servicios}</div>
-        </div>
-      </div>
-      <div style="height:9px;border-radius:99px;background:#1E293B;overflow:hidden;margin-bottom:10px"><div style="height:100%;width:${progressPct}%;background:${estadoColor};border-radius:99px"></div></div>
-      <div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#CBD5E1;font-weight:800">
-        <span>${progressPct}% de meta diaria</span>
-        <span>${gfcMoneyText(json.meta.meta_diaria)}</span>
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <button onclick="toggleGraficosVista('semanal')" style="border:1px solid ${enfoqueSemanal?'#BBD8C8':'#E5E7EB'};background:${enfoqueSemanal?'#EEF7F2':'#FFFFFF'};color:${enfoqueSemanal?'#2F6F53':'#64748B'};border-radius:14px;padding:12px 10px;font-weight:900;font-size:13px;box-shadow:${enfoqueSemanal?'0 8px 20px rgba(79,138,109,.08)':'none'};cursor:pointer">Semana</button>
-      <button onclick="toggleGraficosVista('mensual')" style="border:1px solid ${!enfoqueSemanal?'#BBD8C8':'#E5E7EB'};background:${!enfoqueSemanal?'#EEF7F2':'#FFFFFF'};color:${!enfoqueSemanal?'#2F6F53':'#64748B'};border-radius:14px;padding:12px 10px;font-weight:900;font-size:13px;box-shadow:${!enfoqueSemanal?'0 8px 20px rgba(79,138,109,.08)':'none'};cursor:pointer">Mes</button>
-    </div>
-
-    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:14px">
-      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;padding:12px;box-shadow:0 10px 25px rgba(15,23,42,.04)"><div style="font-size:10px;color:#64748B;text-transform:uppercase;font-weight:900">Ganancia</div><div style="font-size:18px;font-family:'Playfair Display',serif;color:${enfoque.ganancia>=0?'#2F6F53':'#B91C1C'};font-weight:900;margin-top:5px">${gfcMoneyText(enfoque.ganancia)}</div></div>
-      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;padding:12px;box-shadow:0 10px 25px rgba(15,23,42,.04)"><div style="font-size:10px;color:#64748B;text-transform:uppercase;font-weight:900">Gastos</div><div style="font-size:18px;font-family:'Playfair Display',serif;color:#A85D5D;font-weight:900;margin-top:5px">${gfcMoneyText(enfoque.egresos)}</div></div>
-      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;padding:12px;box-shadow:0 10px 25px rgba(15,23,42,.04)"><div style="font-size:10px;color:#64748B;text-transform:uppercase;font-weight:900">Trabajos</div><div style="font-size:18px;font-family:'Playfair Display',serif;color:#20352B;font-weight:900;margin-top:5px">${enfoque.servicios}</div></div>
-    </div>
-
-    <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:18px;padding:15px;margin-bottom:14px;box-shadow:0 12px 30px rgba(15,23,42,.05)">
-      <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px">
-        <div><div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:900">Siguiente acción</div><div style="font-size:16px;color:#111827;font-weight:900;margin-top:4px">${gfHtml(json.recomendaciones.servicios_objetivo)}</div></div>
-        <div style="text-align:right"><div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:900">Mínimo</div><div style="font-size:16px;color:#2F6F53;font-weight:900;margin-top:4px">${gfHtml(json.recomendaciones.ingreso_objetivo)}</div></div>
-      </div>
-      <div style="font-size:13px;color:#334155;line-height:1.45;background:#F8FAFC;border-radius:14px;padding:12px;font-weight:700">${gfHtml(json.recomendaciones.accion)}</div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:18px;padding:14px;box-shadow:0 10px 25px rgba(15,23,42,.04)">
-        <div style="font-size:12px;color:#B45309;text-transform:uppercase;font-weight:900">Deuda</div>
-        <div style="font-size:19px;font-family:'Playfair Display',serif;color:#9A3412;font-weight:900;margin-top:5px">${gfcMoneyText(json.deudas.cuota_mensual)}</div>
-        <div style="font-size:11px;color:#9A3412;margin-top:4px;font-weight:800">${json.deudas.estado}</div>
-      </div>
-      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:18px;padding:14px;box-shadow:0 10px 25px rgba(15,23,42,.04)">
-        <div style="font-size:12px;color:#1D4ED8;text-transform:uppercase;font-weight:900">Proyección</div>
-        <div style="font-size:19px;font-family:'Playfair Display',serif;color:#1D4ED8;font-weight:900;margin-top:5px">${gfcMoneyText(json.proyeccion.mejorada)}</div>
-        <div style="font-size:11px;color:#1D4ED8;margin-top:4px;font-weight:800">ritmo +30%</div>
-      </div>
-    </div>
-
-    <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:18px;padding:15px;margin-bottom:14px;box-shadow:0 12px 30px rgba(15,23,42,.05)">
-      <div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:900;margin-bottom:12px">Últimos 7 días</div>
-      <div style="display:flex;gap:7px;align-items:flex-end">${hist}</div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:18px;padding:14px;box-shadow:0 10px 25px rgba(15,23,42,.04)"><div style="font-size:11px;color:#64748B;text-transform:uppercase;font-weight:900">Zona fuerte</div><div style="font-size:14px;color:#111827;font-weight:900;margin-top:6px;line-height:1.25">${gfHtml(bestDistrict?.nombre || 'Sin datos')}</div><div style="font-size:12px;color:#2F6F53;font-weight:900;margin-top:5px">${bestDistrict ? gfcMoneyText(bestDistrict.ganancia) : '-'}</div></div>
-      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:18px;padding:14px;box-shadow:0 10px 25px rgba(15,23,42,.04)"><div style="font-size:11px;color:#64748B;text-transform:uppercase;font-weight:900">Servicio fuerte</div><div style="font-size:14px;color:#111827;font-weight:900;margin-top:6px;line-height:1.25">${gfHtml(bestService?.nombre || 'Sin datos')}</div><div style="font-size:12px;color:#2F6F53;font-weight:900;margin-top:5px">${bestService ? gfcMoneyText(bestService.ganancia) : '-'}</div></div>
-    </div>
-
-    <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:18px;padding:15px;margin-bottom:14px;box-shadow:0 12px 30px rgba(15,23,42,.05)">
-      <div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:900;margin-bottom:10px">Alertas</div>
-      <div style="display:flex;flex-direction:column;gap:8px">${alertas}</div>
-    </div>
-
-    <div style="background:#171717;border:1px solid #2A2A2A;border-radius:20px;padding:16px;margin-bottom:12px;color:#FFFFFF;box-shadow:0 18px 42px rgba(0,0,0,.16)">
-      <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;align-items:flex-start">
+    <div style="padding-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px">
         <div>
-          <div style="font-family:'Playfair Display',serif;font-size:18px;color:#F2B66D;font-weight:900">Mentor</div>
-          <div style="font-size:12px;color:#BDBDBD;margin-top:4px">Directo, exigente y accionable.</div>
+          <div style="font-family:'Playfair Display',serif;font-size:25px;color:#172033;font-weight:900;line-height:1">Gráficos</div>
+          <div style="font-size:12px;color:#64748B;margin-top:5px;font-weight:750">Resumen vivo · ${data.fecha_actual} · ${data.hora_actual}</div>
         </div>
-        <button onclick="detenerDiscurso()" title="Detener voz" style="width:34px;height:34px;border:1px solid #444;background:#222;color:#CCC;border-radius:11px;cursor:pointer">■</button>
+        <button onclick="openGraficosMetas()" title="Metas" style="width:42px;height:42px;border:none;border-radius:8px;background:#FFFFFF;color:#334155;box-shadow:0 10px 24px rgba(15,23,42,.08);font-weight:900;cursor:pointer">⚙</button>
       </div>
-      <div id="box-mentor-ai" style="display:block;background:#222;border-left:3px solid #F2B66D;border-radius:0 14px 14px 0;padding:12px;margin-bottom:12px;font-size:13px;line-height:1.5;color:#EEE">
-        <div id="txt-mentor-ai">${gfHtml(json.mentor)}</div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;background:#F1F5F9;border:1px solid #E2E8F0;border-radius:8px;padding:4px">
+        ${['diario','semanal','mensual'].map(v => `<button onclick="toggleGraficosVista('${v}')" style="border:none;background:${vista===v?'#FFFFFF':'transparent'};color:${vista===v?'#0F766E':'#64748B'};border-radius:7px;padding:10px 5px;font-size:12px;font-weight:950;box-shadow:${vista===v?'0 6px 16px rgba(15,23,42,.08)':'none'};cursor:pointer">${gfcVistaLabel(v)}</button>`).join('')}
       </div>
-      <button id="btn-mentor-ai" onclick="reproducirUltimoDiscurso()" style="width:100%;background:#D87332;color:#fff;border:none;border-radius:14px;padding:12px;font-family:'DM Sans',sans-serif;font-weight:900;font-size:13px;cursor:pointer">Escuchar mentor</button>
+
+      <div style="background:linear-gradient(135deg,#F8FAFC,#ECFDF5);border:1px solid #D7EDE2;border-radius:8px;padding:15px;margin-bottom:12px;box-shadow:0 14px 34px rgba(15,23,42,.055)">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px">
+          <div>
+            <div style="display:inline-flex;background:#FFFFFF;border:1px solid #D7EDE2;color:${estadoColor};border-radius:999px;padding:5px 9px;font-size:10px;font-weight:950;text-transform:uppercase">${json.header.titulo}</div>
+            <div style="font-family:'Playfair Display',serif;font-size:34px;line-height:.95;color:${netColor};font-weight:950;margin-top:11px">${gfcMoneyText(enfoque.ganancia)}</div>
+            <div style="font-size:12px;color:#475569;font-weight:800;margin-top:7px">${vistaLabel} · ${rangeSub}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:10px;color:#64748B;text-transform:uppercase;font-weight:950">Servicios</div>
+            <div style="font-family:'Playfair Display',serif;font-size:30px;color:#172033;font-weight:950;margin-top:4px">${enfoque.servicios}</div>
+          </div>
+        </div>
+        <div style="height:9px;border-radius:99px;background:#DDE7E2;overflow:hidden"><div style="height:100%;width:${progressPct}%;background:${estadoColor};border-radius:99px"></div></div>
+        <div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#64748B;font-weight:900;margin-top:8px"><span>${progressPct}% meta diaria</span><span>${gfcMoneyText(json.meta.meta_diaria)}</span></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px">
+        ${gfcCard('Ingresos', gfcMoneyText(enfoque.ingresos), 'entradas de caja', '#2563EB')}
+        ${gfcCard('Egresos', gfcMoneyText(enfoque.egresos), 'salidas reales', '#B45309')}
+        ${gfcCard('Utilidad', gfcMoneyText(enfoque.ganancia), 'ingresos - egresos', netColor)}
+        ${gfcCard('Deuda mensual', gfcMoneyText(cuotaDebt), debtState.estado, debtState.estado==='EN RIESGO'?'#B91C1C':'#9A3412', '#FFF7ED')}
+      </div>
+
+      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:14px;margin-bottom:12px;box-shadow:0 12px 28px rgba(15,23,42,.045)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+          <div><div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:950">Flujo de 7 días</div><div style="font-size:11px;color:#94A3B8;font-weight:750;margin-top:3px">Azul ingresos · Naranja egresos</div></div>
+          <div style="font-size:12px;color:${data.resumen_semana.ganancia>=0?'#047857':'#B91C1C'};font-weight:950">${gfcMoneyText(data.resumen_semana.ganancia)}</div>
+        </div>
+        <div style="display:flex;gap:7px;align-items:flex-end">${gfcSparkBars(data.historial_ultimos_7_dias)}</div>
+      </div>
+
+      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:14px;margin-bottom:12px;box-shadow:0 12px 28px rgba(15,23,42,.045)">
+        <div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:950;margin-bottom:11px">Egresos por categoría</div>
+        ${gfcRingChart(categoryItems)}
+        <div style="margin-top:10px">${gfcBarsList(categoryItems, '#F59E0B', 'Sin egresos en este periodo')}</div>
+      </div>
+
+      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:14px;margin-bottom:12px;box-shadow:0 12px 28px rgba(15,23,42,.045)">
+        <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:11px">
+          <div><div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:950">Deudas</div><div style="font-size:11px;color:#94A3B8;font-weight:750;margin-top:3px">sale de la pestaña Deudas y préstamos</div></div>
+          <div style="text-align:right"><div style="font-family:'Playfair Display',serif;color:#B91C1C;font-size:21px;font-weight:950">${gfcMoneyText(totalDebt)}</div><div style="font-size:10px;color:#B91C1C;font-weight:900">${debtState.estado}</div></div>
+        </div>
+        ${gfcBarsList(debtItems, debtState.estado==='EN RIESGO'?'#EF4444':'#F97316', 'Sin deudas activas')}
+        <div style="font-size:12px;line-height:1.35;color:#7C2D12;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:10px;font-weight:850;margin-top:10px">${gfHtml(debtState.mensaje)}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px">
+        ${gfcCard('Zona fuerte', gfHtml(bestDistrict?.nombre || 'Sin datos'), bestDistrict ? gfcMoneyText(bestDistrict.ganancia) : 'sin servicios', '#0F766E')}
+        ${gfcCard('Servicio fuerte', gfHtml(bestService?.nombre || 'Sin datos'), bestService ? gfcMoneyText(bestService.ganancia) : 'sin servicios', '#0F766E')}
+      </div>
+
+      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:14px;margin-bottom:12px;box-shadow:0 12px 28px rgba(15,23,42,.045)">
+        <div style="font-size:12px;color:#64748B;text-transform:uppercase;font-weight:950;margin-bottom:10px">Actualizaciones recientes</div>
+        <div style="display:grid;gap:8px">
+          ${recent.map(x => `<div style="display:grid;grid-template-columns:32px 1fr;gap:10px;align-items:center;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:9px">
+            <div style="width:32px;height:32px;border-radius:8px;background:#FFFFFF;color:${x.color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:950;border:1px solid #E2E8F0">${gfHtml(x.icon)}</div>
+            <div style="min-width:0"><div style="font-size:13px;color:#172033;font-weight:950">${gfHtml(x.title)}</div><div style="font-size:11px;color:#64748B;font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px">${gfHtml(x.detail)}</div></div>
+          </div>`).join('')}
+        </div>
+        <div style="font-size:11px;color:#0F766E;background:#ECFDF5;border:1px solid #BBF7D0;border-radius:999px;padding:8px 10px;text-align:center;font-weight:950;margin-top:10px">Sincronizado con ediciones y eliminaciones locales</div>
+      </div>
+
+      <div style="background:#111827;border:1px solid #1F2937;border-radius:8px;padding:15px;color:#F9FAFB;box-shadow:0 16px 36px rgba(17,24,39,.16)">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:10px">
+          <div><div style="font-family:'Playfair Display',serif;font-size:19px;color:#FBBF24;font-weight:950">Mentor IA</div><div style="font-size:12px;color:#CBD5E1;font-weight:750;margin-top:3px">voz y consejo más humano</div></div>
+          <button onclick="detenerDiscurso()" title="Detener voz" style="width:34px;height:34px;border:1px solid #374151;background:#1F2937;color:#CBD5E1;border-radius:8px;cursor:pointer">■</button>
+        </div>
+        <div id="box-mentor-ai" style="display:block;background:#1F2937;border-left:3px solid #FBBF24;border-radius:0 8px 8px 0;padding:11px;margin-bottom:11px;font-size:13px;line-height:1.45;color:#E5E7EB;font-weight:700">
+          <div id="txt-mentor-ai">${gfHtml(mentorPreview)}</div>
+        </div>
+        <button id="btn-mentor-ai" onclick="reproducirUltimoDiscurso()" style="width:100%;background:#D97706;color:#fff;border:none;border-radius:8px;padding:12px;font-family:'DM Sans',sans-serif;font-weight:950;font-size:13px;cursor:pointer">Escuchar mentor</button>
+      </div>
     </div>`;
 }
 
@@ -5313,7 +5612,7 @@ function syncToSheets(lastTx){
     // Siempre enviar la tx específica que cambió (insert/update)
     const tx = lastTx || (state.transactions.length ? state.transactions[0] : null);
     if(!tx) return;
-    const payload={type:'tx',modo:state.modo,timestamp:'tx_'+tx.id+'_'+Date.now(),tx};
+    const payload={type:'tx',modo:txSheetModo(tx),timestamp:'tx_'+tx.id+'_'+Date.now(),tx};
     _sendToSheets(url,payload);
   },200);
 }
@@ -5322,7 +5621,7 @@ function syncToSheets(lastTx){
 function syncAllTxToSheets(silencioso){
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(!url) return;
-  const txs=state.transactions||[];
+  const txs=allStoredTransactions();
   if(!txs.length) return;
 
   const trabajosMap = new Map();
@@ -5381,7 +5680,7 @@ function syncAllTxToSheets(silencioso){
 
   const jobs = [
     ...trabajos.map(trabajo => ({type:'trabajo', item:trabajo, timestamp:'trabajo_'+trabajo.id+'_'+Date.now()})),
-    ...txsLibres.map(tx => ({type:'tx', modo:state.modo, timestamp:'tx_'+tx.id+'_'+Date.now(), tx}))
+    ...txsLibres.map(tx => ({type:'tx', modo:txSheetModo(tx), timestamp:'tx_'+tx.id+'_'+Date.now(), tx}))
   ];
 
   let idx=0;
@@ -5538,6 +5837,13 @@ function renderAjustes(){
   const temaActual = localStorage.getItem('fnz_tema') || 'esmeralda';
   const sheetsUrl = localStorage.getItem('fnz_sheets_url') || '';
   const gemKey = localStorage.getItem('fnz_gemini_key') || '';
+  const elevenKey = localStorage.getItem('fnz_eleven_key') || '';
+  const elevenVoice = localStorage.getItem('fnz_eleven_voice_id') || '';
+  const elevenModel = localStorage.getItem('fnz_eleven_model_id') || 'eleven_multilingual_v2';
+  const elevenEnabled = localStorage.getItem('fnz_eleven_enabled') === '1';
+  const elevenStability = localStorage.getItem('fnz_eleven_stability') || '0.42';
+  const elevenSimilarity = localStorage.getItem('fnz_eleven_similarity') || '0.82';
+  const elevenStyle = localStorage.getItem('fnz_eleven_style') || '0.18';
   const notionToken = localStorage.getItem('fnz_notion_token') || '';
   const notionDb = localStorage.getItem('fnz_notion_dbid') || '';
   const notionClientesDb = localStorage.getItem('fnz_notion_dbid_clientes') || '';
@@ -5604,7 +5910,7 @@ function enviarTodoASheets() {
   const url = localStorage.getItem('fnz_sheets_url') || '';
   if (!url) return toast('Primero configura la URL de Sheets en Ajustes', 'error');
 
-  const txs    = state.transactions || [];
+  const txs    = allStoredTransactions();
   const agenda = state.agenda || [];
   const deudas = state.debts || [];
 
@@ -5680,7 +5986,7 @@ function enviarTodoASheets() {
   trabajos.forEach(trabajo => add({ type:'trabajo', item: trabajo, timestamp:'tbj_'+trabajo.id+'_'+Date.now() }));
 
   // 2. Movimientos (No Notion o transacciones libres)
-  txsNormales.forEach(tx => add({ type:'tx', modo: tx.negocio?'negocio':'personal', timestamp:'tx_'+tx.id+'_'+Date.now(), tx }));
+  txsNormales.forEach(tx => add({ type:'tx', modo: txSheetModo(tx), timestamp:'tx_'+tx.id+'_'+Date.now(), tx }));
 
   // 3. Agenda
   agenda.forEach(item => add({ type:'agenda', item, modo:'negocio', timestamp:'ag_'+item.id+'_'+Date.now() }));
@@ -6140,10 +6446,18 @@ function openAddTxWithData(pre){ openTxModal(null, pre); }
 function openTxModal(tx, preData){
   const isEdit=!!tx;
   const pre = preData || {};
-  const defType = pre.type || 'egreso';
-  const t=tx||{type:defType,date:pre.date||todayStr(),amount:pre.amount||'',category:pre.category||(defType==='ingreso'?(state.catsIn[0]?.name||'Ingreso'):(state.catsEx[0]?.name||'Otros gastos del dia')),catId:pre.catId||'',description:pre.description||'',cliente:pre.cliente||'',ubicacion:pre.ubicacion||''};
+  const defType = pre.type || tx?.type || 'egreso';
+  const rawScope = tx ? txSheetModo(tx, state.modo) : (pre.modo || pre.scope || pre.ambito || (pre.negocio === false ? 'personal' : (pre.negocio === true ? 'negocio' : state.modo)));
+  const txScope = rawScope === 'personal' ? 'personal' : 'negocio';
+  const fallbackCatList = getCatsForScope(defType, txScope).filter(c=>!c.hidden && !c.system);
+  const fallbackCat = fallbackCatList[0] || getCatDefaultsForScope(defType, txScope)[0] || null;
+  const fallbackName = defType === 'ingreso'
+    ? (fallbackCat?.name || (txScope === 'negocio' ? 'Otros servicios' : 'Reembolsos'))
+    : (fallbackCat?.name || (txScope === 'negocio' ? 'Otros gastos de negocio' : 'Otros gastos personales'));
+  const t=tx||{type:defType,date:pre.date||todayStr(),amount:pre.amount||'',category:pre.category||fallbackName,catId:pre.catId||(fallbackCat?.id||''),description:pre.description||'',cliente:pre.cliente||'',ubicacion:pre.ubicacion||''};
   window._txType=t.type;
-  const isNeg=state.modo==='negocio';
+  window._txScope=txScope;
+  const isNeg=txScope==='negocio';
   document.getElementById('modal-content').innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px">
       <div>
@@ -6151,6 +6465,13 @@ function openTxModal(tx, preData){
         <div style="font-size:12px;color:#64748B;font-weight:700">${t.type==='egreso'?'Salida de dinero':'Entrada de dinero'}</div>
       </div>
       <div style="width:42px;height:42px;border-radius:14px;background:${t.type==='egreso'?'#FFF1F1':'#EEF7F2'};color:${t.type==='egreso'?'#A85D5D':'#2F6F53'};display:flex;align-items:center;justify-content:center;font-weight:900">${t.type==='egreso'?'−':'+'}</div>
+    </div>
+    <div class="field">
+      <label class="field-label">Ambito</label>
+      <div class="type-toggle">
+        <button class="type-btn ${txScope==='negocio'?'sel-in':''}" id="btn-scope-neg" onclick="setTxScope('negocio')">Negocio</button>
+        <button class="type-btn ${txScope==='personal'?'sel-out':''}" id="btn-scope-per" onclick="setTxScope('personal')">Personal</button>
+      </div>
     </div>
     <div class="field">
       <label class="field-label">Tipo</label>
@@ -6162,7 +6483,7 @@ function openTxModal(tx, preData){
     <div class="field"><label class="field-label">Monto (S/)</label><input id="tx-amount" type="number" inputmode="decimal" placeholder="0.00" value="${t.amount||''}"></div>
     <div class="field" id="tx-cat-wrap">
       <label class="field-label">Categoría</label>
-      ${catSelectHtml('tx-cat',t.type,t.category,t.catId)}
+      ${catSelectHtml('tx-cat',t.type,t.category,t.catId,txScope)}
     </div>
     <div class="field"><label class="field-label">Moneda</label>
       <div style="display:flex;gap:8px">
@@ -6171,7 +6492,7 @@ function openTxModal(tx, preData){
       </div>
     </div>
     <div class="field"><label class="field-label">Fecha</label><input id="tx-date" type="date" value="${t.date}"></div>
-    ${isNeg?`
+    <div id="tx-neg-fields" style="${isNeg?'':'display:none'}">
     <div class="field"><label class="field-label">👤 Cliente</label><input id="tx-cliente" type="text" placeholder="Ej: Sr. Víctor Quispe" value="${t.cliente||''}"></div>
     <div class="field"><label class="field-label">📍 Ubicación</label>
       <div class="ubic-wrap">
@@ -6179,7 +6500,7 @@ function openTxModal(tx, preData){
         <div id="ubic-dropdown" class="ubic-dropdown" style="display:none"></div>
       </div>
     </div>
-    `:''}
+    </div>
     <div class="field"><label class="field-label">Descripción (opcional)</label><input id="tx-desc" type="text" placeholder="Ej: Punto adicional" value="${t.description||''}"></div>
     <div class="btn-row">
       <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
@@ -6193,6 +6514,7 @@ function openTxModal(tx, preData){
     if(btnIn) btnIn.className='type-btn'+(t.type==='ingreso'?' sel-in':'');
     if(btnOut) btnOut.className='type-btn'+(t.type==='egreso'?' sel-out':'');
     window._txType = t.type;
+    setTxScope(txScope);
     if(pre.moneda) setTxMoneda(pre.moneda, null);
     else if(t.moneda) setTxMoneda(t.moneda, null);
   }, 30);
@@ -6243,7 +6565,54 @@ function setTxType(type){
   window._txType=type;
   document.getElementById('btn-in').className='type-btn'+(type==='ingreso'?' sel-in':'');
   document.getElementById('btn-out').className='type-btn'+(type==='egreso'?' sel-out':'');
-  document.getElementById('tx-cat-wrap').innerHTML=`<label class="field-label">Categoría</label>${catSelectHtml('tx-cat',type,null,null)}`;
+  const scope = window._txScope || state.modo || 'negocio';
+  document.getElementById('tx-cat-wrap').innerHTML=`<label class="field-label">Categoría</label>${catSelectHtml('tx-cat',type,null,null,scope)}`;
+}
+
+function setTxScope(scope){
+  const next = scope === 'personal' ? 'personal' : 'negocio';
+  window._txScope = next;
+  const neg = document.getElementById('btn-scope-neg');
+  const per = document.getElementById('btn-scope-per');
+  if(neg) neg.className = 'type-btn' + (next === 'negocio' ? ' sel-in' : '');
+  if(per) per.className = 'type-btn' + (next === 'personal' ? ' sel-out' : '');
+  const wrap = document.getElementById('tx-cat-wrap');
+  if(wrap){
+    const type = window._txType || document.getElementById('tx-cat')?.dataset?.type || 'egreso';
+    const selectedId = document.getElementById('tx-cat')?.value || '';
+    wrap.innerHTML = `<label class="field-label">Categoría</label>${catSelectHtml('tx-cat',type,null,selectedId,next)}`;
+  }
+  const negFields = document.getElementById('tx-neg-fields');
+  if(negFields) negFields.style.display = next === 'negocio' ? '' : 'none';
+}
+
+function findTxInScope(scope, id){
+  const k = getKeys(scope);
+  const txs = scope === state.modo ? (state.transactions || []) : load(k.tx, []);
+  const tx = txs.find(t => String(t.id) === String(id));
+  return tx ? {tx, scope} : null;
+}
+
+function findTxInAnyScope(id){
+  return findTxInScope('negocio', id) || findTxInScope('personal', id) || {tx:null, scope:state.modo || 'negocio'};
+}
+
+function persistTxInScope(scope, item){
+  const k = getKeys(scope);
+  let txs = scope === state.modo ? [...(state.transactions || [])] : load(k.tx, []);
+  const idx = txs.findIndex(t => String(t.id) === String(item.id));
+  if(idx >= 0) txs[idx] = item;
+  else txs.unshift(item);
+  if(scope === state.modo) state.transactions = txs;
+  save(k.tx, txs);
+}
+
+function removeTxFromScope(scope, id){
+  const k = getKeys(scope);
+  let txs = scope === state.modo ? [...(state.transactions || [])] : load(k.tx, []);
+  txs = txs.filter(t => String(t.id) !== String(id));
+  if(scope === state.modo) state.transactions = txs;
+  save(k.tx, txs);
 }
 
 async function saveTx(editId){
@@ -6253,18 +6622,19 @@ async function saveTx(editId){
   const clienteEl=document.getElementById('tx-cliente');
   const ubicEl=document.getElementById('tx-ubicacion');
   const catId = document.getElementById('tx-cat').value;
+  const targetScope = window._txScope === 'personal' ? 'personal' : 'negocio';
 
   // Buscar la categoría en TODAS las listas disponibles
-  const allCatsTx = [
-    ...state.catsIn, ...state.catsEx,
-    ...DEFAULT_CATS_NEG_IN, ...DEFAULT_CATS_NEG_EX,
-    ...DEFAULT_CATS_IN, ...DEFAULT_CATS_EX
-  ];
+  const allCatsTx = allCatsForLookup();
   const catObj = allCatsTx.find(c => c.id === catId);
-  const catName = catObj ? catObj.name : (window._txType==='ingreso' ? 'Reembolsos' : 'Otros gastos del dia');
+  const catName = catObj ? catObj.name : (window._txType==='ingreso'
+    ? (targetScope === 'negocio' ? 'Otros servicios' : 'Reembolsos')
+    : (targetScope === 'negocio' ? 'Otros gastos de negocio' : 'Otros gastos personales'));
 
   // Preservar campos del registro original si es edición
-  const original = editId ? state.transactions.find(t => t.id === editId) : null;
+  const originalInfo = editId ? findTxInAnyScope(editId) : {tx:null, scope:targetScope};
+  const original = originalInfo.tx;
+  const originalScope = originalInfo.scope || targetScope;
 
   const item = {
     ...(original || {}),               // preservar campos como _importadoDeNotion, etc.
@@ -6275,14 +6645,14 @@ async function saveTx(editId){
     catId,
     date,
     description: document.getElementById('tx-desc').value.trim() || catName,
-    cliente: clienteEl ? clienteEl.value.trim() : (original?.cliente || ''),
-    ubicacion: ubicEl ? ubicEl.value.trim() : (original?.ubicacion || ''),
-    negocio: state.modo === 'negocio',
+    cliente: targetScope === 'negocio' ? (clienteEl ? clienteEl.value.trim() : (original?.cliente || '')) : '',
+    ubicacion: targetScope === 'negocio' ? (ubicEl ? ubicEl.value.trim() : (original?.ubicacion || '')) : '',
+    negocio: targetScope === 'negocio',
     moneda: window._txMoneda || original?.moneda || 'PEN',
   };
 
   const esUsoMaterialServicio = !!(original?.origenServicioMaterial || original?.materialUsoServicio || item.origenServicioMaterial || item.materialUsoServicio);
-  const entraAStockValor = item.type === 'egreso' && state.modo === 'negocio' && isMaterialesCategory(item.catId, item.category) && !esUsoMaterialServicio;
+  const entraAStockValor = item.type === 'egreso' && targetScope === 'negocio' && isMaterialesCategory(item.catId, item.category) && !esUsoMaterialServicio;
   if(entraAStockValor){
     item.afectaStockValor = true;
     item.stockOperacion = 'entrada_valor';
@@ -6328,17 +6698,19 @@ async function saveTx(editId){
     }
   }
 
-  if(editId) {
-    state.transactions = state.transactions.map(t => t.id === editId ? item : t);
-  } else {
-    state.transactions.unshift(item);
-  }
+  const movedScope = !!(editId && originalScope !== targetScope);
+  if(movedScope) removeTxFromScope(originalScope, editId);
+  persistTxInScope(targetScope, item);
   actualizarServicioPorTxCambio(item, original);
   saveAll();
+  if(movedScope){
+    const url=localStorage.getItem('fnz_sheets_url')||'';
+    if(url) _sendToSheets(url,{type:'tx_delete',id:item.id,modo:originalScope,timestamp:'txmove_'+item.id+'_'+Date.now()});
+  }
   syncToSheets(item);
   if(compraStockValor) syncCompraToSheets(compraStockValor);
   closeModal(); render();
-  if(!original || (!original._importadoDeNotion)) toast(editId ? 'Movimiento actualizado ✓' : 'Movimiento guardado ✓');
+  if(!original || (!original._importadoDeNotion)) toast((editId ? 'Movimiento actualizado' : 'Movimiento guardado') + ' · ' + (targetScope === 'negocio' ? 'Negocio' : 'Personal') + ' ✓');
 }
 
 function deleteTx(id){
@@ -6365,7 +6737,10 @@ function deleteTx(id){
     }
   }
   saveAll();
-  if(tx&&tx.negocio) syncSeccionToSheets('tx_delete',{id});
+  if(tx){
+    const url=localStorage.getItem('fnz_sheets_url')||'';
+    if(url) _sendToSheets(url,{type:'tx_delete',id,modo:txSheetModo(tx),timestamp:'txdel_'+id+'_'+Date.now()});
+  }
   // Archivar en Notion si tiene ID de Notion
   if(tx&&tx._notionRowId){
     let pId = tx._notionRowId;
@@ -13672,7 +14047,7 @@ Object.assign(CAT_KEYWORDS, {
   ce7: ['ropa','polo','camisa','pantalon','pantalón','zapatos','zapatillas'],
   ce_accesorios: ['accesorio','accesorios','cartera','mochila','reloj','lentes','correa'],
   ce_cine: ['cine','pelicula','película','entrada de cine'],
-  ce10: ['otro gasto','otros gastos','otros gastos del dia','otros gastos del día','varios','miscelaneo','misceláneo'],
+  ce10: ['otro gasto','otros gastos','otros gastos personales','otros gastos del dia','otros gastos del día','varios','miscelaneo','misceláneo'],
 
   cn1: ['punto adicional','punto extra','punto de gas','salida nueva','boca nueva'],
   cn2: ['modificacion de tuberia','modificación de tubería','modificacion','modificación','modificar tuberia','modificar tubería','cambio de tuberia','cambio de tubería'],
@@ -16561,6 +16936,50 @@ function testGeminiKey(){
   });
 }
 
+function saveElevenLabsSettings(){
+  const key = document.getElementById('eleven-key-input')?.value.trim() || '';
+  const voiceId = document.getElementById('eleven-voice-input')?.value.trim() || '';
+  const modelId = document.getElementById('eleven-model-input')?.value.trim() || 'eleven_multilingual_v2';
+  const enabled = document.getElementById('eleven-enabled-input')?.checked;
+  const stability = moneyValue(document.getElementById('eleven-stability-input')?.value || 0.42);
+  const similarity = moneyValue(document.getElementById('eleven-similarity-input')?.value || 0.82);
+  const style = moneyValue(document.getElementById('eleven-style-input')?.value || 0.18);
+  if(enabled && (!key || !voiceId)) return toast('Para activar ElevenLabs necesitas API key y Voice ID', 'error');
+  localStorage.setItem('fnz_eleven_enabled', enabled ? '1' : '0');
+  localStorage.setItem('fnz_eleven_key', key);
+  localStorage.setItem('fnz_eleven_voice_id', voiceId);
+  localStorage.setItem('fnz_eleven_model_id', modelId);
+  localStorage.setItem('fnz_eleven_stability', String(stability || 0.42));
+  localStorage.setItem('fnz_eleven_similarity', String(similarity || 0.82));
+  localStorage.setItem('fnz_eleven_style', String(style || 0.18));
+  toast(enabled ? 'ElevenLabs activado para el mentor' : 'ElevenLabs guardado pero desactivado');
+  render();
+}
+
+async function testElevenLabs(){
+  const key = document.getElementById('eleven-key-input')?.value.trim() || localStorage.getItem('fnz_eleven_key') || '';
+  const voiceId = document.getElementById('eleven-voice-input')?.value.trim() || localStorage.getItem('fnz_eleven_voice_id') || '';
+  if(!key || !voiceId) return toast('Pega API key y Voice ID primero', 'error');
+  const prev = {
+    enabled: localStorage.getItem('fnz_eleven_enabled'),
+    key: localStorage.getItem('fnz_eleven_key'),
+    voiceId: localStorage.getItem('fnz_eleven_voice_id')
+  };
+  localStorage.setItem('fnz_eleven_enabled','1');
+  localStorage.setItem('fnz_eleven_key', key);
+  localStorage.setItem('fnz_eleven_voice_id', voiceId);
+  try{
+    await reproducirDiscursoElevenLabs('Listo. La voz natural del mentor ya esta conectada.');
+    toast('ElevenLabs conectado');
+  }catch(e){
+    console.error(e);
+    toast('No se pudo conectar ElevenLabs. Revisa key, Voice ID o CORS.', 'error');
+    if(prev.enabled === null) localStorage.removeItem('fnz_eleven_enabled'); else localStorage.setItem('fnz_eleven_enabled', prev.enabled);
+    if(prev.key === null) localStorage.removeItem('fnz_eleven_key'); else localStorage.setItem('fnz_eleven_key', prev.key);
+    if(prev.voiceId === null) localStorage.removeItem('fnz_eleven_voice_id'); else localStorage.setItem('fnz_eleven_voice_id', prev.voiceId);
+  }
+}
+
 async function callGemini(prompt, keyOverride){
   const key = keyOverride || localStorage.getItem('fnz_gemini_key');
   if(!key) return null;
@@ -16622,7 +17041,7 @@ Para AGENDA:
 Categorías para ${isNeg?'NEGOCIO':'PERSONAL'}:
 ${isNeg?
 'Ingresos: Punto adicional, Modificacion de tuberia, Instalacion nueva, Reparacion de tuberia, Gasfiteria, Conversion de artefactos, Conexion de artefactos, Documentacion, Otros servicios. Egresos: Operacion, Personal, Transporte, Luz, Agua, Internet casa, Internet movil, Materiales, Gasolina, GNV, Reparacion de auto, Agregados, Documentacion, Otros gastos de negocio':
-'Ingresos: Sueldo / Salario, Bonos / Gratificaciones, Propinas, Comisiones, Venta de articulos personales, Reembolsos. Egresos: Compras del mercado, Compras al super, Gaseosa, Agua, Golosinas, Snack, Pizza, Salidas, Menu, Entretenimiento, Medicina, Productos de aseo, Cuidado personal, Belleza, Ropa, Accesorios, Cine, Otros gastos del dia'}
+'Ingresos: Sueldo / Salario, Bonos / Gratificaciones, Propinas, Comisiones, Venta de articulos personales, Reembolsos. Egresos: Compras del mercado, Compras al super, Gaseosa, Agua, Golosinas, Snack, Pizza, Salidas, Menu, Entretenimiento, Medicina, Productos de aseo, Cuidado personal, Belleza, Ropa, Accesorios, Cine, Otros gastos personales'}
 
 Para fechas relativas usa hoy (${hoy}) como referencia. "este sábado" = próximo sábado. "construccion" es ambiguo: analizar contexto para determinar si es "Instalacion nueva", "Punto adicional", "Modificacion de tuberia" u otro servicio.
 
@@ -17347,38 +17766,39 @@ function confirmarNegocio(esNegocio) {
     if (isGnvVoice(micParsed.raw))                    newCatId = 'cneg_gnv';
     else if (/\bmateriales?\b|\binsumos?\b/.test(t)) newCatId = 'cneg_mat';
     else                                              newCatId = 'cneg_gas';
-    const newCat = state.catsEx.find(c=>c.id===newCatId) || micParsed.cat;
+    const newCat = getCatsForScope('egreso','negocio').find(c=>c.id===newCatId) || micParsed.cat;
     micParsed.cat = newCat;
     micParsed.negocio = true;
     document.getElementById('pvCat').innerHTML = `${iconHtml(newCat.icon)} ${newCat.name}`;
-    updateCatSelect('egreso', newCat.id);
+    updateCatSelect('egreso', newCat.id, 'negocio');
     document.getElementById('pvNegocioBadge').textContent = '🏗️ Registrado como gasto del negocio';
     document.getElementById('pvNegocioBadge').style.display = 'block';
   } else {
     micParsed.negocio = false;
     // Si era combustible sin negocio → Transporte personal
-    const newCat = state.catsEx.find(c=>c.id==='ce2') || micParsed.cat;
+    const newCat = getCatsForScope('egreso','personal').find(c=>c.id==='ce_movilidad' || c.id==='ce2') || micParsed.cat;
     micParsed.cat = newCat;
     document.getElementById('pvCat').innerHTML = `${iconHtml(newCat.icon)} ${newCat.name}`;
-    updateCatSelect('egreso', newCat.id);
+    updateCatSelect('egreso', newCat.id, 'personal');
     document.getElementById('pvNegocioBadge').textContent = '🏠 Registrado como gasto personal';
     document.getElementById('pvNegocioBadge').style.display = 'block';
   }
   document.getElementById('micSaveBtn').style.display = 'block';
 }
 
-function updateCatSelect(type, selectedId) {
+function updateCatSelect(type, selectedId, scope) {
   const sel = document.getElementById('pvCatEdit');
   if(!sel) return; // ★ modal puede no estar en DOM todavía — no explotar
-  const base = type==='ingreso' ? state.catsIn : state.catsEx;
-  const defs = state.modo==='negocio' ? (type==='ingreso' ? DEFAULT_CATS_NEG_IN : DEFAULT_CATS_NEG_EX) : (type==='ingreso' ? DEFAULT_CATS_IN : DEFAULT_CATS_EX);
+  const modo = scope || (micParsed?.negocio === false ? 'personal' : state.modo);
+  const base = getCatsForScope(type, modo);
+  const defs = getCatDefaultsForScope(type, modo);
   const list = [...(base||[]), ...defs.filter(d => !(base||[]).some(c=>c.id===d.id))].filter(c=>!c.hidden&&!c.system);
   const groups = new Map();
-  list.forEach(c=>{ const g=categoryAreaLabel(c,type); if(!groups.has(g)) groups.set(g,[]); groups.get(g).push(c); });
+  list.forEach(c=>{ const g=categoryAreaLabelForScope(c,type,modo); if(!groups.has(g)) groups.set(g,[]); groups.get(g).push(c); });
   sel.innerHTML = [...groups.entries()].map(([label,items]) => `<optgroup label="${esc(label)}">${items.map(c=>`<option value="${esc(c.id)}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join('')}</optgroup>`).join('');
   const typeEdit = document.getElementById('pvTypeEdit');
   if(typeEdit) typeEdit.onchange = function(){
-    updateCatSelect(this.value);
+    updateCatSelect(this.value, null, modo);
     const pvType = document.getElementById('pvType');
     if(pvType){
       pvType.textContent = this.value==='ingreso'?'↑ Ingreso':'↓ Egreso';
@@ -17399,11 +17819,12 @@ function saveMicTx() {
   const catId  = document.getElementById('pvCatEdit').value;
   const desc   = document.getElementById('pvDescEdit').value.trim();
   if(!amount || amount<=0){ toast('Escribe un monto válido','error'); return; }
-  const allCats=[...state.catsIn,...state.catsEx,
-    ...DEFAULT_CATS_NEG_IN,...DEFAULT_CATS_NEG_EX,
-    ...DEFAULT_CATS_IN,...DEFAULT_CATS_EX];
+  const targetScope = micParsed?.negocio === false ? 'personal' : (micParsed?.negocio === true ? 'negocio' : (state.modo === 'personal' ? 'personal' : 'negocio'));
+  const allCats=allCatsForLookup();
   const cat = allCats.find(c=>c.id===catId);
-  const catName = cat?.name || (type==='ingreso'?'Reembolsos':'Otros gastos del dia');
+  const catName = cat?.name || (type==='ingreso'
+    ? (targetScope === 'negocio' ? 'Otros servicios' : 'Reembolsos')
+    : (targetScope === 'negocio' ? 'Otros gastos de negocio' : 'Otros gastos personales'));
   const tx = {
     id: Date.now()+'', type, amount,
     category: catName,
@@ -17412,9 +17833,9 @@ function saveMicTx() {
     catId,
     cliente:      micParsed?.cliente      ||null,
     servicioTipo: micParsed?.servicioNeg?.label||null,
-    negocio:      state.modo === 'negocio' || !!(micParsed?.negocio),
+    negocio:      targetScope === 'negocio',
   };
-  const entraAStockValor = tx.type === 'egreso' && state.modo === 'negocio' && isMaterialesCategory(tx.catId, tx.category);
+  const entraAStockValor = tx.type === 'egreso' && targetScope === 'negocio' && isMaterialesCategory(tx.catId, tx.category);
   if(entraAStockValor){
     tx.afectaStockValor = true;
     tx.stockOperacion = 'entrada_valor';
@@ -17431,7 +17852,7 @@ function saveMicTx() {
     });
     if(compraStockValor) syncCompraToSheets(compraStockValor);
   }
-  state.transactions.push(tx);
+  persistTxInScope(targetScope, tx);
   actualizarServicioPorTxCambio(tx, null);
   let servicioMarcado=null;
   if(micParsed&&micParsed.serviceMatch){
@@ -23240,8 +23661,8 @@ function ajResetLocalData(){
 }
 
 function ajClearCredentials(){
-  if(!confirm('Borrar credenciales y conexiones?\n\nEsto elimina URL de Sheets, token/DB de Notion y API key de Gemini.')) return;
-  ['fnz_sheets_url','fnz_notion_token','fnz_notion_dbid','fnz_notion_dbid_clientes','fnz_notion_last_sync','fnz_notion_polling','fnz_gemini_key'].forEach(k=>localStorage.removeItem(k));
+  if(!confirm('Borrar credenciales y conexiones?\n\nEsto elimina URL de Sheets, token/DB de Notion, API key de Gemini y credenciales de ElevenLabs.')) return;
+  ['fnz_sheets_url','fnz_notion_token','fnz_notion_dbid','fnz_notion_dbid_clientes','fnz_notion_last_sync','fnz_notion_polling','fnz_gemini_key','fnz_eleven_enabled','fnz_eleven_key','fnz_eleven_voice_id','fnz_eleven_model_id','fnz_eleven_stability','fnz_eleven_similarity','fnz_eleven_style'].forEach(k=>localStorage.removeItem(k));
   try{ notionApiSyncStop(); }catch(e){}
   render();
   toast('Credenciales borradas');
@@ -23255,6 +23676,13 @@ function renderAjustes(){
   const temaActual = localStorage.getItem('fnz_tema') || 'esmeralda';
   const sheetsUrl = localStorage.getItem('fnz_sheets_url') || '';
   const gemKey = localStorage.getItem('fnz_gemini_key') || '';
+  const elevenKey = localStorage.getItem('fnz_eleven_key') || '';
+  const elevenVoice = localStorage.getItem('fnz_eleven_voice_id') || '';
+  const elevenModel = localStorage.getItem('fnz_eleven_model_id') || 'eleven_multilingual_v2';
+  const elevenEnabled = localStorage.getItem('fnz_eleven_enabled') === '1';
+  const elevenStability = localStorage.getItem('fnz_eleven_stability') || '0.42';
+  const elevenSimilarity = localStorage.getItem('fnz_eleven_similarity') || '0.82';
+  const elevenStyle = localStorage.getItem('fnz_eleven_style') || '0.18';
   const notionToken = localStorage.getItem('fnz_notion_token') || '';
   const notionDb = localStorage.getItem('fnz_notion_dbid') || '';
   const notionClientesDb = localStorage.getItem('fnz_notion_dbid_clientes') || '';
@@ -23304,6 +23732,16 @@ function renderAjustes(){
       ${sec('gemini','note','Gemini','IA para agenda, notas y reuniones.',
         `<div class="aj-field"><label>API key</label><input id="gemini-key-input" value="${npEsc(gemKey)}" placeholder="AIza..."></div>
          <div class="aj-row"><button class="aj-btn primary" onclick="saveGeminiKey()">Guardar</button><button class="aj-btn" onclick="testGeminiKey()">Probar</button></div>`)}
+      ${sec('eleven','mic','ElevenLabs','Voz natural para el Mentor IA.',
+        `<div class="aj-status">Recomendado: usa esto solo en tu app local. Si publicas la app, conviene pasar la llamada por Apps Script para no exponer tu API key.</div>
+         <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:#334155;margin:10px 0"><input id="eleven-enabled-input" type="checkbox" ${elevenEnabled?'checked':''}> Usar ElevenLabs en Mentor IA</label>
+         <div class="aj-field"><label>API key ElevenLabs</label><input id="eleven-key-input" value="${npEsc(elevenKey)}" placeholder="sk_..."></div>
+         <div class="aj-field"><label>Voice ID</label><input id="eleven-voice-input" value="${npEsc(elevenVoice)}" placeholder="Pega el voice_id de ElevenLabs"></div>
+         <div class="aj-field"><label>Modelo</label><input id="eleven-model-input" value="${npEsc(elevenModel)}" placeholder="eleven_multilingual_v2"></div>
+         <div class="aj-field"><label>Naturalidad / estabilidad</label><input id="eleven-stability-input" type="number" min="0" max="1" step="0.01" value="${npEsc(elevenStability)}"></div>
+         <div class="aj-field"><label>Similitud de voz</label><input id="eleven-similarity-input" type="number" min="0" max="1" step="0.01" value="${npEsc(elevenSimilarity)}"></div>
+         <div class="aj-field"><label>Estilo expresivo</label><input id="eleven-style-input" type="number" min="0" max="1" step="0.01" value="${npEsc(elevenStyle)}"></div>
+         <div class="aj-row"><button class="aj-btn primary" onclick="saveElevenLabsSettings()">Guardar voz</button><button class="aj-btn" onclick="testElevenLabs()">Probar voz</button></div>`)}
       ${sec('alertas','clipboard','Alertas','Notificaciones, sonidos y recordatorios.',
         `<div class="aj-row"><button id="notif-btn" class="aj-btn" onclick="requestNotifPermission()">Activar notificaciones</button><button class="aj-btn primary" onclick="openAddReminder()">Nuevo recordatorio</button></div>
          <div style="display:grid;gap:10px;margin-top:10px"><div id="sounds-list" class="aj-listbox"></div><div id="reminders-list" class="aj-listbox"></div></div>`)}
