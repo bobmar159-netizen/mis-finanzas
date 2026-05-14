@@ -4810,6 +4810,24 @@ function mentorTextoParaVoz(texto) {
     .trim();
 }
 
+function elevenLabsErrorMessage(err) {
+  const raw = String(err && err.message ? err.message : err || '');
+  const lower = raw.toLowerCase();
+  if (raw.includes('401') || raw.includes('403') || lower.includes('unauthorized')) {
+    return 'ElevenLabs rechazo la API key. Revisa que este copiada completa y con acceso a texto a voz.';
+  }
+  if (raw.includes('400') && (lower.includes('invalid id') || lower.includes('invalid_id') || lower.includes('voice'))) {
+    return 'ElevenLabs no reconoce ese Voice ID. Copia el voice_id exacto desde la voz, no el nombre de la voz.';
+  }
+  if (raw.includes('429') || lower.includes('quota') || lower.includes('credits')) {
+    return 'ElevenLabs no pudo generar audio por limite de creditos o uso.';
+  }
+  if (lower.includes('failed to fetch') || lower.includes('cors')) {
+    return 'El navegador bloqueo la conexion. Si pasa en GitHub Pages, conviene usar un puente con Apps Script.';
+  }
+  return 'ElevenLabs no conecto: ' + raw.slice(0, 160);
+}
+
 async function reproducirDiscursoElevenLabs(texto, cfg = getElevenLabsConfig()) {
   if (!cfg.enabled || !cfg.key || !cfg.voiceId) return false;
   const clean = mentorTextoParaVoz(texto).slice(0, 2400);
@@ -4893,7 +4911,7 @@ async function reproducirDiscurso(texto) {
       return;
     } catch (e) {
       console.warn('ElevenLabs fallback:', e);
-      toast('ElevenLabs no respondió; usando voz del navegador', 'error');
+      toast(elevenLabsErrorMessage(e) + ' Usando voz del navegador.', 'error');
     }
   }
   reproducirDiscursoNavegador(texto);
@@ -16973,7 +16991,7 @@ async function testElevenLabs(){
     toast('ElevenLabs conectado');
   }catch(e){
     console.error(e);
-    toast('No se pudo conectar ElevenLabs. Revisa key, Voice ID o CORS.', 'error');
+    toast(elevenLabsErrorMessage(e), 'error');
     if(prev.enabled === null) localStorage.removeItem('fnz_eleven_enabled'); else localStorage.setItem('fnz_eleven_enabled', prev.enabled);
     if(prev.key === null) localStorage.removeItem('fnz_eleven_key'); else localStorage.setItem('fnz_eleven_key', prev.key);
     if(prev.voiceId === null) localStorage.removeItem('fnz_eleven_voice_id'); else localStorage.setItem('fnz_eleven_voice_id', prev.voiceId);
