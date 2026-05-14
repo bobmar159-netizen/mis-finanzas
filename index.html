@@ -2350,6 +2350,7 @@ function loadStateForModo(modo){
 
   syncDefaultCategoriesForMode(isNeg);
   normalizeBusinessLabelsForState(isNeg);
+  if(typeof deudaReconcileAllPaymentTxs === 'function') deudaReconcileAllPaymentTxs({syncSheets:false});
 }
 
 // ── Guardar todo según modo activo ──
@@ -3813,7 +3814,8 @@ function deudaRemovePaymentTxs(debtId){
   if(url) removed.forEach(t => _sendToSheets(url, {type:'tx_delete', id:t.id, modo:txSheetModo(t), timestamp:'debtpay_del_' + t.id + '_' + Date.now()}));
   return removed.length;
 }
-function deudaReconcilePaymentTxs(d){
+function deudaReconcilePaymentTxs(d, opts = {}){
+  const syncSheets = opts.syncSheets !== false;
   state.transactions = state.transactions || [];
   const pagos = deudaPagos(d);
   const active = new Set(pagos.map(p => String(p.txId || deudaPagoTxId(d.id, p.id))));
@@ -3822,15 +3824,27 @@ function deudaReconcilePaymentTxs(d){
   linked.forEach(t => {
     if(active.has(String(t.id))) return;
     state.transactions = state.transactions.filter(x => String(x.id) !== String(t.id));
-    if(url) _sendToSheets(url, {type:'tx_delete', id:t.id, modo:txSheetModo(t), timestamp:'debtpay_trim_' + t.id + '_' + Date.now()});
+    if(syncSheets && url) _sendToSheets(url, {type:'tx_delete', id:t.id, modo:txSheetModo(t), timestamp:'debtpay_trim_' + t.id + '_' + Date.now()});
   });
   pagos.forEach((p,idx) => {
     const tx = deudaBuildPagoTx(d, p, idx);
     const oldIdx = state.transactions.findIndex(x => String(x.id) === String(tx.id));
     if(oldIdx >= 0) state.transactions[oldIdx] = {...state.transactions[oldIdx], ...tx};
     else state.transactions.unshift(tx);
-    syncToSheets(tx);
+    if(syncSheets) syncToSheets(tx);
   });
+}
+function deudaReconcileAllPaymentTxs(opts = {}){
+  if(!Array.isArray(state.debts) || !state.debts.length) return 0;
+  let total = 0;
+  state.debts = state.debts.map(d => {
+    const item = deudaNormalizePagos(d, d);
+    total += deudaPagos(item).length;
+    deudaReconcilePaymentTxs(item, opts);
+    return item;
+  });
+  if(opts.persist !== false) saveAll();
+  return total;
 }
 function deudaSyncFromPaymentTx(tx){
   if(!tx?.origenDeudaPago) return;
@@ -6532,6 +6546,7 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
 
     save('fnz_neg_tx',merged);
     if(state.modo==='negocio') state.transactions=merged;
+    if(state.modo==='negocio' && typeof deudaReconcileAllPaymentTxs === 'function') deudaReconcileAllPaymentTxs({syncSheets:false});
 
     const url=localStorage.getItem('fnz_sheets_url')||'';
     if(url && nuevosTrabajos.length){
@@ -24154,8 +24169,9 @@ function ajClearAllMovements(){
   localStorage.setItem('fnz_neg_tx','[]');
   localStorage.setItem('fnz_tx','[]');
   state.transactions = [];
+  const pagosReconstruidos = typeof deudaReconcileAllPaymentTxs === 'function' ? deudaReconcileAllPaymentTxs({syncSheets:false}) : 0;
   render();
-  toast('Movimientos financieros borrados');
+  toast('Movimientos borrados' + (pagosReconstruidos ? ' · pagos de deuda reconstruidos en caja' : ''));
 }
 
 function ajResetNotionSyncCache(){
