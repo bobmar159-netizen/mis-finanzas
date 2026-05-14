@@ -4827,6 +4827,9 @@ function elevenLabsErrorMessage(err) {
   if (raw.includes('400') && (lower.includes('invalid id') || lower.includes('invalid_id') || lower.includes('voice'))) {
     return 'ElevenLabs no reconoce ese Voice ID. Copia el voice_id exacto desde la voz, no el nombre de la voz.';
   }
+  if (lower.includes('creator tier') || lower.includes('creator plan') || lower.includes('above to use')) {
+    return 'Esa voz no esta disponible por API en tu plan. En Free, muchas voces de Explorar/Voice Library no funcionan por API. Prueba una voz base o una voz de Mis Voces permitida.';
+  }
   if (raw.includes('429') || lower.includes('quota') || lower.includes('credits')) {
     return 'ElevenLabs no pudo generar audio por limite de creditos o uso.';
   }
@@ -16982,6 +16985,33 @@ function saveElevenLabsSettings(){
   render();
 }
 
+async function testElevenLabsSafeVoice(){
+  const key = document.getElementById('eleven-key-input')?.value.trim() || localStorage.getItem('fnz_eleven_key') || '';
+  if(!key) return toast('Pega API key primero', 'error');
+  const prev = {
+    enabled: localStorage.getItem('fnz_eleven_enabled'),
+    key: localStorage.getItem('fnz_eleven_key'),
+    voiceId: localStorage.getItem('fnz_eleven_voice_id'),
+    modelId: localStorage.getItem('fnz_eleven_model_id')
+  };
+  localStorage.setItem('fnz_eleven_enabled','1');
+  localStorage.setItem('fnz_eleven_key', key);
+  localStorage.setItem('fnz_eleven_voice_id', '21m00Tcm4TlvDq8ikWAM');
+  localStorage.setItem('fnz_eleven_model_id', 'eleven_multilingual_v2');
+  try{
+    await reproducirDiscursoElevenLabs('Prueba correcta. Tu API key funciona con una voz base de ElevenLabs.');
+    toast('API key correcta. Si tu voz no funciona, esa voz no esta habilitada para API en tu plan.');
+  }catch(e){
+    console.error(e);
+    toast(elevenLabsErrorMessage(e), 'error');
+  }finally{
+    if(prev.enabled === null) localStorage.removeItem('fnz_eleven_enabled'); else localStorage.setItem('fnz_eleven_enabled', prev.enabled);
+    if(prev.key === null) localStorage.removeItem('fnz_eleven_key'); else localStorage.setItem('fnz_eleven_key', prev.key);
+    if(prev.voiceId === null) localStorage.removeItem('fnz_eleven_voice_id'); else localStorage.setItem('fnz_eleven_voice_id', prev.voiceId);
+    if(prev.modelId === null) localStorage.removeItem('fnz_eleven_model_id'); else localStorage.setItem('fnz_eleven_model_id', prev.modelId);
+  }
+}
+
 async function testElevenLabs(){
   const key = document.getElementById('eleven-key-input')?.value.trim() || localStorage.getItem('fnz_eleven_key') || '';
   const voiceId = document.getElementById('eleven-voice-input')?.value.trim() || localStorage.getItem('fnz_eleven_voice_id') || '';
@@ -23767,7 +23797,7 @@ function renderAjustes(){
          <div class="aj-field"><label>Naturalidad / estabilidad</label><input id="eleven-stability-input" type="number" min="0" max="1" step="0.01" value="${npEsc(elevenStability)}"></div>
          <div class="aj-field"><label>Similitud de voz</label><input id="eleven-similarity-input" type="number" min="0" max="1" step="0.01" value="${npEsc(elevenSimilarity)}"></div>
          <div class="aj-field"><label>Estilo expresivo</label><input id="eleven-style-input" type="number" min="0" max="1" step="0.01" value="${npEsc(elevenStyle)}"></div>
-         <div class="aj-row"><button class="aj-btn primary" onclick="saveElevenLabsSettings()">Guardar voz</button><button class="aj-btn" onclick="testElevenLabs()">Probar voz</button></div>`)}
+         <div class="aj-row"><button class="aj-btn primary" onclick="saveElevenLabsSettings()">Guardar voz</button><button class="aj-btn" onclick="testElevenLabs()">Probar voz</button><button class="aj-btn" onclick="testElevenLabsSafeVoice()">Probar voz base</button></div>`)}
       ${sec('alertas','clipboard','Alertas','Notificaciones, sonidos y recordatorios.',
         `<div class="aj-row"><button id="notif-btn" class="aj-btn" onclick="requestNotifPermission()">Activar notificaciones</button><button class="aj-btn primary" onclick="openAddReminder()">Nuevo recordatorio</button></div>
          <div style="display:grid;gap:10px;margin-top:10px"><div id="sounds-list" class="aj-listbox"></div><div id="reminders-list" class="aj-listbox"></div></div>`)}
