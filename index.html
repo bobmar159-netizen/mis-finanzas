@@ -3884,15 +3884,17 @@ function renderDebtCard(d){
   const pendiente = restantes * moneyValue(d.cuotaMonto);
   const pct = moneyValue(d.cuotasTotales) > 0 ? Math.round((moneyValue(d.cuotasPagadas) / moneyValue(d.cuotasTotales)) * 100) : 0;
   const done = restantes === 0;
-  const dw = d.cuotasTotales <= 12 ? 16 : d.cuotasTotales <= 24 ? 12 : 8;
+  const dotSize = d.cuotasTotales <= 12 ? 12 : d.cuotasTotales <= 24 ? 10 : 8;
   const pagos = deudaPagos(d);
   const last = pagos[pagos.length - 1] || null;
   const next = deudaProximoPago(d);
   const expanded = !!(window._debtExpanded && window._debtExpanded[String(d.id)]);
   const id = debtJs(d.id);
-  const dots = Array.from({length: Math.max(0, Math.floor(moneyValue(d.cuotasTotales)))}, (_,i) =>
-    '<div class="cuota-dot" style="width:' + dw + 'px;background:' + (i < d.cuotasPagadas ? d.color : '#E2E8F0') + '"></div>'
-  ).join('');
+  const dots = Array.from({length: Math.max(0, Math.floor(moneyValue(d.cuotasTotales)))}, (_,i) => {
+    const filled = i < d.cuotasPagadas;
+    const cuotaFecha = debtAddMonths(deudaInicio(d), i, deudaDiaPago(d));
+    return '<div title="Cuota ' + (i + 1) + ' · ' + debtFmtDate(cuotaFecha) + '" style="width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:' + (filled ? d.color : '#FFFFFF') + ';border:1.5px solid ' + (filled ? d.color : '#CBD5E1') + ';box-shadow:' + (filled ? '0 0 0 3px rgba(84,104,120,.10)' : 'none') + ';flex-shrink:0"></div>';
+  }).join('');
   const rows = [
     ['Inicio', debtFmtDate(deudaInicio(d))],
     ['Final', debtFmtDate(deudaFin(d))],
@@ -3910,19 +3912,23 @@ function renderDebtCard(d){
       circleProgress(pct,62,5,d.color,'<span style="font-size:10px;font-weight:700">' + pct + '%</span>') +
       '<div class="debt-info">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
-          '<div><div class="debt-name">' + debtHtml(d.name) + '</div><div class="debt-cat">' + debtHtml(d.tipo || d.categoria || 'Deuda') + ' · inicio ' + debtFmtDate(deudaInicio(d)) + '</div></div>' +
+          '<div><div class="debt-name">' + debtHtml(d.name) + '</div><div class="debt-cat">' + debtHtml(d.tipo || d.categoria || 'Deuda') + ' · dia ' + deudaDiaPago(d) + ' de cada mes</div></div>' +
           '<div class="debt-pending"><div class="debt-pending-amt" style="color:' + d.color + '">' + (done ? 'Pagada' : fmt(pendiente)) + '</div>' + (!done ? '<div class="debt-pending-lbl">pendiente</div>' : '') + '</div>' +
         '</div>' +
-        '<div class="cuotas-track">' + dots + '</div>' +
-        '<div class="cuotas-meta"><span><span style="color:var(--gold);font-weight:600">' + d.cuotasPagadas + '</span> pagadas · <span style="color:var(--red);font-weight:600">' + restantes + '</span> restantes</span><span>' + fmt(d.cuotaMonto) + '/mes</span></div>' +
-        '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:11px;color:var(--muted)"><span>Final: <b style="color:var(--text)">' + debtFmtDate(deudaFin(d)) + '</b></span><span>' + (last ? 'Ultimo: ' + debtFmtDate(last.fecha) : 'Sin pagos') + '</span></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px">' +
+          '<div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:7px"><div style="font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase">Inicio</div><div style="font-size:11px;color:var(--text);font-weight:900">' + debtFmtDate(deudaInicio(d)) + '</div></div>' +
+          '<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:7px"><div style="font-size:8px;color:#9A3412;font-weight:900;text-transform:uppercase">Proximo</div><div style="font-size:11px;color:#9A3412;font-weight:900">' + (next ? debtFmtDate(next) : 'Listo') + '</div></div>' +
+          '<div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:7px"><div style="font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase">Final</div><div style="font-size:11px;color:var(--text);font-weight:900">' + debtFmtDate(deudaFin(d)) + '</div></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:11px;align-items:center">' + dots + '</div>' +
+        '<div class="cuotas-meta"><span><span style="color:var(--gold);font-weight:600">' + d.cuotasPagadas + '</span> llenas · <span style="color:var(--red);font-weight:600">' + restantes + '</span> vacias</span><span>' + fmt(d.cuotaMonto) + '/mes</span></div>' +
       '</div>' +
     '</div>' +
     (msg ? '<div class="motivation">' + debtHtml(msg) + '</div>' : '') +
     details +
     '<div style="display:flex;gap:6px;margin-top:12px" onclick="event.stopPropagation()">' +
       (!done ? '<button onclick="pagarCuota(\'' + id + '\')" style="flex:1;background:#EBF1F5;border:1px solid #54687844;color:var(--gold);border-radius:8px;padding:8px;font-family:\'DM Sans\',sans-serif;font-size:12px;font-weight:600;cursor:pointer">Pagar cuota</button>' : '') +
-      '<button onclick="openEditDebt(\'' + id + '\')" style="width:36px;height:36px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:13px">Edit</button>' +
+      '<button onclick="openEditDebt(\'' + id + '\')" style="width:36px;height:36px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:13px">✎</button>' +
       '<button onclick="deleteDebt(\'' + id + '\')" style="width:36px;height:36px;background:none;border:none;color:#E0525266;cursor:pointer;font-size:14px">X</button>' +
     '</div>' +
   '</div>';
