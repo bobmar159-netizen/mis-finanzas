@@ -4789,12 +4789,20 @@ function mentorLoadVoices() {
   });
 }
 
+function normalizeElevenLabsModelId(modelId) {
+  const raw = String(modelId || '').trim();
+  const compact = raw.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+  if (!raw || compact === 'v3' || compact === 'eleven_v3') return 'eleven_v3';
+  if (compact === 'eleven_v2' || compact === 'multilingual_v2' || compact === 'eleven_multilingual_v2') return 'eleven_multilingual_v2';
+  return raw;
+}
+
 function getElevenLabsConfig() {
   return {
     enabled: localStorage.getItem('fnz_eleven_enabled') === '1',
     key: localStorage.getItem('fnz_eleven_key') || '',
     voiceId: localStorage.getItem('fnz_eleven_voice_id') || '',
-    modelId: localStorage.getItem('fnz_eleven_model_id') || 'eleven_multilingual_v2',
+    modelId: normalizeElevenLabsModelId(localStorage.getItem('fnz_eleven_model_id') || 'eleven_v3'),
     stability: moneyValue(localStorage.getItem('fnz_eleven_stability') || 0.42),
     similarity: moneyValue(localStorage.getItem('fnz_eleven_similarity') || 0.82),
     style: moneyValue(localStorage.getItem('fnz_eleven_style') || 0.18)
@@ -4841,7 +4849,7 @@ async function reproducirDiscursoElevenLabs(texto, cfg = getElevenLabsConfig()) 
     },
     body: JSON.stringify({
       text: clean,
-      model_id: cfg.modelId || 'eleven_multilingual_v2',
+      model_id: normalizeElevenLabsModelId(cfg.modelId || 'eleven_v3'),
       voice_settings: {
         stability: Math.max(0, Math.min(1, cfg.stability || 0.42)),
         similarity_boost: Math.max(0, Math.min(1, cfg.similarity || 0.82)),
@@ -5857,7 +5865,7 @@ function renderAjustes(){
   const gemKey = localStorage.getItem('fnz_gemini_key') || '';
   const elevenKey = localStorage.getItem('fnz_eleven_key') || '';
   const elevenVoice = localStorage.getItem('fnz_eleven_voice_id') || '';
-  const elevenModel = localStorage.getItem('fnz_eleven_model_id') || 'eleven_multilingual_v2';
+  const elevenModel = localStorage.getItem('fnz_eleven_model_id') || 'eleven_v3';
   const elevenEnabled = localStorage.getItem('fnz_eleven_enabled') === '1';
   const elevenStability = localStorage.getItem('fnz_eleven_stability') || '0.42';
   const elevenSimilarity = localStorage.getItem('fnz_eleven_similarity') || '0.82';
@@ -16957,7 +16965,7 @@ function testGeminiKey(){
 function saveElevenLabsSettings(){
   const key = document.getElementById('eleven-key-input')?.value.trim() || '';
   const voiceId = document.getElementById('eleven-voice-input')?.value.trim() || '';
-  const modelId = document.getElementById('eleven-model-input')?.value.trim() || 'eleven_multilingual_v2';
+  const modelId = normalizeElevenLabsModelId(document.getElementById('eleven-model-input')?.value.trim() || 'eleven_v3');
   const enabled = document.getElementById('eleven-enabled-input')?.checked;
   const stability = moneyValue(document.getElementById('eleven-stability-input')?.value || 0.42);
   const similarity = moneyValue(document.getElementById('eleven-similarity-input')?.value || 0.82);
@@ -23696,7 +23704,7 @@ function renderAjustes(){
   const gemKey = localStorage.getItem('fnz_gemini_key') || '';
   const elevenKey = localStorage.getItem('fnz_eleven_key') || '';
   const elevenVoice = localStorage.getItem('fnz_eleven_voice_id') || '';
-  const elevenModel = localStorage.getItem('fnz_eleven_model_id') || 'eleven_multilingual_v2';
+  const elevenModel = localStorage.getItem('fnz_eleven_model_id') || 'eleven_v3';
   const elevenEnabled = localStorage.getItem('fnz_eleven_enabled') === '1';
   const elevenStability = localStorage.getItem('fnz_eleven_stability') || '0.42';
   const elevenSimilarity = localStorage.getItem('fnz_eleven_similarity') || '0.82';
