@@ -2575,6 +2575,58 @@ function isAgregadoCategory(catId, category, description=''){
   return catId === 'cne_agregados' || /\b(agregado|agregados|arena|piedra|cemento)\b/.test(text);
 }
 
+function isNotionStockUsageTx(t){
+  return !!(t && t._importadoDeNotion && t.type === 'egreso' && (t.materialUsoServicio || t.origenServicioMaterial || t.stockOperacion === 'uso_valor'));
+}
+
+function aplicarUsoStockNotionImport(existingTxs, nuevasTx, isFullSync){
+  const existing = Array.isArray(existingTxs) ? existingTxs : [];
+  const nuevos = Array.isArray(nuevasTx) ? nuevasTx : [];
+  const oldById = new Map(existing.map(t => [String(t.id || ''), t]));
+  const newIds = new Set(nuevos.map(t => String(t.id || '')));
+  let deltaStock = 0;
+  let aplicados = 0;
+  let devueltos = 0;
+
+  nuevos.forEach(t => {
+    if(!isNotionStockUsageTx(t)) return;
+    const old = oldById.get(String(t.id || ''));
+    const oldApplied = !!old?.stockAjusteAplicado;
+    const oldAmount = oldApplied ? moneyValue(old.amount) : 0;
+    const newAmount = moneyValue(t.amount);
+    const diff = +(newAmount - oldAmount).toFixed(2);
+    if(diff !== 0){
+      deltaStock -= diff;
+      if(diff > 0) aplicados += diff;
+      else devueltos += Math.abs(diff);
+    }
+    t.stockAjusteAplicado = true;
+    t.stockAjusteOrigen = 'notion_import';
+  });
+
+  if(isFullSync){
+    existing.forEach(old => {
+      if(!isNotionStockUsageTx(old) || !old.stockAjusteAplicado) return;
+      if(newIds.has(String(old.id || ''))) return;
+      const amt = moneyValue(old.amount);
+      if(amt > 0){
+        deltaStock += amt;
+        devueltos += amt;
+      }
+    });
+  }
+
+  if(deltaStock !== 0){
+    ajustarStockValorGeneral(deltaStock);
+    registrarMovimientoStockValor(deltaStock < 0 ? 'uso_valor_notion' : 'devolucion_valor_notion', Math.abs(deltaStock), {
+      fecha: todayStr(),
+      descripcion: deltaStock < 0 ? 'Uso de materiales importado desde Notion' : 'Ajuste por reimportacion Notion',
+      txId: 'notion_stock_' + Date.now()
+    });
+  }
+  return {deltaStock, aplicados, devueltos};
+}
+
 function ajustarStockValorGeneral(delta){
   const before = moneyValue(state.stockValorGeneral);
   const after = Math.max(0, +(before + moneyValue(delta)).toFixed(2));
@@ -3568,30 +3620,85 @@ function setCatModalType(type){
   }
 }
 
+function catMatchesTx(cat, tx){
+  if(!cat || !tx) return false;
+  const sameId = cat.id && tx.catId === cat.id;
+  const sameName = normSimpleText(tx.category || '') === normSimpleText(cat.name || '');
+  const sameType = !cat.type || !tx.type || tx.type === cat.type;
+  return sameId || (sameName && sameType);
+}
+
+function categoryUsage(cat){
+  return (state.transactions || []).filter(t => catMatchesTx(cat, t));
+}
+
+function applyCategoryToTransactions(oldCat, newCat){
+  let changed = 0;
+  state.transactions = (state.transactions || []).map(t => {
+    if(!catMatchesTx(oldCat, t)) return t;
+    changed++;
+    return {
+      ...t,
+      type: newCat.type,
+      category: newCat.name,
+      catId: newCat.id
+    };
+  });
+  return changed;
+}
+
 function saveCat(editId,type){
   const name=document.getElementById('cat-name').value.trim();
   if(!name)return toast('Escribe un nombre para la categoría','error');
   const finalType=window._catType||type;
-  const item={id:editId||Date.now()+'',name,icon:window._catIcon||'🏷',color:window._catColor||CAT_COLORS[0],type:finalType};
-  if(finalType==='ingreso'){
-    if(editId)state.catsIn=state.catsIn.map(c=>c.id===editId?item:c);
-    else state.catsIn.push(item);
-  } else {
-    if(editId)state.catsEx=state.catsEx.map(c=>c.id===editId?item:c);
-    else state.catsEx.push(item);
+  const allBefore=[...(state.catsIn||[]),...(state.catsEx||[])];
+  const oldCat=editId ? allBefore.find(c=>c.id===editId) : null;
+  const item={
+    ...(oldCat || {}),
+    id:editId||Date.now()+'',
+    name,
+    icon:window._catIcon||oldCat?.icon||'🏷',
+    color:window._catColor||oldCat?.color||CAT_COLORS[0],
+    type:finalType
+  };
+  let updatedMovs = 0;
+  if(editId && oldCat){
+    const used = categoryUsage(oldCat);
+    const structuralChange = oldCat.name !== item.name || oldCat.type !== item.type;
+    if(used.length && structuralChange){
+      const msg = 'Esta categoría ya se usa en ' + used.length + ' movimiento(s).\n\nAceptar: actualizar también esos movimientos al nuevo nombre/tipo.\nCancelar: mantener el historial como está y solo cambiar la categoría para futuros movimientos.';
+      if(confirm(msg)){
+        updatedMovs = applyCategoryToTransactions(oldCat, item);
+      }
+    }
   }
+
+  state.catsIn=(state.catsIn||[]).filter(c=>c.id!==item.id);
+  state.catsEx=(state.catsEx||[]).filter(c=>c.id!==item.id);
+  if(finalType==='ingreso') state.catsIn.push(item);
+  else state.catsEx.push(item);
+
   catPageType=finalType;
-  saveAll();closeModal();render();toast(editId?'Categoría actualizada':'Categoría creada ✓');
+  saveAll();closeModal();render();
+  toast(editId
+    ? ('Categoría actualizada' + (updatedMovs ? ' · ' + updatedMovs + ' movimientos corregidos' : ''))
+    : 'Categoría creada ✓');
 }
 
 function deleteCat(id){
-  if(!confirm('¿Eliminar esta categoría?'))return;
-  state.catsIn=state.catsIn.filter(c=>c.id!==id);
-  state.catsEx=state.catsEx.filter(c=>c.id!==id);
-  saveAll();render();toast('Categoría eliminada');
+  const all=[...(state.catsIn||[]),...(state.catsEx||[])];
+  const cat=all.find(c=>c.id===id);
+  if(!cat) return;
+  const used = categoryUsage(cat);
+  if(used.length){
+    const msg = 'Esta categoría está usada en ' + used.length + ' movimiento(s).\n\nSi la eliminas, esos movimientos conservarán su nombre actual como historial, pero la categoría ya no aparecerá para nuevos registros.\n\n¿Eliminar de todos modos?';
+    if(!confirm(msg)) return;
+  } else if(!confirm('¿Eliminar esta categoría?')) return;
+  state.catsIn=(state.catsIn||[]).filter(c=>c.id!==id);
+  state.catsEx=(state.catsEx||[]).filter(c=>c.id!==id);
+  saveAll();render();toast(used.length ? 'Categoría eliminada · movimientos conservados' : 'Categoría eliminada');
 }
 
-// ── DEUDAS ──
 function renderDeudas(){
   const debts=state.debts;
   const prestPers=state.prestamosPersonales||[];
@@ -4646,16 +4753,17 @@ function gfcDebtState(ratio, cuota) {
 
 function gfcMentorTexto(data, json) {
   const accion = json.recomendaciones.accion;
-  const base = `Meta diaria ${gfcMoneyText(data.meta_diaria)}, avance ${Math.round(json.meta.progreso * 100)}%, deuda mensual ${gfcMoneyText(data.cuota_mensual_deuda)}.`;
+  const metaPct = Math.round(json.meta.progreso * 100);
+  const deuda = Number(data.cuota_mensual_deuda || 0) > 0 ? ` Deuda mensual: ${gfcMoneyText(data.cuota_mensual_deuda)}.` : '';
+  const objetivo = `Objetivo inmediato: ${json.recomendaciones.servicios_objetivo} servicio(s) y ${json.recomendaciones.ingreso_objetivo}.`;
   if (json.header.estado === 'rojo') {
-    return `Escuchame bien. Hoy estas en ${gfcMoneyText(data.ganancia_hoy)} con ${data.servicios_hoy} servicios, y eso no se arregla mirando la pantalla. Si ya paso el mediodia y no hay produccion, el problema no es mala suerte: es falta de control. No estas cansado, estas desordenado cuando permites que el dia avance sin una llamada, sin una visita, sin una cotizacion y sin cerrar dinero real. ${base} La deuda no espera a que tengas ganas; la deuda cobra igual. Si gastaste sin producir, ese gasto ahora es presion encima de tu espalda. Tu responsabilidad es convertir las horas que quedan en entradas de efectivo, no en excusas. Necesitas ${json.recomendaciones.servicios_objetivo} y minimo ${json.recomendaciones.ingreso_objetivo}. ${accion}. Empieza por lo rentable, corta lo que no genera, llama a clientes pendientes y sal a buscar el siguiente servicio. No negocies con la pereza ni con la comodidad. Ordena tu ruta, revisa contactos, manda mensajes concretos y pide cierre. Si no responden, insiste con otro cliente; si no hay trabajo grande, busca uno pequeno pagado. La disciplina se mide cuando el dia viene duro. Hoy no necesitas comodidad; necesitas disciplina, orden y movimiento inmediato.`;
+    return `Mira. Hoy estas en ${gfcMoneyText(data.ganancia_hoy)} con ${data.servicios_hoy} servicios. Duro: asi no se gana el mes. Meta ${metaPct}%.${deuda} ${objetivo} ${accion}. Levanta la cabeza, corta excusas y mueve una accion ahora: llama, cotiza o cobra. Hoy no necesitas ganas; necesitas orden.`;
   }
   if (json.header.estado === 'amarillo') {
-    return `Vas justo. Eso significa que te moviste, pero todavia no alcanza para llamarlo buen dia. Tienes ${data.servicios_hoy} servicios y una ganancia de ${gfcMoneyText(data.ganancia_hoy)}; sirve como base, no como premio. ${base} Si te conformas con estar cerca, manana vas a estar corriendo detras de la cuota y de tus propios gastos. La correccion es simple: deja de dispersarte, identifica el servicio que mas paga, vuelve a llamar al cliente que no cerro y prioriza la zona que ya demostro dejar dinero. Necesitas ${json.recomendaciones.servicios_objetivo} y minimo ${json.recomendaciones.ingreso_objetivo}. ${accion}. No maquilles el numero: si la meta no esta cubierta, el dia no esta cerrado. Revisa tus gastos de hoy, elimina lo innecesario y deja de regalar tiempo en conversaciones que no terminan en pago. Trabaja con una lista corta: cliente pendiente, zona rentable, servicio rentable, cierre por cobrar. No abras diez frentes; cierra uno que pague. Sin cierre, todo lo demas es ruido. Tu tiempo vale dinero. Una tarde bien usada puede salvar la semana. Toma agua, respira, ordena la ruta y vuelve a producir. La motivacion real aparece despues de cumplir, no antes.`;
+    return `Vas justo: ${gfcMoneyText(data.ganancia_hoy)} y ${data.servicios_hoy} servicios. Hay avance, pero todavia no hay victoria. Meta ${metaPct}%.${deuda} ${objetivo} ${accion}. Enfocate en un cierre que pague, no en diez pendientes. Respira, ajusta ruta y termina fuerte.`;
   }
-  return `Buen trabajo, pero no confundas cumplir con terminar. Hoy llegaste a ${gfcMoneyText(data.ganancia_hoy)} con ${data.servicios_hoy} servicios; eso demuestra capacidad, no permiso para bajar la guardia. ${base} Cuando el dia esta verde, el objetivo cambia: proteger la ganancia, no inflar gastos, y buscar un servicio extra que aumente el promedio. El tecnico que crece no celebra demasiado pronto; separa dinero para deuda, revisa que servicio rindio mejor y repite lo que funciono. ${accion}. Si tu mejor zona esta dando resultado, vuelve ahi con intencion. Si tu mejor servicio paga mejor, ofrece ese tipo de trabajo primero. Tambien revisa que gasto fue necesario y cual fue impulso. No pierdas el ritmo por sentirte ganador unas horas. Usa el buen dia para construir ventaja: cobra bien, registra limpio, deja seguimiento listo y no cierres la jornada con dinero desordenado. La victoria de hoy debe financiar orden, no capricho. Mantente exigente porque la estabilidad no se consigue con un buen dia aislado, se construye con semanas ordenadas. Hoy puedes cerrar fuerte, guardar dinero y dejarle menos carga a manana. Esa es la diferencia entre sobrevivir y dirigir tu economia.`;
+  return `Bien. Hoy vas en ${gfcMoneyText(data.ganancia_hoy)} con ${data.servicios_hoy} servicios. Cumpliste, pero no aflojes. Meta ${metaPct}%.${deuda} Protege la ganancia, separa deuda y busca un cierre extra. ${accion}. Esto es disciplina: ganar, registrar y repetir.`;
 }
-
 function gfcBuildPanelJson(data = gfcBuildInputs()) {
   let estado = 'amarillo';
   let titulo = 'DIA SIN ARRANCAR';
@@ -4810,19 +4918,87 @@ function getElevenLabsConfig() {
 }
 
 function mentorTextoParaVoz(texto) {
-  return String(texto || '')
+  const limpio = String(texto || '')
     .replace(/\s+/g, ' ')
     .replace(/Escuchame bien\.?/i, 'Mira.')
-    .replace(/No negocies con la pereza ni con la comodidad\.?/i, 'Ve paso a paso, pero no te sueltes.')
-    .replace(/La deuda no espera a que tengas ganas; la deuda cobra igual\.?/i, 'La deuda sigue corriendo, así que hoy conviene moverse con calma y precisión.')
     .trim();
+  return limpio.length > 850 ? limpio.slice(0, 847).replace(/\s+\S*$/, '') + '...' : limpio;
+}
+
+const ELEVEN_AUDIO_CACHE_KEY = 'fnz_eleven_last_audio_cache_v1';
+
+function elevenCacheSignature(texto, cfg) {
+  const clean = mentorTextoParaVoz(texto).slice(0, 850);
+  return JSON.stringify({
+    text: clean,
+    voiceId: cfg.voiceId || '',
+    modelId: normalizeElevenLabsModelId(cfg.modelId || 'eleven_multilingual_v2'),
+    stability: String(Math.max(0, Math.min(1, cfg.stability || 0.42))),
+    similarity: String(Math.max(0, Math.min(1, cfg.similarity || 0.82))),
+    style: String(Math.max(0, Math.min(1, cfg.style || 0.18)))
+  });
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function playMentorAudioUrl(url, cacheUrl = false) {
+  if (window._mentorAudio) {
+    try { window._mentorAudio.pause(); window._mentorAudio.currentTime = 0; } catch(e) {}
+  }
+  if (window._mentorAudioUrl && window._mentorAudioUrl !== url) {
+    try { URL.revokeObjectURL(window._mentorAudioUrl); } catch(e) {}
+    window._mentorAudioUrl = null;
+  }
+  const audio = new Audio(url);
+  window._mentorAudio = audio;
+  window._mentorAudioUrl = cacheUrl ? null : url;
+  audio.onended = () => {
+    if (!cacheUrl && window._mentorAudioUrl === url) {
+      URL.revokeObjectURL(url);
+      window._mentorAudioUrl = null;
+    }
+  };
+  await audio.play();
+}
+
+function getElevenAudioCache(signature) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(ELEVEN_AUDIO_CACHE_KEY) || 'null');
+    if (!cache || cache.signature !== signature || !cache.audioDataUrl) return null;
+    if (Date.now() - Number(cache.createdAt || 0) > 1000 * 60 * 60 * 24 * 7) return null;
+    return cache.audioDataUrl;
+  } catch(e) {
+    return null;
+  }
+}
+
+function setElevenAudioCache(signature, audioDataUrl) {
+  try {
+    localStorage.setItem(ELEVEN_AUDIO_CACHE_KEY, JSON.stringify({
+      signature,
+      audioDataUrl,
+      createdAt: Date.now()
+    }));
+  } catch(e) {
+    console.warn('No se pudo guardar cache de audio ElevenLabs:', e);
+  }
 }
 
 function elevenLabsErrorMessage(err) {
   const raw = String(err && err.message ? err.message : err || '');
   const lower = raw.toLowerCase();
-  if (raw.includes('401') || raw.includes('403') || lower.includes('unauthorized')) {
-    return 'ElevenLabs rechazo la API key. Revisa que este copiada completa y con acceso a texto a voz.';
+  if (raw.includes('401') || lower.includes('invalid_api_key') || lower.includes('invalid api key')) {
+    return 'ElevenLabs rechazo la API key. Revisa que este copiada completa. No uses el ID de clave.';
+  }
+  if (raw.includes('403') || lower.includes('authorization_error') || lower.includes('doesn') || lower.includes('permission')) {
+    return 'La API key existe, pero no tiene permiso para esta accion o tu plan no permite esa voz/modelo. Para diagnosticar voces activa tambien lectura de Voces/Models, o usa Probar voz con una voz permitida.';
   }
   if (raw.includes('400') && (lower.includes('invalid id') || lower.includes('invalid_id') || lower.includes('voice'))) {
     return 'ElevenLabs no reconoce ese Voice ID. Copia el voice_id exacto desde la voz, no el nombre de la voz.';
@@ -4841,8 +5017,15 @@ function elevenLabsErrorMessage(err) {
 
 async function reproducirDiscursoElevenLabs(texto, cfg = getElevenLabsConfig()) {
   if (!cfg.enabled || !cfg.key || !cfg.voiceId) return false;
-  const clean = mentorTextoParaVoz(texto).slice(0, 2400);
+  const clean = mentorTextoParaVoz(texto).slice(0, 850);
   if (!clean) return false;
+  const signature = elevenCacheSignature(texto, cfg);
+  const cachedAudio = getElevenAudioCache(signature);
+  if (cachedAudio) {
+    await playMentorAudioUrl(cachedAudio, true);
+    toast('Reproduciendo audio guardado. No se gastaron caracteres.', 'info');
+    return true;
+  }
   const res = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + encodeURIComponent(cfg.voiceId), {
     method: 'POST',
     headers: {
@@ -4867,20 +5050,11 @@ async function reproducirDiscursoElevenLabs(texto, cfg = getElevenLabsConfig()) 
     throw new Error('ElevenLabs ' + res.status + ' ' + detail.slice(0, 120));
   }
   const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const audio = new Audio(url);
-  window._mentorAudio = audio;
-  window._mentorAudioUrl = url;
-  audio.onended = () => {
-    if (window._mentorAudioUrl === url) {
-      URL.revokeObjectURL(url);
-      window._mentorAudioUrl = null;
-    }
-  };
-  await audio.play();
+  const dataUrl = await blobToDataUrl(blob);
+  setElevenAudioCache(signature, dataUrl);
+  await playMentorAudioUrl(dataUrl, true);
   return true;
 }
-
 async function reproducirDiscursoNavegador(texto) {
   if (!('speechSynthesis' in window)) return toast('Tu navegador no soporta audio', 'error');
   const chunks = mentorChunks(texto);
@@ -6146,6 +6320,7 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
     }
 
     const existing=load('fnz_neg_tx',[]);
+    const stockImport = aplicarUsoStockNotionImport(existing, nuevasTx, isFullSync);
     let merged=[];
     if(isFullSync){
       const manuales=existing.filter(t=>!t._importadoDeNotion), ids=new Set(manuales.map(t=>t.id)), sin=[];
@@ -6172,7 +6347,7 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
     }
 
     saveAll(); render();
-    const msg='Notion: '+(rows.length-1)+' filas leidas, '+filasUtiles+' utiles, '+nuevasTx.length+' movimientos ('+txImportadas+' ingresos, '+egresosCom+' comida, '+egresosMov+' movilidad, '+egresosMat+' materiales)';
+    const msg='Notion: '+(rows.length-1)+' filas leidas, '+filasUtiles+' utiles, '+nuevasTx.length+' movimientos ('+txImportadas+' ingresos, '+egresosCom+' comida, '+egresosMov+' movilidad, '+egresosMat+' materiales)'+(stockImport&&stockImport.deltaStock!==0?' · stock '+(stockImport.deltaStock<0?'descontado ':'devuelto ')+fmt(Math.abs(stockImport.deltaStock)):'');
     if(status) status.textContent=msg;
     toast(msg);
     return {ok:true,filasNotion:rows.length-1,filasUtiles,movimientos:nuevasTx.length,trabajos:nuevosTrabajos.length,txImportadas,egresosMov,egresosMat,egresosCom,egresosOtros,egresosAgr};
@@ -17046,16 +17221,33 @@ async function diagnoseElevenLabsApi() {
   if (!key) return toast('Pega API key primero', 'error');
   elevenLabsStatus('Consultando ElevenLabs sin mostrar tu clave...', '');
   try {
-    const sub = await elevenLabsJson('user/subscription', key);
-    const voicesData = await elevenLabsJson('voices', key);
+    let sub = null;
+    let voicesData = null;
     let models = [];
-    try { models = await elevenLabsJson('models', key); } catch(e) { models = []; }
+    let diagNotes = [];
+    try {
+      sub = await elevenLabsJson('user/subscription', key);
+    } catch(e) {
+      diagNotes.push('La clave no permite leer suscripcion. Esto es normal si la creaste solo para texto a voz.');
+    }
+    try {
+      voicesData = await elevenLabsJson('voices', key);
+    } catch(e) {
+      diagNotes.push('La clave no permite listar voces. Para usar esta lista activa permiso de lectura de Voces/Models o pega el Voice ID manualmente.');
+      voicesData = { voices: [] };
+    }
+    try {
+      models = await elevenLabsJson('models', key);
+    } catch(e) {
+      diagNotes.push('La clave no permite listar modelos. Puedes usar eleven_multilingual_v2 para probar.');
+      models = [];
+    }
     const voices = Array.isArray(voicesData?.voices) ? voicesData.voices : [];
     const ttsModels = Array.isArray(models) ? models.filter(m => m.can_do_text_to_speech !== false) : [];
-    const tier = sub?.tier || sub?.character_limit ? (sub?.tier || 'plan activo') : 'plan detectado';
+    const tier = sub?.tier || sub?.character_limit ? (sub?.tier || 'plan activo') : 'permiso limitado';
     const remaining = Number.isFinite(Number(sub?.character_count)) && Number.isFinite(Number(sub?.character_limit))
       ? Math.max(0, Number(sub.character_limit) - Number(sub.character_count)).toLocaleString('es-PE') + ' caracteres restantes'
-      : 'creditos consultados';
+      : 'sin lectura de creditos';
     const voiceCards = voices.slice(0, 16).map(v => {
       const id = npEsc(v.voice_id || '');
       const name = npEsc(v.name || 'Voz sin nombre');
@@ -17071,9 +17263,10 @@ async function diagnoseElevenLabsApi() {
     const modelNames = ttsModels.slice(0, 8).map(m => '<code>' + npEsc(m.model_id || m.name || '') + '</code>').join(' ');
     elevenLabsStatus(
       '<b>API key conectada.</b><span>' + npEsc(tier) + ' · ' + npEsc(remaining) + '</span>' +
-      '<span><b>Modelos TTS visibles:</b> ' + (modelNames || 'no listados') + '</span>' +
-      '<span><b>Voces visibles para tu API:</b> ' + voices.length + '. Usa una de estas, no solo una que aparezca en la pantalla de ElevenLabs.</span>' +
-      '<div style="display:grid;gap:8px;margin-top:4px">' + (voiceCards || '<span>No se encontraron voces disponibles para esta clave.</span>') + '</div>',
+      '<span><b>Modelos TTS visibles:</b> ' + (modelNames || 'no listados por permiso') + '</span>' +
+      '<span><b>Voces visibles para tu API:</b> ' + voices.length + '. Usa una de estas si aparece lista; si no, pega Voice ID manual y usa Probar voz.</span>' +
+      (diagNotes.length ? '<div style="display:grid;gap:5px;color:#92400e;background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:8px">' + diagNotes.map(npEsc).join('<br>') + '</div>' : '') +
+      '<div style="display:grid;gap:8px;margin-top:4px">' + (voiceCards || '<span>No se pudieron listar voces con los permisos actuales de esta clave.</span>') + '</div>',
       'ok'
     );
   } catch(e) {
@@ -23861,7 +24054,7 @@ function renderAjustes(){
          <div class="aj-row"><button class="aj-btn primary" onclick="saveGeminiKey()">Guardar</button><button class="aj-btn" onclick="testGeminiKey()">Probar</button></div>`)}
       ${sec('eleven','mic','ElevenLabs','Voz natural para el Mentor IA.',
         `<div class="aj-status">Recomendado: usa esto solo en tu app local. Si publicas la app, conviene pasar la llamada por Apps Script para no exponer tu API key.</div>
-         <div class="aj-status">Primero usa <b>Diagnosticar API</b>. La app consultara que voces y modelos ve tu API key realmente, sin mostrar tu clave.</div>
+         <div class="aj-status">Si tu clave fue creada solo con De texto a voz, <b>Diagnosticar API</b> puede no listar voces/modelos por permisos. Eso no significa que la clave este mal. Para confirmar la voz usa <b>Probar voz</b>.</div>
          <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:#334155;margin:10px 0"><input id="eleven-enabled-input" type="checkbox" ${elevenEnabled?'checked':''}> Usar ElevenLabs en Mentor IA</label>
          <div class="aj-field"><label>API key ElevenLabs</label><input id="eleven-key-input" value="${npEsc(elevenKey)}" placeholder="sk_..."></div>
          <div class="aj-field"><label>Voice ID</label><input id="eleven-voice-input" value="${npEsc(elevenVoice)}" placeholder="Pega el voice_id de ElevenLabs"></div>
