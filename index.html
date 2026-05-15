@@ -3572,6 +3572,7 @@ function renderMovimientos(){
                   ${t.vinculadoServicioId?`<div class="mv-d-item" style="grid-column:1/-1"><span class="mv-d-lbl">Servicio vinculado</span><span class="mv-d-val">${t.vinculadoServicioDesc||t.vinculadoServicioCliente||'Servicio'}</span></div>`:''}
                   <div class="mv-d-actions">
                     ${txPuedeMoverAStock(t)?`<button class="mv-d-btn stock" onclick="event.stopPropagation();moverMovimientoAStock('${t.id}')">Mover a Stock</button>`:''}
+                    ${txPuedeEnviarUsoStock(t)?`<button class="mv-d-btn stock" onclick="event.stopPropagation();enviarMovimientoAUsoStock('${t.id}')">Usar stock</button>`:''}
                     ${txPuedeVincularServicio(t)?`<button class="mv-d-btn link" onclick="event.stopPropagation();openVincularServicioTx('${t.id}')">${t.vinculadoServicioId?'Cambiar servicio':'Vincular servicio'}</button>`:''}
                     <button class="mv-d-btn" onclick="event.stopPropagation();openEditTx('${t.id}')">✎ Editar</button>
                     <button class="mv-d-btn del" onclick="event.stopPropagation();deleteTx('${t.id}')">✕ Eliminar</button>
@@ -7709,11 +7710,74 @@ async function saveTx(editId){
 
 
 
+function txEsMaterialOAgregado(t){
+  return !!(t && (isMaterialesCategory(t.catId, t.category) || isAgregadoCategory(t.catId, t.category, t.description)));
+}
+
+function txPareceUsoServicioStock(t){
+  if(!t) return false;
+  const txt = normSimpleText([t.category, t.description, t.vinculadoServicioDesc, t.vinculadoServicioCliente].filter(Boolean).join(' '));
+  return !!(t.vinculadoServicioId || t._notionTrabajo || t.origenServicioMaterial || t.materialUsoServicio || /\b(usad|usado|usados|servicio|trabajo)\b/.test(txt));
+}
+
+function txPuedeEnviarUsoStock(t){
+  if(!t || t.type !== 'egreso') return false;
+  if(txSheetModo(t, state.modo) !== 'negocio') return false;
+  if(moneyValue(t.amount) <= 0) return false;
+  if(!txEsMaterialOAgregado(t)) return false;
+  if(t.stockAjusteAplicado || t.stockUsoManual || t.stockOperacion === 'uso_valor') return false;
+  if(t.afectaStockValor || t.stockValorOnly || t.stockCompraId || t.stockOperacion === 'entrada_valor') return false;
+  if(t.origenDeudaPago || deudaTxLooksLike(t)) return false;
+  return true;
+}
+
+function descripcionUsoStockFromTx(t){
+  const servicio = t.vinculadoServicioDesc || t._notionTrabajo?.servicio || t._notionTrabajo?.name || '';
+  const cliente = t.vinculadoServicioCliente || t.cliente || t._notionTrabajo?.cliente || '';
+  const base = t.description || t.category || 'Materiales usados';
+  return [base, servicio, cliente].filter(Boolean).join(' - ');
+}
+
+function enviarMovimientoAUsoStock(txId){
+  const tx = (state.transactions || []).find(t => String(t.id) === String(txId));
+  if(!tx) return toast('Movimiento no encontrado', 'error');
+  if(!txPuedeEnviarUsoStock(tx)) return toast('Este movimiento ya fue enviado a historial de stock o no aplica', 'info');
+  const monto = moneyValue(tx.amount);
+  const delta = ajustarStockValorGeneral(-monto);
+  const aplicado = Math.abs(delta);
+  if(aplicado <= 0) return toast('Stock valorizado esta en cero; no se desconto nada', 'info');
+  const esAgregado = isAgregadoCategory(tx.catId, tx.category, tx.description);
+  const descripcion = (esAgregado ? 'Agregados usados - ' : 'Materiales usados - ') + descripcionUsoStockFromTx(tx);
+  registrarMovimientoStockValor('uso_valor', aplicado, {
+    fecha: tx.date || todayStr(),
+    descripcion,
+    cliente: tx.cliente || tx.vinculadoServicioCliente || '',
+    id_servicio: tx.vinculadoServicioId || tx._notionTrabajo?.id || '',
+    txId: tx.id
+  });
+  tx.noCashFlow = true;
+  tx.materialUsoServicio = true;
+  tx.origenServicioMaterial = true;
+  tx.stockOperacion = 'uso_valor';
+  tx.stockAjusteAplicado = true;
+  tx.stockUsoManual = true;
+  tx.stockUsoManualAt = new Date().toISOString();
+  tx.stockUsoMonto = aplicado;
+  tx.expenseBucket = esAgregado ? 'agregados' : 'materiales';
+  tx.notionColumn = esAgregado ? 'agregados' : 'materiales';
+  const mov = (state.movimientosMateriales || [])[state.movimientosMateriales.length - 1];
+  if(mov && typeof syncMovimientoToSheets === 'function') syncMovimientoToSheets(mov);
+  saveAll();
+  render();
+  toast('Enviado a historial de stock · stock -' + fmt(aplicado) + ' · movimiento conservado');
+}
+
 function txPuedeMoverAStock(t){
   if(!t || t.type !== 'egreso') return false;
   if(txSheetModo(t, state.modo) !== 'negocio') return false;
   if(moneyValue(t.amount) <= 0) return false;
   if(isCompraStockValorTx(t) || isStockValueTx(t)) return false;
+  if(txEsMaterialOAgregado(t) && txPareceUsoServicioStock(t)) return false;
   if(t.vinculadoServicioId || t.origenCierreServicio || t.origenServicioMaterial || t.materialUsoServicio) return false;
   if(t.origenDeudaPago || deudaTxLooksLike(t)) return false;
   if(t.noCashFlow || t.afectaStockValor || t.stockValorOnly) return false;
@@ -8034,10 +8098,18 @@ function openEditDebt(id){ openDebtModal(state.debts.find(d=>d.id===id)); }
 function openDebtModal(debt, preData){
   const pre = preData||{};
   const isEdit=!!debt;
-  const d=debt||{name:pre.name||'',totalAmount:pre.totalAmount||'',cuotaMonto:pre.cuotaMonto||'',cuotasTotales:pre.cuotasTotales||'',cuotasPagadas:0,fechaInicio:pre.fechaInicio||todayStr(),diaPago:pre.diaPago||Number(todayStr().slice(8,10)),categoria:pre.categoria||DEBT_CATS[0],tipo:pre.tipo||'Banco',deudaRol:pre.deudaRol||pre.deudaTipo||pre.rol||'debo',color:pre.color||DEBT_COLORS[3],pagos:[]};
+  const baseDebt = debt
+    ? {...debt, pagos: deudaPagos(debt).map(p=>({...p}))}
+    : {name:pre.name||'',totalAmount:pre.totalAmount||'',cuotaMonto:pre.cuotaMonto||'',cuotasTotales:pre.cuotasTotales||'',cuotasPagadas:0,fechaInicio:pre.fechaInicio||todayStr(),diaPago:pre.diaPago||Number(todayStr().slice(8,10)),categoria:pre.categoria||DEBT_CATS[0],tipo:pre.tipo||'Banco',deudaRol:pre.deudaRol||pre.deudaTipo||pre.rol||'debo',color:pre.color||DEBT_COLORS[3],pagos:[]};
+  const d = debt ? deudaNormalizePagos({
+    ...baseDebt,
+    cuotasPagadas: Math.max(Math.floor(moneyValue(baseDebt.cuotasPagadas)), deudaPagos(debt).length)
+  }, debt) : baseDebt;
   d.fechaInicio = deudaInicio(d);
   d.diaPago = deudaDiaPago(d);
   d.deudaRol = deudaRol(d);
+  d.tipo = d.tipo || 'Banco';
+  d.color = d.color || DEBT_COLORS[3];
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:var(--blue)">${isEdit?'Editar':'Nueva'} Deuda</div>
     <div class="field">
@@ -9690,32 +9762,10 @@ function buildNotionExpenseCobro(tx){
 }
 
 async function syncExpenseTxToNotion(tx){
-  try{
-    const token = localStorage.getItem('fnz_notion_token');
-    const dbId  = localStorage.getItem('fnz_notion_dbid');
-    if(!token || !dbId || !tx || tx.type !== 'egreso' || tx._importadoDeNotion) return;
-    const cobro = buildNotionExpenseCobro(tx);
-    if(!cobro) return;
-    const item = {
-      ...tx,
-      fecha: tx.date,
-      cliente: tx.cliente || 'Gasto app',
-      observaciones: tx.description || tx.category || '',
-      _notionFinanceRowId: tx._notionFinanceRowId || tx._notionRowId || null,
-      _notionReporteRowId: tx._notionReporteRowId || tx._notionRowId || null
-    };
-    const r = await _pushToNotion(item, cobro);
-    if(r?.id){
-      tx._notionRowId = r.id;
-      tx._notionFinanceRowId = r.id;
-      tx._notionReporteRowId = r.id;
-      tx.notionColumn = expenseBucketForTx(tx);
-      persistTxInScope(txSheetModo(tx, 'negocio'), tx);
-      saveAll();
-    }
-  }catch(e){
-    console.warn('[Notion] Gasto local no sincronizado:', e.message);
-  }
+  // Regla de negocio: el Reporte Diario de Notion solo recibe servicios cerrados.
+  // Los movimientos sueltos (META, comida, deudas, cambios negocio/personal, etc.)
+  // se quedan en la app/Sheets y no deben crear filas "Gasto app" en Notion.
+  return;
 }
 
 async function _updateNotionPage(pageId, updatedTx) {
@@ -18881,10 +18931,7 @@ function _agendaMicGuardarDirecto(){
       }).catch(err => console.warn('Notion Clientes Mic (no crítico):', err.message));
     }
 
-    // Sincronización financiera (Solo Trabajo)
-    if (d.tipo === 'trabajo' && nDbidFinanzas) {
-      _pushToNotion(item, 0).catch(err => console.warn('Notion Finanzas Mic (no crítico):', err.message));
-    }
+    // Finanzas Notion se sincroniza solo al cerrar/finalizar el servicio.
   }
 
   document.getElementById('micModal').style.display='none';
@@ -24182,9 +24229,7 @@ function _agendaMicGuardarDirecto(){
         }
       }).catch(err => console.warn('Notion Clientes Mic:', err.message));
     }
-    if(d.tipo === 'trabajo' && nDbidFinanzas){
-      _pushToNotion(item, {}).catch(err => console.warn('Notion Finanzas Mic:', err.message));
-    }
+    // Finanzas Notion se sincroniza solo al cerrar/finalizar el servicio.
   }
   document.getElementById('micModal').style.display='none';
   switchPage('agenda');
@@ -25253,6 +25298,49 @@ function ajResetNotionSyncCache(){
   toast('Cache de Notion reiniciada');
 }
 
+async function ajArchivarGastosSueltosNotion(){
+  const token = localStorage.getItem('fnz_notion_token') || '';
+  const dbId = localStorage.getItem('fnz_notion_dbid') || '';
+  if(!token || !dbId) return toast('Configura Notion primero', 'error');
+  const scopes = ['negocio','personal'];
+  const groups = scopes.map(scope => {
+    const k = getKeys(scope);
+    const txs = scope === state.modo ? [...(state.transactions || [])] : load(k.tx, []);
+    const candidatos = txs.filter(t => {
+      if(!t || t.type !== 'egreso') return false;
+      if(t._importadoDeNotion || t.origenCierreServicio || t._notionTrabajo) return false;
+      return !!(t._notionRowId || t._notionFinanceRowId || t._notionReporteRowId);
+    });
+    return {scope, k, txs, candidatos};
+  });
+  const candidatos = groups.flatMap(g => g.candidatos);
+  if(!candidatos.length) return toast('No hay gastos sueltos locales enlazados a Notion');
+  if(!confirm('Archivar en Notion ' + candidatos.length + ' gasto(s) suelto(s)?\n\nNo borra movimientos locales. No toca servicios cerrados.')) return;
+  const ids = [...new Set(candidatos.map(t => normalizeNotionPageId(t._notionRowId || t._notionFinanceRowId || t._notionReporteRowId)).filter(Boolean))];
+  let ok = 0;
+  for(const id of ids){
+    try{ await _deleteNotionPage(id); ok++; }catch(e){ console.warn('No se pudo archivar gasto suelto Notion:', id, e.message); }
+  }
+  groups.forEach(g => {
+    const idsCandidatos = new Set(g.candidatos.map(t => String(t.id)));
+    if(!idsCandidatos.size) return;
+    g.txs = g.txs.map(t => {
+      if(!idsCandidatos.has(String(t.id))) return t;
+      const limpio = {...t};
+      delete limpio._notionRowId;
+      delete limpio._notionFinanceRowId;
+      delete limpio._notionReporteRowId;
+      delete limpio.notionColumn;
+      return limpio;
+    });
+    if(g.scope === state.modo) state.transactions = g.txs;
+    save(g.k.tx, g.txs);
+  });
+  saveAll();
+  render();
+  toast('Gastos sueltos archivados en Notion: ' + ok);
+}
+
 function ajClearStockHistory(){
   ensureLazyData('movimientosMateriales');
   const n = (state.movimientosMateriales || []).length;
@@ -25351,7 +25439,7 @@ function renderAjustes(){
          <div class="aj-field"><label>Intervalo sync minutos</label><input id="notion-interval-input" type="number" min="1" value="${npEsc(notionInterval)}"></div>
          <div class="aj-row"><button class="aj-btn primary" onclick="saveNotionSettings()">Guardar Notion</button><button class="aj-btn" onclick="notionApiTest()">Forzar importacion</button></div>
          <div class="aj-row" style="margin-top:8px"><button class="aj-btn soft" onclick="notionCargarManual()">Preview Notion</button><button class="aj-btn soft" onclick="notionApiSyncStart()">Auto sync</button><button class="aj-btn soft" onclick="notionApiSyncStop()">Detener</button></div>
-         <div class="aj-row" style="margin-top:8px"><button class="aj-btn" style="background:#E6FCF5;border-color:#099268;color:#099268;font-weight:800" onclick="syncNotionMirrorToSheets()">🔄 Espejo completo → Sheets</button></div>
+         <div class="aj-row" style="margin-top:8px"><button class="aj-btn" style="background:#E6FCF5;border-color:#099268;color:#099268;font-weight:800" onclick="syncNotionMirrorToSheets()">🔄 Espejo completo → Sheets</button><button class="aj-btn warn" onclick="ajArchivarGastosSueltosNotion()">Archivar gastos sueltos</button></div>
          <div style="display:grid;gap:7px;margin-top:10px"><div id="notion-api-status" class="aj-status"></div><div id="notion-load-status" class="aj-status"></div><div id="notion-import-status" class="aj-status"></div></div>`)}
       ${sec('gemini','note','Gemini','IA para agenda, notas y reuniones.',
         `<div class="aj-field"><label>API key</label><input id="gemini-key-input" value="${npEsc(gemKey)}" placeholder="AIza..."></div>
