@@ -4016,6 +4016,74 @@ function deudaProximoPago(d){
   if(pagadas >= total) return '';
   return debtAddMonths(deudaInicio(d), pagadas, deudaDiaPago(d));
 }
+function debtDaysBetween(a,b){
+  const da = debtIsoDate(a).split('-').map(Number);
+  const db = debtIsoDate(b).split('-').map(Number);
+  const ta = Date.UTC(da[0], da[1]-1, da[2]);
+  const tb = Date.UTC(db[0], db[1]-1, db[2]);
+  return Math.round((tb - ta) / 86400000);
+}
+function deudaCuotasVencidasAlDia(d, ref=todayStr()){
+  const total = Math.max(0, Math.floor(moneyValue(d?.cuotasTotales)));
+  if(!total) return 0;
+  let vencidas = 0;
+  for(let i=0;i<total;i++){
+    const fecha = debtAddMonths(deudaInicio(d), i, deudaDiaPago(d));
+    if(debtDaysBetween(fecha, ref) >= 0) vencidas++;
+  }
+  return vencidas;
+}
+function deudaEstadoTiempo(d, ref=todayStr()){
+  const pagadas = Math.max(0, Math.floor(moneyValue(d?.cuotasPagadas)));
+  const total = Math.max(0, Math.floor(moneyValue(d?.cuotasTotales)));
+  if(total > 0 && pagadas >= total) return {label:'Completada', detail:'Sin cuotas pendientes', tone:'ok', bg:'#ECFDF5', color:'#047857', days:0, atraso:0};
+  const next = deudaProximoPago(d);
+  if(!next) return {label:'Sin fecha', detail:'Falta configurar vencimiento', tone:'muted', bg:'#F8FAFC', color:'#64748B', days:0, atraso:0};
+  const diff = debtDaysBetween(ref, next);
+  const vencidas = deudaCuotasVencidasAlDia(d, ref);
+  const atraso = Math.max(0, vencidas - pagadas);
+  if(diff < 0) return {label:'Atrasada', detail:Math.abs(diff) + ' dia(s) vencida' + (atraso ? ' · ' + atraso + ' cuota(s) atrasadas' : ''), tone:'bad', bg:'#FEF2F2', color:'#B91C1C', days:diff, atraso};
+  if(diff === 0) return {label:'Vence hoy', detail:'Esta cuota pertenece al periodo actual', tone:'warn', bg:'#FFF7ED', color:'#C2410C', days:0, atraso};
+  if(diff <= 5) return {label:'Por vencer', detail:'Faltan ' + diff + ' dia(s)', tone:'warn', bg:'#FFFBEB', color:'#A16207', days:diff, atraso};
+  return {label:'Al dia', detail:'Proximo pago en ' + diff + ' dia(s)', tone:'ok', bg:'#ECFDF5', color:'#047857', days:diff, atraso};
+}
+function debtSmartFormData(){
+  const cleanNum = s => parseFloat(String(s||'').replace(',','.')) || 0;
+  const total = Math.max(0, parseInt(document.getElementById('d-ntotal')?.value)||0);
+  const paid = Math.max(0, Math.min(total || 9999, parseInt(document.getElementById('d-npag')?.value)||0));
+  const venc = debtIsoDate(document.getElementById('d-vencimiento')?.value || document.getElementById('d-inicio')?.value || todayStr());
+  const dia = Math.max(1, Math.min(31, Number(venc.slice(8,10)) || parseInt(document.getElementById('d-dia-pago')?.value)||1));
+  const inicio = debtAddMonths(venc, -paid, dia);
+  const cuota = cleanNum(document.getElementById('d-cuota')?.value);
+  const totalAmount = cleanNum(document.getElementById('d-total')?.value) || cuota * total;
+  return {total, paid, venc, dia, inicio, cuota, totalAmount};
+}
+function debtSmartPreviewUpdate(){
+  const data = debtSmartFormData();
+  const diaEl = document.getElementById('d-dia-pago');
+  const inicioEl = document.getElementById('d-inicio');
+  if(diaEl) diaEl.value = data.dia;
+  if(inicioEl) inicioEl.value = data.inicio;
+  const fin = data.total ? debtAddMonths(data.inicio, data.total - 1, data.dia) : data.venc;
+  const ghost = {fechaInicio:data.inicio, diaPago:data.dia, cuotasTotales:data.total, cuotasPagadas:data.paid, cuotaMonto:data.cuota};
+  const estado = deudaEstadoTiempo(ghost);
+  const endEl = document.getElementById('d-smart-final');
+  const countEl = document.getElementById('d-smart-count');
+  const statusEl = document.getElementById('d-smart-status');
+  if(endEl) endEl.textContent = debtFmtDate(fin);
+  if(countEl) countEl.textContent = data.total ? data.total + ' factura(s)/cuota(s)' : 'Sin cuotas';
+  if(statusEl){
+    statusEl.style.background = estado.bg;
+    statusEl.style.color = estado.color;
+    statusEl.style.borderColor = estado.color + '33';
+    statusEl.textContent = estado.label + ' · ' + estado.detail;
+  }
+}
+function debtApplyRecurringPlan(months){
+  const el = document.getElementById('d-ntotal');
+  if(el) el.value = Math.max(1, Number(months||1));
+  debtSmartPreviewUpdate();
+}
 function deudaBuildPago(d, cuotaNum, pago){
   const id = pago?.id || (Date.now() + '_c' + cuotaNum + '_' + Math.random().toString(36).slice(2,6));
   const fecha = pago?.fecha || debtAddMonths(deudaInicio(d), cuotaNum - 1, deudaDiaPago(d));
@@ -4221,6 +4289,7 @@ function renderDebtCard(d){
   const pagos = deudaPagos(d);
   const last = pagos[pagos.length - 1] || null;
   const next = deudaProximoPago(d);
+  const tiempo = deudaEstadoTiempo(d);
   const expanded = !!(window._debtExpanded && window._debtExpanded[String(d.id)]);
   const id = debtJs(d.id);
   const dots = Array.from({length: Math.max(0, Math.floor(moneyValue(d.cuotasTotales)))}, (_,i) => {
@@ -4245,12 +4314,13 @@ function renderDebtCard(d){
       circleProgress(pct,62,5,d.color,'<span style="font-size:10px;font-weight:700">' + pct + '%</span>') +
       '<div class="debt-info">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
-          '<div><div class="debt-name">' + debtHtml(d.name) + '</div><div class="debt-cat"><span style="color:' + (porCobrar ? '#047857' : '#B91C1C') + ';font-weight:900">' + roleLabel + '</span> · ' + debtHtml(d.tipo || d.categoria || 'Deuda') + ' · dia ' + deudaDiaPago(d) + ' de cada mes</div></div>' +
+          '<div><div class="debt-name">' + debtHtml(d.name) + '</div><div class="debt-cat"><span style="color:' + (porCobrar ? '#047857' : '#B91C1C') + ';font-weight:900">' + roleLabel + '</span> · ' + debtHtml(d.tipo || d.categoria || 'Deuda') + ' · mensual dia ' + deudaDiaPago(d) + '</div><div style="display:inline-flex;margin-top:5px;padding:4px 8px;border-radius:999px;background:' + tiempo.bg + ';color:' + tiempo.color + ';font-size:10px;font-weight:900;border:1px solid ' + tiempo.color + '33">' + tiempo.label + '</div></div>' +
           '<div class="debt-pending"><div class="debt-pending-amt" style="color:' + (porCobrar ? '#047857' : d.color) + '">' + (done ? 'Completada' : fmt(pendiente)) + '</div>' + (!done ? '<div class="debt-pending-lbl">' + saldoLabel + '</div>' : '') + '</div>' +
         '</div>' +
         '<div class="debt-next-main ' + (done ? 'ok' : '') + '" style="border-left-color:' + (done ? '#059669' : d.color) + '">' +
           '<div class="debt-next-label">' + appIcon('calendar') + '<span>Proximo pago</span></div>' +
           '<div class="debt-next-date">' + (next ? debtFmtDate(next) : 'Completada') + '</div>' +
+          '<div style="font-size:10px;color:' + tiempo.color + ';font-weight:850;margin-top:3px">' + tiempo.detail + '</div>' +
         '</div>' +
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px">' +
           '<div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:7px"><div style="font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase">Inicio</div><div style="font-size:11px;color:var(--text);font-weight:900">' + debtFmtDate(deudaInicio(d)) + '</div></div>' +
@@ -8111,6 +8181,9 @@ function openDebtModal(debt, preData){
   d.deudaRol = deudaRol(d);
   d.tipo = d.tipo || 'Banco';
   d.color = d.color || DEBT_COLORS[3];
+  d.repeticion = d.repeticion || 'mensual';
+  d.notas = d.notas || '';
+  d.fechaVencimiento = d.fechaVencimiento || deudaProximoPago(d) || d.fechaInicio;
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:var(--blue)">${isEdit?'Editar':'Nueva'} Deuda</div>
     <div class="field">
@@ -8121,20 +8194,45 @@ function openDebtModal(debt, preData){
       </div>
       <div id="d-role-hint" style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Por defecto: Yo debo. Sus pagos salen del balance.</div>
     </div>
-    <div class="field"><label class="field-label">Nombre</label><input id="d-name" type="text" placeholder="Ej: BCP, Tarjeta Ripley" value="${d.name}"></div>
-    <div class="field"><label class="field-label">Monto total (S/)</label><input id="d-total" type="number" inputmode="decimal" placeholder="0.00" value="${d.totalAmount||''}"></div>
-    <div class="field"><label class="field-label">Cuota mensual (S/)</label><input id="d-cuota" type="number" inputmode="decimal" placeholder="0.00" value="${d.cuotaMonto||''}"></div>
-    <div class="field"><label class="field-label">Número de cuotas totales</label><input id="d-ntotal" type="number" inputmode="numeric" placeholder="Ej: 12, 24, 36" value="${d.cuotasTotales||''}"></div>
-    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="d-npag" type="number" inputmode="numeric" placeholder="0" value="${d.cuotasPagadas||0}"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Ejemplo: si son 12 cuotas y ya van 4, escribe 4. Esto solo rellena el avance historico; no mueve caja. Para afectar Balance usa Registrar pago.</div></div>
-    <div class="field"><label class="field-label">Fecha en que empezaste a pagar</label><input id="d-inicio" type="date" value="${d.fechaInicio}"></div>
-    <div class="field"><label class="field-label">Dia de pago mensual</label><input id="d-dia-pago" type="number" inputmode="numeric" min="1" max="31" placeholder="Dia" value="${d.diaPago}"></div>
     <div class="field">
-      <label class="field-label">Tipo de Préstamo</label>
+      <label class="field-label">Tipo</label>
       <select id="d-tipo">
-        <option value="Banco" ${d.tipo==='Banco'?'selected':''}>🏦 Banco</option>
-        <option value="Personal" ${d.tipo==='Personal'?'selected':''}>👤 Personal</option>
+        <option value="Tarjeta de credito" ${d.tipo==='Tarjeta de credito'?'selected':''}>Tarjeta de credito</option>
+        <option value="Otro prestamo" ${d.tipo==='Otro prestamo'?'selected':''}>Otro prestamo</option>
+        <option value="Hipoteca" ${d.tipo==='Hipoteca'?'selected':''}>Hipoteca / prestamo de casa</option>
+        <option value="Factura recurrente" ${d.tipo==='Factura recurrente'?'selected':''}>Factura recurrente</option>
+        <option value="Banco" ${d.tipo==='Banco'?'selected':''}>Banco</option>
+        <option value="Personal" ${d.tipo==='Personal'?'selected':''}>Personal</option>
       </select>
     </div>
+    <div class="field"><label class="field-label">Nombre de factura / deuda</label><input id="d-name" type="text" placeholder="Ej: BCP, Tarjeta Ripley" value="${d.name}"></div>
+    <div class="field"><label class="field-label">Notas</label><input id="d-notas" type="text" placeholder="Opcional: cualquier nota o sugerencia" value="${d.notas||''}"></div>
+    <div class="field">
+      <label class="field-label">Repetir</label>
+      <select id="d-repeticion" onchange="debtSmartPreviewUpdate()">
+        <option value="mensual" selected>Mensual (cada mes)</option>
+      </select>
+    </div>
+    <div class="field"><label class="field-label">Fecha de vencimiento / proximo pago</label><input id="d-vencimiento" type="date" value="${d.fechaVencimiento}" oninput="debtSmartPreviewUpdate()"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">La app usa esta fecha y las cuotas pagadas para calcular automaticamente inicio, final y estado real al dia de hoy.</div></div>
+    <div class="field"><label class="field-label">Total de la factura / deuda (S/)</label><input id="d-total" type="number" inputmode="decimal" placeholder="0.00" value="${d.totalAmount||''}" oninput="debtSmartPreviewUpdate()"></div>
+    <div class="field"><label class="field-label">Cuota mensual (S/)</label><input id="d-cuota" type="number" inputmode="decimal" placeholder="0.00" value="${d.cuotaMonto||''}" oninput="debtSmartPreviewUpdate()"></div>
+    <div class="field"><label class="field-label">Numero de facturas / cuotas</label><input id="d-ntotal" type="number" inputmode="numeric" placeholder="Ej: 12, 24, 36" value="${d.cuotasTotales||''}" oninput="debtSmartPreviewUpdate()"></div>
+    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="d-npag" type="number" inputmode="numeric" placeholder="0" value="${d.cuotasPagadas||0}" oninput="debtSmartPreviewUpdate()"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Esto rellena el avance historico. Solo Registrar pago/cobro mueve Balance.</div></div>
+    <div class="field">
+      <label class="field-label">Plan recurrente inteligente</label>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px">
+        <button type="button" class="btn-ghost" onclick="debtApplyRecurringPlan(12)">1 ano</button>
+        <button type="button" class="btn-ghost" onclick="debtApplyRecurringPlan(36)">3 anos</button>
+        <button type="button" class="btn-ghost" onclick="debtApplyRecurringPlan(120)">10 anos</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:9px"><div style="font-size:9px;color:var(--muted);font-weight:900;text-transform:uppercase">Final estimado</div><div id="d-smart-final" style="font-size:12px;color:var(--text);font-weight:900;margin-top:2px">-</div></div>
+        <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:9px"><div style="font-size:9px;color:var(--muted);font-weight:900;text-transform:uppercase">Facturas</div><div id="d-smart-count" style="font-size:12px;color:var(--text);font-weight:900;margin-top:2px">-</div></div>
+      </div>
+      <div id="d-smart-status" style="font-size:11px;font-weight:850;line-height:1.35;margin-top:8px;border:1px solid var(--border);border-radius:10px;padding:9px;background:#F8FAFC;color:var(--muted)">Calculando...</div>
+    </div>
+    <input id="d-inicio" type="hidden" value="${d.fechaInicio}">
+    <input id="d-dia-pago" type="hidden" value="${d.diaPago}">
     <div class="field"><label class="field-label">Color de la deuda</label><div style="display:flex;gap:10px;flex-wrap:wrap">${DEBT_COLORS.map(c=>`<button type="button" onclick="selectDebtColor(this,'${c}')" style="width:34px;height:34px;border-radius:50%;background:${c};cursor:pointer;border:2px solid ${c===d.color?'#111827':'transparent'};box-shadow:${c===d.color?'0 0 0 3px #E0F2FE':'none'};color:#FFFFFF;font-weight:900;font-size:15px;line-height:1" data-dcolor="${c}" aria-label="Seleccionar color">${c===d.color?'✓':''}</button>`).join('')}</div><div id="d-color-status" style="font-size:11px;color:var(--muted);margin-top:7px">Color seleccionado para diferenciar esta deuda en la lista.</div></div>
     <div class="btn-row" style="margin-top:6px">
       <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
@@ -8142,7 +8240,7 @@ function openDebtModal(debt, preData){
     </div>`;
   window._debtColor=d.color;
   window._debtRole=d.deudaRol;
-  setTimeout(()=>setDebtRole(d.deudaRol), 0);
+  setTimeout(()=>{setDebtRole(d.deudaRol); debtSmartPreviewUpdate();}, 0);
   showModal();
 }
 function selectDebtColor(el,color){document.querySelectorAll('[data-dcolor]').forEach(e=>{e.style.borderColor='transparent';e.style.boxShadow='none';e.textContent='';});el.style.borderColor='#111827';el.style.boxShadow='0 0 0 3px #E0F2FE';el.textContent='✓';window._debtColor=color;const status=document.getElementById('d-color-status');if(status)status.textContent='Color seleccionado para diferenciar esta deuda en la lista.';}
@@ -8174,8 +8272,11 @@ function saveDebt(editId){
   const cuotasTotales=parseInt(document.getElementById('d-ntotal').value)||0;
   const cuotasPagadas=parseInt(document.getElementById('d-npag').value)||0;
   const totalAmount=cleanNum(document.getElementById('d-total').value)||cuotaMonto*cuotasTotales;
-  const fechaInicio=debtIsoDate(document.getElementById('d-inicio')?.value || todayStr());
-  const diaPago=Math.max(1, Math.min(31, parseInt(document.getElementById('d-dia-pago')?.value)||Number(fechaInicio.slice(8,10))||1));
+  const fechaVencimiento=debtIsoDate(document.getElementById('d-vencimiento')?.value || todayStr());
+  const diaPago=Math.max(1, Math.min(31, Number(fechaVencimiento.slice(8,10))||parseInt(document.getElementById('d-dia-pago')?.value)||1));
+  const fechaInicio=debtAddMonths(fechaVencimiento, -Math.max(0, cuotasPagadas), diaPago);
+  const notas=document.getElementById('d-notas')?.value.trim() || '';
+  const repeticion=document.getElementById('d-repeticion')?.value || 'mensual';
   if(!name) return toast('Escribe el nombre de la deuda','error');
   if(!cuotaMonto) return toast('Escribe la cuota mensual','error');
   if(!cuotasTotales) return toast('Escribe el numero de cuotas','error');
@@ -8190,6 +8291,9 @@ function saveDebt(editId){
     cuotasPagadas,
     fechaInicio,
     diaPago,
+    fechaVencimiento,
+    repeticion,
+    notas,
     tipo:document.getElementById('d-tipo').value,
     deudaRol:window._debtRole || deudaRol(original) || 'debo',
     categoria:'Deuda',
