@@ -2206,7 +2206,7 @@ const DEFAULT_CATS_NEG_EX = [
   {id:'cne2',name:'Gnv',icon:'fuel',color:'#5B6E91',type:'egreso'},
   {id:'cne7',name:'Reparacion de auto',icon:'transport',color:'#77746D',type:'egreso'},
   {id:'cne_agregados',name:'Agregados',icon:'box',color:'#A9895C',type:'egreso'},
-  {id:'cne_meta',name:'Meta',icon:'target',color:'#6D8C82',type:'egreso'},
+  {id:'cne_meta',name:'META',icon:'target',color:'#6D8C82',type:'egreso'},
   {id:'cne_documentacion',name:'Documentacion',icon:'document',color:'#77746D',type:'egreso'},
   {id:'cne6',name:'Otros gastos de negocio',icon:'box',color:'#77746D',type:'egreso'},
   {id:'transfer_neg_out',name:'Transferencia enviada',icon:'transfer',color:'#1565C0',type:'egreso',system:true,hidden:true},
@@ -2261,7 +2261,7 @@ function getKeys(modo){
   if(migrated) console.log('[MisFinanzas] Keys migrados a formato fnz_neg_*');
 })();
 
-const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_scope_sheets_v10';
+const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_scope_sheets_v11_meta_upper';
 const CATEGORY_LEGACY_DEFAULT_IDS = {
   personal: {
     ingreso: ['ci1','ci2','ci3','ci4','ci5','ci6','transfer_in','transfer_retiro_in','cneg_svc'],
@@ -2296,6 +2296,7 @@ function normalizeBusinessLabelsForState(isNeg){
   let changed = false;
   state.catsEx = (state.catsEx || []).map(c => {
     if(c && c.id === 'cne2' && c.name !== 'Gnv'){ changed = true; return {...c, name:'Gnv'}; }
+    if(c && c.id === 'cne_meta' && c.name !== 'META'){ changed = true; return {...c, name:'META'}; }
     return c;
   });
   state.transactions = (state.transactions || []).map(t => {
@@ -2303,6 +2304,10 @@ function normalizeBusinessLabelsForState(isNeg){
     if(t && (t.catId === 'cne2' || n === 'gnv') && t.category !== 'Gnv'){
       changed = true;
       return {...t, catId:'cne2', category:'Gnv'};
+    }
+    if(t && (t.catId === 'cne_meta' || /^meta( de ahorro)?$/.test(n) || n === 'ahorro' || n === 'objetivo') && t.category !== 'META'){
+      changed = true;
+      return {...t, catId:'cne_meta', category:'META'};
     }
     return t;
   });
@@ -2580,7 +2585,7 @@ function isAgregadoCategory(catId, category, description=''){
 
 function isMetaCategory(catId, category, description=''){
   const text = normSimpleText([category, description].filter(Boolean).join(' '));
-  return catId === 'cne_meta' || /\b(meta|objetivo|ahorro|ahorrar|separado|separe|guardar|guardado|inversion|inversiones)\b/.test(text);
+  return catId === 'cne_meta' || /\b(meta|meta mensual|meta diaria|objetivo|ahorro|ahorrar|separado|separada|separe|guardar|guardado|reserva|fondo|alcancia|inversion|inversiones)\b/.test(text);
 }
 
 function expenseBucketForTx(t){
@@ -6542,7 +6547,7 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
     const iMat1=col(['1 materiales','materiales 1','1 material','materiales']), iMat2=col(['2 materiales','materiales 2','2 material']), iMat3=col(['3 materiales','materiales 3','3 material']);
     const iPrecio1=col(['1 precio del servicio','1 precio de servicio','precio del servicio 1','precio de servicio 1','1 precio','precio 1','precio del servicio','precio']), iPrecio2=col(['2 precio del servicio','2 precio de servicio','precio del servicio 2','precio de servicio 2','2 precio','precio 2']), iPrecio3=col(['3 precio de servicio','3 precio del servicio','precio de servicio 3','precio del servicio 3','3 precio','precio 3']);
     const iComida=col(['comida','alimentos','menu','menus','snacks','snak','snaks','bebidas','gaseosa','gaseosas']), iOtros=col(['otros','otros gastos','gastos extra','extra']), iAgreg=col(['agregados','agregado','adicional','adicionales']), iMovil=col(['movilidad','movil','transport','transporte','pasajes']);
-    const iMeta=col(['meta','objetivo','separado meta','ahorro meta']);
+    const iMeta=col(['meta','META','objetivo','goal','target','separado meta','ahorro meta','meta ahorro','meta de ahorro','monto meta','reserva','fondo']);
     const iObs=col(['observaciones','observacion','nota','notas','notes','descripcion','description','comentario','comentarios']);
     const iNotionId=col(['notionid','notion id','notion page id','page id','pageid','notion uuid']);
     const comidaCols = cols(['comida','alimentos','alimentacion','menu','menus','snack','snacks','snak','snaks','golosina','golosinas','bebida','bebidas','gaseosa','gaseosas']);
@@ -6605,7 +6610,7 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
       if(comida>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-com',type:'egreso',amount:comida,category:'Comida',catId:'cne_menu',description:'Comida - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'comida')); egresosCom++; }
       if(otros>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-otr',type:'egreso',amount:otros,category:'Otros gastos de negocio',catId:'cne6',description:'Otros gastos - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'otros')); egresosOtros++; }
       if(agregados>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-agr',type:'egreso',amount:agregados,category:'Agregados',catId:'cne_agregados',description:'Agregados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'agregados')); egresosAgr++; }
-      if(meta>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-met',type:'egreso',amount:meta,category:'Meta',catId:'cne_meta',description:'Meta - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'meta')); }
+      if(meta>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-met',type:'egreso',amount:meta,category:'META',catId:'cne_meta',description:'META - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'meta')); }
       
       if(movil>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-mov',type:'egreso',amount:movil,category:'Movilidad',catId:'cne5',description:'Movilidad - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'movilidad')); egresosMov++; }
     }
@@ -6681,6 +6686,7 @@ function _mapearCategoriaNotion(texto) {
   if (t === 'instalacion')      return 'Instalacion nueva';
   if (t === 'gasfiteria')       return 'Gasfiteria';
   if (t === 'documentacion')    return 'Documentacion';
+  if (['meta','meta mensual','meta diaria','meta de ahorro','objetivo','ahorro','reserva','fondo'].includes(t)) return 'META';
   if (t === 'terma')            return 'Conexion de artefactos';
   if (t === 'cocina')           return 'Conexion de artefactos';
   if (t === 'horno')            return 'Conexion de artefactos';
@@ -6698,6 +6704,7 @@ function _mapearCategoriaNotion(texto) {
   if (t.includes('instalac'))   return 'Instalacion nueva';
   if (t.includes('gasfiter'))   return 'Gasfiteria';
   if (t.includes('document'))   return 'Documentacion';
+  if (t.includes('meta') || t.includes('objetivo') || t.includes('ahorro') || t.includes('reserva') || t.includes('fondo')) return 'META';
   if (t.includes('terma') || t.includes('calefon')) return 'Conexion de artefactos';
   if (t.includes('cocina'))     return 'Conexion de artefactos';
   if (t.includes('horno'))      return 'Conexion de artefactos';
@@ -8915,7 +8922,7 @@ async function _updateNotionPage(pageId, updatedTx) {
     else if (isAgregadoCategory(updatedTx.catId, updatedTx.category, updatedTx.description))
       setProp(findCol('agregados','agregado','adicional','adicionales'), moneyValue(updatedTx.amount));
     else if (isMetaCategory(updatedTx.catId, updatedTx.category, updatedTx.description))
-      setProp(findCol('meta','objetivo','ahorro','separado meta'), moneyValue(updatedTx.amount));
+      setProp(findCol('meta','META','objetivo','goal','target','ahorro','separado meta','ahorro meta','meta ahorro','meta de ahorro','monto meta','reserva','fondo'), moneyValue(updatedTx.amount));
     else if (isMaterialesCategory(updatedTx.catId, updatedTx.category))
       setProp(findCol('materiales','material','insumos','compras'), parseFloat(updatedTx.amount)||0);
     else
@@ -9032,7 +9039,7 @@ async function _updateNotionPageFull(pageId, item, cobroObj) {
   if (comida     > 0) setProp(findCol('comida','alimentos','alimentacion','menu','snack','snacks','bebida','bebidas','gaseosa','gaseosas'), comida);
   if (agregados  > 0) setProp(findCol('agregados','agregado','adicional','adicionales'), agregados);
   if (otros      > 0) setProp(findCol('otros','otros gastos','gastos extra','extra'), otros);
-  if (meta       > 0) setProp(findCol('meta','objetivo','goal','target'), meta);
+  if (meta       > 0) setProp(findCol('meta','META','objetivo','goal','target','ahorro','separado meta','ahorro meta','meta ahorro','meta de ahorro','monto meta','reserva','fondo'), meta);
 
   // ── Observaciones ──
   const notasFinal = [observaciones, item.notas||''].filter(Boolean).join(' · ');
@@ -11935,7 +11942,7 @@ async function guardarFinalizacion(id){
   // (la caja ya se movio cuando se compraron los materiales). Se ocultan de movimientos.
   if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
-  if (crearMovimientosCierre && cobroObj.meta > 0) { const txId=rowId+'-met'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.meta, category:'Meta', catId:'cne_meta', description:'Meta - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.meta > 0) { const txId=rowId+'-met'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.meta, category:'META', catId:'cne_meta', description:'META - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if(crearMovimientosCierre) item.cierreTxIds = nuevosCierreTxIds;
 
   if (item.estadoPago === 'parcial' && item.montoPendienteCobro > 0) {
@@ -14664,6 +14671,7 @@ Object.assign(CAT_KEYWORDS, {
   cne2: ['gnv','gas natural vehicular','g n v','g ene ve','ge ene ve','je ene ve','geneve','genuve','gnuve','genv','gnu ve','genu ve'],
   cne7: ['reparacion de auto','reparación de auto','auto','carro','vehiculo','vehículo','taller','llanta','aceite'],
   cne_agregados: ['agregado','agregados','arena','piedra','cemento'],
+  cne_meta: ['meta','meta mensual','meta diaria','meta de ahorro','objetivo','objetivo de ahorro','ahorro','ahorrar','separado','separar','guardar','guardado','reserva','fondo','alcancia','inversion'],
   cne_documentacion: ['documentacion','documentación','papeles','certificado','tramite','trámite'],
   cne6: ['otros gastos de negocio','otro gasto negocio','varios negocio']
 });
@@ -15423,6 +15431,8 @@ function parseVoiceCommand(text) {
         cat = state.catsEx.find(c=>c.id==='cne5') || state.catsEx[0];
       else if (/agregado|arena|piedra|cemento/.test(t))
         cat = state.catsEx.find(c=>c.id==='cne_agregados') || state.catsEx[0];
+      else if (/\b(meta|objetivo|ahorro|ahorrar|separado|separada|separe|guardar|guardado|reserva|fondo|alcancia)\b/.test(t))
+        cat = state.catsEx.find(c=>c.id==='cne_meta') || state.catsEx[0];
       else if (/documentacion|documentación|tramite|trámite|papeles|certificado/.test(t))
         cat = state.catsEx.find(c=>c.id==='cne_documentacion') || state.catsEx[0];
       else if (/herramienta|equipo|instrumento|operacion|operación/.test(t))
@@ -17741,7 +17751,7 @@ Para AGENDA:
 
 Categorías para ${isNeg?'NEGOCIO':'PERSONAL'}:
 ${isNeg?
-'Ingresos: Punto adicional, Modificacion de tuberia, Instalacion nueva, Reparacion de tuberia, Gasfiteria, Conversion de artefactos, Conexion de artefactos, Documentacion, Otros servicios. Egresos: Operacion, Personal, Transporte, Luz, Agua, Internet casa, Internet movil, Materiales, Gasolina, GNV, Reparacion de auto, Agregados, Documentacion, Otros gastos de negocio':
+'Ingresos: Punto adicional, Modificacion de tuberia, Instalacion nueva, Reparacion de tuberia, Gasfiteria, Conversion de artefactos, Conexion de artefactos, Documentacion, Otros servicios. Egresos: Operacion, Personal, Transporte, Luz, Agua, Internet casa, Internet movil, Materiales, Gasolina, GNV, Reparacion de auto, Agregados, META, Documentacion, Otros gastos de negocio':
 'Ingresos: Sueldo / Salario, Bonos / Gratificaciones, Propinas, Comisiones, Venta de articulos personales, Reembolsos. Egresos: Compras del mercado, Compras al super, Gaseosa, Agua, Golosinas, Snack, Pizza, Salidas, Menu, Entretenimiento, Medicina, Productos de aseo, Cuidado personal, Belleza, Ropa, Accesorios, Cine, Otros gastos personales'}
 
 Para fechas relativas usa hoy (${hoy}) como referencia. "este sábado" = próximo sábado. "construccion" es ambiguo: analizar contexto para determinar si es "Instalacion nueva", "Punto adicional", "Modificacion de tuberia" u otro servicio.
