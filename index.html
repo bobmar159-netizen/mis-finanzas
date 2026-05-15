@@ -2811,8 +2811,16 @@ const totalExpense=()=>filteredTx().filter(t=>t.type==='egreso' && isCashFlowTx(
 
 const balance=()=>totalIncome()-totalExpense();
 const daysUntil=day=>{const now=new Date();let t=new Date(now.getFullYear(),now.getMonth(),day);if(t<now)t=new Date(now.getFullYear(),now.getMonth()+1,day);return Math.ceil((t-now)/(864e5));};
-const pendingDebts=()=>state.debts.filter(d=>d.cuotasPagadas<d.cuotasTotales);
-const totalDebt=()=>state.debts.reduce((s,d)=>s+(d.cuotasTotales-d.cuotasPagadas)*d.cuotaMonto,0);
+function deudaEsPorCobrar(d){
+  const rol = String(d?.deudaRol || d?.deudaTipo || d?.rol || 'debo').toLowerCase();
+  return ['meden','me_deben','me deben','por_cobrar','cobrar'].includes(rol);
+}
+function deudaRol(d){
+  return deudaEsPorCobrar(d) ? 'meden' : 'debo';
+}
+const pendingDebts=()=>state.debts.filter(d=>!deudaEsPorCobrar(d)&&d.cuotasPagadas<d.cuotasTotales);
+const totalDebt=()=>state.debts.filter(d=>!deudaEsPorCobrar(d)).reduce((s,d)=>s+(d.cuotasTotales-d.cuotasPagadas)*d.cuotaMonto,0);
+const totalDebtReceivable=()=>state.debts.filter(deudaEsPorCobrar).reduce((s,d)=>s+(d.cuotasTotales-d.cuotasPagadas)*d.cuotaMonto,0);
 const pendingServices=()=>state.servicios.filter(s=>!s.pagado);
 const totalPendingServices=()=>pendingServices().reduce((s,sv)=>s+sv.monto,0);
 const motivationMsg=(r,n)=>r===0?`🎉 ¡Terminaste de pagar ${n}!`:r===1?'🏁 ¡Una cuota más y listo!':r<=3?`🔥 ¡Solo ${r} cuotas más!`:r<=6?`💪 ¡Vas muy bien! Menos de ${r} meses.`:null;
@@ -3796,6 +3804,7 @@ function deudaBuildPago(d, cuotaNum, pago){
   const id = pago?.id || (Date.now() + '_c' + cuotaNum + '_' + Math.random().toString(36).slice(2,6));
   const fecha = pago?.fecha || debtAddMonths(deudaInicio(d), cuotaNum - 1, deudaDiaPago(d));
   const monto = moneyValue(pago?.monto || d?.cuotaMonto);
+  const afectaBalance = pago?.afectaBalance === true || pago?.balanceAfectado === true;
   return {
     ...(pago || {}),
     id,
@@ -3803,8 +3812,27 @@ function deudaBuildPago(d, cuotaNum, pago){
     fecha,
     monto,
     txId: pago?.txId || deudaPagoTxId(d.id, id),
-    autoDeuda: pago?.autoDeuda !== false
+    autoDeuda: pago?.autoDeuda !== false,
+    afectaBalance,
+    historico: pago?.historico === true || !afectaBalance
   };
+}
+function deudaPagoAfectaBalance(p){
+  return !!p && (p.afectaBalance === true || p.balanceAfectado === true);
+}
+function deudaMarkLegacyBalancePago(pagos){
+  if(!Array.isArray(pagos) || !pagos.length) return pagos || [];
+  const hasFlag = pagos.some(p => p && (
+    Object.prototype.hasOwnProperty.call(p, 'afectaBalance') ||
+    Object.prototype.hasOwnProperty.call(p, 'balanceAfectado') ||
+    Object.prototype.hasOwnProperty.call(p, 'historico')
+  ));
+  if(hasFlag) return pagos;
+  return pagos.map((p,i)=>({
+    ...p,
+    afectaBalance: i === pagos.length - 1,
+    historico: i !== pagos.length - 1
+  }));
 }
 function deudaNormalizePagos(item, original){
   item.fechaInicio = deudaInicio(item);
@@ -3812,21 +3840,24 @@ function deudaNormalizePagos(item, original){
   const target = Math.max(0, Math.min(Math.floor(moneyValue(item.cuotasPagadas)), Math.floor(moneyValue(item.cuotasTotales))));
   let pagos = deudaPagos(item).length ? deudaPagos(item).slice() : deudaPagos(original).slice();
   pagos = pagos.slice(0, target).map((p,i)=>deudaBuildPago(item, i + 1, p));
-  while(pagos.length < target) pagos.push(deudaBuildPago(item, pagos.length + 1));
+  while(pagos.length < target) pagos.push(deudaBuildPago(item, pagos.length + 1, {afectaBalance:false, historico:true}));
+  pagos = deudaMarkLegacyBalancePago(pagos);
   item.pagos = pagos;
   item.cuotasPagadas = pagos.length;
   return item;
 }
 function deudaBuildPagoTx(d, pago, idx){
   const txId = pago.txId || deudaPagoTxId(d.id, pago.id);
+  const porCobrar = deudaEsPorCobrar(d);
+  const cuotaNumero = Math.max(1, Math.floor(moneyValue(pago.cuota)) || (idx + 1));
   pago.txId = txId;
   return {
     id: txId,
-    type: 'egreso',
+    type: porCobrar ? 'ingreso' : 'egreso',
     amount: moneyValue(pago.monto || d.cuotaMonto),
-    category: 'Deuda',
-    catId: 'ce9',
-    description: 'Pago cuota ' + (idx + 1) + '/' + d.cuotasTotales + ' - ' + (d.name || 'Deuda'),
+    category: porCobrar ? 'Cobro deuda' : 'Deuda',
+    catId: porCobrar ? (state.modo === 'negocio' ? 'cn_otro_ingreso' : 'ci6') : 'ce9',
+    description: (porCobrar ? 'Cobro cuota ' : 'Pago cuota ') + cuotaNumero + '/' + d.cuotasTotales + ' - ' + (d.name || 'Deuda'),
     date: debtIsoDate(pago.fecha),
     negocio: state.modo === 'negocio',
     moneda: 'PEN',
@@ -3834,7 +3865,8 @@ function deudaBuildPagoTx(d, pago, idx){
     debtId: String(d.id),
     debtPagoId: String(pago.id),
     deudaNombre: d.name || 'Deuda',
-    cuotaNumero: idx + 1
+    deudaRol: porCobrar ? 'meden' : 'debo',
+    cuotaNumero
   };
 }
 function deudaRemovePaymentTxs(debtId){
@@ -3849,7 +3881,8 @@ function deudaReconcilePaymentTxs(d, opts = {}){
   const syncSheets = opts.syncSheets !== false;
   state.transactions = state.transactions || [];
   const pagos = deudaPagos(d);
-  const active = new Set(pagos.map(p => String(p.txId || deudaPagoTxId(d.id, p.id))));
+  const pagosBalance = pagos.filter(deudaPagoAfectaBalance);
+  const active = new Set(pagosBalance.map(p => String(p.txId || deudaPagoTxId(d.id, p.id))));
   const linked = state.transactions.filter(t => t.origenDeudaPago && String(t.debtId) === String(d.id));
   const url = localStorage.getItem('fnz_sheets_url') || '';
   linked.forEach(t => {
@@ -3857,7 +3890,7 @@ function deudaReconcilePaymentTxs(d, opts = {}){
     state.transactions = state.transactions.filter(x => String(x.id) !== String(t.id));
     if(syncSheets && url) _sendToSheets(url, {type:'tx_delete', id:t.id, modo:txSheetModo(t), timestamp:'debtpay_trim_' + t.id + '_' + Date.now()});
   });
-  pagos.forEach((p,idx) => {
+  pagosBalance.forEach((p,idx) => {
     const tx = deudaBuildPagoTx(d, p, idx);
     const oldIdx = state.transactions.findIndex(x => String(x.id) === String(tx.id));
     if(oldIdx >= 0) state.transactions[oldIdx] = {...state.transactions[oldIdx], ...tx};
@@ -3889,7 +3922,9 @@ function deudaSyncFromPaymentTx(tx){
     fecha: debtIsoDate(tx.date),
     monto: moneyValue(tx.amount),
     txId: tx.id,
-    autoDeuda: false
+    autoDeuda: false,
+    afectaBalance: true,
+    historico: false
   };
   if(idx >= 0) d.pagos[idx] = {...d.pagos[idx], ...pago};
   else d.pagos.push(pago);
@@ -3915,6 +3950,10 @@ function renderDebtCard(d){
   const pendiente = restantes * moneyValue(d.cuotaMonto);
   const pct = moneyValue(d.cuotasTotales) > 0 ? Math.round((moneyValue(d.cuotasPagadas) / moneyValue(d.cuotasTotales)) * 100) : 0;
   const done = restantes === 0;
+  const porCobrar = deudaEsPorCobrar(d);
+  const roleLabel = porCobrar ? 'Me deben' : 'Yo debo';
+  const saldoLabel = porCobrar ? 'por cobrar' : 'por pagar';
+  const actionLabel = porCobrar ? 'Registrar cobro de cuota' : 'Registrar pago de cuota';
   const dotSize = d.cuotasTotales <= 12 ? 14 : d.cuotasTotales <= 24 ? 11 : 9;
   const pagos = deudaPagos(d);
   const last = pagos[pagos.length - 1] || null;
@@ -3933,7 +3972,7 @@ function renderDebtCard(d){
     ['Pagado real', fmt(deudaMontoPagado(d))]
   ].map(r => '<div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:9px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:800">' + r[0] + '</div><div style="font-size:12px;color:var(--text);font-weight:800;margin-top:2px">' + r[1] + '</div></div>').join('');
   const pagosHtml = pagos.length
-    ? pagos.slice(-3).reverse().map(p => '<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted);padding:5px 0;border-top:1px solid #EEF2F7"><span>Cuota ' + debtHtml(p.cuota || '') + ' · ' + debtFmtDate(p.fecha) + '</span><b style="color:var(--text)">' + fmt(p.monto) + '</b></div>').join('')
+    ? pagos.slice(-3).reverse().map(p => '<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted);padding:5px 0;border-top:1px solid #EEF2F7"><span>' + (porCobrar ? 'Cobro ' : 'Pago ') + debtHtml(p.cuota || '') + ' · ' + debtFmtDate(p.fecha) + '</span><b style="color:var(--text)">' + fmt(p.monto) + '</b></div>').join('')
     : '<div style="font-size:11px;color:var(--dim);padding-top:6px">Sin pagos registrados todavia</div>';
   const details = expanded ? '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + rows + '</div><div style="font-size:11px;color:var(--muted);margin-top:9px">Movimientos ligados al balance: ' + pagos.length + '</div>' + pagosHtml + '</div>' : '';
   const msg = motivationMsg(restantes, d.name);
@@ -3943,8 +3982,8 @@ function renderDebtCard(d){
       circleProgress(pct,62,5,d.color,'<span style="font-size:10px;font-weight:700">' + pct + '%</span>') +
       '<div class="debt-info">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
-          '<div><div class="debt-name">' + debtHtml(d.name) + '</div><div class="debt-cat">' + debtHtml(d.tipo || d.categoria || 'Deuda') + ' · dia ' + deudaDiaPago(d) + ' de cada mes</div></div>' +
-          '<div class="debt-pending"><div class="debt-pending-amt" style="color:' + d.color + '">' + (done ? 'Pagada' : fmt(pendiente)) + '</div>' + (!done ? '<div class="debt-pending-lbl">pendiente</div>' : '') + '</div>' +
+          '<div><div class="debt-name">' + debtHtml(d.name) + '</div><div class="debt-cat"><span style="color:' + (porCobrar ? '#047857' : '#B91C1C') + ';font-weight:900">' + roleLabel + '</span> · ' + debtHtml(d.tipo || d.categoria || 'Deuda') + ' · dia ' + deudaDiaPago(d) + ' de cada mes</div></div>' +
+          '<div class="debt-pending"><div class="debt-pending-amt" style="color:' + (porCobrar ? '#047857' : d.color) + '">' + (done ? 'Completada' : fmt(pendiente)) + '</div>' + (!done ? '<div class="debt-pending-lbl">' + saldoLabel + '</div>' : '') + '</div>' +
         '</div>' +
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px">' +
           '<div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:7px"><div style="font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase">Inicio</div><div style="font-size:11px;color:var(--text);font-weight:900">' + debtFmtDate(deudaInicio(d)) + '</div></div>' +
@@ -3959,7 +3998,7 @@ function renderDebtCard(d){
     (msg ? '<div class="motivation">' + debtHtml(msg) + '</div>' : '') +
     details +
     '<div style="display:flex;gap:6px;margin-top:12px" onclick="event.stopPropagation()">' +
-      (!done ? '<button onclick="pagarCuota(\'' + id + '\')" style="flex:1;background:' + d.color + ';border:1px solid ' + d.color + ';color:#FFFFFF;border-radius:8px;padding:9px;font-family:\'DM Sans\',sans-serif;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 8px 18px rgba(84,104,120,.18)">Registrar pago de cuota</button>' : '') +
+      (!done ? '<button onclick="pagarCuota(\'' + id + '\')" style="flex:1;background:' + (porCobrar ? '#047857' : d.color) + ';border:1px solid ' + (porCobrar ? '#047857' : d.color) + ';color:#FFFFFF;border-radius:8px;padding:9px;font-family:\'DM Sans\',sans-serif;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 8px 18px rgba(84,104,120,.18)">' + actionLabel + '</button>' : '') +
       '<button onclick="openEditDebt(\'' + id + '\')" style="width:36px;height:36px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:13px">✎</button>' +
       '<button onclick="deleteDebt(\'' + id + '\')" style="width:36px;height:36px;background:none;border:none;color:#E0525266;cursor:pointer;font-size:14px">X</button>' +
     '</div>' +
@@ -3967,10 +4006,13 @@ function renderDebtCard(d){
 }
 
 function renderDeudas(){
-  const debts=state.debts;
+  const debts=state.debts||[];
   const prestPers=state.prestamosPersonales||[];
-  const total=totalDebt();
-  const totalPaid=debts.reduce((s,d)=>s+deudaMontoPagado(d),0);
+  const payableDebts=debts.filter(d=>!deudaEsPorCobrar(d));
+  const receivableDebts=debts.filter(deudaEsPorCobrar);
+  const total=payableDebts.reduce((s,d)=>s+Math.max(0, moneyValue(d.cuotasTotales)-moneyValue(d.cuotasPagadas))*moneyValue(d.cuotaMonto),0);
+  const totalReceivable=receivableDebts.reduce((s,d)=>s+Math.max(0, moneyValue(d.cuotasTotales)-moneyValue(d.cuotasPagadas))*moneyValue(d.cuotaMonto),0);
+  const totalPaid=payableDebts.reduce((s,d)=>s+deudaMontoPagado(d),0);
   const grandTotal=total+totalPaid;
   const pctPaid=grandTotal>0?Math.round((totalPaid/grandTotal)*100):0;
 
@@ -4082,7 +4124,7 @@ function renderDeudas(){
     <div class="summary-card" style="background:linear-gradient(135deg,#EFF6FF,#F8FAFC);border:1px solid #2E86AB33;margin-bottom:16px">
       <div class="summary-label" style="color:#2E86AB88">Total por pagar</div>
       <div class="summary-amount" style="color:var(--blue)">${fmt(total)}</div>
-      <div class="summary-detail">${debts.length} préstamo(s) banco · ${prestPers.length} personal(es)</div>
+      <div class="summary-detail">${payableDebts.length} por pagar · ${receivableDebts.length ? fmt(totalReceivable)+' por cobrar · ' : ''}${prestPers.length} personal(es)</div>
       <div style="margin-top:12px">
         <div style="display:flex;justify-content:space-between;margin-bottom:5px">
           <span style="font-size:11px;color:var(--muted)">Progreso general</span>
@@ -7265,16 +7307,25 @@ function openEditDebt(id){ openDebtModal(state.debts.find(d=>d.id===id)); }
 function openDebtModal(debt, preData){
   const pre = preData||{};
   const isEdit=!!debt;
-  const d=debt||{name:pre.name||'',totalAmount:pre.totalAmount||'',cuotaMonto:pre.cuotaMonto||'',cuotasTotales:pre.cuotasTotales||'',cuotasPagadas:0,fechaInicio:pre.fechaInicio||todayStr(),diaPago:pre.diaPago||Number(todayStr().slice(8,10)),categoria:pre.categoria||DEBT_CATS[0],tipo:pre.tipo||'Personal',color:pre.color||DEBT_COLORS[0],pagos:[]};
+  const d=debt||{name:pre.name||'',totalAmount:pre.totalAmount||'',cuotaMonto:pre.cuotaMonto||'',cuotasTotales:pre.cuotasTotales||'',cuotasPagadas:0,fechaInicio:pre.fechaInicio||todayStr(),diaPago:pre.diaPago||Number(todayStr().slice(8,10)),categoria:pre.categoria||DEBT_CATS[0],tipo:pre.tipo||'Banco',deudaRol:pre.deudaRol||pre.deudaTipo||pre.rol||'debo',color:pre.color||DEBT_COLORS[3],pagos:[]};
   d.fechaInicio = deudaInicio(d);
   d.diaPago = deudaDiaPago(d);
+  d.deudaRol = deudaRol(d);
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:var(--blue)">${isEdit?'Editar':'Nueva'} Deuda</div>
+    <div class="field">
+      <label class="field-label">Quien debe</label>
+      <div class="type-toggle">
+        <button type="button" class="type-btn" id="d-role-debo" onclick="setDebtRole('debo')" style="border-color:#DC2626;background:#FEF2F2;color:#B91C1C">Yo debo</button>
+        <button type="button" class="type-btn" id="d-role-meden" onclick="setDebtRole('meden')" style="border-color:#059669;background:#ECFDF5;color:#047857">Me deben</button>
+      </div>
+      <div id="d-role-hint" style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Por defecto: Yo debo. Sus pagos salen del balance.</div>
+    </div>
     <div class="field"><label class="field-label">Nombre</label><input id="d-name" type="text" placeholder="Ej: BCP, Tarjeta Ripley" value="${d.name}"></div>
     <div class="field"><label class="field-label">Monto total (S/)</label><input id="d-total" type="number" inputmode="decimal" placeholder="0.00" value="${d.totalAmount||''}"></div>
     <div class="field"><label class="field-label">Cuota mensual (S/)</label><input id="d-cuota" type="number" inputmode="decimal" placeholder="0.00" value="${d.cuotaMonto||''}"></div>
     <div class="field"><label class="field-label">Número de cuotas totales</label><input id="d-ntotal" type="number" inputmode="numeric" placeholder="Ej: 12, 24, 36" value="${d.cuotasTotales||''}"></div>
-    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="d-npag" type="number" inputmode="numeric" placeholder="0" value="${d.cuotasPagadas||0}"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Ejemplo: si tu deuda es de 12 cuotas y ya pagaste 4, escribe 4. La tarjeta llenara 4 bolitas y Balance recibira esos pagos como egresos ligados a esta deuda.</div></div>
+    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="d-npag" type="number" inputmode="numeric" placeholder="0" value="${d.cuotasPagadas||0}"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Ejemplo: si son 12 cuotas y ya van 4, escribe 4. Esto solo rellena el avance historico; no mueve caja. Para afectar Balance usa Registrar pago.</div></div>
     <div class="field"><label class="field-label">Fecha en que empezaste a pagar</label><input id="d-inicio" type="date" value="${d.fechaInicio}"></div>
     <div class="field"><label class="field-label">Dia de pago mensual</label><input id="d-dia-pago" type="number" inputmode="numeric" min="1" max="31" placeholder="Dia" value="${d.diaPago}"></div>
     <div class="field">
@@ -7290,9 +7341,31 @@ function openDebtModal(debt, preData){
       <button class="btn-blue" onclick="saveDebt('${isEdit?d.id:''}')">Guardar</button>
     </div>`;
   window._debtColor=d.color;
+  window._debtRole=d.deudaRol;
+  setTimeout(()=>setDebtRole(d.deudaRol), 0);
   showModal();
 }
 function selectDebtColor(el,color){document.querySelectorAll('[data-dcolor]').forEach(e=>{e.style.borderColor='transparent';e.style.boxShadow='none';e.textContent='';});el.style.borderColor='#111827';el.style.boxShadow='0 0 0 3px #E0F2FE';el.textContent='✓';window._debtColor=color;const status=document.getElementById('d-color-status');if(status)status.textContent='Color seleccionado para diferenciar esta deuda en la lista.';}
+function setDebtRole(role){
+  const val = role === 'meden' ? 'meden' : 'debo';
+  window._debtRole = val;
+  const debo = document.getElementById('d-role-debo');
+  const meden = document.getElementById('d-role-meden');
+  if(debo){
+    debo.style.background = val === 'debo' ? '#FEF2F2' : 'transparent';
+    debo.style.color = val === 'debo' ? '#B91C1C' : 'var(--muted)';
+    debo.style.borderColor = val === 'debo' ? '#DC2626' : 'var(--border)';
+  }
+  if(meden){
+    meden.style.background = val === 'meden' ? '#ECFDF5' : 'transparent';
+    meden.style.color = val === 'meden' ? '#047857' : 'var(--muted)';
+    meden.style.borderColor = val === 'meden' ? '#059669' : 'var(--border)';
+  }
+  const hint = document.getElementById('d-role-hint');
+  if(hint) hint.textContent = val === 'meden'
+    ? 'Me deben: el avance historico no mueve caja; Registrar cobro si entra como ingreso.'
+    : 'Yo debo: el avance historico no mueve caja; Registrar pago si sale como egreso.';
+}
 function saveDebt(editId){
   // Android a veces devuelve "450,00" con coma; limpiar antes de parsear
   const cleanNum = s => parseFloat((s||'').replace(',','.')) || 0;
@@ -7318,6 +7391,7 @@ function saveDebt(editId){
     fechaInicio,
     diaPago,
     tipo:document.getElementById('d-tipo').value,
+    deudaRol:window._debtRole || deudaRol(original) || 'debo',
     categoria:'Deuda',
     color:window._debtColor||DEBT_COLORS[0]
   }, original);
@@ -7340,19 +7414,64 @@ function deleteDebt(id){
 }
 function pagarCuota(id){
   const d=(state.debts||[]).find(d=>String(d.id)===String(id));if(!d)return;
-  if(moneyValue(d.cuotasPagadas)>=moneyValue(d.cuotasTotales))return toast('Deuda ya completada');
-  d.fechaInicio=deudaInicio(d);
-  d.diaPago=deudaDiaPago(d);
   deudaNormalizePagos(d,d);
-  const next=d.pagos.length+1;
-  d.pagos.push(deudaBuildPago(d,next,{fecha:todayStr(),monto:moneyValue(d.cuotaMonto)}));
-  d.cuotasPagadas=d.pagos.length;
+  const actual = Math.max(0, Math.floor(moneyValue(d.cuotasPagadas)));
+  const total = Math.max(0, Math.floor(moneyValue(d.cuotasTotales)));
+  if(actual>=total)return toast('Deuda ya completada');
+  const sugerido = Math.min(total, actual + 1);
+  const porCobrar = deudaEsPorCobrar(d);
+  document.getElementById('modal-content').innerHTML=`
+    <div class="modal-title" style="color:${porCobrar?'#047857':'var(--blue)'}">${porCobrar?'Registrar cobro':'Registrar pago'}</div>
+    <div style="background:${porCobrar?'#ECFDF5':'#EFF6FF'};border:1px solid ${porCobrar?'#A7F3D0':'#BFDBFE'};border-radius:12px;padding:12px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:850;color:${porCobrar?'#065F46':'#1D4ED8'}">${debtHtml(d.name||'Deuda')}</div>
+      <div style="font-size:11px;color:${porCobrar?'#047857':'#2E73AB'};margin-top:4px;font-weight:750">${actual}/${total} cuotas registradas · ${porCobrar?'el cobro actual sube balance':'el pago actual baja balance'}</div>
+    </div>
+    <div class="field"><label class="field-label">Cuotas pagadas acumuladas</label><input id="dp-cuotas" type="number" inputmode="numeric" min="0" max="${total}" value="${sugerido}"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Ejemplo: si vas en la cuota 4 de 12, escribe 4. La app rellena las bolitas; solo la ultima cuota nueva afecta Balance con la fecha elegida.</div></div>
+    <div class="field"><label class="field-label">${porCobrar?'Monto cobrado por cuota':'Monto pagado por cuota'} (S/)</label><input id="dp-monto" type="number" inputmode="decimal" value="${moneyValue(d.cuotaMonto)}"></div>
+    <div class="field"><label class="field-label">Fecha para las nuevas cuotas</label><input id="dp-fecha" type="date" value="${todayStr()}"></div>
+    <div class="btn-row" style="margin-top:6px">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button style="flex:2;background:${porCobrar?'#047857':'var(--blue)'};color:#fff;border:none;border-radius:10px;padding:13px;font-weight:800;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="confirmarPagoDeuda('${debtJs(id)}')">${porCobrar?'Registrar cobro':'Registrar pago'}</button>
+    </div>`;
+  showModal();
+}
+
+function confirmarPagoDeuda(id){
+  const d=(state.debts||[]).find(d=>String(d.id)===String(id));if(!d)return;
+  deudaNormalizePagos(d,d);
+  const total = Math.max(0, Math.floor(moneyValue(d.cuotasTotales)));
+  const pagosAntes = deudaPagos(d);
+  const actual = pagosAntes.length;
+  const rawTarget = parseInt(document.getElementById('dp-cuotas')?.value)||0;
+  const target = Math.max(0, Math.min(total, rawTarget));
+  const monto = moneyValue(document.getElementById('dp-monto')?.value || d.cuotaMonto);
+  const fecha = debtIsoDate(document.getElementById('dp-fecha')?.value || todayStr());
+  if(!monto) return toast('Escribe el monto de la cuota','error');
+  let pagos = pagosAntes.slice(0, target);
+  while(pagos.length < target){
+    const cuotaNum = pagos.length + 1;
+    const esUltimaNueva = cuotaNum === target;
+    pagos.push(deudaBuildPago(d, cuotaNum, {
+      fecha: esUltimaNueva ? fecha : debtAddMonths(deudaInicio(d), cuotaNum - 1, deudaDiaPago(d)),
+      monto,
+      afectaBalance: esUltimaNueva,
+      historico: !esUltimaNueva
+    }));
+  }
+  pagos = pagos.map((p,i)=>deudaBuildPago(d, i + 1, p));
+  d.pagos = pagos;
+  d.cuotasPagadas = pagos.length;
+  d.deudaRol = deudaRol(d);
   deudaReconcilePaymentTxs(d);
   saveAll();
   syncSeccionToSheets('deuda', d);
+  closeModal();
   render();
-  const msg=motivationMsg(d.cuotasTotales-d.cuotasPagadas,d.name);
-  toast(msg||('Cuota '+d.cuotasPagadas+'/'+d.cuotasTotales+' registrada y descontada del balance'));
+  const delta = target - actual;
+  const extra = delta > 1 ? ' · anteriores solo historial' : '';
+  if(delta > 0) toast((deudaEsPorCobrar(d)?'Cobro':'Pago') + ' registrado · cuota ' + target + '/' + total + extra + ' · balance actualizado');
+  else if(delta < 0) toast('Cuotas corregidas · balance recalculado');
+  else toast('Sin cambios en cuotas');
 }
 
 function openAddService(pre){openServiceModal(null, pre);}
