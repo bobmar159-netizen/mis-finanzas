@@ -7725,7 +7725,8 @@ function txPuedeEnviarUsoStock(t){
   if(txSheetModo(t, state.modo) !== 'negocio') return false;
   if(moneyValue(t.amount) <= 0) return false;
   if(!txEsMaterialOAgregado(t)) return false;
-  if(t.stockAjusteAplicado || t.stockUsoManual || t.stockOperacion === 'uso_valor') return false;
+  if(t.stockAjusteAplicado || t.stockUsoManual) return false;
+  if(t.stockOperacion === 'uso_valor' && t.origenCierreServicio) return false;
   if(t.afectaStockValor || t.stockValorOnly || t.stockCompraId || t.stockOperacion === 'entrada_valor') return false;
   if(t.origenDeudaPago || deudaTxLooksLike(t)) return false;
   return true;
