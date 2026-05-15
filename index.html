@@ -165,15 +165,43 @@
 html,body{height:100%;overflow:hidden;background:var(--bg);}
 body{font-family:'Inter','Roboto',sans-serif;color:var(--text)}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:4px}
-#app{height:100vh;display:flex;flex-direction:column;max-width:430px;margin:0 auto}
+#app{height:100vh;display:flex;flex-direction:column;width:100%;max-width:430px;margin:0 auto;overflow:hidden}
 #header{background:var(--bg);border-bottom:1px solid var(--border);padding:16px 20px 0;flex-shrink:0}
 #content{flex:1;overflow-y:auto;padding:18px 18px 100px}
-.h-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.h-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:10px}
+.h-top>div:first-child{min-width:0;flex:1}
+.h-top>div:last-child{flex-shrink:0}
 .h-title{font-family:'Inter','Roboto',sans-serif;font-size:23px;font-weight:800;color:var(--gold);letter-spacing:0}
 .h-subtitle{font-size:11px;color:var(--muted);margin-top:2px}
 .h-balance{text-align:right}
 .h-balance-label{font-size:10px;color:var(--muted)}
-.h-balance-val{font-family:'Inter','Roboto',sans-serif;font-size:20px;font-weight:800}
+.h-balance-line{display:flex;align-items:center;justify-content:flex-end;gap:5px}
+.h-balance-val{font-family:'Inter','Roboto',sans-serif;font-size:18px;font-weight:760;letter-spacing:0}
+.h-balance-history{width:20px;height:20px;border-radius:8px;border:1px solid var(--border);background:#FFFFFF;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 2px 8px rgba(15,23,42,.05)}
+.h-balance-history svg{width:12px;height:12px}
+.h-balance-history:active{transform:scale(.97)}
+.mov-filter-panel{background:#FFFFFF;border:1px solid var(--border);border-radius:14px;padding:10px;margin-bottom:12px;box-shadow:0 8px 22px rgba(15,23,42,.045)}
+.mov-filter-top{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:8px}
+.mov-filter-btn{padding:7px 4px;border-radius:10px;font-size:10.5px;font-weight:760;cursor:pointer;transition:all .2s;font-family:'Inter','Roboto',sans-serif;border:1px solid var(--border);background:#FFFFFF;color:var(--muted)}
+.mov-filter-btn.active{border-color:#2A4455;background:#F1F5F9;color:#172033}
+.mov-filter-grid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:7px;align-items:end}
+.mov-filter-field label{display:block;font-size:8.5px;color:#64748B;text-transform:uppercase;font-weight:820;letter-spacing:.05em;margin:0 0 4px 2px}
+.mov-filter-input{width:100%;height:36px;background:#F8FAFC;border:1px solid #E5E7EB;border-radius:10px;color:#172033;font-family:'Inter','Roboto',sans-serif;font-size:12px;padding:0 9px;outline:none}
+.mov-filter-input:focus{border-color:#94A3B8;background:#FFFFFF}
+.mov-filter-search{position:relative;margin-top:8px}
+.mov-filter-search input{padding-left:34px;padding-right:34px}
+.mov-filter-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;font-size:10.5px;color:var(--muted)}
+.mov-filter-clear{border:1px solid #E5E7EB;background:#FFFFFF;color:#64748B;border-radius:999px;padding:5px 9px;font-size:10.5px;font-weight:760;cursor:pointer}
+.debt-next-main{margin-top:10px;background:#FFF7ED;border:1px solid #FED7AA;border-left:4px solid #F97316;border-radius:11px;padding:9px 10px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.debt-next-label{display:flex;align-items:center;gap:6px;font-size:10px;color:#9A3412;text-transform:uppercase;font-weight:850;letter-spacing:.04em}
+.debt-next-date{font-size:13px;color:#7C2D12;font-weight:850;text-align:right}
+.debt-next-main.ok{background:#ECFDF5;border-color:#BBF7D0;border-left-color:#059669}
+.debt-next-main.ok .debt-next-label,.debt-next-main.ok .debt-next-date{color:#047857}
+.caja-h-row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #EEF2F7}
+.caja-h-date{font-size:13px;font-weight:780;color:#172033}
+.caja-h-sub{font-size:11px;color:#64748B;margin-top:2px}
+.caja-h-amt{text-align:right;font-size:12px;color:#64748B}
+@media(max-width:390px){.mov-filter-grid{grid-template-columns:1fr 1fr}.mov-filter-field.cat{grid-column:1/-1}}
 .tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:0;padding-bottom:0;border-bottom:1px solid var(--border)}
 .tabs-row2{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-bottom:1px solid var(--border)}
 .tab{width:100%;padding:9px 4px 10px;background:transparent;border:none;border-bottom:3px solid transparent;color:var(--muted);font-family:'Inter','Roboto',sans-serif;font-size:10px;font-weight:650;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -1850,7 +1878,10 @@ table.nt tbody tr:hover td,
       <div style="display:flex;align-items:flex-start;gap:8px">
         <div class="h-balance">
           <div class="h-balance-label">Balance del mes</div>
-          <div class="h-balance-val" id="header-balance">S/ 0</div>
+          <div class="h-balance-line">
+            <div class="h-balance-val" id="header-balance">S/ 0</div>
+            <button class="h-balance-history" onclick="openCajaHistorial()" title="Historial de caja" aria-label="Historial de caja"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l3 2"/></svg></button>
+          </div>
           <div id="sync-badge" style="font-size:10px;padding:2px 8px;border-radius:10px;margin-top:3px;transition:all .3s;border:1px solid transparent"></div>
         </div>
         <button onclick="switchPage('ajustes')" id="btn-gear" title="Ajustes" style="width:34px;height:34px;border-radius:10px;background:#fff;border:1px solid var(--border);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">⚙️</button>
@@ -2153,6 +2184,7 @@ const APP_ICON_PATHS = {
   note:'<path d="M6 4h9l3 3v13H6V4Z"/><path class="accent" d="M15 4v4h4M9 12h6M9 16h4"/>',
   service:'<path d="M4 20h16M6 20V9l6-5 6 5v11"/><path class="accent" d="M10 20v-6h4v6"/>',
   bank:'<path d="M4 9h16L12 4 4 9Z"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8M4 20h16"/><path class="accent" d="M12 6.5v0"/>',
+  clock:'<circle cx="12" cy="12" r="8.5"/><path class="accent" d="M12 7.5v5l3 2"/>',
   calendar:'<path d="M5 5h14v15H5V5Z"/><path d="M8 3v4M16 3v4M5 9h14"/><path class="accent" d="M9 13h3v3H9z"/>',
   chart:'<path d="M4 19h16"/><path d="M7 16v-5M12 16V7M17 16v-8"/><path class="accent" d="M7 11l5-4 5 1"/>',
   stock:'<path d="M7 4h10v16H7V4Z"/><path d="M10 8h4M10 12h4M10 16h2"/><path class="accent" d="M15.5 17.5 18 20l3-4"/>',
@@ -3333,10 +3365,29 @@ function getGananciaServicio(t) {
 function renderMovimientos(){
   if(!window._movBusqueda) window._movBusqueda='';
   if(!window._movFiltro) window._movFiltro='todos';
-  let filtered=visibleTx();
+  if(!window._movCatFiltro) window._movCatFiltro='todos';
+  if(typeof window._movFechaDesde === 'undefined') window._movFechaDesde='';
+  if(typeof window._movFechaHasta === 'undefined') window._movFechaHasta='';
+  const baseTx=visibleTx();
+  const catMap=new Map();
+  baseTx.forEach(t=>{
+    const key=String(t.catId||t.category||'').trim();
+    if(!key) return;
+    catMap.set(key,{key,label:t.category||key,type:t.type});
+  });
+  const catOptions=[...catMap.values()].sort((a,b)=>String(a.label).localeCompare(String(b.label),'es'));
+  let filtered=baseTx;
   // Filtro por tipo
   if(window._movFiltro==='ingresos') filtered=filtered.filter(t=>t.type==='ingreso');
   if(window._movFiltro==='egresos')  filtered=filtered.filter(t=>t.type==='egreso');
+  // Filtro por categoria
+  if(window._movCatFiltro && window._movCatFiltro!=='todos'){
+    const ck=String(window._movCatFiltro);
+    filtered=filtered.filter(t=>String(t.catId||t.category||'')===ck || String(t.category||'')===ck);
+  }
+  // Filtro por fecha dentro del mes seleccionado
+  if(window._movFechaDesde) filtered=filtered.filter(t=>String(t.date||'')>=window._movFechaDesde);
+  if(window._movFechaHasta) filtered=filtered.filter(t=>String(t.date||'')<=window._movFechaHasta);
   // Filtro por búsqueda
   if(window._movBusqueda.trim()){
     const q=window._movBusqueda.toLowerCase();
@@ -3344,9 +3395,11 @@ function renderMovimientos(){
       (t.description||'').toLowerCase().includes(q)||
       (t.category||'').toLowerCase().includes(q)||
       (t.cliente||'').toLowerCase().includes(q)||
+      (t.ubicacion||'').toLowerCase().includes(q)||
       String(t.amount).includes(q)
     );
   }
+  const filtersActive=window._movBusqueda.trim() || window._movFiltro!=='todos' || window._movCatFiltro!=='todos' || window._movFechaDesde || window._movFechaHasta;
   const inc=totalIncome(),exp=totalExpense();
 
   // ── Icono y color según categoría ──
@@ -3395,23 +3448,41 @@ function renderMovimientos(){
       </div>
     </div>
     <div class="month-nav"><button onclick="prevMonth()">‹</button><span>${monthName()}</span><button onclick="nextMonth()">›</button></div>
-    <!-- Filtros rápidos -->
-    <div style="display:flex;gap:6px;margin-bottom:10px">
-      ${['todos','ingresos','egresos'].map(f=>`
-        <button onclick="window._movFiltro='${f}';render()" style="flex:1;padding:7px 4px;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;
-          border:1px solid ${window._movFiltro===f?'var(--gold)':'var(--border)'};
-          background:${window._movFiltro===f?'var(--gold)':'transparent'};
-          color:${window._movFiltro===f?'#fff':'var(--muted)'}">
-          ${f==='todos'?'Todos':f==='ingresos'?'↑ Ingresos':'↓ Egresos'}
-        </button>`).join('')}
-    </div>
-    <div style="position:relative;margin-bottom:12px">
-      <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)">🔍</span>
-      <input type="text" placeholder="Buscar por descripción, cliente o monto..."
-        value="${window._movBusqueda}"
-        oninput="window._movBusqueda=this.value;render()"
-        style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px 10px 36px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px">
-      ${window._movBusqueda?`<button onclick="window._movBusqueda='';render()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px">✕</button>`:''}
+    <div class="mov-filter-panel">
+      <div class="mov-filter-top">
+        ${['todos','ingresos','egresos'].map(f=>`
+          <button class="mov-filter-btn ${window._movFiltro===f?'active':''}" onclick="window._movFiltro='${f}';render()">
+            ${f==='todos'?'Todos':f==='ingresos'?'+ Ingresos':'- Egresos'}
+          </button>`).join('')}
+      </div>
+      <div class="mov-filter-grid">
+        <div class="mov-filter-field cat">
+          <label>Categoría</label>
+          <select class="mov-filter-input" onchange="window._movCatFiltro=this.value;render()">
+            <option value="todos">Todas</option>
+            ${catOptions.map(c=>`<option value="${debtHtml(c.key)}" ${String(window._movCatFiltro)===String(c.key)?'selected':''}>${debtHtml(c.label)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="mov-filter-field">
+          <label>Desde</label>
+          <input class="mov-filter-input" type="date" value="${debtHtml(window._movFechaDesde||'')}" onchange="window._movFechaDesde=this.value;render()">
+        </div>
+        <div class="mov-filter-field">
+          <label>Hasta</label>
+          <input class="mov-filter-input" type="date" value="${debtHtml(window._movFechaHasta||'')}" onchange="window._movFechaHasta=this.value;render()">
+        </div>
+      </div>
+      <div class="mov-filter-search">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--muted)">🔍</span>
+        <input class="mov-filter-input" type="text" placeholder="Buscar descripcion, cliente o monto"
+          value="${debtHtml(window._movBusqueda||'')}"
+          oninput="window._movBusqueda=this.value;render()">
+        ${window._movBusqueda?`<button onclick="window._movBusqueda='';render()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:15px">✕</button>`:''}
+      </div>
+      <div class="mov-filter-meta">
+        <span>${filtered.length} de ${baseTx.length} movimientos</span>
+        ${filtersActive?`<button class="mov-filter-clear" onclick="resetMovFilters()">Limpiar filtros</button>`:''}
+      </div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <div onclick="window._movFiltro='ingresos';render()" style="flex:1;background:${window._movFiltro==='ingresos'?'var(--ing-bg,#EBF1F5)':'#EBF1F5'};border:1px solid ${window._movFiltro==='ingresos'?'var(--gold)':'#54687833'};border-radius:10px;padding:12px;cursor:pointer;transition:all .2s">
@@ -3424,7 +3495,7 @@ function renderMovimientos(){
       </div>
     </div>
     ${filtered.length===0
-      ?`<div style="text-align:center;color:var(--dim);padding:40px 0;font-size:14px">${window._movBusqueda?'Sin resultados para "'+window._movBusqueda+'"':'Sin movimientos este mes'}</div>`
+      ?`<div style="text-align:center;color:var(--dim);padding:40px 0;font-size:14px">${filtersActive?'Sin movimientos con esos filtros':'Sin movimientos este mes'}</div>`
       :(() => {
         // Agrupar por fecha
         const grupos = {};
@@ -4088,6 +4159,10 @@ function renderDebtCard(d){
           '<div><div class="debt-name">' + debtHtml(d.name) + '</div><div class="debt-cat"><span style="color:' + (porCobrar ? '#047857' : '#B91C1C') + ';font-weight:900">' + roleLabel + '</span> · ' + debtHtml(d.tipo || d.categoria || 'Deuda') + ' · dia ' + deudaDiaPago(d) + ' de cada mes</div></div>' +
           '<div class="debt-pending"><div class="debt-pending-amt" style="color:' + (porCobrar ? '#047857' : d.color) + '">' + (done ? 'Completada' : fmt(pendiente)) + '</div>' + (!done ? '<div class="debt-pending-lbl">' + saldoLabel + '</div>' : '') + '</div>' +
         '</div>' +
+        '<div class="debt-next-main ' + (done ? 'ok' : '') + '" style="border-left-color:' + (done ? '#059669' : d.color) + '">' +
+          '<div class="debt-next-label">' + appIcon('calendar') + '<span>Proximo pago</span></div>' +
+          '<div class="debt-next-date">' + (next ? debtFmtDate(next) : 'Completada') + '</div>' +
+        '</div>' +
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px">' +
           '<div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:7px"><div style="font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase">Inicio</div><div style="font-size:11px;color:var(--text);font-weight:900">' + debtFmtDate(deudaInicio(d)) + '</div></div>' +
           '<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:7px"><div style="font-size:8px;color:#9A3412;font-weight:900;text-transform:uppercase">Proximo</div><div style="font-size:11px;color:#9A3412;font-weight:900">' + (next ? debtFmtDate(next) : 'Listo') + '</div></div>' +
@@ -4181,6 +4256,10 @@ function renderDeudas(){
                 <div class="debt-pending-amt" style="color:${done?'var(--gold)':'#9B59B6'}">${done?'✓ Saldado':fmt(p.capitalPendiente)}</div>
                 ${!done?`<div class="debt-pending-lbl">capital pendiente</div>`:''}
               </div>
+            </div>
+            <div class="debt-next-main ${done?'ok':''}" style="border-left-color:${done?'#059669':ppDotColor};background:${done?'#ECFDF5':'#FAF5FF'};border-color:${done?'#BBF7D0':'#E9D5FF'};margin-top:10px">
+              <div class="debt-next-label" style="color:${done?'#047857':'#6C3483'}">${appIcon('calendar')}<span>Proximo pago</span></div>
+              <div class="debt-next-date" style="color:${done?'#047857':'#6C3483'}">${done?'Completado':debtFmtDate(ppPagoFecha(p,pagosH+1))}</div>
             </div>
             <!-- Cuotas -->
             <div class="cuotas-meta" style="margin-top:8px">
@@ -7180,6 +7259,90 @@ function openEditTx(id){ openTxModal(state.transactions.find(t=>t.id===id)); }
 
 function openAddTxWithData(pre){ openTxModal(null, pre); }
 
+function resetMovFilters(){
+  window._movFiltro='todos';
+  window._movCatFiltro='todos';
+  window._movFechaDesde='';
+  window._movFechaHasta='';
+  window._movBusqueda='';
+  render();
+}
+
+function txInSelectedMonth(tx){
+  if(!tx?.date) return false;
+  const d=new Date(String(tx.date).slice(0,10)+'T00:00:00');
+  return !Number.isNaN(d.getTime()) && d.getMonth()===state.filterMonth && d.getFullYear()===state.filterYear;
+}
+
+function shortMonthFromDate(dateStr){
+  const d=new Date(String(dateStr||'').slice(0,10)+'T00:00:00');
+  if(Number.isNaN(d.getTime())) return 'otra fecha';
+  return MONTHS_FULL[d.getMonth()]+' '+d.getFullYear();
+}
+
+function openCajaHistorial(){
+  const txs=visibleTx().filter(t=>isCashFlowTx(t)).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')) || String(a.id||'').localeCompare(String(b.id||'')));
+  const byDay=new Map();
+  txs.forEach(t=>{
+    const k=String(t.date||'Sin fecha');
+    if(!byDay.has(k)) byDay.set(k,{fecha:k,ing:0,egr:0,count:0,last:[]});
+    const row=byDay.get(k);
+    if(t.type==='ingreso') row.ing += moneyValue(t.amount);
+    else row.egr += moneyValue(t.amount);
+    row.count += 1;
+    row.last.push(t);
+  });
+  let acumulado=0;
+  const rows=[...byDay.values()].sort((a,b)=>a.fecha.localeCompare(b.fecha)).map(r=>{
+    const net=+(r.ing-r.egr).toFixed(2);
+    acumulado=+(acumulado+net).toFixed(2);
+    return {...r,net,acumulado};
+  });
+  const fmtCajaFecha=(f)=>{
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(f)) return f;
+    const [y,m,d]=f.split('-');
+    const mm=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    return parseInt(d)+' '+mm[parseInt(m)-1]+' '+y;
+  };
+  const rowsHtml=rows.length
+    ? rows.slice().reverse().map(r=>`
+      <div class="caja-h-row">
+        <div>
+          <div class="caja-h-date">${fmtCajaFecha(r.fecha)}</div>
+          <div class="caja-h-sub">${r.count} movimiento(s) · Ingresos ${fmt(r.ing)} · Egresos ${fmt(r.egr)}</div>
+        </div>
+        <div class="caja-h-amt">
+          <div style="font-weight:850;color:${r.net>=0?'#047857':'#B91C1C'}">${r.net>=0?'+':'-'}${fmt(Math.abs(r.net))}</div>
+          <div style="font-size:10px;margin-top:2px">Caja: ${fmtSign(r.acumulado)}</div>
+        </div>
+      </div>`).join('')
+    : '<div style="text-align:center;color:var(--dim);padding:24px 0;font-size:13px">Sin movimientos de caja en este mes</div>';
+  document.getElementById('modal-content').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px">
+      <div>
+        <div class="modal-title" style="margin-bottom:4px;color:#172033">Historial de caja</div>
+        <div style="font-size:12px;color:#64748B;font-weight:700">${monthName()} · solo movimientos que afectan balance</div>
+      </div>
+      <div style="width:42px;height:42px;border-radius:14px;background:#F8FAFC;border:1px solid #E5E7EB;color:#64748B;display:flex;align-items:center;justify-content:center">${appIcon('clock')}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <div style="background:#F8FAFC;border:1px solid #E5E7EB;border-radius:12px;padding:10px">
+        <div style="font-size:9px;color:#64748B;text-transform:uppercase;font-weight:850;letter-spacing:.05em">Caja actual</div>
+        <div style="font-size:20px;font-weight:780;color:${balance()>=0?'#047857':'#B91C1C'}">${fmtSign(balance())}</div>
+      </div>
+      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:10px">
+        <div style="font-size:9px;color:#64748B;text-transform:uppercase;font-weight:850;letter-spacing:.05em">Resumen</div>
+        <div style="font-size:11px;color:#047857;font-weight:780">+${fmt(totalIncome())}</div>
+        <div style="font-size:11px;color:#B91C1C;font-weight:780">-${fmt(totalExpense())}</div>
+      </div>
+    </div>
+    <div style="max-height:54vh;overflow:auto;border-top:1px solid #EEF2F7">
+      ${rowsHtml}
+    </div>
+    <div class="btn-row" style="margin-top:14px"><button class="btn-ghost" style="width:100%" onclick="closeModal()">Cerrar</button></div>`;
+  showModal();
+}
+
 function openTxModal(tx, preData){
   const isEdit=!!tx;
   const pre = preData || {};
@@ -7446,8 +7609,14 @@ async function saveTx(editId){
   syncToSheets(item);
   if(compraStockValor) syncCompraToSheets(compraStockValor);
   if(!item.afectaStockValor) syncExpenseTxToNotion(item);
+  const movedOutOfCurrentMonth = !!(editId && original && txInSelectedMonth(original) && !txInSelectedMonth(item));
   closeModal(); render();
-  if(!original || (!original._importadoDeNotion)) toast((editId ? 'Movimiento actualizado' : 'Movimiento guardado') + ' · ' + (targetScope === 'negocio' ? 'Negocio' : 'Personal') + ' ✓');
+  if(!original || (!original._importadoDeNotion)) {
+    toast(movedOutOfCurrentMonth
+      ? 'Movimiento actualizado · ahora esta en ' + shortMonthFromDate(item.date)
+      : ((editId ? 'Movimiento actualizado' : 'Movimiento guardado') + ' · ' + (targetScope === 'negocio' ? 'Negocio' : 'Personal') + ' ✓'),
+      movedOutOfCurrentMonth ? 'info' : 'success');
+  }
 }
 
 function deleteTx(id){
@@ -24861,9 +25030,6 @@ setTimeout(()=>{
 </script>
 </body>
 </html>
-
-
-
 
 
 
