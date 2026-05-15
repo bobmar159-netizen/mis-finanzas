@@ -58,6 +58,109 @@
 }
 #app.tema-slate .mv-card{border:none;border-bottom:2px solid #D3D1C7;border-radius:4px;background:transparent}
 #app.tema-slate .mv-card.open{border-bottom-color:var(--gold)}
+
+/* Graficos: estilo Notion compacto */
+.gfc-notion{
+  --gfc-ink:var(--text,#2F302D);
+  --gfc-muted:var(--muted,#74756F);
+  --gfc-line:var(--border,#E6E4DF);
+  --gfc-soft:var(--surface,#F7F7F5);
+  --gfc-soft-2:var(--surface-2,#EBEAE7);
+  --gfc-sage:var(--sage,#EEF6F1);
+  --gfc-sage-ink:var(--ing-color,#4F7F67);
+  --gfc-blue:var(--sky,#EEF4FA);
+  --gfc-blue-ink:var(--blue,#4F7EA8);
+  --gfc-warm:var(--peach,#F8EFE6);
+  --gfc-warm-ink:var(--gas-orange,#B07B52);
+  color:var(--gfc-ink);
+}
+.gfc-notion,
+.gfc-notion *{
+  font-family:Inter,Roboto,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+  letter-spacing:0 !important;
+  box-shadow:none !important;
+}
+.gfc-notion [style*="Playfair Display"]{font-family:Inter,Roboto,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important}
+.gfc-notion [style*="font-weight:950"]{font-weight:720 !important}
+.gfc-notion [style*="font-weight:900"]{font-weight:700 !important}
+.gfc-notion [style*="font-weight:850"]{font-weight:680 !important}
+.gfc-notion [style*="font-size:25px"]{font-size:22px !important;font-weight:760 !important;line-height:1.08 !important}
+.gfc-notion [style*="font-size:22px"]{font-size:17px !important;font-weight:700 !important}
+.gfc-notion [style*="font-size:19px"]{font-size:16px !important;font-weight:700 !important}
+.gfc-notion [style*="font-size:18px"]{font-size:15px !important;font-weight:700 !important}
+.gfc-notion [style*="font-size:17px"]{font-size:15px !important;font-weight:700 !important}
+.gfc-notion [style*="font-size:16px"]{font-size:14px !important}
+.gfc-notion [style*="font-size:13px"]{font-size:12px !important}
+.gfc-notion [style*="font-size:12px"]{font-size:11px !important}
+.gfc-notion [style*="font-size:11px"]{font-size:10.5px !important}
+.gfc-notion [style*="font-size:10px"]{font-size:10px !important}
+.gfc-notion [style*="background:#FFFFFF"],
+.gfc-notion [style*="background:#fff"]{background:var(--card,#FFFFFF) !important}
+.gfc-notion [style*="background:#F8FAFC"],
+.gfc-notion [style*="background:#F1F5F9"]{background:var(--gfc-soft) !important}
+.gfc-notion [style*="background:#EFF6FF"],
+.gfc-notion [style*="background:#DBEAFE"]{background:var(--gfc-blue) !important}
+.gfc-notion [style*="background:#ECFDF5"],
+.gfc-notion [style*="background:#F0FDF4"]{background:var(--gfc-sage) !important}
+.gfc-notion [style*="background:#FFF7ED"],
+.gfc-notion [style*="background:#FEF2F2"]{background:var(--gfc-warm) !important}
+.gfc-notion [style*="border:1px solid #E5E7EB"],
+.gfc-notion [style*="border:1px solid #E2E8F0"],
+.gfc-notion [style*="border:1px solid #EEF2F7"],
+.gfc-notion [style*="border:1px solid #BFDBFE"],
+.gfc-notion [style*="border:1px solid #BBF7D0"],
+.gfc-notion [style*="border:1px solid #FED7AA"]{border-color:var(--gfc-line) !important}
+.gfc-notion [style*="border-radius:8px"]{border-radius:10px !important}
+.gfc-notion [style*="border-radius:12px"]{border-radius:12px !important}
+.gfc-notion [style*="border-radius:999px"]{border-radius:999px !important}
+.gfc-notion [style*="padding:14px"]{padding:12px !important}
+.gfc-notion [style*="padding:12px"]{padding:11px !important}
+.gfc-notion [style*="padding:10px"]{padding:9px !important}
+.gfc-notion [style*="margin-bottom:13px"],
+.gfc-notion [style*="margin-bottom:12px"]{margin-bottom:10px !important}
+.gfc-notion [style*="gap:12px"]{gap:9px !important}
+.gfc-notion button{
+  border-color:var(--gfc-line) !important;
+  border-radius:10px !important;
+  background:var(--card,#FFFFFF) !important;
+  color:var(--gfc-ink) !important;
+}
+.gfc-notion button[style*="background:#111827"]{
+  background:var(--gfc-sage) !important;
+  border-color:#CFE5DA !important;
+}
+.gfc-notion button[style*="background:#111827"] *,
+.gfc-notion button[style*="background:#111827"] [style*="color:#FFFFFF"],
+.gfc-notion button[style*="background:#111827"] [style*="color:#E5E7EB"]{
+  color:var(--gfc-sage-ink) !important;
+}
+.gfc-notion [style*="background:#111827"]{background:var(--gfc-sage) !important}
+.gfc-notion [style*="color:#111827"]{color:var(--gfc-ink) !important}
+.gfc-notion [style*="color:#64748B"],
+.gfc-notion [style*="color:#94A3B8"],
+.gfc-notion [style*="color:#475569"],
+.gfc-notion [style*="color:#CBD5E1"]{color:var(--gfc-muted) !important}
+.gfc-notion [style*="color:#047857"],
+.gfc-notion [style*="color:#0F766E"],
+.gfc-notion [style*="color:#065F46"]{color:var(--gfc-sage-ink) !important}
+.gfc-notion [style*="color:#1D4ED8"]{color:var(--gfc-blue-ink) !important}
+.gfc-notion [style*="color:#B91C1C"],
+.gfc-notion [style*="color:#C62828"]{color:var(--red,#C75F5F) !important}
+.gfc-notion [style*="color:#9A3412"],
+.gfc-notion [style*="color:#B45309"]{color:var(--gfc-warm-ink) !important}
+.gfc-notion [style*="background:#2563EB"]{background:var(--gfc-blue-ink) !important}
+.gfc-notion [style*="background:#F97316"],
+.gfc-notion [style*="background:#D97706"]{background:var(--gfc-warm-ink) !important}
+.gfc-notion [style*="background:#0F766E"],
+.gfc-notion [style*="background:#059669"]{background:var(--gfc-sage-ink) !important}
+.gfc-notion [style*="height:9px"],
+.gfc-notion [style*="height:10px"]{height:7px !important}
+.gfc-notion [style*="height:7px"]{height:6px !important}
+.gfc-notion [style*="border-left:3px"]{border-left-width:2px !important}
+.gfc-notion [style*="width:88px;height:88px"]{width:74px !important;height:74px !important}
+.gfc-notion svg[width="88"]{width:74px !important;height:74px !important}
+.gfc-notion .app-icon{stroke-width:1.7 !important}
+
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden;background:var(--bg);}
 body{font-family:'Inter','Roboto',sans-serif;color:var(--text)}
@@ -5668,11 +5771,11 @@ function renderGraficos(){
       : 'Vas cerca. Cierra una venta mas y no dejes que los gastos coman el dia.';
 
   return `
-    <div style="padding-bottom:10px">
+    <div class="gfc-notion" style="padding-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:13px">
         <div style="min-width:0">
-          <div style="font-size:11px;color:#64748B;text-transform:uppercase;font-weight:950;letter-spacing:.08em">Graficos</div>
-          <div style="font-family:'Playfair Display',serif;font-size:25px;color:#111827;font-weight:950;line-height:1;margin-top:3px">Mesa de control</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.04em">Graficos</div>
+          <div style="font-size:22px;color:var(--text);font-weight:760;line-height:1.08;margin-top:4px">Mesa de control</div>
           <div style="font-size:11px;color:#64748B;margin-top:5px;font-weight:750">Dia · Semana · Mes · ${data.hora_actual}</div>
         </div>
         <button onclick="openGraficosMetas()" title="Metas" style="width:38px;height:38px;border:1px solid #E5E7EB;border-radius:8px;background:#FFFFFF;color:#111827;font-weight:950;cursor:pointer">⚙</button>
