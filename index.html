@@ -292,14 +292,15 @@ body{font-family:'Inter','Roboto',sans-serif;color:var(--text)}
 .ag-act-btn{flex:1;min-width:80px;border:1px solid;border-radius:10px;padding:10px 8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;text-align:center;-webkit-tap-highlight-color:transparent}
 .ag-act-btn:active{opacity:.8;transform:scale(.97)}
 .mv-expand{max-height:0;overflow:hidden;transition:max-height .28s ease}
-.mv-card.open .mv-expand{max-height:300px}
+.mv-card.open .mv-expand{max-height:430px}
 .mv-detail{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;padding-top:10px;margin-top:10px;border-top:0.5px solid var(--border)}
 .mv-d-item{display:flex;flex-direction:column;gap:2px}
 .mv-d-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .mv-d-val{font-size:13px;font-weight:600;color:var(--text)}
-.mv-d-actions{display:flex;gap:6px;padding-top:8px;margin-top:4px;border-top:0.5px solid var(--border);grid-column:1/-1}
-.mv-d-btn{flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;border:0.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer}
+.mv-d-actions{display:flex;gap:6px;flex-wrap:wrap;padding-top:8px;margin-top:4px;border-top:0.5px solid var(--border);grid-column:1/-1}
+.mv-d-btn{flex:1;min-width:96px;padding:8px;border-radius:8px;font-size:12px;font-weight:600;border:0.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer}
 .mv-d-btn:active{opacity:.7}
+.mv-d-btn.link{color:#2F6F53;border-color:#BBD8C8;background:#EEF7F2}
 .mv-d-btn.del{color:#C62828;border-color:#C6282833}
 .btn-gold{background:linear-gradient(135deg,#3D6677,#2E5265);color:#fff;border:none;border-radius:14px;padding:15px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;transition:opacity .2s,transform .15s;box-shadow:0 4px 14px rgba(61,102,119,0.30)}
 .btn-gold:hover{opacity:.88;transform:translateY(-1px)}
@@ -2116,6 +2117,7 @@ const DEFAULT_CATS_IN = [
   {id:'ci_comisiones',name:'Comisiones',icon:'money',color:'#4F7EA8',type:'ingreso'},
   {id:'ci_venta_articulos',name:'Venta de articulos personales',icon:'store',color:'#9A7AA0',type:'ingreso'},
   {id:'ci6',name:'Reembolsos',icon:'transfer',color:'#6E8C7B',type:'ingreso'},
+  {id:'ci_deuda_cobro',name:'Cobro de deuda',icon:'bank',color:'#047857',type:'ingreso',system:true,hidden:true},
   {id:'transfer_in',name:'Transferencia recibida',icon:'transfer',color:'#1565C0',type:'ingreso',system:true,hidden:true},
   {id:'transfer_retiro_in',name:'Retiro del negocio',icon:'briefcase',color:'#C9A84C',type:'ingreso',system:true,hidden:true},
   {id:'cneg_svc',name:'Servicios Gas Natural',icon:'service',color:'#1565C0',type:'ingreso',system:true,hidden:true,negocio:true},
@@ -2146,7 +2148,7 @@ const DEFAULT_CATS_EX = [
   {id:'ce_accesorios',name:'Accesorios',icon:'box',color:'#7B8790',type:'egreso'},
   {id:'ce_cine',name:'Cine',icon:'play',color:'#6D7FA3',type:'egreso'},
   {id:'ce10',name:'Otros gastos personales',icon:'box',color:'#77746D',type:'egreso'},
-  {id:'ce9',name:'Deuda',icon:'bank',color:'#B96868',type:'egreso',system:true,hidden:true},
+  {id:'ce9',name:'Deudas',icon:'bank',color:'#B96868',type:'egreso',system:true,hidden:true},
   {id:'ce6',name:'Servicios del hogar',icon:'light',color:'#D09A4E',type:'egreso',system:true,hidden:true},
   {id:'transfer_out',name:'Transferencia enviada',icon:'transfer',color:'#1565C0',type:'egreso',system:true,hidden:true},
   {id:'transfer_retiro',name:'Retiro personal',icon:'briefcase',color:'#C9A84C',type:'egreso',system:true,hidden:true},
@@ -2313,6 +2315,7 @@ const DEFAULT_CATS_NEG_IN = [
   {id:'cn8',name:'Documentacion',icon:'document',color:'#77746D',type:'ingreso'},
   {id:'cn9',name:'Otros servicios',icon:'box',color:'#5A8E7A',type:'ingreso'},
   {id:'cn_otro_ingreso',name:'Otros ingresos',icon:'money',color:'#6E8C7B',type:'ingreso'},
+  {id:'cn_cobro_deuda',name:'Cobro de deuda',icon:'bank',color:'#047857',type:'ingreso',system:true,hidden:true},
   {id:'transfer_neg_in',name:'Transferencia recibida',icon:'transfer',color:'var(--gold)',type:'ingreso',system:true,hidden:true},
   {id:'transfer_neg_retiro',name:'Retiro personal',icon:'briefcase',color:'#C9A84C',type:'ingreso',system:true,hidden:true},
 ];
@@ -2344,6 +2347,7 @@ const DEFAULT_CATS_NEG_EX = [
   {id:'cne_meta',name:'META',icon:'target',color:'#6D8C82',type:'egreso'},
   {id:'cne_documentacion',name:'Documentacion',icon:'document',color:'#77746D',type:'egreso'},
   {id:'cne6',name:'Otros gastos de negocio',icon:'box',color:'#77746D',type:'egreso'},
+  {id:'cne_deuda',name:'Deudas',icon:'bank',color:'#B96868',type:'egreso',system:true,hidden:true},
   {id:'transfer_neg_out',name:'Transferencia enviada',icon:'transfer',color:'#1565C0',type:'egreso',system:true,hidden:true},
   {id:'transfer_neg_retiro_out',name:'Retiro personal',icon:'briefcase',color:'#C9A84C',type:'egreso',system:true,hidden:true},
 ];
@@ -2396,15 +2400,15 @@ function getKeys(modo){
   if(migrated) console.log('[MisFinanzas] Keys migrados a formato fnz_neg_*');
 })();
 
-const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_scope_sheets_v11_meta_upper';
+const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_scope_sheets_v12_debt_order';
 const CATEGORY_LEGACY_DEFAULT_IDS = {
   personal: {
-    ingreso: ['ci1','ci2','ci3','ci4','ci5','ci6','transfer_in','transfer_retiro_in','cneg_svc'],
+    ingreso: ['ci1','ci2','ci3','ci4','ci5','ci6','ci_deuda_cobro','transfer_in','transfer_retiro_in','cneg_svc'],
     egreso: ['ce1','ce2','ce3','ce4','ce5','ce6','ce7','ce8','ce9','ce10','transfer_out','transfer_retiro','cneg_mat','cneg_gnv','cneg_gas']
   },
   negocio: {
-    ingreso: ['cn1','cn2','cn3','cn4','cn5','cn6','cn7','cn8','cn9','cn10','cn11','cn12','cn13','cn14','cn15','transfer_neg_in','transfer_neg_retiro'],
-    egreso: ['cne_operacion','cne_personal','cne_gaseosa','cne_snack','cne_golosina','cne_pizza','cne_menu','cne5','cne_luz','cne_agua','cne_internet_casa','cne_internet_movil','cne1','cne3','cne2','cne7','cne_agregados','cne_meta','cne_documentacion','cne6','transfer_neg_out','transfer_neg_retiro_out']
+    ingreso: ['cn1','cn2','cn3','cn4','cn5','cn6','cn7','cn8','cn9','cn10','cn11','cn12','cn13','cn14','cn15','cn_cobro_deuda','transfer_neg_in','transfer_neg_retiro'],
+    egreso: ['cne_operacion','cne_personal','cne_gaseosa','cne_snack','cne_golosina','cne_pizza','cne_menu','cne5','cne_luz','cne_agua','cne_internet_casa','cne_internet_movil','cne1','cne3','cne2','cne7','cne_agregados','cne_meta','cne_documentacion','cne6','cne_deuda','transfer_neg_out','transfer_neg_retiro_out']
   }
 };
 
@@ -2492,6 +2496,7 @@ function loadStateForModo(modo){
   syncDefaultCategoriesForMode(isNeg);
   normalizeBusinessLabelsForState(isNeg);
   if(typeof deudaReconcileAllPaymentTxs === 'function') deudaReconcileAllPaymentTxs({syncSheets:false});
+  if(typeof deudaNormalizePaymentTxs === 'function') deudaNormalizePaymentTxs({persist:true});
 }
 
 // ── Guardar todo según modo activo ──
@@ -3368,12 +3373,15 @@ function renderMovimientos(){
   if(!window._movCatFiltro) window._movCatFiltro='todos';
   if(typeof window._movFechaDesde === 'undefined') window._movFechaDesde='';
   if(typeof window._movFechaHasta === 'undefined') window._movFechaHasta='';
+  if(typeof deudaNormalizePaymentTxs === 'function') deudaNormalizePaymentTxs({persist:false});
   const baseTx=visibleTx();
+  const movCatKey=(t)=>deudaTxLooksLike(t) ? (t.type==='ingreso'?'deuda_cobro':'deudas') : String(t.catId||t.category||'').trim();
+  const movCatLabel=(t)=>deudaTxLooksLike(t) ? (t.type==='ingreso'?'Cobro de deuda':'Deudas') : (t.category||movCatKey(t));
   const catMap=new Map();
   baseTx.forEach(t=>{
-    const key=String(t.catId||t.category||'').trim();
+    const key=movCatKey(t);
     if(!key) return;
-    catMap.set(key,{key,label:t.category||key,type:t.type});
+    catMap.set(key,{key,label:movCatLabel(t),type:t.type});
   });
   const catOptions=[...catMap.values()].sort((a,b)=>String(a.label).localeCompare(String(b.label),'es'));
   let filtered=baseTx;
@@ -3383,7 +3391,7 @@ function renderMovimientos(){
   // Filtro por categoria
   if(window._movCatFiltro && window._movCatFiltro!=='todos'){
     const ck=String(window._movCatFiltro);
-    filtered=filtered.filter(t=>String(t.catId||t.category||'')===ck || String(t.category||'')===ck);
+    filtered=filtered.filter(t=>movCatKey(t)===ck || String(t.category||'')===ck);
   }
   // Filtro por fecha dentro del mes seleccionado
   if(window._movFechaDesde) filtered=filtered.filter(t=>String(t.date||'')>=window._movFechaDesde);
@@ -3532,7 +3540,10 @@ function renderMovimientos(){
             const clienteTxt = t.cliente ? `👤 ${t.cliente}` : '';
             const ubicTxt = t.ubicacion ? ` · ${t.ubicacion}` : '';
             const linkTxt = t.vinculadoServicioId ? ` · Servicio: ${t.vinculadoServicioCliente||'vinculado'}` : '';
-            const subTxt = (clienteTxt ? (clienteTxt+ubicTxt) : (t.category||'')) + linkTxt;
+            const isDebtTx = deudaTxLooksLike(t);
+            const debtName = isDebtTx ? deudaTxNombre(t) : '';
+            const titleTxt = isDebtTx ? ((esIng ? 'Cobro de deuda' : 'Deudas') + ' · ' + debtName) : (t.category||t.description||'Sin categoría');
+            const subTxt = (clienteTxt ? (clienteTxt+ubicTxt) : (isDebtTx ? (t.description || titleTxt) : (t.category||''))) + linkTxt;
             const cardId = 'mvcard_'+t.id;
 
             return `
@@ -3541,10 +3552,10 @@ function renderMovimientos(){
                 <div class="mv-icon-box ${esIng?'mv-icon-ing':'mv-icon-egr'}" style="background:${color}18">${icon}</div>
                 <div class="mv-main">
                   <div class="mv-row1">
-                    <span class="mv-svc">${t.category||t.description||'Sin categoría'}</span>
+                    <span class="mv-svc">${debtHtml(titleTxt)}</span>
                     <span class="${esIng?'mv-badge-ing':'mv-badge-egr'}">${esIng?'↑ Ingreso':'↓ Egreso'}</span>
                   </div>
-                  <div class="mv-cli">${subTxt}</div>
+                  <div class="mv-cli">${debtHtml(subTxt)}</div>
                 </div>
                 <div class="mv-right">
                   <span class="mv-amt ${esIng?'mv-amt-ing':'mv-amt-egr'}">${esIng?'+':'-'}${fmt(t.amount)}</span>
@@ -3559,6 +3570,7 @@ function renderMovimientos(){
                   ${t.cliente?`<div class="mv-d-item"><span class="mv-d-lbl">Cliente</span><span class="mv-d-val">${t.cliente}</span></div>`:''}
                   ${t.vinculadoServicioId?`<div class="mv-d-item" style="grid-column:1/-1"><span class="mv-d-lbl">Servicio vinculado</span><span class="mv-d-val">${t.vinculadoServicioDesc||t.vinculadoServicioCliente||'Servicio'}</span></div>`:''}
                   <div class="mv-d-actions">
+                    ${txPuedeVincularServicio(t)?`<button class="mv-d-btn link" onclick="event.stopPropagation();openVincularServicioTx('${t.id}')">${t.vinculadoServicioId?'Cambiar servicio':'Vincular servicio'}</button>`:''}
                     <button class="mv-d-btn" onclick="event.stopPropagation();openEditTx('${t.id}')">✎ Editar</button>
                     <button class="mv-d-btn del" onclick="event.stopPropagation();deleteTx('${t.id}')">✕ Eliminar</button>
                   </div>
@@ -3994,6 +4006,52 @@ function deudaBuildPago(d, cuotaNum, pago){
 function deudaPagoAfectaBalance(p){
   return !!p && (p.afectaBalance === true || p.balanceAfectado === true);
 }
+function deudaTxNombre(tx){
+  const raw = String(tx?.deudaNombre || tx?.description || tx?.category || '').trim();
+  const m = raw.match(/(?:pago|cobro)(?:\s+de)?\s+(?:deuda|cuota|prestamo|pr[eé]stamo)?\s*(?:[:\\-])?\s*([^·|]+?)(?:\s*·|\s+cuota\s+\d|$)/i);
+  let name = (tx?.deudaNombre || (m && m[1]) || '').trim();
+  if(!name && /^pago de deuda\s+/i.test(String(tx?.category||''))) name = String(tx.category).replace(/^pago de deuda\s+/i,'').trim();
+  return name || 'Deuda';
+}
+function deudaTxLooksLike(tx){
+  if(!tx) return false;
+  const cat = String(tx.category || '').toLowerCase();
+  const desc = String(tx.description || '').toLowerCase();
+  return !!tx.origenDeudaPago || !!tx.debtId || /^pago de deuda\b/.test(cat) || /^pago de deuda\b/.test(desc) || /^pago cuota\b/.test(desc) || /^cobro cuota\b/.test(desc) || /^cobro de deuda\b/.test(cat) || /^cobro deuda\b/.test(cat);
+}
+function deudaTxCatId(tx, porCobrar){
+  const isNeg = tx?.negocio !== false && state.modo === 'negocio';
+  if(porCobrar) return isNeg ? 'cn_cobro_deuda' : 'ci_deuda_cobro';
+  return isNeg ? 'cne_deuda' : 'ce9';
+}
+function deudaNormalizePaymentTx(tx){
+  if(!deudaTxLooksLike(tx)) return tx;
+  const porCobrar = tx.type === 'ingreso' || tx.deudaRol === 'meden' || /^cobro/i.test(String(tx.category||tx.description||''));
+  const name = deudaTxNombre(tx);
+  const cuota = tx.cuotaNumero ? ' · cuota ' + tx.cuotaNumero : '';
+  return {
+    ...tx,
+    category: porCobrar ? 'Cobro de deuda' : 'Deudas',
+    catId: deudaTxCatId(tx, porCobrar),
+    description: (porCobrar ? 'Cobro de deuda: ' : 'Pago de deuda: ') + name + cuota,
+    deudaNombre: name,
+    deudaRol: porCobrar ? 'meden' : 'debo'
+  };
+}
+function deudaNormalizePaymentTxs(opts = {}){
+  if(!Array.isArray(state.transactions)) return 0;
+  let changed = 0;
+  state.transactions = state.transactions.map(tx => {
+    const next = deudaNormalizePaymentTx(tx);
+    if(next !== tx && (next.category !== tx.category || next.catId !== tx.catId || next.description !== tx.description || next.deudaNombre !== tx.deudaNombre)) changed++;
+    return next;
+  });
+  if(changed && opts.persist){
+    const k = getKeys(state.modo || 'negocio');
+    save(k.tx, state.transactions);
+  }
+  return changed;
+}
 function deudaMarkLegacyBalancePago(pagos){
   if(!Array.isArray(pagos) || !pagos.length) return pagos || [];
   const hasFlag = pagos.some(p => p && (
@@ -4024,21 +4082,22 @@ function deudaBuildPagoTx(d, pago, idx){
   const txId = pago.txId || deudaPagoTxId(d.id, pago.id);
   const porCobrar = deudaEsPorCobrar(d);
   const cuotaNumero = Math.max(1, Math.floor(moneyValue(pago.cuota)) || (idx + 1));
+  const deudaNombre = d.name || 'Deuda';
   pago.txId = txId;
   return {
     id: txId,
     type: porCobrar ? 'ingreso' : 'egreso',
     amount: moneyValue(pago.monto || d.cuotaMonto),
-    category: porCobrar ? 'Cobro deuda' : 'Deuda',
-    catId: porCobrar ? (state.modo === 'negocio' ? 'cn_otro_ingreso' : 'ci6') : 'ce9',
-    description: (porCobrar ? 'Cobro cuota ' : 'Pago cuota ') + cuotaNumero + '/' + d.cuotasTotales + ' - ' + (d.name || 'Deuda'),
+    category: porCobrar ? 'Cobro de deuda' : 'Deudas',
+    catId: porCobrar ? (state.modo === 'negocio' ? 'cn_cobro_deuda' : 'ci_deuda_cobro') : (state.modo === 'negocio' ? 'cne_deuda' : 'ce9'),
+    description: (porCobrar ? 'Cobro de deuda: ' : 'Pago de deuda: ') + deudaNombre + ' · cuota ' + cuotaNumero + '/' + d.cuotasTotales,
     date: debtIsoDate(pago.fecha),
     negocio: state.modo === 'negocio',
     moneda: 'PEN',
     origenDeudaPago: true,
     debtId: String(d.id),
     debtPagoId: String(pago.id),
-    deudaNombre: d.name || 'Deuda',
+    deudaNombre,
     deudaRol: porCobrar ? 'meden' : 'debo',
     cuotaNumero
   };
@@ -4630,7 +4689,7 @@ function pagarPrestPers(id){
   p.pagos.push(pago);
   p.cuotasPagadas=p.pagos.length;
   const totalPago=interes+capitalMes;
-  const tx={id:'prestpers_'+p.id+'_'+pago.id,type:p.tipo==='meden'?'ingreso':'egreso',amount:totalPago,category:p.tipo==='meden'?'Cobro prestamo':'Deuda',catId:p.tipo==='meden'?'ci6':'ce9',description:(p.tipo==='meden'?'Cobro ':'Pago ')+p.nombre,date:pago.fecha,negocio:state.modo==='negocio',moneda:'PEN',origenPrestamoPersonalPago:true,prestamoPersonalId:p.id,prestamoPagoId:pago.id};
+  const tx={id:'prestpers_'+p.id+'_'+pago.id,type:p.tipo==='meden'?'ingreso':'egreso',amount:totalPago,category:p.tipo==='meden'?'Cobro de deuda':'Deudas',catId:p.tipo==='meden'?(state.modo==='negocio'?'cn_cobro_deuda':'ci_deuda_cobro'):(state.modo==='negocio'?'cne_deuda':'ce9'),description:(p.tipo==='meden'?'Cobro de deuda: ':'Pago de deuda: ')+p.nombre,date:pago.fecha,negocio:state.modo==='negocio',moneda:'PEN',origenPrestamoPersonalPago:true,prestamoPersonalId:p.id,prestamoPagoId:pago.id,deudaNombre:p.nombre,deudaRol:p.tipo==='meden'?'meden':'debo'};
   pago.txId=tx.id;
   state.transactions=state.transactions||[];
   state.transactions.unshift(tx);
@@ -6259,7 +6318,7 @@ function guardarPagoPrestamo(prestamoId){
   // Registrar también como movimiento (egreso categoría Deuda)
   const totalPago=montoInteres+montoCapital;
   const desc=tipo==='interes'?`Interés ${p.nombre}`:`Cuota ${p.nombre} (capital S/${montoCapital.toFixed(2)} + interés S/${montoInteres.toFixed(2)})`;
-  state.transactions.unshift({id:Date.now()+'_pt',type:'egreso',amount:totalPago,category:'Deuda',description:desc,date:fecha,catId:'ce9'});
+  state.transactions.unshift({id:Date.now()+'_pt',type:'egreso',amount:totalPago,category:'Deudas',description:'Pago de deuda: '+p.nombre,date:fecha,catId:state.modo==='negocio'?'cne_deuda':'ce9',negocio:state.modo==='negocio',deudaNombre:p.nombre,deudaRol:'debo'});
   saveAll();
   syncSeccionToSheets('prestamo', p);
   syncToSheets(state.transactions[0]);
@@ -7281,7 +7340,7 @@ function shortMonthFromDate(dateStr){
 }
 
 function openCajaHistorial(){
-  const txs=visibleTx().filter(t=>isCashFlowTx(t)).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')) || String(a.id||'').localeCompare(String(b.id||'')));
+  const txs=filteredTx().filter(t=>isCashFlowTx(t)).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')) || String(a.id||'').localeCompare(String(b.id||'')));
   const byDay=new Map();
   txs.forEach(t=>{
     const k=String(t.date||'Sin fecha');
@@ -7617,6 +7676,137 @@ async function saveTx(editId){
       : ((editId ? 'Movimiento actualizado' : 'Movimiento guardado') + ' · ' + (targetScope === 'negocio' ? 'Negocio' : 'Personal') + ' ✓'),
       movedOutOfCurrentMonth ? 'info' : 'success');
   }
+}
+
+
+function txPuedeVincularServicio(t){
+  if(!t || t.type !== 'egreso') return false;
+  if(t.origenCierreServicio || t.origenServicioMaterial || t.materialUsoServicio) return false;
+  if(isStockValueTx(t) || isMaterialesCategory(t.catId, t.category)) return false;
+  if(t.noCashFlow || t.afectaStockValor || t.stockValorOnly) return false;
+  return true;
+}
+
+function servicioResumenVinculo(item){
+  if(!item) return '';
+  const partes = [item.servicio1 || item.servicio || 'Servicio'];
+  if(item.servicio2) partes.push(item.servicio2);
+  if(item.servicio3) partes.push(item.servicio3);
+  return partes.filter(Boolean).join(' + ');
+}
+
+function servicioMontoVinculo(item){
+  return moneyValue(item?.precio1 || item?.precio) + moneyValue(item?.precio2) + moneyValue(item?.precio3);
+}
+
+function servicioDescVinculo(item){
+  return servicioResumenVinculo(item) + ' — ' + (item?.cliente || 'Sin cliente');
+}
+
+function serviciosCandidatosParaTx(tx){
+  const txDate = String(tx?.date || '');
+  const txCliente = normSimpleText(tx?.cliente || '');
+  return (state.agenda || [])
+    .filter(a => isServicioFinalizado(a))
+    .sort((a,b) => {
+      const sameA = String(a.fecha || '') === txDate ? 1 : 0;
+      const sameB = String(b.fecha || '') === txDate ? 1 : 0;
+      if(sameA !== sameB) return sameB - sameA;
+      const cliA = txCliente && normSimpleText(a.cliente || '') === txCliente ? 1 : 0;
+      const cliB = txCliente && normSimpleText(b.cliente || '') === txCliente ? 1 : 0;
+      if(cliA !== cliB) return cliB - cliA;
+      return String(b.fecha || '').localeCompare(String(a.fecha || '')) || String(b.finalizadoAt || b.id || '').localeCompare(String(a.finalizadoAt || a.id || ''));
+    });
+}
+
+function refrescarServiciosPorIds(ids){
+  [...new Set((ids || []).filter(Boolean).map(String))].forEach(id => {
+    const item = (state.agenda || []).find(a => String(a.id) === id);
+    if(!item || !isServicioFinalizado(item)) return;
+    recalcularGastosVinculadosServicio(item);
+    scheduleSyncServicioFinalizadoReporte(item);
+  });
+}
+
+function limpiarVinculoServicioTx(tx){
+  if(!tx) return;
+  delete tx.vinculadoServicioId;
+  delete tx.vinculadoServicioCliente;
+  delete tx.vinculadoServicioFecha;
+  delete tx.vinculadoServicioDesc;
+  delete tx.vinculadoServicioMonto;
+}
+
+function openVincularServicioTx(id){
+  const tx = (state.transactions || []).find(t => String(t.id) === String(id));
+  if(!tx) return toast('Movimiento no encontrado', 'error');
+  if(!txPuedeVincularServicio(tx)) return toast('Este movimiento no se vincula aqui. Materiales se corrige desde Stock o desde el cierre del servicio.', 'info');
+  const servicios = serviciosCandidatosParaTx(tx);
+  const actualId = String(tx.vinculadoServicioId || '');
+  const actual = actualId ? (state.agenda || []).find(a => String(a.id) === actualId) : null;
+  const sameDay = servicios.filter(a => String(a.fecha || '') === String(tx.date || ''));
+  const otros = servicios.filter(a => String(a.fecha || '') !== String(tx.date || '')).slice(0, 12);
+  const row = (a) => {
+    const selected = String(a.id) === actualId;
+    const total = servicioMontoVinculo(a);
+    return `<button type="button" onclick="vincularMovimientoAServicio('${tx.id}','${a.id}')" style="width:100%;border:1px solid ${selected?'#2F6F53':'#E5E7EB'};background:${selected?'#EEF7F2':'#FFFFFF'};border-radius:14px;padding:12px;text-align:left;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;font-family:'DM Sans',sans-serif;cursor:pointer">
+      <span style="min-width:0">
+        <span style="display:block;font-size:13px;font-weight:850;color:#172033;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${debtHtml(a.cliente || 'Sin cliente')}${selected?' · Actual':''}</span>
+        <span style="display:block;font-size:11px;color:#64748B;margin-top:2px;line-height:1.25">${debtHtml(a.fecha || '')} · ${debtHtml(servicioResumenVinculo(a))}</span>
+      </span>
+      <span style="font-size:12px;font-weight:850;color:#2F6F53;white-space:nowrap">${fmt(total)}</span>
+    </button>`;
+  };
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title" style="color:#172033;margin-bottom:8px">${actual?'Cambiar servicio':'Vincular servicio'}</div>
+    <div style="background:#F8FAFC;border:1px solid #E5E7EB;border-radius:14px;padding:12px;margin-bottom:12px">
+      <div style="font-size:10px;color:#64748B;text-transform:uppercase;font-weight:850;letter-spacing:.05em">Movimiento</div>
+      <div style="font-size:14px;font-weight:850;color:#172033;margin-top:3px">${debtHtml(tx.category || 'Egreso')} · -${fmt(tx.amount)}</div>
+      <div style="font-size:12px;color:#64748B;margin-top:2px">${debtHtml(tx.date || '')}${tx.description?' · '+debtHtml(tx.description):''}</div>
+      ${actual?`<div style="font-size:12px;color:#2F6F53;font-weight:800;margin-top:8px">Ahora esta en: ${debtHtml(servicioDescVinculo(actual))}</div>`:''}
+    </div>
+    <div style="font-size:11px;color:#64748B;font-weight:850;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 6px">Servicios del mismo dia</div>
+    <div style="display:grid;gap:8px">${sameDay.length?sameDay.map(row).join(''):'<div style="font-size:13px;color:#64748B;text-align:center;padding:14px;border:1px dashed #CBD5E1;border-radius:14px">No hay servicios finalizados ese dia.</div>'}</div>
+    ${otros.length?`<div style="font-size:11px;color:#64748B;font-weight:850;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 6px">Otros servicios recientes</div><div style="display:grid;gap:8px">${otros.map(row).join('')}</div>`:''}
+    <div class="btn-row" style="margin-top:14px">
+      ${actual?'<button class="btn-ghost" onclick="desvincularMovimientoDeServicio(\''+tx.id+'\')">Desvincular</button>':''}
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+    </div>`;
+  showModal();
+}
+
+function vincularMovimientoAServicio(txId, servicioId){
+  const tx = (state.transactions || []).find(t => String(t.id) === String(txId));
+  const item = (state.agenda || []).find(a => String(a.id) === String(servicioId));
+  if(!tx || !item) return toast('No se pudo vincular', 'error');
+  if(!txPuedeVincularServicio(tx)) return toast('Ese movimiento no se puede migrar desde aqui', 'error');
+  const oldId = tx.vinculadoServicioId || '';
+  tx.vinculadoServicioId = item.id;
+  tx.vinculadoServicioCliente = item.cliente || '';
+  tx.vinculadoServicioFecha = item.fecha || tx.date || todayStr();
+  tx.vinculadoServicioDesc = servicioDescVinculo(item);
+  tx.vinculadoServicioMonto = servicioMontoVinculo(item);
+  refrescarServiciosPorIds([oldId, item.id]);
+  saveAll();
+  syncToSheets(tx);
+  if(!tx.afectaStockValor) syncExpenseTxToNotion(tx);
+  closeModal();
+  render();
+  toast(oldId && String(oldId) !== String(item.id) ? 'Movimiento migrado a otro servicio' : 'Movimiento vinculado al servicio');
+}
+
+function desvincularMovimientoDeServicio(txId){
+  const tx = (state.transactions || []).find(t => String(t.id) === String(txId));
+  if(!tx) return toast('Movimiento no encontrado', 'error');
+  const oldId = tx.vinculadoServicioId || '';
+  limpiarVinculoServicioTx(tx);
+  refrescarServiciosPorIds([oldId]);
+  saveAll();
+  syncToSheets(tx);
+  if(!tx.afectaStockValor) syncExpenseTxToNotion(tx);
+  closeModal();
+  render();
+  toast('Movimiento desvinculado');
 }
 
 function deleteTx(id){
@@ -11776,8 +11966,6 @@ function maybeAutoVincularGastoACierre(tx){
 function actualizarServicioPorTxCambio(tx, original=null){
   const ids = new Set();
   if(original?.vinculadoServicioId) ids.add(String(original.vinculadoServicioId));
-  const auto = maybeAutoVincularGastoACierre(tx);
-  if(auto?.id) ids.add(String(auto.id));
   if(tx?.vinculadoServicioId) ids.add(String(tx.vinculadoServicioId));
   ids.forEach(id => {
     const item = (state.agenda || []).find(a => String(a.id) === String(id));
@@ -25030,8 +25218,3 @@ setTimeout(()=>{
 </script>
 </body>
 </html>
-
-
-
-
-
