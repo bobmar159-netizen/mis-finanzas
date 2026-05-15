@@ -2206,6 +2206,7 @@ const DEFAULT_CATS_NEG_EX = [
   {id:'cne2',name:'Gnv',icon:'fuel',color:'#5B6E91',type:'egreso'},
   {id:'cne7',name:'Reparacion de auto',icon:'transport',color:'#77746D',type:'egreso'},
   {id:'cne_agregados',name:'Agregados',icon:'box',color:'#A9895C',type:'egreso'},
+  {id:'cne_meta',name:'Meta',icon:'target',color:'#6D8C82',type:'egreso'},
   {id:'cne_documentacion',name:'Documentacion',icon:'document',color:'#77746D',type:'egreso'},
   {id:'cne6',name:'Otros gastos de negocio',icon:'box',color:'#77746D',type:'egreso'},
   {id:'transfer_neg_out',name:'Transferencia enviada',icon:'transfer',color:'#1565C0',type:'egreso',system:true,hidden:true},
@@ -2260,7 +2261,7 @@ function getKeys(modo){
   if(migrated) console.log('[MisFinanzas] Keys migrados a formato fnz_neg_*');
 })();
 
-const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_scope_sheets_v9';
+const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_scope_sheets_v10';
 const CATEGORY_LEGACY_DEFAULT_IDS = {
   personal: {
     ingreso: ['ci1','ci2','ci3','ci4','ci5','ci6','transfer_in','transfer_retiro_in','cneg_svc'],
@@ -2268,7 +2269,7 @@ const CATEGORY_LEGACY_DEFAULT_IDS = {
   },
   negocio: {
     ingreso: ['cn1','cn2','cn3','cn4','cn5','cn6','cn7','cn8','cn9','cn10','cn11','cn12','cn13','cn14','cn15','transfer_neg_in','transfer_neg_retiro'],
-    egreso: ['cne_operacion','cne_personal','cne_gaseosa','cne_snack','cne_golosina','cne_pizza','cne_menu','cne5','cne_luz','cne_agua','cne_internet_casa','cne_internet_movil','cne1','cne3','cne2','cne7','cne_agregados','cne_documentacion','cne6','transfer_neg_out','transfer_neg_retiro_out']
+    egreso: ['cne_operacion','cne_personal','cne_gaseosa','cne_snack','cne_golosina','cne_pizza','cne_menu','cne5','cne_luz','cne_agua','cne_internet_casa','cne_internet_movil','cne1','cne3','cne2','cne7','cne_agregados','cne_meta','cne_documentacion','cne6','transfer_neg_out','transfer_neg_retiro_out']
   }
 };
 
@@ -2534,21 +2535,22 @@ function isMaterialesCategory(catId, category){
 }
 
 function isStockValueTx(t){
-  // Ocultar de movimientos: compras que van al stock Y usos de stock al cerrar servicio
+  // Ocultar de Movimientos solo las COMPRAS que entran a Stock.
+  // Los materiales usados en un servicio si se muestran dentro del grupo del servicio
+  // para que la ganancia sea entendible, pero no vuelven a descontar caja.
   if(!t || t.type !== 'egreso') return false;
-  // Entrada al stock (compra de materiales registrada como egreso)
-  if(t.ocultarEnMovimientos || t.afectaStockValor || t.stockOperacion === 'entrada_valor' || t.stockValorOnly || t.stockCompraId) return true;
-  // Uso de stock al cerrar servicio (no es flujo de caja, es solo reduccion de inventario)
-  if(t.materialUsoServicio || t.origenServicioMaterial || t.stockOperacion === 'uso_valor' || t.stockOperacion === 'devolucion_valor') return true;
+  if(t.afectaStockValor || t.stockOperacion === 'entrada_valor' || t.stockValorOnly || t.stockCompraId) return true;
+  if(t.ocultarEnMovimientos && !t.materialUsoServicio && !t.origenServicioMaterial) return true;
+  if(t.stockOperacion === 'devolucion_valor' && !t.materialUsoServicio && !t.origenServicioMaterial) return true;
   return false;
 }
 
 function isCashFlowTx(t){
-  // No es flujo de caja si: esta marcado como noCashFlow, o es exclusivamente para el stock
+  // Las compras de materiales se ocultan de Movimientos, pero SI son salida de caja.
+  // El uso de materiales en un servicio no vuelve a descontar caja: solo baja stock valorizado.
   if(!t) return true;
   if(t.noCashFlow) return false;
   if(t.materialUsoServicio || t.origenServicioMaterial || t.stockOperacion === 'uso_valor' || t.stockOperacion === 'devolucion_valor') return false;
-  if(t.stockValorOnly || t.ocultarEnMovimientos) return false;
   return true;
 }
 
@@ -2574,6 +2576,30 @@ function isMovilidadCategory(catId, category, description=''){
 function isAgregadoCategory(catId, category, description=''){
   const text = normSimpleText([category, description].filter(Boolean).join(' '));
   return catId === 'cne_agregados' || /\b(agregado|agregados|arena|piedra|cemento)\b/.test(text);
+}
+
+function isMetaCategory(catId, category, description=''){
+  const text = normSimpleText([category, description].filter(Boolean).join(' '));
+  return catId === 'cne_meta' || /\b(meta|objetivo|ahorro|ahorrar|separado|separe|guardar|guardado|inversion|inversiones)\b/.test(text);
+}
+
+function expenseBucketForTx(t){
+  if(!t || t.type !== 'egreso') return '';
+  if(t.expenseBucket) return t.expenseBucket;
+  if(isMaterialesCategory(t.catId, t.category)) return 'materiales';
+  if(isComidaCategory(t.catId, t.category, t.description)) return 'comida';
+  if(isMovilidadCategory(t.catId, t.category, t.description)) return 'movilidad';
+  if(isAgregadoCategory(t.catId, t.category, t.description)) return 'agregados';
+  if(isMetaCategory(t.catId, t.category, t.description)) return 'meta';
+  return 'otros';
+}
+
+function tagExpenseBucket(tx, bucket){
+  if(tx && bucket){
+    tx.expenseBucket = bucket;
+    tx.notionColumn = bucket;
+  }
+  return tx;
 }
 
 function isNotionStockUsageTx(t){
@@ -2821,7 +2847,7 @@ function categoryAreaLabel(cat, type){
   if(['cne5','cne2','cne3','cne7'].includes(id) || /transporte|gnv|gasolina|auto|movilidad/.test(n)) return 'Movilidad y auto';
   if(['cne1'].includes(id) || /material/.test(n)) return 'Stock y materiales';
   if(['cne_luz','cne_agua','cne_internet_casa','cne_internet_movil'].includes(id) || /luz|agua|internet/.test(n)) return 'Servicios fijos';
-  if(['cne_operacion','cne_personal','cne_agregados','cne_documentacion'].includes(id) || /operacion|personal|agregado|documentacion/.test(n)) return 'Operacion';
+  if(['cne_operacion','cne_personal','cne_agregados','cne_meta','cne_documentacion'].includes(id) || /operacion|personal|agregado|meta|ahorro|documentacion/.test(n)) return 'Operacion';
   return 'Otros';
 }
 
@@ -6061,6 +6087,11 @@ function syncToSheets(lastTx){
     // Siempre enviar la tx específica que cambió (insert/update)
     const tx = lastTx || (state.transactions.length ? state.transactions[0] : null);
     if(!tx) return;
+    if(tx.afectaStockValor || tx.stockValorOnly || tx.ocultarEnMovimientos){
+      _syncStatus='idle';
+      _updateSyncBadge();
+      return;
+    }
     const payload={type:'tx',modo:txSheetModo(tx),timestamp:'tx_'+tx.id+'_'+Date.now(),tx};
     _sendToSheets(url,payload);
   },200);
@@ -6112,6 +6143,7 @@ function syncAllTxToSheets(silencioso){
           else if(isComidaCategory(tx.catId, tx.category, tx.description)) row.comida = (parseFloat(row.comida)||0) + amt;
           else if(isMovilidadCategory(tx.catId, tx.category, tx.description)) row.movilidad = (parseFloat(row.movilidad)||0) + amt;
           else if(isAgregadoCategory(tx.catId, tx.category, tx.description)) row.agregados = (parseFloat(row.agregados)||0) + amt;
+          else if(isMetaCategory(tx.catId, tx.category, tx.description)) row.meta = (parseFloat(row.meta)||0) + amt;
           else row.otros_gastos = (parseFloat(row.otros_gastos)||0) + amt;
         }
       }
@@ -6374,13 +6406,13 @@ function enviarTodoASheets() {
     if (tx._importadoDeNotion && tx._notionRowId) {
       if (!notionRows[tx._notionRowId]) {
         notionRows[tx._notionRowId] = {
-          id: tx._notionRowId.split('-')[0], // Base ID
+          id: normalizeNotionPageId(tx._notionRowId), // Base ID
           fecha: tx.date,
           cliente: tx.cliente || '(Sin cliente)',
           telefono: tx.contacto || '',
           ubicacion: tx.ubicacion || '',
           formaPago: tx.formaPago || '',
-          ingreso: 0, movilidad: 0, materiales: 0, otros: 0, meta: 0,
+          ingreso: 0, movilidad: 0, materiales: 0, comida: 0, agregados: 0, otros: 0, otros_gastos: 0, meta: 0,
           servicio1: '', servicio2: '', servicio3: '', servicio4: '', observaciones: ''
         };
       }
@@ -6397,14 +6429,19 @@ function enviarTodoASheets() {
           row.servicio1 = tx.category;
         }
         row.observaciones = tx.description;
-      } else if (tx.id.endsWith('-mov') || tx.category === 'Movilidad') {
+      } else if (tx.id.endsWith('-mov') || isMovilidadCategory(tx.catId, tx.category, tx.description)) {
         row.movilidad += amt;
-      } else if (tx.id.endsWith('-mat') || tx.category === 'Materiales') {
+      } else if (tx.id.endsWith('-mat') || isMaterialesCategory(tx.catId, tx.category)) {
         row.materiales += amt;
-      } else if (tx.id.endsWith('-otr') || tx.category === 'Agregados') {
-        row.otros += amt;
-      } else if (tx.id.endsWith('-met') || tx.category === 'Ahorro / Inversión') {
+      } else if (tx.id.endsWith('-com') || isComidaCategory(tx.catId, tx.category, tx.description)) {
+        row.comida += amt;
+      } else if (tx.id.endsWith('-agr') || tx.category === 'Agregados' || isAgregadoCategory(tx.catId, tx.category, tx.description)) {
+        row.agregados += amt;
+      } else if (tx.id.endsWith('-met') || isMetaCategory(tx.catId, tx.category, tx.description)) {
         row.meta += amt;
+      } else {
+        row.otros += amt;
+        row.otros_gastos += amt;
       }
     } else {
       txsNormales.push(tx);
@@ -6548,22 +6585,23 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
         const servicio=_mapearCategoriaNotion(s.svc||'Servicio Gas')||'Servicio Gas';
         const obsFiltrado=obs && obs.toLowerCase()!==servicio.toLowerCase() && obs.toLowerCase()!==clienteLimpio.toLowerCase() ? obs : '';
         const svId = nId+'-svc'+s.idx;
-        nuevasTx.push({id:svId,type:'ingreso',amount:s.precio,category:servicio,catId:_getCatIdByName(servicio),description:servicio+(clienteLimpio&&clienteLimpio!=='(Sin cliente)'?' - '+clienteLimpio:'')+(obsFiltrado?' - '+obsFiltrado:''),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,formaPago:forma,negocio:true,moneda:'PEN',vinculadoServicioId:svId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null});
+        nuevasTx.push({id:svId,type:'ingreso',amount:s.precio,category:servicio,catId:_getCatIdByName(servicio),description:servicio+(clienteLimpio&&clienteLimpio!=='(Sin cliente)'?' - '+clienteLimpio:'')+(obsFiltrado?' - '+obsFiltrado:''),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,formaPago:forma,negocio:true,moneda:'PEN',vinculadoServicioId:svId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null, notionColumn:'precio'+s.idx});
         txImportadas++;
 
-        if(s.mat>0){ nuevasTx.push({id:nId+'-mat'+s.idx,type:'egreso',amount:s.mat,category:'Materiales',catId:'cne1',description:'Materiales usados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:svId,origenServicioMaterial:true,materialUsoServicio:true,noCashFlow:true,stockOperacion:'uso_valor',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMat++; }
+        if(s.mat>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-mat'+s.idx,type:'egreso',amount:s.mat,category:'Materiales',catId:'cne1',description:'Materiales usados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:svId,origenServicioMaterial:true,materialUsoServicio:true,noCashFlow:true,stockOperacion:'uso_valor',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'materiales')); egresosMat++; }
       });
 
       const mainSvcId = (precio1>0) ? nId+'-svc1' : ((precio2>0) ? nId+'-svc2' : ((precio3>0) ? nId+'-svc3' : null));
 
-      if(comida>0){ nuevasTx.push({id:nId+'-com',type:'egreso',amount:comida,category:'Comida',catId:'cne_menu',description:'Comida - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosCom++; }
-      if(otros>0){ nuevasTx.push({id:nId+'-otr',type:'egreso',amount:otros,category:'Otros gastos de negocio',catId:'cne6',description:'Otros gastos - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosOtros++; }
-      if(agregados>0){ nuevasTx.push({id:nId+'-agr',type:'egreso',amount:agregados,category:'Agregados',catId:'cne_agregados',description:'Agregados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosAgr++; }
-      if(meta>0){ nuevasTx.push({id:nId+'-met',type:'egreso',amount:meta,category:'Meta',catId:'cne_meta',description:'Meta - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); }
+      if(comida>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-com',type:'egreso',amount:comida,category:'Comida',catId:'cne_menu',description:'Comida - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'comida')); egresosCom++; }
+      if(otros>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-otr',type:'egreso',amount:otros,category:'Otros gastos de negocio',catId:'cne6',description:'Otros gastos - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'otros')); egresosOtros++; }
+      if(agregados>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-agr',type:'egreso',amount:agregados,category:'Agregados',catId:'cne_agregados',description:'Agregados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'agregados')); egresosAgr++; }
+      if(meta>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-met',type:'egreso',amount:meta,category:'Meta',catId:'cne_meta',description:'Meta - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'meta')); }
       
-      if(movil>0){ nuevasTx.push({id:nId+'-mov',type:'egreso',amount:movil,category:'Movilidad',catId:'cne5',description:'Movilidad - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}); egresosMov++; }
-    if(nuevasTx.length===0 && nuevosTrabajos.length===0){ if(status) status.textContent='No se encontraron datos validos. Revisa las columnas.'; return; }
+      if(movil>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-mov',type:'egreso',amount:movil,category:'Movilidad',catId:'cne5',description:'Movilidad - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'movilidad')); egresosMov++; }
     }
+
+    if(nuevasTx.length===0 && nuevosTrabajos.length===0){ if(status) status.textContent='No se encontraron datos validos. Revisa las columnas.'; return; }
 
     const existing=load('fnz_neg_tx',[]);
     const stockImport = aplicarUsoStockNotionImport(existing, nuevasTx, isFullSync);
@@ -6786,6 +6824,7 @@ function _getCatIdByName(nombre) {
   if(n.includes('gasolina')) return 'cne3';
   if(n.includes('gnv')) return 'cne2';
   if(n.includes('agregado')) return 'cne_agregados';
+  if(n.includes('meta') || n.includes('ahorro') || n.includes('objetivo')) return 'cne_meta';
   if(n.includes('documentacion')) return 'cne_documentacion';
   return 'cn9';
 }
@@ -7137,9 +7176,7 @@ async function saveTx(editId){
   if (original && original._importadoDeNotion && original._notionRowId) {
     toast('⏳ Guardando edición oficial en Notion...', 'info');
     try {
-      // Remover sufijos -ing, -mov, -mat para obtener el pageId puro
-      let pureId = original._notionRowId;
-      if (pureId.includes('-')) pureId = pureId.split('-')[0];
+      const pureId = normalizeNotionPageId(original._notionRowId || original._notionFinanceRowId || original._notionReporteRowId);
       await _updateNotionPage(pureId, item);
       toast('✓ Cambio registrado en Notion', 'success');
     } catch (err) {
@@ -7161,6 +7198,7 @@ async function saveTx(editId){
   }
   syncToSheets(item);
   if(compraStockValor) syncCompraToSheets(compraStockValor);
+  if(!item.afectaStockValor) syncExpenseTxToNotion(item);
   closeModal(); render();
   if(!original || (!original._importadoDeNotion)) toast((editId ? 'Movimiento actualizado' : 'Movimiento guardado') + ' · ' + (targetScope === 'negocio' ? 'Negocio' : 'Personal') + ' ✓');
 }
@@ -7195,10 +7233,8 @@ function deleteTx(id){
     if(url) _sendToSheets(url,{type:'tx_delete',id,modo:txSheetModo(tx),timestamp:'txdel_'+id+'_'+Date.now()});
   }
   // Archivar en Notion si tiene ID de Notion
-  if(tx&&tx._notionRowId){
-    let pId = tx._notionRowId;
-    // Quitar sufijos -ing, -mov, -mat, -otr para obtener el pageId puro
-    if(pId.includes('-')) pId = pId.split('-').slice(0,-1).join('-');
+  if(tx&&(tx._notionRowId||tx._notionFinanceRowId||tx._notionReporteRowId)){
+    const pId = normalizeNotionPageId(tx._notionRowId || tx._notionFinanceRowId || tx._notionReporteRowId);
     _deleteNotionPage(pId).then(()=>toast('Eliminado · Archivado en Notion ✓')).catch(()=>toast('Eliminado'));
   } else { toast('Eliminado'); }
   render();
@@ -8648,6 +8684,13 @@ async function _fetchNotionSchema(token, dbId) {
   return db.properties;
 }
 
+function normalizeNotionPageId(id){
+  const s = String(id || '').trim();
+  if(!s) return '';
+  if(/^[0-9a-f]{32}$/i.test(s) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return s;
+  return s.replace(/-(svc\d+|mat\d*|com|mov|otr|otg|agr|met)$/i, '');
+}
+
 async function _pushToNotion(item, cobroObj) {
   const token = localStorage.getItem('fnz_notion_token');
   const dbId  = localStorage.getItem('fnz_notion_dbid');
@@ -8692,7 +8735,7 @@ async function _pushToNotion(item, cobroObj) {
   if (clienteCol && clienteCol.name !== pTitle) setProp(clienteCol, nombreFinal);
 
   // 2. Fecha y Contacto
-  const fullIso = (item.fecha || todayStr()) + (item.hora ? 'T' + item.hora + ':00' : 'T09:00:00') + '-05:00';
+  const fullIso = (item.fecha || item.date || todayStr()) + (item.hora ? 'T' + item.hora + ':00' : 'T09:00:00') + '-05:00';
   setProp(findCol('fecha', 'date', 'día', 'dia'), fullIso);
   if (item.telefono) setProp(findCol('contacto', 'telefono', 'teléfono', 'tel', 'phone'), item.telefono);
   setProp(findCol('distrito', 'ubicacion', 'ubicación', 'zona'), item.ubicacion);
@@ -8729,8 +8772,8 @@ async function _pushToNotion(item, cobroObj) {
   // 5. Gastos extra
   setProp(findCol('movilidad', 'pasajes', 'gasolina', 'gnv', 'combustible', 'transporte'), moneyValue(cobroObj.movilidad));
   setProp(findCol('comida','alimentos','alimentacion','menu','snack','snacks','golosina','golosinas','bebida','bebidas','gaseosa','gaseosas'), moneyValue(cobroObj.comida));
-  setProp(findCol('agregados'), moneyValue(cobroObj.agregados || cobroObj.otros));
-  setProp(findCol('otros', 'extra'), moneyValue(cobroObj.otros_gastos));
+  setProp(findCol('agregados','agregado','adicional','adicionales'), moneyValue(cobroObj.agregados));
+  setProp(findCol('otros', 'otros gastos', 'gastos extra', 'extra'), moneyValue(cobroObj.otros_gastos || cobroObj.otros));
   setProp(findCol('meta','objetivo'), moneyValue(cobroObj.meta));
   setProp(findCol('ganancia'), ganancia);
   const obsFinal = cobroObj.observaciones || item.observaciones || item.notas;
@@ -8755,6 +8798,62 @@ async function _pushToNotion(item, cobroObj) {
     throw new Error(error.message || 'Error en Notion');
   }
   return await res.json();
+}
+
+function buildNotionExpenseCobro(tx){
+  if(!tx || tx.type !== 'egreso') return null;
+  if(tx.afectaStockValor || tx.stockValorOnly || tx.materialUsoServicio || tx.origenServicioMaterial || tx.noCashFlow) return null;
+  if(tx.origenDeudaPago) return null;
+  const bucket = expenseBucketForTx(tx);
+  if(bucket === 'materiales') return null;
+  const amt = moneyValue(tx.amount);
+  if(!amt) return null;
+  const cobro = {
+    svc1: '',
+    precio1: 0,
+    materiales1: 0,
+    comida: 0,
+    movilidad: 0,
+    agregados: 0,
+    otros_gastos: 0,
+    meta: 0,
+    observaciones: tx.description || tx.category || ''
+  };
+  if(bucket === 'comida') cobro.comida = amt;
+  else if(bucket === 'movilidad') cobro.movilidad = amt;
+  else if(bucket === 'agregados') cobro.agregados = amt;
+  else if(bucket === 'meta') cobro.meta = amt;
+  else cobro.otros_gastos = amt;
+  return cobro;
+}
+
+async function syncExpenseTxToNotion(tx){
+  try{
+    const token = localStorage.getItem('fnz_notion_token');
+    const dbId  = localStorage.getItem('fnz_notion_dbid');
+    if(!token || !dbId || !tx || tx.type !== 'egreso' || tx._importadoDeNotion) return;
+    const cobro = buildNotionExpenseCobro(tx);
+    if(!cobro) return;
+    const item = {
+      ...tx,
+      fecha: tx.date,
+      cliente: tx.cliente || 'Gasto app',
+      observaciones: tx.description || tx.category || '',
+      _notionFinanceRowId: tx._notionFinanceRowId || tx._notionRowId || null,
+      _notionReporteRowId: tx._notionReporteRowId || tx._notionRowId || null
+    };
+    const r = await _pushToNotion(item, cobro);
+    if(r?.id){
+      tx._notionRowId = r.id;
+      tx._notionFinanceRowId = r.id;
+      tx._notionReporteRowId = r.id;
+      tx.notionColumn = expenseBucketForTx(tx);
+      persistTxInScope(txSheetModo(tx, 'negocio'), tx);
+      saveAll();
+    }
+  }catch(e){
+    console.warn('[Notion] Gasto local no sincronizado:', e.message);
+  }
 }
 
 async function _updateNotionPage(pageId, updatedTx) {
@@ -8802,10 +8901,14 @@ async function _updateNotionPage(pageId, updatedTx) {
   } else {
     if (isMovilidadCategory(updatedTx.catId, updatedTx.category, updatedTx.description))
       setProp(findCol('movilidad','pasajes','gasolina','gnv','combustible','transporte'), moneyValue(updatedTx.amount));
-    else if (catL.includes('material'))
-      setProp(findCol('materiales','material','insumos','compras'), parseFloat(updatedTx.amount)||0);
     else if (isComidaCategory(updatedTx.catId, updatedTx.category, updatedTx.description))
       setProp(findCol('comida','alimentos','alimentacion','menu','snack','snacks','golosina','golosinas','bebida','bebidas','gaseosa','gaseosas'), moneyValue(updatedTx.amount));
+    else if (isAgregadoCategory(updatedTx.catId, updatedTx.category, updatedTx.description))
+      setProp(findCol('agregados','agregado','adicional','adicionales'), moneyValue(updatedTx.amount));
+    else if (isMetaCategory(updatedTx.catId, updatedTx.category, updatedTx.description))
+      setProp(findCol('meta','objetivo','ahorro','separado meta'), moneyValue(updatedTx.amount));
+    else if (isMaterialesCategory(updatedTx.catId, updatedTx.category))
+      setProp(findCol('materiales','material','insumos','compras'), parseFloat(updatedTx.amount)||0);
     else
       setProp(findCol('otros','otros gastos','gastos extra'), parseFloat(updatedTx.amount)||0);
   }
@@ -8849,6 +8952,7 @@ async function _updateNotionPageFull(pageId, item, cobroObj) {
   const materiales = cobroObj.materiales || 0;
   const otros      = cobroObj.otros      || cobroObj.otros_gastos || 0;
   const comida     = cobroObj.comida     || 0;
+  const agregados  = cobroObj.agregados  || 0;
   const meta       = cobroObj.meta       || 0;
   const formaPago  = cobroObj.formaPago  || '';
   const observaciones = cobroObj.observaciones || '';
@@ -8916,7 +9020,8 @@ async function _updateNotionPageFull(pageId, item, cobroObj) {
   // ── Gastos ──
   if (movilidad  > 0) setProp(findCol('movilidad','pasajes','gasolina','combustible','transporte'), movilidad);
   if (materiales > 0) setProp(findCol('materiales','material','insumos','compras'), materiales);
-  if (comida     > 0) setProp(findCol('comida','alimentos','menu','snack','snacks','bebida','bebidas'), comida);
+  if (comida     > 0) setProp(findCol('comida','alimentos','alimentacion','menu','snack','snacks','bebida','bebidas','gaseosa','gaseosas'), comida);
+  if (agregados  > 0) setProp(findCol('agregados','agregado','adicional','adicionales'), agregados);
   if (otros      > 0) setProp(findCol('otros','otros gastos','gastos extra','extra'), otros);
   if (meta       > 0) setProp(findCol('meta','objetivo','goal','target'), meta);
 
@@ -18446,7 +18551,7 @@ function saveMicTx() {
     const svc=state.servicios.find(s=>s.id===micParsed.serviceMatch.id);
     if(svc&&!svc.pagado){svc.pagado=true;servicioMarcado=svc.name;}
   }
-  saveAll(); syncToSheets(tx); render();
+  saveAll(); syncToSheets(tx); if(!tx.afectaStockValor) syncExpenseTxToNotion(tx); render();
   document.getElementById('micModal').style.display='none';
   let msg=`✓ ${type==='ingreso'?'Ingreso':'Gasto'} de S/ ${amount.toFixed(2)} registrado`;
   if(servicioMarcado) msg+=` · ✅ ${servicioMarcado} pagado`;
@@ -20994,7 +21099,34 @@ function guardarEdicionCompra(id){
   mat.costo_actual = precio;
   syncMaterialToSheets(mat);
 
-  Object.assign(c, {fecha, material_id:mat.id, material:mat.nombre, cantidad:cant, precio_unitario:precio, total:cant*precio});
+  const nuevoTotal = +(cant * precio).toFixed(2);
+  const oldTotal = +(oldCant * oldPrecio).toFixed(2);
+  Object.assign(c, {fecha, material_id:mat.id, material:mat.nombre, cantidad:cant, precio_unitario:precio, total:nuevoTotal});
+  const linkedTx = (state.transactions || []).find(t=>String(t.id)===String(c.txId || c.id + '_tx'));
+  if(linkedTx){
+    const deltaValor = +(nuevoTotal - moneyValue(linkedTx.amount)).toFixed(2);
+    linkedTx.amount = nuevoTotal;
+    linkedTx.date = fecha;
+    linkedTx.description = 'Compra de materiales - ' + mat.nombre;
+    linkedTx.category = 'Materiales';
+    linkedTx.catId = 'cne1';
+    linkedTx.negocio = true;
+    linkedTx.afectaStockValor = true;
+    linkedTx.stockOperacion = 'entrada_valor';
+    linkedTx.ocultarEnMovimientos = true;
+    linkedTx.stockValorOnly = true;
+    linkedTx.stockCompraId = c.id;
+    c.txId = linkedTx.id;
+    if(deltaValor !== 0){
+      ajustarStockValorGeneral(deltaValor);
+      registrarMovimientoStockValor(deltaValor > 0 ? 'ajuste_entrada_valor' : 'anulacion_entrada_valor', Math.abs(deltaValor), {
+        fecha, descripcion: linkedTx.description, txId: linkedTx.id, compraId: c.id
+      });
+    }
+    syncToSheets(linkedTx);
+  } else if(nuevoTotal !== oldTotal) {
+    ajustarStockValorGeneral(nuevoTotal - oldTotal);
+  }
   const mov = (state.movimientosMateriales || []).find(m=>m.compraId===c.id) ||
     (state.movimientosMateriales || []).find(m=>m.tipo==='compra' && m.material_id===oldMatId && m.fecha===oldFecha && Math.abs(moneyValue(m.costo_total) - oldCant*oldPrecio) < 0.01);
   if(mov){
@@ -21033,6 +21165,17 @@ function deleteCompraMaterial(id){
       if(m.compraId === c.id) return false;
       return !(m.tipo==='compra' && m.material_id===c.material_id && m.fecha===c.fecha && Math.abs(moneyValue(m.costo_total) - moneyValue(c.cantidad)*moneyValue(c.precio_unitario)) < 0.01);
     });
+    const txId = c.txId || c.id + '_tx';
+    const linkedTx = (state.transactions || []).find(t=>String(t.id)===String(txId));
+    if(linkedTx){
+      ajustarStockValorGeneral(-moneyValue(linkedTx.amount));
+      registrarMovimientoStockValor('anulacion_entrada_valor', linkedTx.amount, {
+        fecha: c.fecha || todayStr(), descripcion: linkedTx.description || c.material || '', txId: linkedTx.id, compraId: c.id
+      });
+      state.transactions = (state.transactions || []).filter(t=>String(t.id)!==String(txId));
+      const url=localStorage.getItem('fnz_sheets_url')||'';
+      if(url) _sendToSheets(url,{type:'tx_delete',id:txId,modo:'negocio',timestamp:'cmpdel_'+txId+'_'+Date.now()});
+    }
   }
   state.comprasMateriales = (state.comprasMateriales || []).filter(x=>String(x.id)!==String(id));
   saveAll();
@@ -21708,7 +21851,8 @@ function _registrarCompra(matId, cantidad, precio_unitario, fecha, imagenBase64)
   if(!mat) return;
 
   // FASE 15: Registrar compra
-  const compra = { id:'cmp_'+Date.now(), fecha, material_id:matId, material:mat.nombre, cantidad, precio_unitario, imagen_boleta: imagenBase64?'data:image/jpeg;base64,'+imagenBase64:null };
+  const totalCompra = +(moneyValue(cantidad) * moneyValue(precio_unitario)).toFixed(2);
+  const compra = { id:'cmp_'+Date.now(), fecha, material_id:matId, material:mat.nombre, cantidad, precio_unitario, total:totalCompra, imagen_boleta: imagenBase64?'data:image/jpeg;base64,'+imagenBase64:null };
   state.comprasMateriales = state.comprasMateriales||[];
   state.comprasMateriales.push(compra);
 
@@ -21720,14 +21864,43 @@ function _registrarCompra(matId, cantidad, precio_unitario, fecha, imagenBase64)
     syncMaterialToSheets(state.inventario[idx]);
   }
 
-  // Registrar movimiento
-  const mov = { id:'mov_'+Date.now(), tipo:'compra', compraId:compra.id, material_id:matId, material:mat.nombre, cantidad, costo_unitario_usado:precio_unitario, costo_total:cantidad*precio_unitario, fecha };
+  // Registrar movimiento de stock fisico y egreso oculto de caja
+  const mov = { id:'mov_'+Date.now(), tipo:'compra', compraId:compra.id, material_id:matId, material:mat.nombre, cantidad, costo_unitario_usado:precio_unitario, costo_total:totalCompra, fecha, saldo: moneyValue(state.stockValorGeneral) + totalCompra };
   state.movimientosMateriales = state.movimientosMateriales||[];
   state.movimientosMateriales.push(mov);
+
+  const tx = {
+    id: compra.id + '_tx',
+    type: 'egreso',
+    amount: totalCompra,
+    category: 'Materiales',
+    catId: 'cne1',
+    date: fecha,
+    description: 'Compra de materiales - ' + mat.nombre,
+    cliente: '',
+    ubicacion: '',
+    negocio: true,
+    moneda: 'PEN',
+    afectaStockValor: true,
+    stockOperacion: 'entrada_valor',
+    ocultarEnMovimientos: true,
+    stockValorOnly: true,
+    stockCompraId: compra.id
+  };
+  compra.txId = tx.id;
+  persistTxInScope('negocio', tx);
+  ajustarStockValorGeneral(totalCompra);
+  registrarMovimientoStockValor('entrada_valor', totalCompra, {
+    fecha,
+    descripcion: tx.description,
+    txId: tx.id,
+    compraId: compra.id
+  });
 
   saveAll();
   syncCompraToSheets(compra);
   syncMovimientoToSheets(mov);
+  syncToSheets(tx);
 }
 
 function verBoleta(id){
