@@ -4396,9 +4396,15 @@ function renderDeudas(){
       const pct=p.plazo>0?Math.round((pagosH/p.plazo)*100):0;
       const done=p.capitalPendiente<=0 || pagosH>=p.plazo;
       const restantes=Math.max(0,p.plazo-pagosH);
+      const ppNext=ppProximoPago(p);
+      const ppFinal=ppFin(p);
+      const ppEstado=ppEstadoTiempo(p);
       const ppDotTotal=Math.max(0, Math.min(36, Math.floor(moneyValue(p.plazo)||0)));
       const ppDotColor=p.tipo==='meden'?'#047857':'#9B59B6';
-      const ppDots=Array.from({length:ppDotTotal},(_,i)=>'<span title="Cuota '+(i+1)+'" style="width:'+(ppDotTotal>24?8:ppDotTotal>12?10:12)+'px;height:'+(ppDotTotal>24?8:ppDotTotal>12?10:12)+'px;border-radius:50%;display:inline-block;background:'+(i<pagosH?ppDotColor:'#FFFFFF')+';border:2px solid '+(i<pagosH?ppDotColor:'#CBD5E1')+'"></span>').join('');
+      const ppDots=Array.from({length:ppDotTotal},(_,i)=>{
+        const fechaCuota = ppPagoFecha(p, i + 1);
+        return '<span title="Cuota '+(i+1)+' · '+debtFmtDate(fechaCuota)+(i<pagosH?' · Pagada':' · Pendiente')+'" style="width:'+(ppDotTotal>24?8:ppDotTotal>12?10:12)+'px;height:'+(ppDotTotal>24?8:ppDotTotal>12?10:12)+'px;border-radius:50%;display:inline-block;background:'+(i<pagosH?ppDotColor:'#FFFFFF')+';border:2px solid '+(i<pagosH?ppDotColor:'#CBD5E1')+'"></span>';
+      }).join('');
       return `<div class="debt-card" style="border-color:${done?'#54687833':'var(--border)'}">
         <div class="debt-accent" style="background:${done?'var(--gold)':'#9B59B6'}"></div>
         <!-- Fila 1: círculo + nombre + monto -->
@@ -4408,8 +4414,10 @@ function renderDeudas(){
             <div style="display:flex;justify-content:space-between;align-items:flex-start">
               <div>
                 <div class="debt-name">${p.nombre}</div>
-                <div class="debt-cat">${p.tipo==='debo'?'Yo debo':'Me deben'} · ${p.tasaMensual}% mensual</div>
+                <div class="debt-cat">${p.tipo==='debo'?'Yo debo':'Me deben'} · ${p.tasaMensual}% mensual · dia ${ppDiaPago(p)}</div>
                 <div style="font-size:11px;color:#9B59B6;margin-top:2px;font-weight:500">${{solo_interes:'Solo interés mensual',frances:'Cuota fija (francés)',aleman:'Capital fijo (alemán)'}[p.sistema||'solo_interes']}</div>
+                <div style="display:inline-flex;margin-top:5px;padding:4px 8px;border-radius:999px;background:${ppEstado.bg};color:${ppEstado.color};font-size:10px;font-weight:900;border:1px solid ${ppEstado.color}33">${ppEstado.label}</div>
+                ${p.notas?`<div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.35">${debtHtml(p.notas)}</div>`:''}
               </div>
               <div class="debt-pending">
                 <div class="debt-pending-amt" style="color:${done?'var(--gold)':'#9B59B6'}">${done?'✓ Saldado':fmt(p.capitalPendiente)}</div>
@@ -4418,7 +4426,13 @@ function renderDeudas(){
             </div>
             <div class="debt-next-main ${done?'ok':''}" style="border-left-color:${done?'#059669':ppDotColor};background:${done?'#ECFDF5':'#FAF5FF'};border-color:${done?'#BBF7D0':'#E9D5FF'};margin-top:10px">
               <div class="debt-next-label" style="color:${done?'#047857':'#6C3483'}">${appIcon('calendar')}<span>Proximo pago</span></div>
-              <div class="debt-next-date" style="color:${done?'#047857':'#6C3483'}">${done?'Completado':debtFmtDate(ppPagoFecha(p,pagosH+1))}</div>
+              <div class="debt-next-date" style="color:${done?'#047857':'#6C3483'}">${done?'Completado':(ppNext?debtFmtDate(ppNext):'Sin fecha')}</div>
+              <div style="font-size:10px;color:${ppEstado.color};font-weight:850;margin-top:3px">${ppEstado.detail}</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px">
+              <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:7px"><div style="font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase">Inicio</div><div style="font-size:11px;color:var(--text);font-weight:900">${debtFmtDate(ppInicio(p))}</div></div>
+              <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:7px"><div style="font-size:8px;color:#9A3412;font-weight:900;text-transform:uppercase">Proximo</div><div style="font-size:11px;color:#9A3412;font-weight:900">${ppNext?debtFmtDate(ppNext):'Listo'}</div></div>
+              <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:7px"><div style="font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase">Final</div><div style="font-size:11px;color:var(--text);font-weight:900">${debtFmtDate(ppFinal)}</div></div>
             </div>
             <!-- Cuotas -->
             <div class="cuotas-meta" style="margin-top:8px">
@@ -4535,10 +4549,88 @@ function ppClampCuotasPagadas(n, plazo){
 function ppCuotasPagadas(p){
   return ppClampCuotasPagadas(p?.cuotasPagadas ?? ((p?.pagos || []).length), p?.plazo);
 }
+function ppDiaPago(p){
+  const base = debtIsoDate(p?.fechaVencimiento || p?.fechaInicio || todayStr());
+  return Math.max(1, Math.min(31, Number(p?.diaPago) || Number(base.slice(8,10)) || 1));
+}
+function ppInicio(p){
+  if(p?.fechaInicio) return debtIsoDate(p.fechaInicio);
+  const venc = debtIsoDate(p?.fechaVencimiento || todayStr());
+  return debtAddMonths(venc, -ppCuotasPagadas(p), ppDiaPago({...p, fechaVencimiento:venc}));
+}
 function ppPagoFecha(p, cuotaNum){
-  const start = debtIsoDate(p?.fechaInicio || todayStr());
-  const day = Math.max(1, Math.min(31, Number(start.slice(8,10)) || 1));
-  return debtAddMonths(start, Math.max(0, cuotaNum - 1), day);
+  const start = ppInicio(p);
+  return debtAddMonths(start, Math.max(0, cuotaNum - 1), ppDiaPago(p));
+}
+function ppProximoPago(p){
+  const total = Math.max(0, Math.floor(moneyValue(p?.plazo)));
+  const pagadas = ppCuotasPagadas(p);
+  if(total > 0 && pagadas >= total) return '';
+  return ppPagoFecha(p, pagadas + 1);
+}
+function ppFin(p){
+  const total = Math.max(0, Math.floor(moneyValue(p?.plazo)));
+  if(!total) return ppProximoPago(p) || todayStr();
+  return debtAddMonths(ppInicio(p), total - 1, ppDiaPago(p));
+}
+function ppCuotasVencidasAlDia(p, ref=todayStr()){
+  const total = Math.max(0, Math.floor(moneyValue(p?.plazo)));
+  if(!total) return 0;
+  let vencidas = 0;
+  for(let i=0;i<total;i++){
+    const fecha = debtAddMonths(ppInicio(p), i, ppDiaPago(p));
+    if(debtDaysBetween(fecha, ref) >= 0) vencidas++;
+  }
+  return vencidas;
+}
+function ppEstadoTiempo(p, ref=todayStr()){
+  const pagadas = ppCuotasPagadas(p);
+  const total = Math.max(0, Math.floor(moneyValue(p?.plazo)));
+  if(total > 0 && pagadas >= total) return {label:'Completado', detail:'Sin cuotas pendientes', tone:'ok', bg:'#ECFDF5', color:'#047857', days:0, atraso:0};
+  const next = ppProximoPago(p);
+  if(!next) return {label:'Sin fecha', detail:'Falta configurar vencimiento', tone:'muted', bg:'#F8FAFC', color:'#64748B', days:0, atraso:0};
+  const diff = debtDaysBetween(ref, next);
+  const vencidas = ppCuotasVencidasAlDia(p, ref);
+  const atraso = Math.max(0, vencidas - pagadas);
+  if(diff < 0) return {label:'Atrasado', detail:Math.abs(diff) + ' dia(s) vencido' + (atraso ? ' · ' + atraso + ' cuota(s) atrasadas' : ''), tone:'bad', bg:'#FEF2F2', color:'#B91C1C', days:diff, atraso};
+  if(diff === 0) return {label:'Vence hoy', detail:'Esta cuota pertenece al periodo actual', tone:'warn', bg:'#FFF7ED', color:'#C2410C', days:0, atraso};
+  if(diff <= 5) return {label:'Por vencer', detail:'Faltan ' + diff + ' dia(s)', tone:'warn', bg:'#FFFBEB', color:'#A16207', days:diff, atraso};
+  return {label:'Al dia', detail:'Proximo pago en ' + diff + ' dia(s)', tone:'ok', bg:'#ECFDF5', color:'#047857', days:diff, atraso};
+}
+function ppSmartFormData(prefix='pp'){
+  const plazo = Math.max(0, parseInt(document.getElementById(prefix + '-plazo')?.value)||0);
+  const paid = ppClampCuotasPagadas(document.getElementById(prefix + '-pagadas')?.value||0, plazo || 9999);
+  const venc = debtIsoDate(document.getElementById(prefix + '-vencimiento')?.value || document.getElementById(prefix + '-fecha')?.value || todayStr());
+  const dia = Math.max(1, Math.min(31, Number(venc.slice(8,10)) || parseInt(document.getElementById(prefix + '-dia-pago')?.value)||1));
+  const inicio = debtAddMonths(venc, -paid, dia);
+  return {plazo, paid, venc, dia, inicio};
+}
+function ppSmartPreviewUpdate(prefix='pp'){
+  const data = ppSmartFormData(prefix);
+  const diaEl = document.getElementById(prefix + '-dia-pago');
+  const inicioEl = document.getElementById(prefix + '-fecha');
+  if(diaEl) diaEl.value = data.dia;
+  if(inicioEl) inicioEl.value = data.inicio;
+  const ghost = {fechaInicio:data.inicio, fechaVencimiento:data.venc, diaPago:data.dia, plazo:data.plazo, cuotasPagadas:data.paid};
+  const estado = ppEstadoTiempo(ghost);
+  const fin = data.plazo ? ppFin(ghost) : data.venc;
+  const endEl = document.getElementById(prefix + '-smart-final');
+  const countEl = document.getElementById(prefix + '-smart-count');
+  const statusEl = document.getElementById(prefix + '-smart-status');
+  if(endEl) endEl.textContent = debtFmtDate(fin);
+  if(countEl) countEl.textContent = data.plazo ? data.plazo + ' cuota(s)' : 'Sin cuotas';
+  if(statusEl){
+    statusEl.style.background = estado.bg;
+    statusEl.style.color = estado.color;
+    statusEl.style.borderColor = estado.color + '33';
+    statusEl.textContent = estado.label + ' · ' + estado.detail;
+  }
+}
+function ppApplyRecurringPlan(months, prefix='pp'){
+  const el = document.getElementById(prefix + '-plazo');
+  if(el) el.value = Math.max(1, Number(months||1));
+  if(prefix === 'pp') calcPPPreview();
+  else ppSmartPreviewUpdate(prefix);
 }
 function ppLinkedTxForPago(p, pago){
   if(!p || !pago) return null;
@@ -4620,7 +4712,28 @@ function openAddPrestPers(pre){
         <option value="aleman">Capital fijo — sistema alemán (cuota baja)</option>
       </select>
     </div>
-    <div class="field"><label class="field-label">Fecha inicio</label><input id="pp-fecha" type="date" value="${new Date().toISOString().split('T')[0]}"></div>
+    <div class="field"><label class="field-label">Notas</label><textarea id="pp-notas" rows="2" placeholder="Opcional: acuerdo, persona, garantía, recordatorio" style="width:100%;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;resize:vertical"></textarea></div>
+    <div class="field">
+      <label class="field-label">Repetir</label>
+      <select id="pp-repeticion" onchange="ppSmartPreviewUpdate('pp')" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+        <option value="mensual" selected>Mensual (cada mes)</option>
+        <option value="unico">Un solo vencimiento</option>
+      </select>
+    </div>
+    <div class="field"><label class="field-label">Fecha de vencimiento / próximo pago</label><input id="pp-vencimiento" type="date" value="${todayStr()}" onchange="ppSmartPreviewUpdate('pp')"><input id="pp-fecha" type="hidden" value="${todayStr()}"><input id="pp-dia-pago" type="hidden" value="${Number(todayStr().slice(8,10))||1}"></div>
+    <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="font-size:10px;color:var(--muted);font-weight:900;text-transform:uppercase;margin-bottom:8px">Plan recurrente inteligente</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px">
+        <button type="button" onclick="ppApplyRecurringPlan(12,'pp')" style="border:1px solid #E9D5FF;background:#FFFFFF;color:#6C3483;border-radius:8px;padding:8px;font-size:11px;font-weight:800">1 año</button>
+        <button type="button" onclick="ppApplyRecurringPlan(36,'pp')" style="border:1px solid #E9D5FF;background:#FFFFFF;color:#6C3483;border-radius:8px;padding:8px;font-size:11px;font-weight:800">3 años</button>
+        <button type="button" onclick="ppApplyRecurringPlan(120,'pp')" style="border:1px solid #E9D5FF;background:#FFFFFF;color:#6C3483;border-radius:8px;padding:8px;font-size:11px;font-weight:800">10 años</button>
+      </div>
+      <div id="pp-smart-status" style="display:inline-flex;padding:5px 9px;border-radius:999px;background:#ECFDF5;color:#047857;border:1px solid #04785733;font-size:11px;font-weight:900">Al dia</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px">
+        <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px"><div style="font-size:9px;color:var(--muted);font-weight:900;text-transform:uppercase">Final estimado</div><div id="pp-smart-final" style="font-size:12px;color:var(--text);font-weight:900;margin-top:2px">-</div></div>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px"><div style="font-size:9px;color:var(--muted);font-weight:900;text-transform:uppercase">Cantidad</div><div id="pp-smart-count" style="font-size:12px;color:var(--text);font-weight:900;margin-top:2px">Sin cuotas</div></div>
+      </div>
+    </div>
     <div id="pp-preview" style="display:none;background:#F3F0FF;border:1px solid #9B59B644;border-radius:10px;padding:12px;margin-bottom:10px">
       <div style="font-size:11px;color:#6C3483;margin-bottom:10px;font-weight:600" id="pp-sistema-label">Resumen del préstamo:</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">
@@ -4660,12 +4773,17 @@ function openAddPrestPers(pre){
       <button style="flex:2;background:linear-gradient(135deg,#6C3483,#9B59B6);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="savePrestPers()">Guardar</button>
     </div>`;
   window._ppTipo = 'debo';
-  ['pp-capital','pp-tasa','pp-plazo'].forEach(id=>{
+  ['pp-capital','pp-tasa','pp-plazo','pp-pagadas','pp-vencimiento','pp-repeticion'].forEach(id=>{
     setTimeout(()=>{
       const el=document.getElementById(id);
-      if(el) el.addEventListener('input', calcPPPreview);
+      if(el){
+        const refresh=()=>{ calcPPPreview(); ppSmartPreviewUpdate('pp'); };
+        el.addEventListener('input', refresh);
+        el.addEventListener('change', refresh);
+      }
     },50);
   });
+  setTimeout(()=>{ calcPPPreview(); ppSmartPreviewUpdate('pp'); },70);
   showModal();
 }
 
@@ -4692,6 +4810,7 @@ function calcPPPreview(){
   const tasa=parseFloat(document.getElementById('pp-tasa')?.value||0);
   const plazo=parseInt(document.getElementById('pp-plazo')?.value||0);
   const sistema=document.getElementById('pp-sistema')?.value||'solo_interes';
+  ppSmartPreviewUpdate('pp');
   if(!capital||!plazo) return;
 
   const tabla=calcTablaAmort(capital,tasa,plazo,sistema);
@@ -4751,15 +4870,23 @@ function savePrestPers(){
   const tasa=parseFloat(document.getElementById('pp-tasa')?.value||0);
   const plazo=parseInt(document.getElementById('pp-plazo')?.value);
   const cuotasPagadas=ppClampCuotasPagadas(document.getElementById('pp-pagadas')?.value||0, plazo);
-  const fecha=document.getElementById('pp-fecha')?.value;
+  const fechaVencimiento=debtIsoDate(document.getElementById('pp-vencimiento')?.value||document.getElementById('pp-fecha')?.value||todayStr());
+  const diaPago=Math.max(1, Math.min(31, Number(fechaVencimiento.slice(8,10)) || 1));
+  const fecha=debtAddMonths(fechaVencimiento, -cuotasPagadas, diaPago);
   const sistema=document.getElementById('pp-sistema')?.value||'solo_interes';
-  if(!nombre||!capital||!plazo||!fecha) return toast('Completa todos los campos','error');
+  const repeticion=document.getElementById('pp-repeticion')?.value||'mensual';
+  const notas=document.getElementById('pp-notas')?.value.trim()||'';
+  if(!nombre||!capital||!plazo||!fechaVencimiento) return toast('Completa todos los campos','error');
   const p={
     id:Date.now()+'',
     nombre, tipo:window._ppTipo||'debo',
     capital, capitalPendiente:capital,
     tasaMensual:tasa, plazo, sistema,
     fechaInicio:fecha,
+    fechaVencimiento,
+    diaPago,
+    repeticion,
+    notas,
     cuotasPagadas:0,
     pagos:[]
   };
@@ -4821,6 +4948,7 @@ function editPrestPers(id){
     {val:'frances',lbl:'Cuota fija — sistema francés'},
     {val:'aleman',lbl:'Capital fijo — sistema alemán'},
   ];
+  const vencimiento = debtIsoDate(p.fechaVencimiento || ppProximoPago(p) || todayStr());
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:#6C3483">Editar Préstamo Personal</div>
     <div class="field"><label class="field-label">Nombre</label><input id="ep-nombre" type="text" value="${p.nombre}"></div>
@@ -4829,6 +4957,28 @@ function editPrestPers(id){
     <div class="field"><label class="field-label">Tasa mensual (%)</label><input id="ep-tasa" type="number" inputmode="decimal" step="0.1" value="${p.tasaMensual}"></div>
     <div class="field"><label class="field-label">Plazo (meses)</label><input id="ep-plazo" type="number" inputmode="numeric" value="${p.plazo}"></div>
     <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="ep-pagadas" type="number" inputmode="numeric" min="0" max="${p.plazo}" value="${ppCuotasPagadas(p)}"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Si aumentas este numero, se marca como historial sin mover Balance. Si lo bajas, se retiran pagos ligados sobrantes.</div></div>
+    <div class="field"><label class="field-label">Notas</label><textarea id="ep-notas" rows="2" style="width:100%;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;resize:vertical">${debtHtml(p.notas||'')}</textarea></div>
+    <div class="field">
+      <label class="field-label">Repetir</label>
+      <select id="ep-repeticion" onchange="ppSmartPreviewUpdate('ep')" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+        <option value="mensual" ${(p.repeticion||'mensual')==='mensual'?'selected':''}>Mensual (cada mes)</option>
+        <option value="unico" ${p.repeticion==='unico'?'selected':''}>Un solo vencimiento</option>
+      </select>
+    </div>
+    <div class="field"><label class="field-label">Fecha de vencimiento / próximo pago</label><input id="ep-vencimiento" type="date" value="${vencimiento}" onchange="ppSmartPreviewUpdate('ep')"><input id="ep-fecha" type="hidden" value="${ppInicio(p)}"><input id="ep-dia-pago" type="hidden" value="${ppDiaPago(p)}"></div>
+    <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="font-size:10px;color:var(--muted);font-weight:900;text-transform:uppercase;margin-bottom:8px">Plan recurrente inteligente</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px">
+        <button type="button" onclick="ppApplyRecurringPlan(12,'ep')" style="border:1px solid #E9D5FF;background:#FFFFFF;color:#6C3483;border-radius:8px;padding:8px;font-size:11px;font-weight:800">1 año</button>
+        <button type="button" onclick="ppApplyRecurringPlan(36,'ep')" style="border:1px solid #E9D5FF;background:#FFFFFF;color:#6C3483;border-radius:8px;padding:8px;font-size:11px;font-weight:800">3 años</button>
+        <button type="button" onclick="ppApplyRecurringPlan(120,'ep')" style="border:1px solid #E9D5FF;background:#FFFFFF;color:#6C3483;border-radius:8px;padding:8px;font-size:11px;font-weight:800">10 años</button>
+      </div>
+      <div id="ep-smart-status" style="display:inline-flex;padding:5px 9px;border-radius:999px;background:#ECFDF5;color:#047857;border:1px solid #04785733;font-size:11px;font-weight:900">Al dia</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px">
+        <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px"><div style="font-size:9px;color:var(--muted);font-weight:900;text-transform:uppercase">Final estimado</div><div id="ep-smart-final" style="font-size:12px;color:var(--text);font-weight:900;margin-top:2px">-</div></div>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px"><div style="font-size:9px;color:var(--muted);font-weight:900;text-transform:uppercase">Cantidad</div><div id="ep-smart-count" style="font-size:12px;color:var(--text);font-weight:900;margin-top:2px">Sin cuotas</div></div>
+      </div>
+    </div>
     <div class="field"><label class="field-label">Sistema de pago</label>
       <select id="ep-sistema" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
         ${sistemas.map(s=>`<option value="${s.val}" ${p.sistema===s.val?'selected':''}>${s.lbl}</option>`).join('')}
@@ -4845,6 +4995,16 @@ function editPrestPers(id){
       <button style="flex:2;background:linear-gradient(135deg,#6C3483,#9B59B6);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="saveEditPrestPers('${id}')">Guardar cambios</button>
     </div>`;
   window._epTipo=p.tipo||'debo';
+  ['ep-plazo','ep-pagadas','ep-vencimiento','ep-repeticion'].forEach(fid=>{
+    setTimeout(()=>{
+      const el=document.getElementById(fid);
+      if(el){
+        el.addEventListener('input', ()=>ppSmartPreviewUpdate('ep'));
+        el.addEventListener('change', ()=>ppSmartPreviewUpdate('ep'));
+      }
+    },50);
+  });
+  setTimeout(()=>ppSmartPreviewUpdate('ep'),70);
   showModal();
 }
 
@@ -4867,13 +5027,23 @@ function saveEditPrestPers(id){
   const plazo=parseInt(document.getElementById('ep-plazo')?.value);
   const cuotasPagadas=ppClampCuotasPagadas(document.getElementById('ep-pagadas')?.value||0, plazo);
   const sistema=document.getElementById('ep-sistema')?.value||'solo_interes';
-  if(!nombre||!capital||isNaN(pendiente)||!plazo) return toast('Completa todos los campos','error');
+  const fechaVencimiento=debtIsoDate(document.getElementById('ep-vencimiento')?.value||p.fechaVencimiento||ppProximoPago(p)||todayStr());
+  const diaPago=Math.max(1, Math.min(31, Number(fechaVencimiento.slice(8,10)) || 1));
+  const fechaInicio=debtAddMonths(fechaVencimiento, -cuotasPagadas, diaPago);
+  const repeticion=document.getElementById('ep-repeticion')?.value||'mensual';
+  const notas=document.getElementById('ep-notas')?.value.trim()||'';
+  if(!nombre||!capital||isNaN(pendiente)||!plazo||!fechaVencimiento) return toast('Completa todos los campos','error');
   p.nombre=nombre;
   p.capital=capital;
   p.capitalPendiente=pendiente;
   p.tasaMensual=tasa;
   p.plazo=plazo;
   p.sistema=sistema;
+  p.fechaInicio=fechaInicio;
+  p.fechaVencimiento=fechaVencimiento;
+  p.diaPago=diaPago;
+  p.repeticion=repeticion;
+  p.notas=notas;
   p.tipo=window._epTipo||'debo';
   if(cuotasPagadas !== cuotasPrevias) ppApplyCuotasPagadas(p, cuotasPagadas, {removeTrimmedTxs:true});
   else { p.capitalPendiente=pendiente; p.cuotasPagadas=cuotasPrevias; }
