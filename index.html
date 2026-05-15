@@ -4157,11 +4157,14 @@ function renderDeudas(){
     ? `<div class="card" style="text-align:center;color:var(--dim);padding:20px 0;font-size:13px">Sin préstamos personales</div>`
     : prestPers.map(p=>{
       const {interes,capitalMes,cuota}=calcMesActual(p);
-      const totalIntPagado=parseFloat((p.pagos||[]).reduce((s,pg)=>s+pg.montoInteres,0).toFixed(2));
-      const pagosH=(p.pagos||[]).length;
-      const pct=Math.round(((p.capital-p.capitalPendiente)/p.capital)*100);
-      const done=p.capitalPendiente<=0;
-      const restantes=p.plazo-pagosH;
+      const totalIntPagado=parseFloat((p.pagos||[]).reduce((s,pg)=>s+moneyValue(pg.montoInteres),0).toFixed(2));
+      const pagosH=ppCuotasPagadas(p);
+      const pct=p.plazo>0?Math.round((pagosH/p.plazo)*100):0;
+      const done=p.capitalPendiente<=0 || pagosH>=p.plazo;
+      const restantes=Math.max(0,p.plazo-pagosH);
+      const ppDotTotal=Math.max(0, Math.min(36, Math.floor(moneyValue(p.plazo)||0)));
+      const ppDotColor=p.tipo==='meden'?'#047857':'#9B59B6';
+      const ppDots=Array.from({length:ppDotTotal},(_,i)=>'<span title="Cuota '+(i+1)+'" style="width:'+(ppDotTotal>24?8:ppDotTotal>12?10:12)+'px;height:'+(ppDotTotal>24?8:ppDotTotal>12?10:12)+'px;border-radius:50%;display:inline-block;background:'+(i<pagosH?ppDotColor:'#FFFFFF')+';border:2px solid '+(i<pagosH?ppDotColor:'#CBD5E1')+'"></span>').join('');
       return `<div class="debt-card" style="border-color:${done?'#54687833':'var(--border)'}">
         <div class="debt-accent" style="background:${done?'var(--gold)':'#9B59B6'}"></div>
         <!-- Fila 1: círculo + nombre + monto -->
@@ -4184,6 +4187,7 @@ function renderDeudas(){
               <span><span style="color:#9B59B6;font-weight:600">${pagosH}</span> pagadas · <span style="color:var(--red);font-weight:600">${restantes}</span> restantes</span>
               <span style="color:var(--muted)">de ${p.plazo} cuotas</span>
             </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;align-items:center;padding:8px;background:#F8FAFC;border:1px solid var(--border);border-radius:9px">${ppDots}</div>
           </div>
         </div>
         <!-- Fila 2: cajas de montos (ancho completo) -->
@@ -4286,6 +4290,74 @@ function calcTablaAmort(capital, tasa, plazo, sistema){
   return tabla;
 }
 
+function ppClampCuotasPagadas(n, plazo){
+  const max = Math.max(0, Math.floor(moneyValue(plazo)));
+  return Math.max(0, Math.min(max, Math.floor(moneyValue(n))));
+}
+function ppCuotasPagadas(p){
+  return ppClampCuotasPagadas(p?.cuotasPagadas ?? ((p?.pagos || []).length), p?.plazo);
+}
+function ppPagoFecha(p, cuotaNum){
+  const start = debtIsoDate(p?.fechaInicio || todayStr());
+  const day = Math.max(1, Math.min(31, Number(start.slice(8,10)) || 1));
+  return debtAddMonths(start, Math.max(0, cuotaNum - 1), day);
+}
+function ppLinkedTxForPago(p, pago){
+  if(!p || !pago) return null;
+  return (state.transactions || []).find(t =>
+    t.origenPrestamoPersonalPago &&
+    String(t.prestamoPersonalId) === String(p.id) &&
+    String(t.prestamoPagoId) === String(pago.id)
+  ) || null;
+}
+function ppBuildPagoFromRow(p, cuotaNum, existing){
+  const tabla = calcTablaAmort(moneyValue(p.capital), moneyValue(p.tasaMensual), Math.max(1, Math.floor(moneyValue(p.plazo))), p.sistema || 'solo_interes');
+  const row = tabla[Math.max(0, cuotaNum - 1)] || {interes:0, capitalMes:0, cuota:0, saldo:moneyValue(p.capitalPendiente)};
+  const linked = existing ? ppLinkedTxForPago(p, existing) : null;
+  const afectaBalance = existing?.afectaBalance === true || !!existing?.txId || !!linked;
+  return {
+    ...(existing || {}),
+    id: existing?.id || (Date.now() + '_pp' + cuotaNum + '_' + Math.random().toString(36).slice(2,6)),
+    cuota: cuotaNum,
+    fecha: existing?.fecha || ppPagoFecha(p, cuotaNum),
+    montoInteres: moneyValue(existing?.montoInteres ?? row.interes),
+    montoCapital: moneyValue(existing?.montoCapital ?? row.capitalMes),
+    capitalPendiente: moneyValue(existing?.capitalPendiente ?? row.saldo),
+    txId: existing?.txId || linked?.id || '',
+    afectaBalance,
+    historico: existing?.historico === true || !afectaBalance
+  };
+}
+function ppRemoveTrimmedTxs(prestamoId, keepIds){
+  const keep = new Set([...keepIds].map(String));
+  const removed = (state.transactions || []).filter(t =>
+    t.origenPrestamoPersonalPago &&
+    String(t.prestamoPersonalId) === String(prestamoId) &&
+    !keep.has(String(t.prestamoPagoId))
+  );
+  if(!removed.length) return 0;
+  state.transactions = (state.transactions || []).filter(t => !(
+    t.origenPrestamoPersonalPago &&
+    String(t.prestamoPersonalId) === String(prestamoId) &&
+    !keep.has(String(t.prestamoPagoId))
+  ));
+  const url = localStorage.getItem('fnz_sheets_url') || '';
+  if(url) removed.forEach(t => _sendToSheets(url, {type:'tx_delete', id:t.id, modo:txSheetModo(t), timestamp:'prestpers_trim_' + t.id + '_' + Date.now()}));
+  return removed.length;
+}
+function ppApplyCuotasPagadas(p, target, opts = {}){
+  const n = ppClampCuotasPagadas(target, p.plazo);
+  const existing = Array.isArray(p.pagos) ? p.pagos.slice() : [];
+  const pagos = existing.slice(0, n).map((pg, i) => ppBuildPagoFromRow(p, i + 1, pg));
+  while(pagos.length < n) pagos.push(ppBuildPagoFromRow(p, pagos.length + 1, {historico:true, afectaBalance:false}));
+  if(opts.removeTrimmedTxs) ppRemoveTrimmedTxs(p.id, new Set(pagos.map(pg => pg.id)));
+  p.pagos = pagos;
+  p.cuotasPagadas = pagos.length;
+  p.capitalPendiente = pagos.length ? moneyValue(pagos[pagos.length - 1].capitalPendiente) : moneyValue(p.capital);
+  if(pagos.length >= Math.floor(moneyValue(p.plazo))) p.capitalPendiente = 0;
+  return p;
+}
+
 function openAddPrestPers(pre){
   pre = pre || {};
   document.getElementById('modal-content').innerHTML=`
@@ -4301,6 +4373,7 @@ function openAddPrestPers(pre){
     <div class="field"><label class="field-label">Capital (S/)</label><input id="pp-capital" type="number" inputmode="decimal" placeholder="0.00"></div>
     <div class="field"><label class="field-label">Tasa de interés mensual (%)</label><input id="pp-tasa" type="number" inputmode="decimal" placeholder="Ej: 20" step="0.1"></div>
     <div class="field"><label class="field-label">Plazo (meses)</label><input id="pp-plazo" type="number" inputmode="numeric" placeholder="Ej: 3"></div>
+    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="pp-pagadas" type="number" inputmode="numeric" min="0" placeholder="0" value="0"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Esto solo rellena el avance historico del prestamo; no mueve Balance. Para afectar caja usa Registrar pago.</div></div>
     <div class="field">
       <label class="field-label">Sistema de pago</label>
       <select id="pp-sistema" onchange="calcPPPreview()" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
@@ -4439,6 +4512,7 @@ function savePrestPers(){
   const capital=parseFloat(document.getElementById('pp-capital')?.value);
   const tasa=parseFloat(document.getElementById('pp-tasa')?.value||0);
   const plazo=parseInt(document.getElementById('pp-plazo')?.value);
+  const cuotasPagadas=ppClampCuotasPagadas(document.getElementById('pp-pagadas')?.value||0, plazo);
   const fecha=document.getElementById('pp-fecha')?.value;
   const sistema=document.getElementById('pp-sistema')?.value||'solo_interes';
   if(!nombre||!capital||!plazo||!fecha) return toast('Completa todos los campos','error');
@@ -4448,8 +4522,10 @@ function savePrestPers(){
     capital, capitalPendiente:capital,
     tasaMensual:tasa, plazo, sistema,
     fechaInicio:fecha,
+    cuotasPagadas:0,
     pagos:[]
   };
+  ppApplyCuotasPagadas(p, cuotasPagadas);
   if(!state.prestamosPersonales) state.prestamosPersonales=[];
   state.prestamosPersonales.unshift(p);
   saveAll();
@@ -4462,18 +4538,21 @@ function savePrestPers(){
 function pagarPrestPers(id){
   const p=state.prestamosPersonales.find(x=>x.id===id);
   if(!p||p.capitalPendiente<=0) return;
+  ppApplyCuotasPagadas(p, ppCuotasPagadas(p), {removeTrimmedTxs:false});
   const tabla=calcTablaAmort(p.capital,p.tasaMensual,p.plazo,p.sistema||'solo_interes');
-  const pagosHechos=p.pagos.length;
+  const pagosHechos=ppCuotasPagadas(p);
   if(pagosHechos>=tabla.length) return toast('Todos los pagos ya fueron registrados','error');
   const fila=tabla[pagosHechos];
   const interes=fila.interes;
   const capitalMes=fila.capitalMes;
-  p.capitalPendiente=parseFloat((p.capitalPendiente-capitalMes).toFixed(2));
+  p.capitalPendiente=moneyValue(fila.saldo);
   if(p.capitalPendiente<0) p.capitalPendiente=0;
-  const pago={id:Date.now()+'',fecha:new Date().toISOString().split('T')[0],montoInteres:interes,montoCapital:capitalMes,capitalPendiente:p.capitalPendiente};
+  const pago={id:Date.now()+'',cuota:pagosHechos+1,fecha:new Date().toISOString().split('T')[0],montoInteres:interes,montoCapital:capitalMes,capitalPendiente:p.capitalPendiente,afectaBalance:true,historico:false};
   p.pagos.push(pago);
+  p.cuotasPagadas=p.pagos.length;
   const totalPago=interes+capitalMes;
   const tx={id:'prestpers_'+p.id+'_'+pago.id,type:p.tipo==='meden'?'ingreso':'egreso',amount:totalPago,category:p.tipo==='meden'?'Cobro prestamo':'Deuda',catId:p.tipo==='meden'?'ci6':'ce9',description:(p.tipo==='meden'?'Cobro ':'Pago ')+p.nombre,date:pago.fecha,negocio:state.modo==='negocio',moneda:'PEN',origenPrestamoPersonalPago:true,prestamoPersonalId:p.id,prestamoPagoId:pago.id};
+  pago.txId=tx.id;
   state.transactions=state.transactions||[];
   state.transactions.unshift(tx);
   saveAll();
@@ -4511,6 +4590,7 @@ function editPrestPers(id){
     <div class="field"><label class="field-label">Capital pendiente (S/)</label><input id="ep-pendiente" type="number" inputmode="decimal" value="${p.capitalPendiente}"></div>
     <div class="field"><label class="field-label">Tasa mensual (%)</label><input id="ep-tasa" type="number" inputmode="decimal" step="0.1" value="${p.tasaMensual}"></div>
     <div class="field"><label class="field-label">Plazo (meses)</label><input id="ep-plazo" type="number" inputmode="numeric" value="${p.plazo}"></div>
+    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="ep-pagadas" type="number" inputmode="numeric" min="0" max="${p.plazo}" value="${ppCuotasPagadas(p)}"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Si aumentas este numero, se marca como historial sin mover Balance. Si lo bajas, se retiran pagos ligados sobrantes.</div></div>
     <div class="field"><label class="field-label">Sistema de pago</label>
       <select id="ep-sistema" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
         ${sistemas.map(s=>`<option value="${s.val}" ${p.sistema===s.val?'selected':''}>${s.lbl}</option>`).join('')}
@@ -4541,11 +4621,13 @@ function setEPTipo(tipo){
 function saveEditPrestPers(id){
   const p=state.prestamosPersonales.find(x=>x.id===id);
   if(!p) return;
+  const cuotasPrevias=ppCuotasPagadas(p);
   const nombre=document.getElementById('ep-nombre')?.value.trim();
   const capital=parseFloat(document.getElementById('ep-capital')?.value);
   const pendiente=parseFloat(document.getElementById('ep-pendiente')?.value);
   const tasa=parseFloat(document.getElementById('ep-tasa')?.value||0);
   const plazo=parseInt(document.getElementById('ep-plazo')?.value);
+  const cuotasPagadas=ppClampCuotasPagadas(document.getElementById('ep-pagadas')?.value||0, plazo);
   const sistema=document.getElementById('ep-sistema')?.value||'solo_interes';
   if(!nombre||!capital||isNaN(pendiente)||!plazo) return toast('Completa todos los campos','error');
   p.nombre=nombre;
@@ -4555,7 +4637,11 @@ function saveEditPrestPers(id){
   p.plazo=plazo;
   p.sistema=sistema;
   p.tipo=window._epTipo||'debo';
-  saveAll();closeModal();render();toast('Préstamo actualizado ✓');
+  if(cuotasPagadas !== cuotasPrevias) ppApplyCuotasPagadas(p, cuotasPagadas, {removeTrimmedTxs:true});
+  else { p.capitalPendiente=pendiente; p.cuotasPagadas=cuotasPrevias; }
+  saveAll();
+  syncSeccionToSheets('prestamo', p);
+  closeModal();render();toast('Préstamo actualizado ✓');
 }
 
 
