@@ -301,6 +301,7 @@ body{font-family:'Inter','Roboto',sans-serif;color:var(--text)}
 .mv-d-btn{flex:1;min-width:96px;padding:8px;border-radius:8px;font-size:12px;font-weight:600;border:0.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer}
 .mv-d-btn:active{opacity:.7}
 .mv-d-btn.link{color:#2F6F53;border-color:#BBD8C8;background:#EEF7F2}
+.mv-d-btn.stock{color:#9A6B00;border-color:#F4D48B;background:#FFF8E6}
 .mv-d-btn.del{color:#C62828;border-color:#C6282833}
 .btn-gold{background:linear-gradient(135deg,#3D6677,#2E5265);color:#fff;border:none;border-radius:14px;padding:15px 18px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer;transition:opacity .2s,transform .15s;box-shadow:0 4px 14px rgba(61,102,119,0.30)}
 .btn-gold:hover{opacity:.88;transform:translateY(-1px)}
@@ -3570,6 +3571,7 @@ function renderMovimientos(){
                   ${t.cliente?`<div class="mv-d-item"><span class="mv-d-lbl">Cliente</span><span class="mv-d-val">${t.cliente}</span></div>`:''}
                   ${t.vinculadoServicioId?`<div class="mv-d-item" style="grid-column:1/-1"><span class="mv-d-lbl">Servicio vinculado</span><span class="mv-d-val">${t.vinculadoServicioDesc||t.vinculadoServicioCliente||'Servicio'}</span></div>`:''}
                   <div class="mv-d-actions">
+                    ${txPuedeMoverAStock(t)?`<button class="mv-d-btn stock" onclick="event.stopPropagation();moverMovimientoAStock('${t.id}')">Mover a Stock</button>`:''}
                     ${txPuedeVincularServicio(t)?`<button class="mv-d-btn link" onclick="event.stopPropagation();openVincularServicioTx('${t.id}')">${t.vinculadoServicioId?'Cambiar servicio':'Vincular servicio'}</button>`:''}
                     <button class="mv-d-btn" onclick="event.stopPropagation();openEditTx('${t.id}')">✎ Editar</button>
                     <button class="mv-d-btn del" onclick="event.stopPropagation();deleteTx('${t.id}')">✕ Eliminar</button>
@@ -7679,6 +7681,65 @@ async function saveTx(editId){
 }
 
 
+
+function txPuedeMoverAStock(t){
+  if(!t || t.type !== 'egreso') return false;
+  if(txSheetModo(t, state.modo) !== 'negocio') return false;
+  if(moneyValue(t.amount) <= 0) return false;
+  if(isCompraStockValorTx(t) || isStockValueTx(t)) return false;
+  if(t.vinculadoServicioId || t.origenCierreServicio || t.origenServicioMaterial || t.materialUsoServicio) return false;
+  if(t.origenDeudaPago || deudaTxLooksLike(t)) return false;
+  if(t.noCashFlow || t.afectaStockValor || t.stockValorOnly) return false;
+  if(t._importadoDeNotion || t._notionTrabajo) return false;
+  return true;
+}
+
+function moverMovimientoAStock(txId){
+  const tx = (state.transactions || []).find(t => String(t.id) === String(txId));
+  if(!tx) return toast('Movimiento no encontrado', 'error');
+  if(!txPuedeMoverAStock(tx)) return toast('Ese movimiento no se puede mover a Stock desde aqui', 'info');
+  const oldCat = tx.category || '';
+  const oldCatId = tx.catId || '';
+  const notionPageId = normalizeNotionPageId(tx._notionRowId || tx._notionFinanceRowId || tx._notionReporteRowId || '');
+  tx.category = 'Materiales';
+  tx.catId = 'cne1';
+  tx.description = (tx.description || oldCat || 'Compra de materiales').trim();
+  tx.afectaStockValor = true;
+  tx.stockOperacion = 'entrada_valor';
+  tx.ocultarEnMovimientos = true;
+  tx.stockValorOnly = true;
+  tx.stockMigradoDesdeMovimiento = true;
+  tx.stockMigradoAt = new Date().toISOString();
+  tx.stockOldCategory = oldCat;
+  tx.stockOldCatId = oldCatId;
+  tx.expenseBucket = 'materiales';
+  tx.notionColumn = 'materiales';
+  delete tx.vinculadoServicioId;
+  delete tx.vinculadoServicioCliente;
+  delete tx.vinculadoServicioFecha;
+  delete tx.vinculadoServicioDesc;
+  delete tx.vinculadoServicioMonto;
+  delete tx._notionRowId;
+  delete tx._notionFinanceRowId;
+  delete tx._notionReporteRowId;
+  const compra = upsertCompraStockValorFromTx(tx);
+  const delta = ajustarStockValorGeneral(tx.amount);
+  registrarMovimientoStockValor('entrada_valor', tx.amount, {
+    fecha: tx.date,
+    descripcion: tx.description,
+    cliente: tx.cliente || '',
+    txId: tx.id,
+    compraId: tx.stockCompraId || ''
+  });
+  saveAll();
+  const url = localStorage.getItem('fnz_sheets_url') || '';
+  if(url) _sendToSheets(url, {type:'tx_delete', id:tx.id, modo:'negocio', timestamp:'txstock_'+tx.id+'_'+Date.now()});
+  if(compra) syncCompraToSheets(compra);
+  if(notionPageId) _deleteNotionPage(notionPageId);
+  render();
+  toast('Movido a Stock · caja no se duplico · stock +' + fmt(Math.abs(delta || moneyValue(tx.amount))));
+}
+
 function txPuedeVincularServicio(t){
   if(!t || t.type !== 'egreso') return false;
   if(t.origenCierreServicio || t.origenServicioMaterial || t.materialUsoServicio) return false;
@@ -7737,26 +7798,101 @@ function limpiarVinculoServicioTx(tx){
   delete tx.vinculadoServicioMonto;
 }
 
-function openVincularServicioTx(id){
+function svcLinkStateFor(txId, reset=false){
+  if(!window._svcLinkState || reset) window._svcLinkState = {};
+  const key = String(txId || '');
+  if(!window._svcLinkState[key]) window._svcLinkState[key] = {q:'', fecha:'', limit:12};
+  return window._svcLinkState[key];
+}
+
+function svcLinkJs(v){
+  return String(v || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+}
+
+function svcLinkSetSearch(txId, value){
+  const st = svcLinkStateFor(txId);
+  st.q = value || '';
+  st.limit = 12;
+  openVincularServicioTx(txId, {focus:'search'});
+}
+
+function svcLinkSetFecha(txId, value){
+  const st = svcLinkStateFor(txId);
+  st.fecha = value || '';
+  st.limit = 12;
+  openVincularServicioTx(txId);
+}
+
+function svcLinkResetFiltros(txId){
+  const st = svcLinkStateFor(txId);
+  st.q = '';
+  st.fecha = '';
+  st.limit = 12;
+  openVincularServicioTx(txId, {focus:'search'});
+}
+
+function svcLinkLoadMore(txId){
+  const st = svcLinkStateFor(txId);
+  st.limit = Math.min(240, moneyValue(st.limit || 12) + 12);
+  openVincularServicioTx(txId);
+}
+
+function svcLinkServicioTexto(a){
+  return normSimpleText([
+    a?.cliente,
+    a?.fecha,
+    a?.ubicacion,
+    a?.distrito,
+    servicioResumenVinculo(a),
+    servicioDescVinculo(a),
+    servicioMontoVinculo(a)
+  ].filter(Boolean).join(' '));
+}
+
+function openVincularServicioTx(id, opts={}){
   const tx = (state.transactions || []).find(t => String(t.id) === String(id));
   if(!tx) return toast('Movimiento no encontrado', 'error');
   if(!txPuedeVincularServicio(tx)) return toast('Este movimiento no se vincula aqui. Materiales se corrige desde Stock o desde el cierre del servicio.', 'info');
+  const st = svcLinkStateFor(tx.id, !!opts.reset);
+  const txJsId = svcLinkJs(tx.id);
   const servicios = serviciosCandidatosParaTx(tx);
   const actualId = String(tx.vinculadoServicioId || '');
   const actual = actualId ? (state.agenda || []).find(a => String(a.id) === actualId) : null;
-  const sameDay = servicios.filter(a => String(a.fecha || '') === String(tx.date || ''));
-  const otros = servicios.filter(a => String(a.fecha || '') !== String(tx.date || '')).slice(0, 12);
+  const qRaw = String(st.q || '').trim();
+  const q = normSimpleText(qRaw);
+  const fechaFiltro = String(st.fecha || '');
+  const hasFilter = !!(q || fechaFiltro);
+  const limit = Math.max(12, moneyValue(st.limit || 12));
+  const matchServicio = (a) => {
+    if(fechaFiltro && String(a.fecha || '') !== fechaFiltro) return false;
+    if(q && !svcLinkServicioTexto(a).includes(q)) return false;
+    return true;
+  };
   const row = (a) => {
     const selected = String(a.id) === actualId;
     const total = servicioMontoVinculo(a);
-    return `<button type="button" onclick="vincularMovimientoAServicio('${tx.id}','${a.id}')" style="width:100%;border:1px solid ${selected?'#2F6F53':'#E5E7EB'};background:${selected?'#EEF7F2':'#FFFFFF'};border-radius:14px;padding:12px;text-align:left;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;font-family:'DM Sans',sans-serif;cursor:pointer">
+    const svcId = svcLinkJs(a.id);
+    return `<button type="button" onclick="vincularMovimientoAServicio('${txJsId}','${svcId}')" style="width:100%;border:1px solid ${selected?'#2F6F53':'#E5E7EB'};background:${selected?'#EEF7F2':'#FFFFFF'};border-radius:14px;padding:12px;text-align:left;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;font-family:'DM Sans',sans-serif;cursor:pointer">
       <span style="min-width:0">
         <span style="display:block;font-size:13px;font-weight:850;color:#172033;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${debtHtml(a.cliente || 'Sin cliente')}${selected?' · Actual':''}</span>
         <span style="display:block;font-size:11px;color:#64748B;margin-top:2px;line-height:1.25">${debtHtml(a.fecha || '')} · ${debtHtml(servicioResumenVinculo(a))}</span>
+        ${a.ubicacion?`<span style="display:block;font-size:10px;color:#94A3B8;margin-top:2px">${debtHtml(a.ubicacion)}</span>`:''}
       </span>
       <span style="font-size:12px;font-weight:850;color:#2F6F53;white-space:nowrap">${fmt(total)}</span>
     </button>`;
   };
+  const sameDay = servicios.filter(a => String(a.fecha || '') === String(tx.date || '') && (!hasFilter || matchServicio(a)));
+  const otrosBase = servicios.filter(a => String(a.fecha || '') !== String(tx.date || '') && (!hasFilter || matchServicio(a)));
+  const matchesBase = hasFilter ? servicios.filter(matchServicio) : [];
+  const matches = hasFilter ? matchesBase.slice(0, limit) : [];
+  const otros = hasFilter ? [] : otrosBase.slice(0, limit);
+  const totalDisponibles = hasFilter ? matchesBase.length : otrosBase.length;
+  const visibleCount = hasFilter ? matches.length : otros.length;
+  const showMore = totalDisponibles > visibleCount;
+  const filtroActivo = qRaw || fechaFiltro;
+  const focusScript = opts.focus === 'search'
+    ? `setTimeout(()=>{const el=document.getElementById('svc-link-search');if(el){el.focus();try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){}}},0);`
+    : '';
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-title" style="color:#172033;margin-bottom:8px">${actual?'Cambiar servicio':'Vincular servicio'}</div>
     <div style="background:#F8FAFC;border:1px solid #E5E7EB;border-radius:14px;padding:12px;margin-bottom:12px">
@@ -7765,15 +7901,31 @@ function openVincularServicioTx(id){
       <div style="font-size:12px;color:#64748B;margin-top:2px">${debtHtml(tx.date || '')}${tx.description?' · '+debtHtml(tx.description):''}</div>
       ${actual?`<div style="font-size:12px;color:#2F6F53;font-weight:800;margin-top:8px">Ahora esta en: ${debtHtml(servicioDescVinculo(actual))}</div>`:''}
     </div>
-    <div style="font-size:11px;color:#64748B;font-weight:850;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 6px">Servicios del mismo dia</div>
-    <div style="display:grid;gap:8px">${sameDay.length?sameDay.map(row).join(''):'<div style="font-size:13px;color:#64748B;text-align:center;padding:14px;border:1px dashed #CBD5E1;border-radius:14px">No hay servicios finalizados ese dia.</div>'}</div>
-    ${otros.length?`<div style="font-size:11px;color:#64748B;font-weight:850;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 6px">Otros servicios recientes</div><div style="display:grid;gap:8px">${otros.map(row).join('')}</div>`:''}
+    <div style="display:grid;gap:8px;margin-bottom:12px">
+      <div style="position:relative">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;color:#64748B">🔎</span>
+        <input id="svc-link-search" type="text" value="${debtHtml(qRaw)}" placeholder="Buscar cliente, servicio, distrito o monto" oninput="svcLinkSetSearch('${txJsId}', this.value)" style="width:100%;height:46px;border:1px solid #E5E7EB;border-radius:14px;background:#FFFFFF;padding:0 12px 0 36px;font-family:'DM Sans',sans-serif;font-size:14px;color:#172033;outline:none">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
+        <input type="date" value="${debtHtml(fechaFiltro)}" onchange="svcLinkSetFecha('${txJsId}', this.value)" style="width:100%;height:44px;border:1px solid #E5E7EB;border-radius:14px;background:#FFFFFF;padding:0 12px;font-family:'DM Sans',sans-serif;font-size:13px;color:#172033;outline:none">
+        ${filtroActivo?`<button type="button" onclick="svcLinkResetFiltros('${txJsId}')" style="height:44px;border:1px solid #E5E7EB;border-radius:14px;background:#FFFFFF;color:#64748B;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:850;padding:0 12px">Limpiar</button>`:''}
+      </div>
+    </div>
+    ${hasFilter
+      ? `<div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0 6px"><span style="font-size:11px;color:#64748B;font-weight:850;text-transform:uppercase;letter-spacing:.05em">Coincidencias</span><span style="font-size:11px;color:#94A3B8;font-weight:800">${matches.length} de ${matchesBase.length}</span></div>
+         <div style="display:grid;gap:8px">${matches.length?matches.map(row).join(''):'<div style="font-size:13px;color:#64748B;text-align:center;padding:14px;border:1px dashed #CBD5E1;border-radius:14px">No encontre servicios con ese filtro.</div>'}</div>`
+      : `<div style="font-size:11px;color:#64748B;font-weight:850;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 6px">Servicios del mismo dia</div>
+         <div style="display:grid;gap:8px">${sameDay.length?sameDay.map(row).join(''):'<div style="font-size:13px;color:#64748B;text-align:center;padding:14px;border:1px dashed #CBD5E1;border-radius:14px">No hay servicios finalizados ese dia.</div>'}</div>
+         ${otros.length?`<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px"><span style="font-size:11px;color:#64748B;font-weight:850;text-transform:uppercase;letter-spacing:.05em">Historial reciente</span><span style="font-size:11px;color:#94A3B8;font-weight:800">${otros.length} de ${otrosBase.length}</span></div><div style="display:grid;gap:8px">${otros.map(row).join('')}</div>`:''}`}
+    ${showMore?`<button type="button" onclick="svcLinkLoadMore('${txJsId}')" style="width:100%;height:44px;margin-top:10px;border:1px solid #BBD8C8;border-radius:14px;background:#EEF7F2;color:#2F6F53;font-family:'DM Sans',sans-serif;font-weight:850">Cargar mas</button>`:''}
     <div class="btn-row" style="margin-top:14px">
-      ${actual?'<button class="btn-ghost" onclick="desvincularMovimientoDeServicio(\''+tx.id+'\')">Desvincular</button>':''}
+      ${actual?'<button class="btn-ghost" onclick="desvincularMovimientoDeServicio(\''+txJsId+'\')">Desvincular</button>':''}
       <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
     </div>`;
   showModal();
+  if(focusScript) Function(focusScript)();
 }
+
 
 function vincularMovimientoAServicio(txId, servicioId){
   const tx = (state.transactions || []).find(t => String(t.id) === String(txId));
