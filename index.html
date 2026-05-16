@@ -3571,8 +3571,8 @@ function renderMovimientos(){
                   ${t.cliente?`<div class="mv-d-item"><span class="mv-d-lbl">Cliente</span><span class="mv-d-val">${t.cliente}</span></div>`:''}
                   ${t.vinculadoServicioId?`<div class="mv-d-item" style="grid-column:1/-1"><span class="mv-d-lbl">Servicio vinculado</span><span class="mv-d-val">${t.vinculadoServicioDesc||t.vinculadoServicioCliente||'Servicio'}</span></div>`:''}
                   <div class="mv-d-actions">
-                    ${txPuedeMoverAStock(t)?`<button class="mv-d-btn stock" onclick="event.stopPropagation();moverMovimientoAStock('${t.id}')">Mover a Stock</button>`:''}
-                    ${txPuedeEnviarUsoStock(t)?`<button class="mv-d-btn stock" onclick="event.stopPropagation();enviarMovimientoAUsoStock('${t.id}')">Usar stock</button>`:''}
+                    ${txPuedeMoverAStock(t)?`<button class="mv-d-btn stock" onclick="event.stopPropagation();moverMovimientoAStock('${t.id}')" title="Compra de materiales: sube stock valorizado y oculta el egreso de movimientos">📥 Compra stock</button>`:''}
+                    ${txPuedeEnviarUsoStock(t)?`<button class="mv-d-btn stock" onclick="event.stopPropagation();enviarMovimientoAUsoStock('${t.id}')" title="Usar este material/agregado en obra: registra en historial de stock, baja stock valorizado y el egreso queda neutro en balance">📦 Usar material</button>`:''}
                     ${txPuedeVincularServicio(t)?`<button class="mv-d-btn link" onclick="event.stopPropagation();openVincularServicioTx('${t.id}')">${t.vinculadoServicioId?'Cambiar servicio':'Vincular servicio'}</button>`:''}
                     <button class="mv-d-btn" onclick="event.stopPropagation();openEditTx('${t.id}')">✎ Editar</button>
                     <button class="mv-d-btn del" onclick="event.stopPropagation();deleteTx('${t.id}')">✕ Eliminar</button>
@@ -7962,11 +7962,16 @@ function txPareceUsoServicioStock(t){
 
 function txPuedeEnviarUsoStock(t){
   if(!t || t.type !== 'egreso') return false;
-  if(txSheetModo(t, state.modo) !== 'negocio') return false;
+  // Acepta cualquier modo — Materiales/Agregados son siempre negocio por catId
   if(moneyValue(t.amount) <= 0) return false;
   if(!txEsMaterialOAgregado(t)) return false;
+  // Ya fue procesado manualmente
   if(t.stockAjusteAplicado || t.stockUsoManual) return false;
+  // Ya fue procesado y marcado noCashFlow (uso_valor previo)
+  if(t.noCashFlow && (t.materialUsoServicio || t.origenServicioMaterial)) return false;
+  // Cierre de servicio ya gestiona su propio stock al finalizar
   if(t.stockOperacion === 'uso_valor' && t.origenCierreServicio) return false;
+  // Es una compra de stock (entrada), no un uso
   if(t.afectaStockValor || t.stockValorOnly || t.stockCompraId || t.stockOperacion === 'entrada_valor') return false;
   if(t.origenDeudaPago || deudaTxLooksLike(t)) return false;
   return true;
@@ -8010,7 +8015,7 @@ function enviarMovimientoAUsoStock(txId){
   if(mov && typeof syncMovimientoToSheets === 'function') syncMovimientoToSheets(mov);
   saveAll();
   render();
-  toast('Enviado a historial de stock · stock -' + fmt(aplicado) + ' · movimiento conservado');
+  toast('✓ Material registrado en stock · -' + fmt(aplicado) + ' · movimiento conservado en balance neutro');
 }
 
 function txPuedeMoverAStock(t){
