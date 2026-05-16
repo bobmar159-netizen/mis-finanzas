@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -12738,7 +12738,8 @@ function abrirModalCobro(id){
       </div>
 
       <div class="cierre-section-title" style="padding:0 2px">Servicios con sus gastos</div>
-        ${[1,2,3].map(i => `
+        ${(()=>{
+          const mkSvcCard = i => `
           <div class="cierre-service-card">
             <div class="cierre-service-head">
               <span class="cierre-num">${i}</span>
@@ -12769,8 +12770,17 @@ function abrirModalCobro(id){
               </div>
               <div class="cierre-service-total"><span>Neto servicio ${i}</span><b id="cobro-serv-net${i}">S/ 0.00</b></div>
             </div>
-          </div>
-        `).join('')}
+          </div>`;
+          const hasExtra = getVal('servicio',2) || getVal('servicio',3) || getNum('precio',2) || getNum('precio',3);
+          return mkSvcCard(1) +
+            `<div id="cobro-svc-extra" style="display:${hasExtra?'block':'none'}">`
+            + mkSvcCard(2) + mkSvcCard(3) +
+            `</div>
+            <button type="button" id="cobro-add-svc-btn"
+              onclick="document.getElementById('cobro-svc-extra').style.display='block';this.style.display='none'"
+              style="display:${hasExtra?'none':'flex'};width:100%;padding:12px 8px;margin:6px 0 0;border:1.5px dashed #A8BCC9;border-radius:12px;background:transparent;color:#546878;font-size:13px;font-weight:700;cursor:pointer;align-items:center;justify-content:center;gap:6px;font-family:'DM Sans',sans-serif"
+            >＋ Agregar otro servicio</button>`;
+        })()}
 
       <div class="cierre-card">
         <div class="cierre-section">
@@ -12814,7 +12824,17 @@ function abrirModalCobro(id){
         </div>
         <div class="cierre-grid-2" style="margin-top:10px">
           <div class="cierre-field"><label>Telefono</label><input id="cobro-telefono" class="cierre-input" type="tel" inputmode="tel" value="${item.telefono||''}" placeholder="987654321"></div>
-          <div class="cierre-field"><label>Distrito</label><input id="cobro-distrito" class="cierre-input" type="text" value="${item.ubicacion||''}"></div>
+          <div class="cierre-field" style="position:relative">
+            <label>Distrito</label>
+            <div style="position:relative">
+              <input id="cobro-distrito" class="cierre-input" type="text" value="${item.ubicacion||''}" placeholder="Escribe el distrito..." autocomplete="off"
+                oninput="distritoComboShow('cobro-distrito','cobro-dist-dd')"
+                onfocus="distritoComboShow('cobro-distrito','cobro-dist-dd')"
+                onblur="setTimeout(()=>{const d=document.getElementById('cobro-dist-dd');if(d)d.style.display='none'},200)"
+                onkeydown="distritoComboKey(event,'cobro-distrito','cobro-dist-dd')">
+              <div id="cobro-dist-dd" class="ubic-dropdown" style="display:none;position:absolute;z-index:999;width:100%;max-height:180px;overflow-y:auto;background:#fff;border:1px solid #C7D5E8;border-radius:10px;box-shadow:0 8px 24px #0002;top:calc(100% + 4px);left:0"></div>
+            </div>
+          </div>
         </div>
         <div class="cierre-field" style="margin-top:10px">
           <label>Observaciones</label>
@@ -12831,7 +12851,7 @@ function abrirModalCobro(id){
       </div>
 
       <div class="btn-row" style="margin-top:0">
-        <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+        <button class="btn-ghost" onclick="limpiarRegistroRapidoDraft();closeModal()">Cancelar</button>
         <button class="cierre-primary" onclick="guardarFinalizacion('${id}')">${primaryLabel}</button>
       </div>
     </div>
@@ -12878,6 +12898,8 @@ function setCobro(v){ document.getElementById('cobro-monto').value=v; }
 async function guardarFinalizacion(id){
   const item = (state.agenda||[]).find(x => x.id === id);
   if(!item) return;
+  let _guardadoOk = false;
+  try {
   const yaFinalizadoAntes = item.estado === 'se_finalizo' || item.estado === 'finalizado' || !!item.estadoPago;
 
   const gastosServicio = [1,2,3].map(i => ({
@@ -13131,9 +13153,16 @@ async function guardarFinalizacion(id){
 
   save('fnz_agenda', state.agenda);
   saveAll();
-  closeModal();
-  render();
-  toast('✓ Trabajo finalizado correctamente');
+  _guardadoOk = true;
+  } catch(e) {
+    console.error('[guardarFinalizacion] error:', e);
+    try { save('fnz_agenda', state.agenda); saveAll(); } catch(_){}
+    toast('⚠ Error al procesar — datos guardados localmente', 'error');
+  } finally {
+    closeModal();
+    render();
+    if(_guardadoOk) toast('✓ Trabajo finalizado correctamente');
+  }
 }
 
 function _guardarFinalizacionLocal(lId, cobrado, movilidad, materiales, otros, baseTx, agDesc){
