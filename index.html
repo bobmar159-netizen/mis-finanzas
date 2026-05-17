@@ -2895,7 +2895,8 @@ function upsertCompraStockValorFromTx(tx, original=null){
     total: amount,
     compra_valor: true,
     txId: tx.id,
-    origen: 'movimiento_materiales'
+    origen: 'movimiento_materiales',
+    cliente: tx.cliente || ''
   };
   const idx = state.comprasMateriales.findIndex(c=>String(c.id)===String(compraId) || String(c.txId||'')===String(tx.id));
   if(idx >= 0) state.comprasMateriales[idx] = {...state.comprasMateriales[idx], ...compra};
@@ -25753,80 +25754,69 @@ function ensureAjustesStyles(){
 }
 
 function diagnosticoBalance(mesAnio){
-  // mesAnio = 'YYYY-MM', por defecto el mes actual
   const hoy = new Date();
   const defMes = hoy.getFullYear()+'-'+(String(hoy.getMonth()+1).padStart(2,'0'));
   const sel = mesAnio || defMes;
-
   const txs = load('fnz_neg_tx', []);
   const mv = v => parseFloat(v)||0;
   const enMes = t => (t.date||'').startsWith(sel);
 
-  const ingresos    = txs.filter(t => t.type==='ingreso' && !t.noCashFlow && enMes(t));
-  const egresos     = txs.filter(t => t.type==='egreso'  && !t.noCashFlow && enMes(t)
-                        && !t.afectaStockValor && !t.stockValorOnly
-                        && t.stockOperacion !== 'entrada_valor'
-                        && t.stockOperacion !== 'uso_valor'
-                        && t.stockOperacion !== 'devolucion_valor'
-                        && !t.materialUsoServicio && !t.origenServicioMaterial);
-  const comprasStock = txs.filter(t => t.type==='egreso' && enMes(t)
-                        && (t.afectaStockValor || t.stockValorOnly || t.stockOperacion==='entrada_valor' || t.stockCompraId));
-  const usosStock   = txs.filter(t => t.type==='egreso' && enMes(t)
-                        && (t.materialUsoServicio || t.origenServicioMaterial || t.stockOperacion==='uso_valor'));
+  // Usa exactamente isCashFlowTx — misma logica que el dashboard
+  const ingCaja      = txs.filter(t => t.type==='ingreso' && isCashFlowTx(t) && enMes(t));
+  const egrCaja      = txs.filter(t => t.type==='egreso'  && isCashFlowTx(t) && enMes(t));
+  const comprasStock = egrCaja.filter(t => t.afectaStockValor || t.stockValorOnly || t.stockOperacion==='entrada_valor' || t.stockCompraId);
+  const egresosNorm  = egrCaja.filter(t => !t.afectaStockValor && !t.stockValorOnly && t.stockOperacion!=='entrada_valor' && !t.stockCompraId);
+  const usosStock    = txs.filter(t => t.type==='egreso' && !isCashFlowTx(t) && enMes(t) && (t.materialUsoServicio || t.origenServicioMaterial || t.stockOperacion==='uso_valor'));
 
-  const totIng = ingresos.reduce((s,t)=>s+mv(t.amount),0);
-  const totEgr = egresos.reduce((s,t)=>s+mv(t.amount),0);
-  const totCS  = comprasStock.reduce((s,t)=>s+mv(t.amount),0);
-  const totUS  = usosStock.reduce((s,t)=>s+mv(t.amount),0);
-  const balance = totIng - totEgr;
+  const totIng   = ingCaja.reduce((s,t)=>s+mv(t.amount),0);
+  const totEgr   = egrCaja.reduce((s,t)=>s+mv(t.amount),0);
+  const totCS    = comprasStock.reduce((s,t)=>s+mv(t.amount),0);
+  const totENorm = egresosNorm.reduce((s,t)=>s+mv(t.amount),0);
+  const totUS    = usosStock.reduce((s,t)=>s+mv(t.amount),0);
+  const balance  = totIng - totEgr;
   const stockVal = mv(state.stockValorGeneral);
 
   const f = n => 'S/ '+n.toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
   const [anio, mes] = sel.split('-');
   const nombreMes = new Date(+anio, +mes-1).toLocaleString('es-PE',{month:'long',year:'numeric'});
-
-  // Eliminar cualquier diagnóstico previo
   document.querySelectorAll('#diag-balance-overlay').forEach(e=>e.remove());
 
-  const html = `
+  const csRow  = totCS>0  ? `<div style="display:flex;justify-content:space-between;padding-left:12px;margin-bottom:2px"><span style="color:var(--muted);font-size:12px">&#8627; &#128722; Compras material (${comprasStock.length})</span><span style="color:#F44336;font-size:12px">-${f(totCS)}</span></div>` : '';
+  const oeRow  = totENorm>0 ? `<div style="display:flex;justify-content:space-between;padding-left:12px;margin-bottom:2px"><span style="color:var(--muted);font-size:12px">&#8627; &#128203; Otros egresos (${egresosNorm.length})</span><span style="color:#F44336;font-size:12px">-${f(totENorm)}</span></div>` : '';
+
+  document.body.insertAdjacentHTML('beforeend', `
   <div id="diag-balance-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)this.remove()">
     <div style="background:var(--surface);border-radius:16px;padding:24px;max-width:400px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div style="font-size:16px;font-weight:800;color:var(--text)">🔍 Diagnóstico Balance</div>
-        <button onclick="document.getElementById('diag-balance-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted)">✕</button>
+        <div style="font-size:16px;font-weight:800;color:var(--text)">&#128269; Diagnostico Balance</div>
+        <button onclick="document.getElementById('diag-balance-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted)">&#10005;</button>
       </div>
-
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
         <input type="month" id="diag-mes-input" value="${sel}" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px">
         <button onclick="document.getElementById('diag-balance-overlay').remove();diagnosticoBalance(document.getElementById('diag-mes-input')?.value||undefined)" style="padding:8px 14px;border-radius:8px;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#6366F1;font-weight:700;cursor:pointer;font-size:13px">Ver</button>
       </div>
-
       <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:12px;text-transform:capitalize">${nombreMes}</div>
-
       <div style="background:rgba(99,102,241,.08);border-radius:10px;padding:14px;margin-bottom:10px">
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">CAJA (afecta balance)</div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="color:var(--muted);font-size:13px">✅ Ingresos (${ingresos.length})</span><span style="color:#4CAF50;font-weight:700">+${f(totIng)}</span></div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="color:var(--muted);font-size:13px">❌ Egresos (${egresos.length})</span><span style="color:#F44336;font-weight:700">−${f(totEgr)}</span></div>
-        <div style="border-top:1px solid var(--border);padding-top:8px;display:flex;justify-content:space-between">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">CAJA — mismo calculo que el dashboard</div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="color:var(--muted);font-size:13px">&#9989; Ingresos (${ingCaja.length})</span><span style="color:#4CAF50;font-weight:700">+${f(totIng)}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:var(--muted);font-size:13px">&#10060; Egresos (${egrCaja.length})</span><span style="color:#F44336;font-weight:700">-${f(totEgr)}</span></div>
+        ${csRow}${oeRow}
+        <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:6px;display:flex;justify-content:space-between">
           <span style="font-weight:800;color:var(--text)">= BALANCE MES</span>
           <span style="font-weight:800;color:${balance>=0?'#4CAF50':'#F44336'};font-size:17px">${balance>=0?'+':''}${f(balance)}</span>
         </div>
       </div>
-
       <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:10px">
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">STOCK este mes (NO afectan caja)</div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="color:var(--muted);font-size:13px">📥 Compras stock (${comprasStock.length})</span><span style="color:var(--text);font-weight:600">${f(totCS)}</span></div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="color:var(--muted);font-size:13px">📦 Usos material (${usosStock.length})</span><span style="color:var(--text);font-weight:600">${f(totUS)}</span></div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">STOCK — NO afectan caja</div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="color:var(--muted);font-size:13px">&#128230; Usos material (${usosStock.length})</span><span style="color:var(--text);font-weight:600">-${f(totUS)}</span></div>
         <div style="border-top:1px solid var(--border);padding-top:8px;display:flex;justify-content:space-between">
           <span style="font-weight:700;color:var(--text)">Stock valorizado total</span>
           <span style="font-weight:700;color:var(--gold)">${f(stockVal)}</span>
         </div>
       </div>
-
-      <div style="font-size:11px;color:var(--muted);text-align:center">Stock valorizado = acumulado total, no solo del mes</div>
+      <div style="font-size:11px;color:var(--muted);text-align:center">Balance = exactamente igual al dashboard principal</div>
     </div>
-  </div>`;
-  document.body.insertAdjacentHTML('beforeend', html);
+  </div>`);
 }
 
 function ajClearAllMovements(){
@@ -26120,3 +26110,5 @@ setTimeout(()=>{
 </script>
 </body>
 </html>
+
+
