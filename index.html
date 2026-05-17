@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -26098,7 +26098,7 @@ function renderAjustes(){
          })()}
          ${(()=>{
            const comprasErroneas = (load('fnz_neg_tx',[])||[]).filter(t=>{const esC=(t.afectaStockValor||t.stockValorOnly||t.stockOperacion==='entrada_valor'||t.stockCompraId)&&!t.materialUsoServicio&&!t.origenServicioMaterial&&t.stockOperacion!=='uso_valor';return esC&&t.noCashFlow;}).length;
-           if(comprasErroneas===0) return <div style="font-size:12px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">&#10003; Compras de material correctas - restan del balance.</div>;
+           if(comprasErroneas===0) return `<div style="font-size:12px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">&#10003; Compras de material correctas &mdash; restan del balance.</div>`;
            return `<div class="aj-row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:10px">
              <div style="font-size:12px;color:#9A6B00;margin-bottom:6px;line-height:1.4">&#9888; <b>${comprasErroneas}</b> compra(s) tienen noCashFlow incorrecto y NO restan del balance. Corrígelas.</div>
              <button class="aj-btn warn" onclick="corregirComprasStockExistentes()">&#128295; Corregir ${comprasErroneas} compra(s) - restaurar al balance</button>
