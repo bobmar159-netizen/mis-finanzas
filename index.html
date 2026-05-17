@@ -8023,7 +8023,8 @@ function enviarMovimientoAUsoStock(txId){
   toast('✓ Material registrado en stock · -' + fmt(aplicado) + ' · movimiento conservado en balance neutro');
 }
 
-function recalcularUsoStockDesdeMovimientos(){
+function recalcularUsoStockDesdeMovimientos(desdeDate){
+  // desdeDate opcional: 'YYYY-MM-DD' — solo procesa txs desde esa fecha
   const txs = (state.transactions || []).filter(t => {
     if(!t || t.type !== 'egreso') return false;
     if(!txEsMaterialOAgregado(t)) return false;
@@ -8036,6 +8037,8 @@ function recalcularUsoStockDesdeMovimientos(){
     // Saltar compras de stock (entradas)
     if(t.afectaStockValor || t.stockValorOnly || t.stockCompraId || t.stockOperacion === 'entrada_valor') return false;
     if(moneyValue(t.amount) <= 0) return false;
+    // Filtro de fecha opcional
+    if(desdeDate && t.date && t.date < desdeDate) return false;
     return true;
   });
 
@@ -8114,6 +8117,38 @@ function corregirComprasStockExistentes(){
   if(state.modo === 'negocio') state.transactions = txs;
   render();
   toast(`\u2713 ${corregidas} compra(s) de stock corregidas \u00b7 El balance ya no las descuenta`);
+}
+
+function revertirRecalculoStock(){
+  const txs = load('fnz_neg_tx', []);
+  // Solo las procesadas por el recálculo manual (tienen stockUsoMonto > 0 Y stockUsoManualAt)
+  const revertibles = txs.filter(t => moneyValue(t.stockUsoMonto) > 0 && t.stockUsoManualAt);
+  if(!revertibles.length){
+    toast('No hay recálculo manual pendiente de revertir', 'info');
+    return;
+  }
+  const totalRestaurar = +revertibles.reduce((s,t) => s + moneyValue(t.stockUsoMonto), 0).toFixed(2);
+  if(!confirm(`¿Revertir el recálculo de ${revertibles.length} movimiento(s)?\n\nSe restaurará S/ ${fmt(totalRestaurar)} al stock valorizado.\nLuego podés volver a ejecutar el recálculo eligiendo la fecha correcta.`)) return;
+
+  const txIdsRevertidos = new Set(revertibles.map(t => String(t.id)));
+  // Limpiar solo los flags del recálculo manual
+  revertibles.forEach(t => {
+    delete t.stockUsoMonto;
+    delete t.stockUsoManualAt;
+    // stockAjusteAplicado lo dejamos (puede ser del import de Notion)
+  });
+  // Eliminar las entradas del historial de stock creadas por el recálculo
+  const hist = load('fnz_mov_mat', []);
+  const newHist = hist.filter(h => !(h.tipo === 'uso_valor' && txIdsRevertidos.has(String(h.txId))));
+  state.movimientosMateriales = newHist;
+  save('fnz_mov_mat', newHist);
+  // Devolver el stock valorizado
+  ajustarStockValorGeneral(totalRestaurar);
+  save('fnz_neg_tx', txs);
+  if(state.modo === 'negocio') state.transactions = txs;
+  save('fnz_stock_valor_general', state.stockValorGeneral || 0);
+  render();
+  toast(`✓ Revertido · +${fmt(totalRestaurar)} restaurados al stock · ${revertibles.length} movimiento(s) listos para recálculo`);
 }
 
 function txPuedeMoverAStock(t){
@@ -25943,9 +25978,34 @@ function renderAjustes(){
          <div class="aj-row" style="margin-top:8px"><button class="aj-btn warn" onclick="ajClearStockHistory()">Borrar historial stock</button><button class="aj-btn soft" onclick="ajClearCredentials()">Borrar credenciales</button></div>
          <div class="aj-row" style="margin-top:8px"><button class="aj-btn danger" onclick="ajResetLocalData()">Borrar datos locales</button>${countPerTx > 0 ? `<button class="aj-btn primary" onclick="migrarTxPersonalesANegocio()" title="Mueve los ${countPerTx} movimientos personales al ecosistema negocio con distintivo 'Personal'. Aparecerán en movimientos y afectarán la caja.">📥 Migrar ${countPerTx} tx personales a Negocio</button>` : ''}</div>
          <div class="aj-row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:10px">
-           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.4">⚠️ Usa esto si restauraste movimientos desde Notion y el stock no se descontó (estaba en 0). Procesa todos los Materiales/Agregados pendientes y los aplica al stock valorizado actual.</div>
-           <button class="aj-btn primary" onclick="recalcularUsoStockDesdeMovimientos()">📦 Recalcular uso de stock desde movimientos</button>
+           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.4">📦 Recalcular uso de stock desde una fecha. Útil si restauraste datos desde Notion con stock en 0. Solo procesa Materiales/Agregados pendientes desde la fecha elegida.</div>
+           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+             <label style="font-size:12px;color:var(--muted)">Desde:</label>
+             <input type="date" id="recalc-desde-date" value="${new Date().getFullYear()}-05-01" style="flex:1;min-width:130px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px">
+             <button class="aj-btn primary" onclick="recalcularUsoStockDesdeMovimientos(document.getElementById('recalc-desde-date')?.value||undefined)">📦 Recalcular desde esa fecha</button>
+           </div>
+           ${(()=>{
+             const pendientes = (state.transactions||[]).filter(t=>{
+               if(!t||t.type!=='egreso') return false;
+               if(!(isMaterialesCategory(t.catId,t.category)||isAgregadoCategory(t.catId,t.category,t.description))) return false;
+               if(moneyValue(t.stockUsoMonto)>0) return false;
+               if(t.stockOperacion==='uso_valor'&&t.origenCierreServicio) return false;
+               if(t.afectaStockValor||t.stockValorOnly||t.stockCompraId||t.stockOperacion==='entrada_valor') return false;
+               return moneyValue(t.amount)>0;
+             }).length;
+             const yaProc = (state.transactions||[]).filter(t=>moneyValue(t.stockUsoMonto)>0&&t.stockUsoManualAt).length;
+             return `<div style="font-size:12px;color:var(--muted)">${pendientes>0?`⚠️ <b>${pendientes}</b> pendiente(s) de procesar`:'✓ Sin pendientes'} · ${yaProc>0?`<b>${yaProc}</b> ya procesado(s) (revertible)`:'ninguno procesado aún'}</div>`;
+           })()}
          </div>
+         ${(()=>{
+           const yaProc = (state.transactions||[]).filter(t=>moneyValue(t.stockUsoMonto)>0&&t.stockUsoManualAt).length;
+           if(yaProc===0) return '';
+           const totalProc = (state.transactions||[]).filter(t=>moneyValue(t.stockUsoMonto)>0&&t.stockUsoManualAt).reduce((s,t)=>s+moneyValue(t.stockUsoMonto),0);
+           return `<div class="aj-row" style="margin-top:4px">
+             <div style="font-size:12px;color:#9A6B00;margin-bottom:6px;line-height:1.4">↩️ Hay <b>${yaProc}</b> movimiento(s) procesados (−${fmt(totalProc)} del stock). Podés revertir el recálculo para volver a elegir desde qué fecha.</div>
+             <button class="aj-btn warn" onclick="revertirRecalculoStock()">↩️ Revertir recálculo de stock</button>
+           </div>`;
+         })()}
          ${(()=>{
            const comprasErroneas = (load('fnz_neg_tx',[])||[]).filter(t=>(t.afectaStockValor||t.stockValorOnly||t.stockOperacion==='entrada_valor'||t.stockCompraId)&&!t.noCashFlow).length;
            if(comprasErroneas===0) return `<div style="font-size:12px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">✓ Compras de stock correctas — no afectan el balance.</div>`;
