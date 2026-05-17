@@ -3555,6 +3555,7 @@ function renderMovimientos(){
                   <div class="mv-row1">
                     <span class="mv-svc">${debtHtml(titleTxt)}</span>
                     <span class="${esIng?'mv-badge-ing':'mv-badge-egr'}">${esIng?'↑ Ingreso':'↓ Egreso'}</span>
+                    ${t.esGastoPersonal?`<span style="background:#F3E5F5;color:#7B1FA2;border:1px solid #CE93D8;border-radius:10px;font-size:9px;font-weight:800;padding:2px 7px;white-space:nowrap">👤 Personal</span>`:''}
                   </div>
                   <div class="mv-cli">${debtHtml(subTxt)}</div>
                 </div>
@@ -7851,34 +7852,37 @@ async function saveTx(editId){
   const clienteEl=document.getElementById('tx-cliente');
   const ubicEl=document.getElementById('tx-ubicacion');
   const catId = document.getElementById('tx-cat').value;
-  const targetScope = window._txScope === 'personal' ? 'personal' : 'negocio';
+  // Ecosistema único: TODO va a negocio. Si marcó Personal, solo agrega el distintivo.
+  const targetScope = 'negocio';
+  const esGastoPersonalFlag = window._txScope === 'personal';
 
   // Buscar la categoría en TODAS las listas disponibles
   const allCatsTx = allCatsForLookup();
   const catObj = allCatsTx.find(c => c.id === catId);
-  const catName = catObj ? catObj.name : (window._txType==='ingreso'
-    ? (targetScope === 'negocio' ? 'Otros servicios' : 'Reembolsos')
-    : (targetScope === 'negocio' ? 'Otros gastos de negocio' : 'Otros gastos personales'));
+  const catName = catObj ? catObj.name : (window._txType==='ingreso' ? 'Otros servicios' : 'Otros gastos de negocio');
 
   // Preservar campos del registro original si es edición
-  const originalInfo = editId ? findTxInAnyScope(editId) : {tx:null, scope:targetScope};
+  const originalInfo = editId ? findTxInAnyScope(editId) : {tx:null, scope:'negocio'};
   const original = originalInfo.tx;
-  const originalScope = originalInfo.scope || targetScope;
+  const originalScope = originalInfo.scope || 'negocio';
 
   const item = {
-    ...(original || {}),               // preservar campos como _importadoDeNotion, etc.
-    id: editId || (Date.now() + ''),   // mantener ID original en edición
+    ...(original || {}),
+    id: editId || (Date.now() + ''),
     type: window._txType,
     amount,
     category: catName,
     catId,
     date,
     description: document.getElementById('tx-desc').value.trim() || catName,
-    cliente: targetScope === 'negocio' ? (clienteEl ? clienteEl.value.trim() : (original?.cliente || '')) : '',
-    ubicacion: targetScope === 'negocio' ? (ubicEl ? ubicEl.value.trim() : (original?.ubicacion || '')) : '',
-    negocio: targetScope === 'negocio',
+    cliente: clienteEl ? clienteEl.value.trim() : (original?.cliente || ''),
+    ubicacion: ubicEl ? ubicEl.value.trim() : (original?.ubicacion || ''),
+    negocio: true,
     moneda: window._txMoneda || original?.moneda || 'PEN',
+    ...(esGastoPersonalFlag ? {esGastoPersonal: true} : {esGastoPersonal: false}),
   };
+  // Si se edita y se quita el flag personal, limpiarlo
+  if(!esGastoPersonalFlag) delete item.esGastoPersonal;
 
   const esUsoMaterialServicio = !!(original?.origenServicioMaterial || original?.materialUsoServicio || item.origenServicioMaterial || item.materialUsoServicio);
   const entraAStockValor = item.type === 'egreso' && targetScope === 'negocio' && isMaterialesCategory(item.catId, item.category) && !esUsoMaterialServicio;
@@ -8016,6 +8020,63 @@ function enviarMovimientoAUsoStock(txId){
   saveAll();
   render();
   toast('✓ Material registrado en stock · -' + fmt(aplicado) + ' · movimiento conservado en balance neutro');
+}
+
+function recalcularUsoStockDesdeMovimientos(){
+  const txs = (state.transactions || []).filter(t => {
+    if(!t || t.type !== 'egreso') return false;
+    if(!txEsMaterialOAgregado(t)) return false;
+    // Saltar los ya procesados
+    if(t.stockAjusteAplicado || t.stockUsoManual) return false;
+    // Saltar los Materiales del cierre (ya tienen stockOperacion='uso_valor' + noCashFlow)
+    if(t.noCashFlow && (t.materialUsoServicio || t.origenServicioMaterial)) return false;
+    if(t.stockOperacion === 'uso_valor' && t.origenCierreServicio) return false;
+    // Saltar compras de stock
+    if(t.afectaStockValor || t.stockValorOnly || t.stockCompraId || t.stockOperacion === 'entrada_valor') return false;
+    if(moneyValue(t.amount) <= 0) return false;
+    return true;
+  });
+
+  if(!txs.length) return toast('No hay movimientos de Materiales/Agregados pendientes de aplicar a stock', 'info');
+
+  const stockActual = moneyValue(state.stockValorGeneral);
+  if(stockActual <= 0) return toast('⚠ El stock valorizado está en S/ 0. Primero registra compras de stock antes de aplicar usos.', 'error');
+
+  let totalAplicado = 0;
+  let totalTx = 0;
+
+  txs.forEach(tx => {
+    const monto = moneyValue(tx.amount);
+    const delta = ajustarStockValorGeneral(-monto);
+    const aplicado = Math.abs(delta);
+    if(aplicado <= 0) return; // stock llegó a cero, no seguir
+    const esAgregado = isAgregadoCategory(tx.catId, tx.category, tx.description);
+    const descripcion = (esAgregado ? 'Agregados usados - ' : 'Materiales usados - ') + descripcionUsoStockFromTx(tx);
+    registrarMovimientoStockValor('uso_valor', aplicado, {
+      fecha: tx.date || todayStr(),
+      descripcion,
+      cliente: tx.cliente || tx.vinculadoServicioCliente || '',
+      id_servicio: tx.vinculadoServicioId || '',
+      txId: tx.id
+    });
+    tx.noCashFlow = true;
+    tx.materialUsoServicio = true;
+    tx.origenServicioMaterial = true;
+    tx.stockOperacion = 'uso_valor';
+    tx.stockAjusteAplicado = true;
+    tx.stockUsoManual = true;
+    tx.stockUsoManualAt = new Date().toISOString();
+    tx.stockUsoMonto = aplicado;
+    tx.expenseBucket = esAgregado ? 'agregados' : 'materiales';
+    totalAplicado += aplicado;
+    totalTx++;
+  });
+
+  if(totalTx === 0) return toast('⚠ Stock llegó a cero antes de procesar todos los movimientos', 'info');
+
+  saveAll();
+  render();
+  toast(`✓ ${totalTx} movimiento(s) aplicados al stock · -${fmt(totalAplicado)} del stock valorizado`);
 }
 
 function txPuedeMoverAStock(t){
@@ -13137,7 +13198,7 @@ async function guardarFinalizacion(id){
   // Materiales usados en el servicio: reducen el stock valorizado pero NO afectan la caja
   // (la caja ya se movio cuando se compraron los materiales). Se ocultan de movimientos.
   if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
-  if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', catId:'cne_agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.meta > 0) { const txId=rowId+'-met'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.meta, category:'META', catId:'cne_meta', description:'META - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if(crearMovimientosCierre) item.cierreTxIds = nuevosCierreTxIds;
 
@@ -19685,13 +19746,14 @@ function confirmarNegocio(esNegocio) {
     document.getElementById('pvNegocioBadge').textContent = '🏗️ Registrado como gasto del negocio';
     document.getElementById('pvNegocioBadge').style.display = 'block';
   } else {
-    micParsed.negocio = false;
-    // Si era combustible sin negocio → Transporte personal
-    const newCat = getCatsForScope('egreso','personal').find(c=>c.id==='ce_movilidad' || c.id==='ce2') || micParsed.cat;
+    // Ecosistema único: no guardamos en personal. Solo marcamos el distintivo.
+    micParsed.negocio = true;  // forzar negocio
+    micParsed.esGastoPersonal = true;
+    const newCat = getCatsForScope('egreso','negocio').find(c=>c.id==='cneg_gas') || micParsed.cat;
     micParsed.cat = newCat;
     document.getElementById('pvCat').innerHTML = `${iconHtml(newCat.icon)} ${newCat.name}`;
-    updateCatSelect('egreso', newCat.id, 'personal');
-    document.getElementById('pvNegocioBadge').textContent = '🏠 Registrado como gasto personal';
+    updateCatSelect('egreso', newCat.id, 'negocio');
+    document.getElementById('pvNegocioBadge').textContent = '👤 Gasto personal · afecta la caja';
     document.getElementById('pvNegocioBadge').style.display = 'block';
   }
   document.getElementById('micSaveBtn').style.display = 'block';
@@ -19730,12 +19792,12 @@ function saveMicTx() {
   const catId  = document.getElementById('pvCatEdit').value;
   const desc   = document.getElementById('pvDescEdit').value.trim();
   if(!amount || amount<=0){ toast('Escribe un monto válido','error'); return; }
-  const targetScope = micParsed?.negocio === false ? 'personal' : (micParsed?.negocio === true ? 'negocio' : (state.modo === 'personal' ? 'personal' : 'negocio'));
+  // Ecosistema único: siempre negocio. Personal = solo distintivo.
+  const targetScope = 'negocio';
+  const esGastoPersonalMic = micParsed?.negocio === false || micParsed?.esGastoPersonal === true;
   const allCats=allCatsForLookup();
   const cat = allCats.find(c=>c.id===catId);
-  const catName = cat?.name || (type==='ingreso'
-    ? (targetScope === 'negocio' ? 'Otros servicios' : 'Reembolsos')
-    : (targetScope === 'negocio' ? 'Otros gastos de negocio' : 'Otros gastos personales'));
+  const catName = cat?.name || (type==='ingreso' ? 'Otros servicios' : 'Otros gastos de negocio');
   const tx = {
     id: Date.now()+'', type, amount,
     category: catName,
@@ -19744,7 +19806,8 @@ function saveMicTx() {
     catId,
     cliente:      micParsed?.cliente      ||null,
     servicioTipo: micParsed?.servicioNeg?.label||null,
-    negocio:      targetScope === 'negocio',
+    negocio:      true,
+    ...(esGastoPersonalMic ? {esGastoPersonal: true} : {}),
   };
   const entraAStockValor = tx.type === 'egreso' && targetScope === 'negocio' && isMaterialesCategory(tx.catId, tx.category);
   if(entraAStockValor){
@@ -22407,7 +22470,7 @@ function renderSubHistorial(movs){
   const usos = movs.filter(m=>m.tipo==='uso' || /valor$/.test(m.tipo||''));
   if(!usos.length) return `<div style="text-align:center;padding:40px 20px;color:var(--muted)"><div style="font-size:36px;margin-bottom:10px">📋</div><div>Sin movimientos registrados</div></div>`;
   return `
-  ${[...usos].reverse().slice(0,80).map(m=>{
+  ${[...usos].sort((a,b)=>{const fa=String(a.fecha||''),fb=String(b.fecha||'');return fb!==fa?fb.localeCompare(fa):String(b.id||'').localeCompare(String(a.id||''));}).slice(0,80).map(m=>{
     const esValor = (m.tipo||'').includes('valor');
     const esEntrada = esValor && (m.tipo.includes('entrada')||m.tipo.includes('devolucion'));
     if(esValor){
@@ -25689,6 +25752,53 @@ function ajClearCredentials(){
   toast('Credenciales borradas');
 }
 
+function migrarTxPersonalesANegocio(){
+  const perTxs = load('fnz_tx', []);
+  if(!perTxs.length){ toast('No hay movimientos personales para migrar', 'info'); return; }
+
+  if(!confirm(`Migrar ${perTxs.length} movimiento(s) personales al ecosistema Negocio?\n\nCada movimiento aparecerá en Movimientos con el distintivo 👤 Personal y SÍ afectará la caja.\n\nEsta acción no se puede deshacer.`)) return;
+
+  // Cargar negocio actual
+  const negTxs = load('fnz_neg_tx', []);
+  const negIds = new Set(negTxs.map(t => t.id));
+
+  let migrados = 0;
+  let duplicados = 0;
+
+  perTxs.forEach(t => {
+    // Evitar duplicados por id
+    if(negIds.has(t.id)) { duplicados++; return; }
+    // Generar nuevo id si colisiona
+    const nuevoId = negIds.has(t.id) ? ('per_mig_' + t.id) : t.id;
+    negTxs.unshift({
+      ...t,
+      id: nuevoId,
+      esGastoPersonal: true,          // distintivo visual
+      negocio: true,                  // vive en ecosistema negocio
+      _migradoDePersonal: true,
+      _migradoAt: new Date().toISOString()
+    });
+    negIds.add(nuevoId);
+    migrados++;
+  });
+
+  if(migrados === 0){
+    toast(`Todos los movimientos ya existían en Negocio (${duplicados} duplicados omitidos)`, 'info');
+    return;
+  }
+
+  // Guardar negocio con los migrados
+  save('fnz_neg_tx', negTxs);
+  // Actualizar state si estamos en negocio
+  if(state.modo === 'negocio') state.transactions = negTxs;
+
+  // Limpiar storage personal ya migrado
+  localStorage.removeItem('fnz_tx');
+
+  render();
+  toast(`✓ ${migrados} movimiento(s) migrados a Negocio con distintivo 👤 Personal${duplicados ? ' · ' + duplicados + ' duplicados omitidos' : ''}`);
+}
+
 function renderAjustes(){
   ensureAjustesStyles();
   ensureLazyData('sonidos');
@@ -25777,7 +25887,11 @@ function renderAjustes(){
         `<div class="aj-status">Locales: <b>${countNegTx}</b> movimientos negocio, <b>${countPerTx}</b> personales, <b>${countAgenda}</b> agenda, <b>${countNotas}</b> notas, <b>${countStockHist}</b> historial stock.</div>
          <div class="aj-row" style="margin-top:8px"><button class="aj-btn warn" onclick="ajResetNotionSyncCache()">Reiniciar cache Notion</button><button class="aj-btn danger" onclick="ajClearAllMovements()">Borrar movimientos</button></div>
          <div class="aj-row" style="margin-top:8px"><button class="aj-btn warn" onclick="ajClearStockHistory()">Borrar historial stock</button><button class="aj-btn soft" onclick="ajClearCredentials()">Borrar credenciales</button></div>
-         <div class="aj-row" style="margin-top:8px"><button class="aj-btn danger" onclick="ajResetLocalData()">Borrar datos locales</button></div>`)}
+         <div class="aj-row" style="margin-top:8px"><button class="aj-btn danger" onclick="ajResetLocalData()">Borrar datos locales</button>${countPerTx > 0 ? `<button class="aj-btn primary" onclick="migrarTxPersonalesANegocio()" title="Mueve los ${countPerTx} movimientos personales al ecosistema negocio con distintivo 'Personal'. Aparecerán en movimientos y afectarán la caja.">📥 Migrar ${countPerTx} tx personales a Negocio</button>` : ''}</div>
+         <div class="aj-row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:10px">
+           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.4">⚠️ Usa esto si restauraste movimientos desde Notion y el stock no se descontó (estaba en 0). Procesa todos los Materiales/Agregados pendientes y los aplica al stock valorizado actual.</div>
+           <button class="aj-btn primary" onclick="recalcularUsoStockDesdeMovimientos()">📦 Recalcular uso de stock desde movimientos</button>
+         </div>`)}
     </div>
   </div>`;
 }
