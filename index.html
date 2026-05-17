@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -7249,7 +7249,7 @@ function _procesarCsvNotionTexto(csv, statusElId, isFullSync = false) {
 
       if(comida>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-com',type:'egreso',amount:comida,category:'Comida',catId:'cne_menu',description:'Comida - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'comida')); egresosCom++; }
       if(otros>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-otr',type:'egreso',amount:otros,category:'Otros gastos de negocio',catId:'cne6',description:'Otros gastos - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'otros')); egresosOtros++; }
-      if(agregados>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-agr',type:'egreso',amount:agregados,category:'Agregados',catId:'cne_agregados',description:'Agregados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'agregados')); egresosAgr++; }
+      if(agregados>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-agr',type:'egreso',amount:agregados,category:'Agregados',catId:'cne_agregados',description:'Agregados - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,origenServicioMaterial:true,materialUsoServicio:true,noCashFlow:true,stockOperacion:'uso_valor',_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'agregados')); egresosAgr++; }
       if(meta>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-met',type:'egreso',amount:meta,category:'META',catId:'cne_meta',description:'META - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'meta')); }
       
       if(movil>0){ nuevasTx.push(tagExpenseBucket({id:nId+'-mov',type:'egreso',amount:movil,category:'Movilidad',catId:'cne5',description:'Movilidad - '+(clienteFinal!=='(Sin cliente)'?clienteFinal:fecha),date:fecha,cliente:clienteLimpio,contacto,ubicacion:distrito,negocio:true,moneda:'PEN',vinculadoServicioId:mainSvcId,_importadoDeNotion:true,_notionRowId:rawNotionId,_notionTrabajo:nuevosTrabajos[nuevosTrabajos.length-1]||null}, 'movilidad')); egresosMov++; }
@@ -7885,13 +7885,18 @@ async function saveTx(editId){
   if(!esGastoPersonalFlag) delete item.esGastoPersonal;
 
   const esUsoMaterialServicio = !!(original?.origenServicioMaterial || original?.materialUsoServicio || item.origenServicioMaterial || item.materialUsoServicio);
-  const entraAStockValor = item.type === 'egreso' && targetScope === 'negocio' && isMaterialesCategory(item.catId, item.category) && !esUsoMaterialServicio;
+  // Compra de stock = categoría Materiales o Agregados, egreso de negocio, NO vinculado a servicio
+  const esMateriales = isMaterialesCategory(item.catId, item.category);
+  const esAgregados  = isAgregadoCategory(item.catId, item.category, item.description);
+  const entraAStockValor = item.type === 'egreso' && targetScope === 'negocio'
+                           && (esMateriales || esAgregados) && !esUsoMaterialServicio;
   if(entraAStockValor){
     item.afectaStockValor = true;
     item.stockOperacion = 'entrada_valor';
     item.ocultarEnMovimientos = true;
     item.stockValorOnly = true;
-    item.noCashFlow = true;  // Compra de stock: NO afecta balance, solo stock valorizado
+    // Compra de stock: SÍ afecta balance (pagás con plata real) y sube el stock
+    delete item.noCashFlow;
   } else {
     delete item.afectaStockValor;
     delete item.stockOperacion;
