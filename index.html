@@ -7891,6 +7891,7 @@ async function saveTx(editId){
     item.stockOperacion = 'entrada_valor';
     item.ocultarEnMovimientos = true;
     item.stockValorOnly = true;
+    item.noCashFlow = true;  // Compra de stock: NO afecta balance, solo stock valorizado
   } else {
     delete item.afectaStockValor;
     delete item.stockOperacion;
@@ -8026,12 +8027,13 @@ function recalcularUsoStockDesdeMovimientos(){
   const txs = (state.transactions || []).filter(t => {
     if(!t || t.type !== 'egreso') return false;
     if(!txEsMaterialOAgregado(t)) return false;
-    // Saltar los ya procesados
-    if(t.stockAjusteAplicado || t.stockUsoManual) return false;
-    // Saltar los Materiales del cierre (ya tienen stockOperacion='uso_valor' + noCashFlow)
-    if(t.noCashFlow && (t.materialUsoServicio || t.origenServicioMaterial)) return false;
+    // Saltar solo si el stock FUE EFECTIVAMENTE REDUCIDO (stockUsoMonto > 0)
+    // Nota: stockAjusteAplicado puede estar en true pero stockUsoMonto=0
+    // si el stock era 0 al momento de importar desde Notion → hay que reprocesar
+    if(moneyValue(t.stockUsoMonto) > 0) return false;
+    // Saltar cierre de servicio que ya procesó su propio stock al finalizar
     if(t.stockOperacion === 'uso_valor' && t.origenCierreServicio) return false;
-    // Saltar compras de stock
+    // Saltar compras de stock (entradas)
     if(t.afectaStockValor || t.stockValorOnly || t.stockCompraId || t.stockOperacion === 'entrada_valor') return false;
     if(moneyValue(t.amount) <= 0) return false;
     return true;
@@ -8045,7 +8047,10 @@ function recalcularUsoStockDesdeMovimientos(){
   let totalAplicado = 0;
   let totalTx = 0;
 
-  txs.forEach(tx => {
+  // Ordenar por fecha para procesar cronológicamente
+  const txsOrdenados = [...txs].sort((a,b) => String(a.date||'').localeCompare(String(b.date||'')));
+
+  txsOrdenados.forEach(tx => {
     const monto = moneyValue(tx.amount);
     const delta = ajustarStockValorGeneral(-monto);
     const aplicado = Math.abs(delta);
@@ -8059,24 +8064,56 @@ function recalcularUsoStockDesdeMovimientos(){
       id_servicio: tx.vinculadoServicioId || '',
       txId: tx.id
     });
-    tx.noCashFlow = true;
-    tx.materialUsoServicio = true;
-    tx.origenServicioMaterial = true;
-    tx.stockOperacion = 'uso_valor';
+    // Marcar como procesado — solo agregar lo que no esté ya
     tx.stockAjusteAplicado = true;
-    tx.stockUsoManual = true;
+    tx.stockUsoMonto = aplicado;        // ← clave: prueba de que SÍ se redujo
     tx.stockUsoManualAt = new Date().toISOString();
-    tx.stockUsoMonto = aplicado;
-    tx.expenseBucket = esAgregado ? 'agregados' : 'materiales';
+    // Estas flags ya pueden estar en Notion-imported txs — no sobreescribir innecesariamente
+    if(!tx.noCashFlow)         tx.noCashFlow = true;
+    if(!tx.materialUsoServicio) tx.materialUsoServicio = true;
+    tx.stockOperacion = 'uso_valor';
+    const bucket = esAgregado ? 'agregados' : 'materiales';
+    if(!tx.expenseBucket) tx.expenseBucket = bucket;
     totalAplicado += aplicado;
     totalTx++;
   });
 
-  if(totalTx === 0) return toast('⚠ Stock llegó a cero antes de procesar todos los movimientos', 'info');
+  // Contar pendientes para el toast final
+  const pendientes = (state.transactions || []).filter(t => {
+    if(!t || t.type !== 'egreso') return false;
+    if(!txEsMaterialOAgregado(t)) return false;
+    if(moneyValue(t.stockUsoMonto) > 0) return false;
+    if(t.stockOperacion === 'uso_valor' && t.origenCierreServicio) return false;
+    if(t.afectaStockValor || t.stockValorOnly || t.stockCompraId || t.stockOperacion === 'entrada_valor') return false;
+    return moneyValue(t.amount) > 0;
+  }).length;
 
   saveAll();
   render();
-  toast(`✓ ${totalTx} movimiento(s) aplicados al stock · -${fmt(totalAplicado)} del stock valorizado`);
+  const pendMsg = pendientes > 0
+    ? ` · ⚠ ${pendientes} pendiente(s) por stock insuficiente`
+    : ' · Stock al día ✓';
+  toast(`✓ ${totalTx} movimiento(s) aplicados · -${fmt(totalAplicado)} del stock valorizado${pendMsg}`);
+}
+
+function corregirComprasStockExistentes(){
+  const txs = load('fnz_neg_tx', []);
+  let corregidas = 0;
+  txs.forEach(t => {
+    const esCompraStock = t.afectaStockValor || t.stockValorOnly || t.stockOperacion === 'entrada_valor' || t.stockCompraId;
+    if(esCompraStock && !t.noCashFlow) {
+      t.noCashFlow = true;
+      corregidas++;
+    }
+  });
+  if(corregidas === 0) {
+    toast('Todas las compras de stock ya estaban correctas \u2713', 'info');
+    return;
+  }
+  save('fnz_neg_tx', txs);
+  if(state.modo === 'negocio') state.transactions = txs;
+  render();
+  toast(`\u2713 ${corregidas} compra(s) de stock corregidas \u00b7 El balance ya no las descuenta`);
 }
 
 function txPuedeMoverAStock(t){
@@ -8106,6 +8143,7 @@ function moverMovimientoAStock(txId){
   tx.stockOperacion = 'entrada_valor';
   tx.ocultarEnMovimientos = true;
   tx.stockValorOnly = true;
+  tx.noCashFlow = true;  // Compra de stock: NO afecta balance, solo stock valorizado
   tx.stockMigradoDesdeMovimiento = true;
   tx.stockMigradoAt = new Date().toISOString();
   tx.stockOldCategory = oldCat;
@@ -15308,6 +15346,12 @@ function abrirEditarNota(id){ abrirEditorNotaBloque(id); }
 
 
 function switchPage(page){
+  // Guardar scroll de la pestaña actual antes de salir
+  const content = document.getElementById('content');
+  if(content) {
+    if(!window._pageScroll) window._pageScroll = {};
+    window._pageScroll[state.page] = content.scrollTop;
+  }
   // Stop mic if active when navigating away
   if(micListening) stopListening();
   if(listaMicActivo) pararListaMicDefinitivo();
@@ -15347,6 +15391,11 @@ function render(){
   applyModoTheme();
   ensurePageData(state.page);
   const content=document.getElementById('content');
+  // Guardar scroll actual antes de reemplazar contenido
+  if(content) {
+    if(!window._pageScroll) window._pageScroll = {};
+    window._pageScroll[state.page] = content.scrollTop;
+  }
   const bal=balance();
   document.getElementById('header-date').textContent=MONTHS_FULL[new Date().getMonth()]+' '+new Date().getFullYear();
   const hb=document.getElementById('header-balance');
@@ -15366,6 +15415,10 @@ function render(){
     case 'inventario':content.innerHTML=renderInventario();break;
   }
   applyAppIcons();
+  // Restaurar scroll de la pestaña si estaba guardado
+  if(content && window._pageScroll && window._pageScroll[state.page] > 0) {
+    content.scrollTop = window._pageScroll[state.page];
+  }
   setTimeout(()=>{ renderSoundsList(); renderRemindersList(); checkNotifBtn(); },50);
 }
 
@@ -19815,6 +19868,7 @@ function saveMicTx() {
     tx.stockOperacion = 'entrada_valor';
     tx.ocultarEnMovimientos = true;
     tx.stockValorOnly = true;
+    tx.noCashFlow = true;  // Compra de stock: NO afecta balance, solo stock valorizado
     const compraStockValor = upsertCompraStockValorFromTx(tx);
     ajustarStockValorGeneral(tx.amount);
     registrarMovimientoStockValor('entrada_valor', tx.amount, {
@@ -25891,7 +25945,15 @@ function renderAjustes(){
          <div class="aj-row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:10px">
            <div style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.4">⚠️ Usa esto si restauraste movimientos desde Notion y el stock no se descontó (estaba en 0). Procesa todos los Materiales/Agregados pendientes y los aplica al stock valorizado actual.</div>
            <button class="aj-btn primary" onclick="recalcularUsoStockDesdeMovimientos()">📦 Recalcular uso de stock desde movimientos</button>
-         </div>`)}
+         </div>
+         ${(()=>{
+           const comprasErroneas = (load('fnz_neg_tx',[])||[]).filter(t=>(t.afectaStockValor||t.stockValorOnly||t.stockOperacion==='entrada_valor'||t.stockCompraId)&&!t.noCashFlow).length;
+           if(comprasErroneas===0) return `<div style="font-size:12px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">✓ Compras de stock correctas — no afectan el balance.</div>`;
+           return `<div class="aj-row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:10px">
+             <div style="font-size:12px;color:#9A6B00;margin-bottom:6px;line-height:1.4">⚠️ <b>${comprasErroneas}</b> compra(s) de stock antiguas reducen el balance incorrectamente. Corrígelas para que solo afecten el stock valorizado.</div>
+             <button class="aj-btn warn" onclick="corregirComprasStockExistentes()">🔧 Corregir ${comprasErroneas} compra(s) de stock en balance</button>
+           </div>`;
+         })()}`)}
     </div>
   </div>`;
 }
