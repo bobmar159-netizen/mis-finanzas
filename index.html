@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -8100,23 +8100,28 @@ function recalcularUsoStockDesdeMovimientos(desdeDate){
 }
 
 function corregirComprasStockExistentes(){
+  // Corrige compras de stock que tengan noCashFlow=true incorrectamente
+  // Las COMPRAS sí deben restar del balance (pagás con plata real)
+  // Solo los USOS de material tienen noCashFlow=true (no hay transacción de caja)
   const txs = load('fnz_neg_tx', []);
   let corregidas = 0;
   txs.forEach(t => {
-    const esCompraStock = t.afectaStockValor || t.stockValorOnly || t.stockOperacion === 'entrada_valor' || t.stockCompraId;
-    if(esCompraStock && !t.noCashFlow) {
-      t.noCashFlow = true;
+    const esCompraStock = (t.afectaStockValor || t.stockValorOnly || t.stockOperacion === 'entrada_valor' || t.stockCompraId)
+                          && !t.materialUsoServicio && !t.origenServicioMaterial && t.stockOperacion !== 'uso_valor';
+    // Si una compra tiene noCashFlow, quitárselo (debe restar del balance)
+    if(esCompraStock && t.noCashFlow) {
+      delete t.noCashFlow;
       corregidas++;
     }
   });
   if(corregidas === 0) {
-    toast('Todas las compras de stock ya estaban correctas \u2713', 'info');
+    toast('Compras de stock correctas \u2713 (no tienen noCashFlow)', 'info');
     return;
   }
   save('fnz_neg_tx', txs);
   if(state.modo === 'negocio') state.transactions = txs;
   render();
-  toast(`\u2713 ${corregidas} compra(s) de stock corregidas \u00b7 El balance ya no las descuenta`);
+  toast(`\u2713 ${corregidas} compra(s) corregidas \u00b7 Ahora s\u00ed restan del balance`);
 }
 
 function revertirRecalculoStock(){
@@ -8178,7 +8183,9 @@ function moverMovimientoAStock(txId){
   tx.stockOperacion = 'entrada_valor';
   tx.ocultarEnMovimientos = true;
   tx.stockValorOnly = true;
-  tx.noCashFlow = true;  // Compra de stock: NO afecta balance, solo stock valorizado
+  // Compra de stock: SÍ afecta balance (pagás con plata real) y sube el stock
+  // Solo los usos de material en servicios tienen noCashFlow=true
+  delete tx.noCashFlow;
   tx.stockMigradoDesdeMovimiento = true;
   tx.stockMigradoAt = new Date().toISOString();
   tx.stockOldCategory = oldCat;
@@ -26085,11 +26092,11 @@ function renderAjustes(){
            </div>`;
          })()}
          ${(()=>{
-           const comprasErroneas = (load('fnz_neg_tx',[])||[]).filter(t=>(t.afectaStockValor||t.stockValorOnly||t.stockOperacion==='entrada_valor'||t.stockCompraId)&&!t.noCashFlow).length;
-           if(comprasErroneas===0) return `<div style="font-size:12px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">✓ Compras de stock correctas — no afectan el balance.</div>`;
+           const comprasErroneas = (load('fnz_neg_tx',[])||[]).filter(t=>{const esC=(t.afectaStockValor||t.stockValorOnly||t.stockOperacion==='entrada_valor'||t.stockCompraId)&&!t.materialUsoServicio&&!t.origenServicioMaterial&&t.stockOperacion!=='uso_valor';return esC&&t.noCashFlow;}).length;
+           if(comprasErroneas===0) return <div style="font-size:12px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">&#10003; Compras de material correctas - restan del balance.</div>;
            return `<div class="aj-row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:10px">
-             <div style="font-size:12px;color:#9A6B00;margin-bottom:6px;line-height:1.4">⚠️ <b>${comprasErroneas}</b> compra(s) de stock antiguas reducen el balance incorrectamente. Corrígelas para que solo afecten el stock valorizado.</div>
-             <button class="aj-btn warn" onclick="corregirComprasStockExistentes()">🔧 Corregir ${comprasErroneas} compra(s) de stock en balance</button>
+             <div style="font-size:12px;color:#9A6B00;margin-bottom:6px;line-height:1.4">&#9888; <b>${comprasErroneas}</b> compra(s) tienen noCashFlow incorrecto y NO restan del balance. Corrígelas.</div>
+             <button class="aj-btn warn" onclick="corregirComprasStockExistentes()">&#128295; Corregir ${comprasErroneas} compra(s) - restaurar al balance</button>
            </div>`;
          })()}`)}
     </div>
