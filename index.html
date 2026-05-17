@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -13283,7 +13283,7 @@ async function guardarFinalizacion(id){
   // Materiales usados en el servicio: reducen el stock valorizado pero NO afectan la caja
   // (la caja ya se movio cuando se compraron los materiales). Se ocultan de movimientos.
   if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
-  if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', catId:'cne_agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', catId:'cne_agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.meta > 0) { const txId=rowId+'-met'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.meta, category:'META', catId:'cne_meta', description:'META - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if(crearMovimientosCierre) item.cierreTxIds = nuevosCierreTxIds;
 
