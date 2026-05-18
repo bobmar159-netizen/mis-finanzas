@@ -7999,12 +7999,11 @@ function enviarMovimientoAUsoStock(txId){
   if(!tx) return toast('Movimiento no encontrado', 'error');
   if(!txPuedeEnviarUsoStock(tx)) return toast('Este movimiento ya fue enviado a historial de stock o no aplica', 'info');
   const monto = moneyValue(tx.amount);
-  const delta = ajustarStockValorGeneral(-monto);
-  const aplicado = Math.abs(delta);
-  if(aplicado <= 0) return toast('Stock valorizado esta en cero; no se desconto nada', 'info');
+  if(monto <= 0) return toast('El monto es cero', 'info');
+  ajustarStockValorGeneral(-monto);
   const esAgregado = isAgregadoCategory(tx.catId, tx.category, tx.description);
   const descripcion = (esAgregado ? 'Agregados usados - ' : 'Materiales usados - ') + descripcionUsoStockFromTx(tx);
-  registrarMovimientoStockValor('uso_valor', aplicado, {
+  registrarMovimientoStockValor('uso_valor', monto, {
     fecha: tx.date || todayStr(),
     descripcion,
     cliente: tx.cliente || tx.vinculadoServicioCliente || '',
@@ -8018,14 +8017,14 @@ function enviarMovimientoAUsoStock(txId){
   tx.stockAjusteAplicado = true;
   tx.stockUsoManual = true;
   tx.stockUsoManualAt = new Date().toISOString();
-  tx.stockUsoMonto = aplicado;
+  tx.stockUsoMonto = monto;
   tx.expenseBucket = esAgregado ? 'agregados' : 'materiales';
   tx.notionColumn = esAgregado ? 'agregados' : 'materiales';
   const mov = (state.movimientosMateriales || [])[state.movimientosMateriales.length - 1];
   if(mov && typeof syncMovimientoToSheets === 'function') syncMovimientoToSheets(mov);
   saveAll();
   render();
-  toast('✓ Material registrado en stock · -' + fmt(aplicado) + ' · movimiento conservado en balance neutro');
+  toast('✓ Material registrado en stock · -' + fmt(monto) + ' · movimiento conservado en balance neutro');
 }
 
 function recalcularUsoStockDesdeMovimientos(desdeDate){
