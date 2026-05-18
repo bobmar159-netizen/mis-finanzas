@@ -7978,10 +7978,9 @@ function txPuedeEnviarUsoStock(t){
   if(!txEsMaterialOAgregado(t)) return false;
   // Ya fue procesado manualmente
   if(t.stockAjusteAplicado || t.stockUsoManual) return false;
-  // Ya fue procesado y marcado noCashFlow (uso_valor previo)
-  if(t.noCashFlow && (t.materialUsoServicio || t.origenServicioMaterial)) return false;
-  // Cierre de servicio ya gestiona su propio stock al finalizar
-  if(t.stockOperacion === 'uso_valor' && t.origenCierreServicio) return false;
+  // Permitimos forzar el envío a stock incluso si vino de cierre de servicio o Notion
+  // if(t.noCashFlow && (t.materialUsoServicio || t.origenServicioMaterial)) return false;
+  // if(t.stockOperacion === 'uso_valor' && t.origenCierreServicio) return false;
   // Es una compra de stock (entrada), no un uso
   if(t.afectaStockValor || t.stockValorOnly || t.stockCompraId || t.stockOperacion === 'entrada_valor') return false;
   if(t.origenDeudaPago || deudaTxLooksLike(t)) return false;
