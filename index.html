@@ -13740,6 +13740,10 @@ function exportData(){
     servicios: state.servicios,
     catsIn: state.catsIn,
     catsEx: state.catsEx,
+    inventario: state.inventario,
+    comprasMateriales: state.comprasMateriales,
+    movimientosMateriales: state.movimientosMateriales,
+    stockValorGeneral: state.stockValorGeneral
   };
   
   let numTx = state.transactions ? state.transactions.length : 0;
@@ -13778,6 +13782,10 @@ function importData(event){
       if(data.servicios) state.servicios=data.servicios;
       if(data.catsIn) state.catsIn=data.catsIn;
       if(data.catsEx) state.catsEx=data.catsEx;
+      if(data.inventario !== undefined) state.inventario=data.inventario;
+      if(data.comprasMateriales !== undefined) state.comprasMateriales=data.comprasMateriales;
+      if(data.movimientosMateriales !== undefined) state.movimientosMateriales=data.movimientosMateriales;
+      if(data.stockValorGeneral !== undefined) state.stockValorGeneral=data.stockValorGeneral;
       saveAll();
       render();
       toast(`⬆ Importación completada: ${numTx} movimientos restaurados`, 'success');
