@@ -12553,14 +12553,31 @@ function getGastosVinculadosServicio(item){
 function recalcularGastosVinculadosServicio(item){
   if(!item) return;
   const linked = getGastosVinculadosServicio(item);
+  
   if(item.comidaManualCierre === undefined) item.comidaManualCierre = Math.max(0, +(moneyValue(item.comida) - moneyValue(item.comidaVinculada)).toFixed(2));
   if(item.movilidadManualCierre === undefined) item.movilidadManualCierre = Math.max(0, +(moneyValue(item.movilidad) - moneyValue(item.movilidadVinculada)).toFixed(2));
+  if(item.agregadosManualCierre === undefined) item.agregadosManualCierre = Math.max(0, +(moneyValue(item.agregados) - moneyValue(item.agregadosVinculada)).toFixed(2));
+  if(item.metaManualCierre === undefined) item.metaManualCierre = Math.max(0, +(moneyValue(item.meta) - moneyValue(item.metaVinculada)).toFixed(2));
+  if(item.otrosManualCierre === undefined) item.otrosManualCierre = Math.max(0, +(moneyValue(item.otros_gastos || item.otros) - moneyValue(item.otrosVinculada)).toFixed(2));
+
   const comidaV = linked.filter(t=>isComidaCategory(t.catId, t.category, t.description)).reduce((s,t)=>s+moneyValue(t.amount),0);
   const movilidadV = linked.filter(t=>isMovilidadCategory(t.catId, t.category, t.description)).reduce((s,t)=>s+moneyValue(t.amount),0);
+  const agregadosV = linked.filter(t=>isAgregadoCategory(t.catId, t.category, t.description)).reduce((s,t)=>s+moneyValue(t.amount),0);
+  const metaV = linked.filter(t=>isMetaCategory(t.catId, t.category, t.description)).reduce((s,t)=>s+moneyValue(t.amount),0);
+  const otrosV = linked.filter(t=>!isComidaCategory(t.catId, t.category, t.description) && !isMovilidadCategory(t.catId, t.category, t.description) && !isAgregadoCategory(t.catId, t.category, t.description) && !isMetaCategory(t.catId, t.category, t.description) && !isMaterialesCategory(t.catId, t.category)).reduce((s,t)=>s+moneyValue(t.amount),0);
+
   item.comidaVinculada = +comidaV.toFixed(2);
   item.movilidadVinculada = +movilidadV.toFixed(2);
+  item.agregadosVinculada = +agregadosV.toFixed(2);
+  item.metaVinculada = +metaV.toFixed(2);
+  item.otrosVinculada = +otrosV.toFixed(2);
+
   item.comida = +(moneyValue(item.comidaManualCierre) + item.comidaVinculada).toFixed(2);
   item.movilidad = +(moneyValue(item.movilidadManualCierre) + item.movilidadVinculada).toFixed(2);
+  item.agregados = +(moneyValue(item.agregadosManualCierre) + item.agregadosVinculada).toFixed(2);
+  item.meta = +(moneyValue(item.metaManualCierre) + item.metaVinculada).toFixed(2);
+  item.otros_gastos = +(moneyValue(item.otrosManualCierre) + item.otrosVinculada).toFixed(2);
+
   item.gastosVinculados = linked.map(t=>String(t.id));
   item.gastosVinculadosTotal = +linked.reduce((s,t)=>s+moneyValue(t.amount),0).toFixed(2);
   item.gastosVinculadosResumen = linked.map(t => `${t.category}: ${fmt(t.amount)}`).join(' · ');
