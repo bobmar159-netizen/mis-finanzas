@@ -2401,7 +2401,7 @@ function getKeys(modo){
   if(migrated) console.log('[MisFinanzas] Keys migrados a formato fnz_neg_*');
 })();
 
-const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_scope_sheets_v12_debt_order';
+const CATEGORY_DEFAULT_VERSION = 'cats_2026_05_smart_local_v13';
 const CATEGORY_LEGACY_DEFAULT_IDS = {
   personal: {
     ingreso: ['ci1','ci2','ci3','ci4','ci5','ci6','ci_deuda_cobro','transfer_in','transfer_retiro_in','cneg_svc'],
@@ -2431,9 +2431,32 @@ function syncCategoryList(current, defaults, legacyIds, forceDefaultRefresh){
   return next;
 }
 
+
+const SMART_NEG_EX_CATEGORIES = [
+  {id:'cne_desayuno',name:'Desayuno',icon:'food',color:'#B58B55',type:'egreso'},
+  {id:'cne_almuerzo',name:'Almuerzo',icon:'food',color:'#B58B55',type:'egreso'},
+  {id:'cne_cena',name:'Cena',icon:'food',color:'#B58B55',type:'egreso'},
+  {id:'cne_peaje',name:'Peaje',icon:'transport',color:'#4F7EA8',type:'egreso'},
+  {id:'cne_reparacion_maquinas',name:'Reparacion de maquinas',icon:'tool',color:'#77746D',type:'egreso'}
+];
+
+function ensureBusinessSmartCategories(){
+  if(!Array.isArray(state.catsEx)) state.catsEx = [];
+  let changed = false;
+  const hasId = id => state.catsEx.some(c => c && c.id === id);
+  const hasName = name => state.catsEx.some(c => normSimpleText(c?.name || '') === normSimpleText(name));
+  SMART_NEG_EX_CATEGORIES.forEach(cat => {
+    if(!hasId(cat.id) && !hasName(cat.name)){
+      state.catsEx.push({...cat});
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 function normalizeBusinessLabelsForState(isNeg){
   if(!isNeg) return;
-  let changed = false;
+  let changed = ensureBusinessSmartCategories();
   state.catsEx = (state.catsEx || []).map(c => {
     if(c && c.id === 'cne2' && c.name !== 'Gnv'){ changed = true; return {...c, name:'Gnv'}; }
     if(c && c.id === 'cne_meta' && c.name !== 'META'){ changed = true; return {...c, name:'META'}; }
@@ -2493,6 +2516,10 @@ function loadStateForModo(modo){
   state.movimientosMateriales = state._lazyLoaded?.movimientosMateriales ? load('fnz_mov_mat', []) : (state.movimientosMateriales || []);
   state.comprasMateriales   = state._lazyLoaded?.comprasMateriales ? load('fnz_compras_mat', []) : (state.comprasMateriales || []);
   state.stockValorGeneral   = load('fnz_stock_valor_general', 0);
+  if(isNeg && typeof normalizarComprasStockCashFlow === 'function'){
+    const comprasStockNormalizadas = normalizarComprasStockCashFlow(state.transactions);
+    if(comprasStockNormalizadas > 0) save(k.tx, state.transactions);
+  }
 
   syncDefaultCategoriesForMode(isNeg);
   normalizeBusinessLabelsForState(isNeg);
@@ -2987,7 +3014,7 @@ function categoryAreaLabel(cat, type){
   const isNeg = state.modo === 'negocio';
   if(!isNeg) {
     if(type === 'ingreso') return 'Ingresos personales';
-    if(/mercado|super|gaseosa|agua|golosina|snack|pizza|menu|comida/.test(n)) return 'Alimentacion';
+    if(/mercado|super|gaseosa|agua|golosina|snack|pizza|menu|comida|desayuno|almuerzo|cena|alimentacion|bebida/.test(n)) return 'Alimentacion';
     if(['ce_movilidad'].includes(id) || /movilidad|transporte|taxi|pasaje/.test(n)) return 'Movilidad';
     if(['ce_edu','ce_edu_colegio','ce_edu_utiles'].includes(id) || /educacion|colegio|utiles/.test(n)) return 'Educacion';
     if(/medicina|salud|aseo|cuidado|belleza|consulta/.test(n)) return 'Salud y cuidado';
@@ -2998,11 +3025,11 @@ function categoryAreaLabel(cat, type){
     if(/^cn[1-8]$/.test(id) || /punto|modificacion|instalacion|reparacion|gasfiteria|conversion|conexion|documentacion/.test(n)) return 'Servicios';
     return 'Otros ingresos';
   }
-  if(['cne_gaseosa','cne_snack','cne_golosina','cne_pizza','cne_menu'].includes(id) || /gaseosa|snack|golosina|pizza|menu|comida|alimentacion|bebida/.test(n)) return 'Alimentacion';
-  if(['cne5','cne2','cne3','cne7'].includes(id) || /transporte|gnv|gasolina|auto|movilidad/.test(n)) return 'Movilidad y auto';
+  if(['cne_gaseosa','cne_snack','cne_golosina','cne_pizza','cne_menu','cne_desayuno','cne_almuerzo','cne_cena'].includes(id) || /gaseosa|snack|golosina|pizza|menu|comida|desayuno|almuerzo|cena|alimentacion|bebida/.test(n)) return 'Alimentacion';
+  if(['cne5','cne2','cne3','cne7','cne_peaje'].includes(id) || /transporte|gnv|gasolina|auto|movilidad|peaje/.test(n)) return 'Movilidad y auto';
   if(['cne1'].includes(id) || /material/.test(n)) return 'Stock y materiales';
   if(['cne_luz','cne_agua','cne_internet_casa','cne_internet_movil'].includes(id) || /luz|agua|internet/.test(n)) return 'Servicios fijos';
-  if(['cne_operacion','cne_personal','cne_agregados','cne_meta','cne_documentacion'].includes(id) || /operacion|personal|agregado|meta|ahorro|documentacion/.test(n)) return 'Operacion';
+  if(['cne_operacion','cne_personal','cne_agregados','cne_meta','cne_documentacion','cne_reparacion_maquinas'].includes(id) || /operacion|personal|agregado|meta|ahorro|documentacion|maquina|maquinas/.test(n)) return 'Operacion';
   return 'Otros';
 }
 
@@ -3340,6 +3367,11 @@ function renderDashboard(){
 
 // ── Ganancia neta de un ingreso de servicio ──────────────────────────────
 // Funciona para Notion (_notionTrabajo) y servicios cerrados desde la app.
+function txServicioGroupId(t){
+  if(!t) return '';
+  return t.visualServicioId || t.vinculadoServicioId || t._notionTrabajo?.id || t._notionRowId || '';
+}
+
 function getGananciaServicio(t) {
   if (t.type !== 'ingreso') return null;
   // Caso 1: importado de Notion con datos del trabajo
@@ -3529,7 +3561,7 @@ function renderMovimientos(){
             const g = getGananciaServicio(t);
             if (g !== null) tieneServicios = true;
             if (g === null) { ganDia += (+(t.amount||0)); return; }
-            const uid = t.vinculadoServicioId || t._notionRowId || t.id;
+            const uid = txServicioGroupId(t) || t.id;
             if (!svcContados.has(uid)) { svcContados.add(uid); ganDia += g; }
           });
           const soloGastos = !tieneServicios && txs.some(t => t.type === 'egreso');
@@ -3547,6 +3579,7 @@ function renderMovimientos(){
             const titleTxt = isDebtTx ? ((esIng ? 'Cobro de deuda' : 'Deudas') + ' · ' + debtName) : (t.category||t.description||'Sin categoría');
             const subTxt = (clienteTxt ? (clienteTxt+ubicTxt) : (isDebtTx ? (t.description || titleTxt) : (t.category||''))) + linkTxt;
             const cardId = 'mvcard_'+t.id;
+            const horaTxt = txHoraLabel(t);
 
             return `
             <div class="mv-card" id="${cardId}" onclick="toggleMvCard('${cardId}')" style="margin-bottom:4px">
@@ -3568,6 +3601,7 @@ function renderMovimientos(){
               <div class="mv-expand">
                 <div class="mv-detail">
                   <div class="mv-d-item"><span class="mv-d-lbl">Fecha</span><span class="mv-d-val">${fechaLabel}</span></div>
+                  ${horaTxt?`<div class="mv-d-item"><span class="mv-d-lbl">Hora</span><span class="mv-d-val">${horaTxt}</span></div>`:'<div></div>'}
                   ${t.ubicacion?`<div class="mv-d-item"><span class="mv-d-lbl">Ubicación</span><span class="mv-d-val">${t.ubicacion}</span></div>`:'<div></div>'}
                   ${t.description&&t.description!==t.category?`<div class="mv-d-item" style="grid-column:1/-1"><span class="mv-d-lbl">Descripción</span><span class="mv-d-val">${t.description}</span></div>`:''}
                   ${t.cliente?`<div class="mv-d-item"><span class="mv-d-lbl">Cliente</span><span class="mv-d-val">${t.cliente}</span></div>`:''}
@@ -3587,7 +3621,7 @@ function renderMovimientos(){
           const svcGroups = {};
           const looseTxs = [];
           txs.forEach(t => {
-            const svcId = t.vinculadoServicioId || t._notionRowId || t._notionTrabajo?.id;
+            const svcId = txServicioGroupId(t);
             if (svcId && (t.vinculadoServicioId || t._notionTrabajo || t.origenServicioMaterial || t.origenCierreServicio || t._importadoDeNotion)) {
               if(!svcGroups[svcId]) svcGroups[svcId] = [];
               svcGroups[svcId].push(t);
@@ -7875,6 +7909,9 @@ async function saveTx(editId){
     category: catName,
     catId,
     date,
+    hora: original?.hora || currentHm(),
+    createdAt: original?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     description: document.getElementById('tx-desc').value.trim() || catName,
     cliente: clienteEl ? clienteEl.value.trim() : (original?.cliente || ''),
     ubicacion: ubicEl ? ubicEl.value.trim() : (original?.ubicacion || ''),
@@ -8103,29 +8140,32 @@ function recalcularUsoStockDesdeMovimientos(desdeDate){
   toast(`✓ ${totalTx} movimiento(s) aplicados · -${fmt(totalAplicado)} del stock valorizado${pendMsg}`);
 }
 
-function corregirComprasStockExistentes(){
-  // Corrige compras de stock que tengan noCashFlow=true incorrectamente
-  // Las COMPRAS sí deben restar del balance (pagás con plata real)
-  // Solo los USOS de material tienen noCashFlow=true (no hay transacción de caja)
-  const txs = load('fnz_neg_tx', []);
+function normalizarComprasStockCashFlow(txs){
   let corregidas = 0;
-  txs.forEach(t => {
+  (txs || []).forEach(t => {
     const esCompraStock = (t.afectaStockValor || t.stockValorOnly || t.stockOperacion === 'entrada_valor' || t.stockCompraId)
-                          && !t.materialUsoServicio && !t.origenServicioMaterial && t.stockOperacion !== 'uso_valor';
-    // Si una compra tiene noCashFlow, quitárselo (debe restar del balance)
-    if(esCompraStock && t.noCashFlow) {
+      && !t.materialUsoServicio
+      && !t.origenServicioMaterial
+      && t.stockOperacion !== 'uso_valor';
+    if(esCompraStock && t.noCashFlow){
       delete t.noCashFlow;
       corregidas++;
     }
   });
+  return corregidas;
+}
+
+function corregirComprasStockExistentes(){
+  const txs = load('fnz_neg_tx', []);
+  const corregidas = normalizarComprasStockCashFlow(txs);
   if(corregidas === 0) {
-    toast('Compras de stock correctas \u2713 (no tienen noCashFlow)', 'info');
+    toast('Compras de stock correctas: ya afectan balance', 'info');
     return;
   }
   save('fnz_neg_tx', txs);
   if(state.modo === 'negocio') state.transactions = txs;
   render();
-  toast(`\u2713 ${corregidas} compra(s) corregidas \u00b7 Ahora s\u00ed restan del balance`);
+  toast('OK: ' + corregidas + ' compra(s) de stock corregidas. Ahora restan del balance.');
 }
 
 function revertirRecalculoStock(){
@@ -10114,8 +10154,7 @@ async function _pushToNotion(item, cobroObj) {
     { name:'Efectivo',      val: cobroObj.pagoEfectivo || 0 },
     { name:'Yape',          val: cobroObj.pagoYape || 0 },
     { name:'Plin',          val: cobroObj.pagoPlin || 0 },
-    { name:'Transferencia', val: cobroObj.pagoTransf || 0 },
-    { name:'A Cuenta',      val: cobroObj.pagoAcuenta || 0 }
+    { name:'Transferencia', val: cobroObj.pagoTransf || 0 }
   ].filter(p => p.val > 0);
 
   const fPago1Col = findCol('1 forma de pago','forma de pago 1','1 forma pago','pago 1');
@@ -10124,6 +10163,8 @@ async function _pushToNotion(item, cobroObj) {
   if (pagosMethods[1]) setProp(fPago2Col, pagosMethods[1].name);
 
   const totalPrecio = [1,2,3].reduce((s,i)=>s+(parseFloat(cobroObj['precio'+i] || item['precio'+i] || 0)||0),0);
+  const totalCobrado = moneyValue(cobroObj.totalCobrado || item.montoPagado || (moneyValue(cobroObj.pagoEfectivo)+moneyValue(cobroObj.pagoYape)+moneyValue(cobroObj.pagoPlin)+moneyValue(cobroObj.pagoTransf)));
+  const saldoPendienteCobro = moneyValue(cobroObj.saldoPendienteCobro || item.montoPendienteCobro || item.saldoPendienteCobro || 0);
   const totalMateriales = [1,2,3].reduce((s,i)=>s+(parseFloat(cobroObj['materiales'+i] || item['materiales'+i] || 0)||0),0);
   const totalGastos = totalMateriales + (parseFloat(cobroObj.comida||0)||0) + (parseFloat(cobroObj.otros_gastos||cobroObj.otros||0)||0) + (parseFloat(cobroObj.agregados||0)||0) + (parseFloat(cobroObj.movilidad||0)||0) + (parseFloat(cobroObj.meta||0)||0);
   const ganancia = +(totalPrecio - totalGastos).toFixed(2);
@@ -10135,6 +10176,9 @@ async function _pushToNotion(item, cobroObj) {
   setProp(findCol('otros', 'otros gastos', 'gastos extra', 'extra'), moneyValue(cobroObj.otros_gastos || cobroObj.otros));
   setProp(findCol('meta','objetivo'), moneyValue(cobroObj.meta));
   setProp(findCol('ganancia'), ganancia);
+  setProp(findCol('monto pagado','pagado','cobrado','total cobrado','cobrado total'), totalCobrado);
+  setProp(findCol('pendiente','saldo pendiente','pendiente por cobrar','por cobrar','monto pendiente'), saldoPendienteCobro);
+  setProp(findCol('estado pago','estado de pago','pago estado'), item.estadoPago || (saldoPendienteCobro > 0 ? 'parcial' : (totalCobrado > 0 ? 'completo' : 'sin_cobro')));
   const obsFinal = cobroObj.observaciones || item.observaciones || item.notas;
   if (obsFinal) setProp(findCol('observaciones','observacion','notas','nota','descripcion'), obsFinal);
 
@@ -12052,6 +12096,30 @@ function horaTo12(hora24){
   return h+':'+(mm||'00')+' '+period;
 }
 
+function currentHm(){
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+function txHoraLabel(t){
+  const raw = String(t?.hora || '').trim();
+  if(/^\d{1,2}:\d{2}/.test(raw)){
+    const [h,m] = raw.split(':');
+    return horaTo12(String(h).padStart(2,'0') + ':' + String(m || '00').slice(0,2));
+  }
+  if(t?.createdAt){
+    const d = new Date(t.createdAt);
+    if(!Number.isNaN(d.getTime())) return d.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+  }
+  const idMatch = String(t?.id || '').match(/^\d{12,}/);
+  if(idMatch){
+    const d = new Date(Number(idMatch[0]));
+    if(!Number.isNaN(d.getTime())) return d.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+  }
+  return '';
+}
+
+
 // ══════════════════════════════════════════════════════════════════
 // DISTRITO COMBOBOX — reutilizable en agenda y modal de cobro
 // InputId: id del <input>, DropId: id del contenedor del dropdown
@@ -12507,7 +12575,9 @@ function buildCobroObjFromAgenda(item){
     svc1:item.servicio1 || item.servicio || '', precio1:moneyValue(item.precio1 || item.precio), materiales1:moneyValue(item.materiales1),
     svc2:item.servicio2 || '', precio2:moneyValue(item.precio2), materiales2:moneyValue(item.materiales2),
     svc3:item.servicio3 || '', precio3:moneyValue(item.precio3), materiales3:moneyValue(item.materiales3),
-    pagoEfectivo:moneyValue(item.pagoEfectivo), pagoYape:moneyValue(item.pagoYape), pagoPlin:moneyValue(item.pagoPlin), pagoTransf:moneyValue(item.pagoTransf), pagoAcuenta:moneyValue(item.pagoAcuenta),
+    pagoEfectivo:moneyValue(item.pagoEfectivo), pagoYape:moneyValue(item.pagoYape), pagoPlin:moneyValue(item.pagoPlin), pagoTransf:moneyValue(item.pagoTransf),
+    pagoAcuenta:0,
+    saldoPendienteCobro:moneyValue(item.montoPendienteCobro || item.saldoPendienteCobro || item.pendienteCobroCliente || item.pagoAcuenta),
     movilidad:moneyValue(item.movilidad), comida:moneyValue(item.comida), agregados:moneyValue(item.agregados),
     otros_gastos:moneyValue(item.otros_gastos || item.otros), meta:moneyValue(item.meta),
     observaciones:item.observaciones || item.notas || ''
@@ -12521,9 +12591,10 @@ function buildTrabajoPayloadFromAgenda(item, cobroObj){
     { name:'Efectivo', val:c.pagoEfectivo },
     { name:'Yape', val:c.pagoYape },
     { name:'Plin', val:c.pagoPlin },
-    { name:'Transferencia', val:c.pagoTransf },
-    { name:'A cuenta', val:c.pagoAcuenta }
+    { name:'Transferencia', val:c.pagoTransf }
   ].filter(p=>moneyValue(p.val)>0);
+  const totalCobrado = moneyValue(item.montoPagado || c.totalCobrado || (moneyValue(c.pagoEfectivo)+moneyValue(c.pagoYape)+moneyValue(c.pagoPlin)+moneyValue(c.pagoTransf)));
+  const saldoPendienteCobro = moneyValue(item.montoPendienteCobro || c.saldoPendienteCobro || item.saldoPendienteCobro || 0);
   return {
     id:item.id, fecha:item.fecha, cliente:item.cliente, telefono:item.telefono, contacto:item.telefono,
     ubicacion:item.ubicacion, distrito:item.ubicacion,
@@ -12531,6 +12602,8 @@ function buildTrabajoPayloadFromAgenda(item, cobroObj){
     servicio2:c.svc2, precio2:c.precio2, materiales2:c.materiales2,
     servicio3:c.svc3, precio3:c.precio3, materiales3:c.materiales3,
     formaPago1:item.formaPago1 || pagos[0]?.name || '', formaPago2:item.formaPago2 || pagos[1]?.name || '',
+    montoPagado:totalCobrado, montoPendienteCobro:saldoPendienteCobro, saldoPendienteCobro:saldoPendienteCobro,
+    estadoPago:item.estadoPago || (saldoPendienteCobro > 0 ? 'parcial' : (totalCobrado > 0 ? 'completo' : 'sin_cobro')),
     movilidad:c.movilidad, comida:c.comida, agregados:c.agregados, otros_gastos:c.otros_gastos, meta:c.meta,
     observaciones:c.observaciones || item.notas || '',
     gastosVinculadosTotal:item.gastosVinculadosTotal || 0, gastosVinculadosResumen:item.gastosVinculadosResumen || '',
@@ -12676,7 +12749,11 @@ window._saveCobroStateToItem = function(id) {
   item.pagoYape = moneyValue(document.getElementById('pago-yape')?.value);
   item.pagoPlin = moneyValue(document.getElementById('pago-plin')?.value);
   item.pagoTransf = moneyValue(document.getElementById('pago-transferencia')?.value);
-  item.pagoAcuenta = moneyValue(document.getElementById('pago-acuenta')?.value);
+  const pendienteCobro = moneyValue(document.getElementById('pago-acuenta')?.value);
+  item.pagoAcuenta = 0;
+  item.montoPendienteCobro = pendienteCobro;
+  item.saldoPendienteCobro = pendienteCobro;
+  item.pendienteCobroCliente = pendienteCobro;
 };
 
 function getGastosSugeridosCierre(item){
@@ -12970,7 +13047,7 @@ function abrirModalCobro(id){
 
           </div>
           <div style="text-align:right">
-            <div class="cierre-kicker">Falta</div>
+            <div class="cierre-kicker">Pendiente</div>
             <div id="cobro-falta-monto" style="font-size:18px;font-weight:850;color:#E05252">S/ 0.00</div>
           </div>
         </div>
@@ -12979,7 +13056,7 @@ function abrirModalCobro(id){
           <div class="cierre-field"><label>Yape</label><input id="pago-yape" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.pagoYape||''}" oninput="updateCobroTotals()"></div>
           <div class="cierre-field"><label>Plin</label><input id="pago-plin" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.pagoPlin||''}" oninput="updateCobroTotals()"></div>
           <div class="cierre-field"><label>Transferencia</label><input id="pago-transferencia" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.pagoTransf||''}" oninput="updateCobroTotals()"></div>
-          <div class="cierre-field" style="grid-column:1/-1"><label>A cuenta</label><input id="pago-acuenta" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.pagoAcuenta||''}" oninput="updateCobroTotals()"></div>
+          <div class="cierre-field" style="grid-column:1/-1"><label>Pendiente por cobrar</label><input id="pago-acuenta" class="cierre-input" type="number" inputmode="decimal" placeholder="0.00" value="${item.montoPendienteCobro||item.saldoPendienteCobro||item.pagoAcuenta||''}" oninput="updateCobroTotals()"><div style="font-size:11px;color:#667085;margin-top:5px">No suma a caja; queda como cuenta por cobrar del cliente.</div></div>
         </div>
       </div>
 
@@ -13048,16 +13125,61 @@ window.updateCobroTotals = function() {
       netEl.style.color = neto < 0 ? '#C62828' : '#2F6F53';
     }
   });
-  const ids = ['pago-efectivo','pago-yape','pago-plin','pago-transferencia','pago-acuenta'];
-  const totalPagado = ids.reduce((s, id) => s + (moneyValue(document.getElementById(id)?.value)), 0);
-  const falta = totalPrecio - totalPagado;
+  const ids = ['pago-efectivo','pago-yape','pago-plin','pago-transferencia'];
+  const totalCobrado = ids.reduce((sum, id) => sum + moneyValue(document.getElementById(id)?.value), 0);
+  const pendienteManual = moneyValue(document.getElementById('pago-acuenta')?.value);
+  const pendienteCalculado = Math.max(totalPrecio - totalCobrado, 0);
+  const pendiente = pendienteManual > 0 ? pendienteManual : pendienteCalculado;
   const totalVinculado = getSelectedGastosCierreTotal();
   const el = document.getElementById('cobro-falta-monto');
-  if (el) { el.textContent = 'S/ ' + falta.toFixed(2); el.style.color = falta > 0 ? '#E05252' : falta < 0 ? '#1565C0' : '#0D9488'; }
+  if (el) {
+    el.textContent = 'S/ ' + pendiente.toFixed(2);
+    el.style.color = pendiente > 0 ? '#E05252' : totalCobrado > totalPrecio ? '#1565C0' : '#0D9488';
+  }
   const linkedEl = document.getElementById('cobro-linked-total');
   if(linkedEl) linkedEl.textContent = 'S/ ' + totalVinculado.toFixed(2);
   const totalEl = document.getElementById('cobro-total-servicio');
   if(totalEl) totalEl.textContent = 'S/ ' + totalPrecio.toFixed(2);
+}
+
+function upsertCuentaPorCobrarServicio(item, pendiente){
+  if(!item) return null;
+  if(!state.debts) state.debts = [];
+  const monto = +moneyValue(pendiente).toFixed(2);
+  const deudaId = 'cxc_' + String(item.id || Date.now()).replace(/[^a-zA-Z0-9_-]/g, '_');
+  const idx = state.debts.findIndex(d => String(d.id) === deudaId || (d.origenCuentaCobrar && String(d.servicioId || '') === String(item.id || '')));
+  if(monto <= 0){
+    if(idx >= 0) state.debts.splice(idx, 1);
+    return null;
+  }
+  const nombreServicio = [item.servicio1 || item.servicio, item.servicio2, item.servicio3].filter(Boolean).join(' + ') || 'Servicio';
+  const base = {
+    id: deudaId,
+    name: 'Por cobrar - ' + (item.cliente || 'Cliente'),
+    totalAmount: monto,
+    cuotaMonto: monto,
+    cuotasTotales: 1,
+    cuotasPagadas: 0,
+    fechaInicio: item.fecha || todayStr(),
+    diaPago: Number((item.fecha || todayStr()).slice(8,10)) || Number(todayStr().slice(8,10)),
+    categoria: 'Cliente por cobrar',
+    tipo: 'Cliente',
+    deudaRol: 'meden',
+    deudaTipo: 'por_cobrar',
+    rol: 'meden',
+    color: '#047857',
+    origenCuentaCobrar: true,
+    servicioId: item.id || '',
+    cliente: item.cliente || '',
+    descripcion: 'Saldo pendiente por ' + nombreServicio
+  };
+  if(idx >= 0){
+    state.debts[idx] = { ...state.debts[idx], ...base, pagos: state.debts[idx].pagos || [] };
+    return state.debts[idx];
+  }
+  base.pagos = [];
+  state.debts.push(base);
+  return base;
 }
 
 function setCobro(v){ document.getElementById('cobro-monto').value=v; }
@@ -13097,7 +13219,8 @@ async function guardarFinalizacion(id){
     pagoYape: moneyValue(document.getElementById('pago-yape')?.value),
     pagoPlin: moneyValue(document.getElementById('pago-plin')?.value),
     pagoTransf: moneyValue(document.getElementById('pago-transferencia')?.value),
-    pagoAcuenta: moneyValue(document.getElementById('pago-acuenta')?.value),
+    saldoPendienteCobro: moneyValue(document.getElementById('pago-acuenta')?.value),
+    pagoAcuenta: 0,
     comida: sumGasto('comida'),
     movilidad: sumGasto('movilidad'),
     agregados: sumGasto('agregados'),
@@ -13109,7 +13232,12 @@ async function guardarFinalizacion(id){
 
   const totalPrecio = cobroObj.precio1 + cobroObj.precio2 + cobroObj.precio3;
   const totalMat    = cobroObj.materiales1 + cobroObj.materiales2 + cobroObj.materiales3;
-  const totalPagado = cobroObj.pagoEfectivo + cobroObj.pagoYape + cobroObj.pagoPlin + cobroObj.pagoTransf + cobroObj.pagoAcuenta;
+  const totalCobrado = +(cobroObj.pagoEfectivo + cobroObj.pagoYape + cobroObj.pagoPlin + cobroObj.pagoTransf).toFixed(2);
+  const pendienteManual = moneyValue(cobroObj.saldoPendienteCobro);
+  const saldoPendienteCobro = +(pendienteManual > 0 ? pendienteManual : Math.max(totalPrecio - totalCobrado, 0)).toFixed(2);
+  cobroObj.totalCobrado = totalCobrado;
+  cobroObj.saldoPendienteCobro = saldoPendienteCobro;
+  const totalPagado = totalCobrado;
   let stockConsumidoPrev = moneyValue(item.stockValorConsumido);
   if(yaFinalizadoAntes && !stockConsumidoPrev){
     const prevCampos = moneyValue(item.materiales1) + moneyValue(item.materiales2) + moneyValue(item.materiales3) + moneyValue(item.agregados);
@@ -13138,14 +13266,16 @@ async function guardarFinalizacion(id){
   item.telefono = cobroObj.telefono;
   item.estado = 'se_finalizo';
   item.montoPagado = totalPagado;
-  item.montoPendienteCobro = Math.max(totalPrecio - totalPagado, 0);
+  item.montoPendienteCobro = saldoPendienteCobro;
+  item.saldoPendienteCobro = saldoPendienteCobro;
+  item.pendienteCobroCliente = saldoPendienteCobro;
   if (cobroObj.distrito) item.ubicacion = cobroObj.distrito;
   item.observaciones = cobroObj.observaciones;
   if (cobroObj.observaciones) item.notas = cobroObj.observaciones;
 
-  if (totalPagado >= totalPrecio) item.estadoPago = 'completo';
-  else if (totalPagado > 0)       item.estadoPago = 'parcial';
-  else                             item.estadoPago = 'sin_cobro';
+  if (saldoPendienteCobro <= 0 && totalPagado >= totalPrecio) item.estadoPago = 'completo';
+  else if (totalPagado > 0)                                  item.estadoPago = 'parcial';
+  else                                                       item.estadoPago = 'sin_cobro';
 
   item.servicio1 = cobroObj.svc1 || '';
   item.servicio2 = cobroObj.svc2 || '';
@@ -13179,7 +13309,9 @@ async function guardarFinalizacion(id){
   item.pagoYape = cobroObj.pagoYape;
   item.pagoPlin = cobroObj.pagoPlin;
   item.pagoTransf = cobroObj.pagoTransf;
-  item.pagoAcuenta = cobroObj.pagoAcuenta;
+  item.pagoAcuenta = 0;
+  item.saldoPendienteCobro = saldoPendienteCobro;
+  item.pendienteCobroCliente = saldoPendienteCobro;
   item.finalizadoAt = new Date().toISOString();
   if(item._movimientosMaterialesPendientes){
     (state.movimientosMateriales || [])
@@ -13252,7 +13384,8 @@ async function guardarFinalizacion(id){
   }
 
   const rowId  = notionRowId || item.id || Date.now();
-  const baseTx = { date: item.fecha, cliente: item.cliente||'', ubicacion: item.ubicacion, negocio: true, _notionRowId: notionRowId, _notionFinanceRowId: notionRowId, _notionReporteRowId: notionRowId };
+  const cierreNowIso = new Date().toISOString();
+  const baseTx = { date: item.fecha, hora: currentHm(), createdAt: cierreNowIso, updatedAt: cierreNowIso, cliente: item.cliente||'', ubicacion: item.ubicacion, negocio: true, moneda:'PEN', _notionRowId: notionRowId, _notionFinanceRowId: notionRowId, _notionReporteRowId: notionRowId };
   const prevCierreTxIds = new Set((item.cierreTxIds||[]).map(String));
   if(prevCierreTxIds.size){
     state.transactions = (state.transactions||[]).filter(t => !prevCierreTxIds.has(String(t.id)));
@@ -13260,63 +13393,89 @@ async function guardarFinalizacion(id){
   const crearMovimientosCierre = !yaFinalizadoAntes || prevCierreTxIds.size > 0;
   const nuevosCierreTxIds = [];
 
-  // Transacciones de INGRESO por SERVICIO (no por método de pago)
-  const servicios = [
-    { svc: cobroObj.svc1, precio: cobroObj.precio1, key: 'svc1' },
-    { svc: cobroObj.svc2, precio: cobroObj.precio2, key: 'svc2' },
-    { svc: cobroObj.svc3, precio: cobroObj.precio3, key: 'svc3' }
-  ];
-  if(crearMovimientosCierre) servicios.forEach((s, i) => {
-    if (s.svc && s.precio > 0) {
-      const txId = rowId + '-svc' + (i+1);
-      nuevosCierreTxIds.push(txId);
-      state.transactions.unshift({
-        id: txId,
-        type: 'ingreso',
-        amount: s.precio,
-        category: s.svc,
-        description: s.svc + ' — ' + (item.cliente||''),
-        formaPago: cobroObj.pagoYape > 0 ? 'Yape' : cobroObj.pagoPlin > 0 ? 'Plin' : cobroObj.pagoTransf > 0 ? 'Transferencia' : cobroObj.pagoAcuenta > 0 ? 'A cuenta' : 'Efectivo',
-        vinculadoServicioId: item.id,
-        origenCierreServicio: true,
-        ...baseTx
-      });
-    }
-  });
-  // Referencias de pago para syncSheets
+  // Transacciones de cierre separadas por servicio.
+  // Notion/Sheets siguen recibiendo un solo trabajo; Movimientos queda legible por servicio.
   const pagos = [
     { name:'Efectivo',      val: cobroObj.pagoEfectivo },
     { name:'Yape',          val: cobroObj.pagoYape },
     { name:'Plin',          val: cobroObj.pagoPlin },
-    { name:'Transferencia', val: cobroObj.pagoTransf },
-    { name:'A cuenta',      val: cobroObj.pagoAcuenta }
+    { name:'Transferencia', val: cobroObj.pagoTransf }
   ];
   const pagosMethods = pagos.filter(p => p.val > 0).map(p => p.name);
   item.formaPago1 = pagosMethods[0] || '';
   item.formaPago2 = pagosMethods[1] || '';
-  if (crearMovimientosCierre && cobroObj.movilidad_manual > 0) { const txId=rowId+'-mov'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.movilidad_manual, category:'Movilidad', catId:'cne5', description:'Movilidad - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
-  if (crearMovimientosCierre && cobroObj.comida_manual > 0) { const txId=rowId+'-com'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.comida_manual, category:'Comida', catId:'cne_menu', description:'Comida - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
-  if (crearMovimientosCierre && cobroObj.otros_gastos > 0) { const txId=rowId+'-otg'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
-  // Materiales usados en el servicio: reducen el stock valorizado pero NO afectan la caja
-  // (la caja ya se movio cuando se compraron los materiales). Se ocultan de movimientos.
-  if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
-  if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', catId:'cne_agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
-  if (crearMovimientosCierre && cobroObj.meta > 0) { const txId=rowId+'-met'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.meta, category:'META', catId:'cne_meta', description:'META - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
+  const formaPagoPrincipal = pagosMethods[0] || 'Efectivo';
+  let cobroRestanteCierre = moneyValue(cobroObj.totalCobrado);
+
+  const servicios = [1,2,3].map(i => ({
+    idx: i,
+    svc: cobroObj['svc'+i],
+    precio: moneyValue(cobroObj['precio'+i]),
+    materiales: moneyValue(cobroObj['materiales'+i]),
+    comida: moneyValue(cobroObj['comida'+i]),
+    movilidad: moneyValue(cobroObj['movilidad'+i]),
+    agregados: moneyValue(cobroObj['agregados'+i]),
+    otros_gastos: moneyValue(cobroObj['otros_gastos'+i]),
+    meta: moneyValue(cobroObj['meta'+i])
+  }));
+
+  const hasSlotContent = s => !!(s.svc || s.precio > 0 || s.materiales > 0 || s.comida > 0 || s.movilidad > 0 || s.agregados > 0 || s.otros_gastos > 0 || s.meta > 0);
+  const addCierreTx = tx => {
+    nuevosCierreTxIds.push(tx.id);
+    state.transactions.unshift({ ...baseTx, ...tx, origenCierreServicio:true });
+  };
+
+  if(crearMovimientosCierre) servicios.forEach(s => {
+    if(!hasSlotContent(s)) return;
+    const visualId = rowId + '-svc' + s.idx;
+    const svcName = s.svc || item.servicio || 'Servicio';
+    const slotDesc = svcName + ' - ' + (item.cliente || '');
+    const linkBase = {
+      vinculadoServicioId: visualId,
+      visualServicioId: visualId,
+      servicioPadreId: item.id,
+      servicioSlot: s.idx,
+      vinculadoServicioCliente: item.cliente || '',
+      vinculadoServicioFecha: item.fecha,
+      vinculadoServicioDesc: slotDesc,
+      vinculadoServicioMonto: s.precio
+    };
+
+    const cobradoServicio = Math.min(s.precio, Math.max(0, cobroRestanteCierre));
+    cobroRestanteCierre = +(cobroRestanteCierre - cobradoServicio).toFixed(2);
+    if(s.svc && cobradoServicio > 0) {
+      addCierreTx({
+        id: visualId,
+        type:'ingreso',
+        amount:cobradoServicio,
+        category:s.svc,
+        catId: typeof _getCatIdByName === 'function' ? _getCatIdByName(s.svc) : '',
+        description:'Cobrado - ' + slotDesc,
+        formaPago: formaPagoPrincipal,
+        montoAcordadoServicio:s.precio,
+        montoCobradoServicio:cobradoServicio,
+        ...linkBase
+      });
+    }
+    if(s.movilidad > 0) addCierreTx({ id: rowId+'-mov'+s.idx, type:'egreso', amount:s.movilidad, category:'Movilidad', catId:'cne5', description:'Movilidad - '+slotDesc, ...linkBase });
+    if(s.comida > 0) addCierreTx({ id: rowId+'-com'+s.idx, type:'egreso', amount:s.comida, category:'Comida', catId:'cne_menu', description:'Comida - '+slotDesc, ...linkBase });
+    if(s.otros_gastos > 0) addCierreTx({ id: rowId+'-otg'+s.idx, type:'egreso', amount:s.otros_gastos, category:'Otros Egresos', description:'Otros Gastos - '+slotDesc, ...linkBase });
+    if(s.materiales > 0) addCierreTx({ id: rowId+'-mat'+s.idx, type:'egreso', amount:s.materiales, category:'Materiales', catId:'cne1', description:'Materiales usados - '+slotDesc, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...linkBase });
+    if(s.agregados > 0) addCierreTx({ id: rowId+'-agr'+s.idx, type:'egreso', amount:s.agregados, category:'Agregados', catId:'cne_agregados', description:'Agregados - '+slotDesc, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...linkBase });
+    if(s.meta > 0) addCierreTx({ id: rowId+'-met'+s.idx, type:'egreso', amount:s.meta, category:'META', catId:'cne_meta', description:'META - '+slotDesc, ...linkBase });
+  });
   if(crearMovimientosCierre) item.cierreTxIds = nuevosCierreTxIds;
 
-  if (item.estadoPago === 'parcial' && item.montoPendienteCobro > 0) {
-    const pendiente = item.montoPendienteCobro;
-    const deudaAuto = { id: Date.now()+'_dag', name:'Saldo pendiente — '+(item.cliente||''), totalAmount: pendiente, cuotaMonto: pendiente, cuotasTotales:1, cuotasPagadas:0, categoria:'Servicio', color:'#9B59B6' };
-    if (!state.debts) state.debts = [];
-    state.debts.push(deudaAuto);
-    syncSeccionToSheets('deuda', deudaAuto);
-    toast('⚠ Saldo pendiente: ' + fmt(pendiente) + ' registrado como deuda', 'info');
+  const cuentaPorCobrar = upsertCuentaPorCobrarServicio(item, item.montoPendienteCobro);
+  if (cuentaPorCobrar) {
+    syncSeccionToSheets('deuda', cuentaPorCobrar);
+    toast('Saldo pendiente por cobrar: ' + fmt(item.montoPendienteCobro), 'info');
   }
 
   const urlSh = localStorage.getItem('fnz_sheets_url');
   if (urlSh) {
     _sendToSheets(urlSh, { type:'trabajo', item:buildTrabajoPayloadFromAgenda(item, cobroObj), modo: state.modo, timestamp:'trabajo_'+item.id+'_'+Date.now() });
-    syncAgendaToSheets({ ...item, estado:'se_finalizo', montoPagado:totalPagado, estadoPago:item.estadoPago });
+    syncAgendaToSheets({ ...item, estado:'se_finalizo', montoPagado:totalPagado, montoPendienteCobro:item.montoPendienteCobro, saldoPendienteCobro:item.saldoPendienteCobro, estadoPago:item.estadoPago });
   }
 
   save('fnz_agenda', state.agenda);
@@ -13792,7 +13951,11 @@ function importData(event){
       const numTx = data.transactions ? data.transactions.length : 0;
       if(!confirm(`¿Importar datos del ${data.exportDate||'archivo'}?\n\nEsto reemplazará tus datos actuales y restaurará ${numTx} movimientos.`))return;
       
-      if(data.transactions) state.transactions=data.transactions;
+      let comprasStockNormalizadas = 0;
+      if(data.transactions){
+        state.transactions=data.transactions;
+        comprasStockNormalizadas = normalizarComprasStockCashFlow(state.transactions);
+      }
       if(data.debts) state.debts=data.debts;
       if(data.servicios) state.servicios=data.servicios;
       if(data.catsIn) state.catsIn=data.catsIn;
@@ -13803,7 +13966,7 @@ function importData(event){
       if(data.stockValorGeneral !== undefined) state.stockValorGeneral=data.stockValorGeneral;
       saveAll();
       render();
-      toast(`⬆ Importación completada: ${numTx} movimientos restaurados`, 'success');
+      toast(`Importacion completada: ${numTx} movimientos restaurados${comprasStockNormalizadas ? ' | ' + comprasStockNormalizadas + ' compra(s) de stock normalizadas' : ''}`, 'success');
     }catch{toast('Error al leer el archivo','error');}
   };
   reader.readAsText(file);
@@ -15563,6 +15726,14 @@ function loadFromSheets(forzar) {
         }
       }
 
+      const txsStockFix = load('fnz_neg_tx', []);
+      const stockFixCount = normalizarComprasStockCashFlow(txsStockFix);
+      if(stockFixCount > 0){
+        save('fnz_neg_tx', txsStockFix);
+        if(state.modo === 'negocio') state.transactions = txsStockFix;
+        changed = true;
+      }
+
       // Movimientos personales
       if (data.movimientosPersonales && data.movimientosPersonales.length) {
         const local = load('fnz_tx',[]);
@@ -16125,6 +16296,12 @@ function extractAmount(text) {
     const cents = NUM_WORDS[spokenDec[2]];
     if(soles >= 0 && cents > 0 && cents < 100) return +(soles + cents / 100).toFixed(2);
   }
+  const spokenNoCon = tn.match(/\b([a-z]+)\s+(diez|veinte|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa)\b/);
+  if(spokenNoCon && NUM_WORDS[spokenNoCon[1]] !== undefined && NUM_WORDS[spokenNoCon[2]] !== undefined){
+    const soles = NUM_WORDS[spokenNoCon[1]];
+    const cents = NUM_WORDS[spokenNoCon[2]];
+    if(soles >= 0 && cents > 0 && cents < 100) return +(soles + cents / 100).toFixed(2);
+  }
   let total=0, last=0;
   for (const w of words) {
     if (NUM_WORDS[w]!==undefined) {
@@ -16377,6 +16554,7 @@ function extractDescription(text) {
   let t = text;
   const numWordsForMoney = 'cero|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieciseis|diecisiete|dieciocho|diecinueve|veinte|veintiuno|veintidos|veintitres|veinticuatro|veinticinco|veintiseis|veintisiete|veintiocho|veintinueve|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa';
   t = t.replace(new RegExp('\\b(?:\\d{1,5}|'+numWordsForMoney+')\\s*(?:soles?|sol)?\\s+con\\s+(?:\\d{1,2}|'+numWordsForMoney+')\\b','gi'),' ');
+  t = t.replace(new RegExp('\\b(?:'+numWordsForMoney+')\\s+(?:diez|veinte|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa)\\b','gi'),' ');
   // Quitar referencias temporales
   t = t.replace(/\b(pasado mañana|antes de ayer|anteayer|antier|mañana|ayer|hoy)\b/gi,'');
   t = t.replace(/\b(el\s+)?(lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\b/gi,'');
@@ -16464,11 +16642,63 @@ function detectServiceMatch(text) {
 }
 
 // ── Descripción inteligente ──
+
+function findMentionedExpenseCategoryByName(text){
+  const t = nrm(text);
+  const cats = (state.catsEx || []).filter(c => c && !c.hidden && !c.system);
+  return [...cats].sort((a,b) => nrm(b.name).length - nrm(a.name).length).find(cat => {
+    const cn = nrm(cat.name || '');
+    return cn && (' ' + t + ' ').includes(' ' + cn + ' ');
+  }) || null;
+}
+
+function findBusinessExpenseCatByNames(names, fallbackId){
+  const list = state.catsEx || [];
+  const wanted = names.map(nrm);
+  let cat = list.find(c => wanted.includes(nrm(c?.name || '')));
+  if(!cat) cat = list.find(c => wanted.some(w => w && nrm(c?.name || '').includes(w)));
+  if(!cat && fallbackId) cat = list.find(c => c.id === fallbackId);
+  return cat || null;
+}
+
+function detectSmartBusinessExpenseCategory(text){
+  const t = nrm(text);
+  const byName = findMentionedExpenseCategoryByName(text);
+  if(byName) return byName;
+  if(isGnvVoice(text)) return findBusinessExpenseCatByNames(['Gnv','GNV'], 'cne2');
+  if(/\bpeaje(s)?\b/.test(t)) return findBusinessExpenseCatByNames(['Peaje'], 'cne5');
+  if(/\bdesayuno(s)?\b/.test(t)) return findBusinessExpenseCatByNames(['Desayuno'], 'cne_menu');
+  if(/\balmuerzo(s)?\b/.test(t)) return findBusinessExpenseCatByNames(['Almuerzo'], 'cne_menu');
+  if(/\bcena(s)?\b/.test(t)) return findBusinessExpenseCatByNames(['Cena'], 'cne_menu');
+  if(/\b(menu|menus|comida|alimentacion|alimento|alimentos|restaurant|restaurante)\b/.test(t)) return findBusinessExpenseCatByNames(['Menu','Comida'], 'cne_menu');
+  return null;
+}
+
+function categoryFamilyDescription(cat){
+  const id = cat?.id || '';
+  const n = normSimpleText(cat?.name || '');
+  if(['cne_desayuno','cne_almuerzo','cne_cena','cne_gaseosa','cne_snack','cne_golosina','cne_pizza','cne_menu'].includes(id) || /^(desayuno|almuerzo|cena|menu|comida|gaseosa|snack|golosina|pizza)$/.test(n)) return 'Alimentacion';
+  if(['cne2','cne3','cne_peaje'].includes(id) || /^(gnv|gasolina|peaje)$/.test(n)) return 'Movilidad y auto';
+  if(id === 'cne_reparacion_maquinas' || /reparacion de maquinas?/.test(n)) return 'Operacion';
+  return '';
+}
+
+function shouldUseFamilyDescription(text, cat, raw){
+  const fam = categoryFamilyDescription(cat);
+  if(!fam) return false;
+  const rn = normSimpleText(raw || '');
+  const cn = normSimpleText(cat?.name || '');
+  if(!rn || rn === cn) return true;
+  if(isGnvVoice(raw || '')) return true;
+  return /^(desayuno|almuerzo|cena|menu|comida|gaseosa|snack|golosina|pizza|gnv|gasolina|peaje)$/.test(rn);
+}
+
 function buildSmartDescription(text, cat, detectedService) {
   // Si es un pago de servicio conocido, usar nombre real del servicio
   if (detectedService) return 'Pago ' + detectedService.name;
   const raw = extractDescription(text);
-  if (!raw || raw.length < 2) return cat?.name || '';
+  if(shouldUseFamilyDescription(text, cat, raw)) return categoryFamilyDescription(cat);
+  if (!raw || raw.length < 2) return categoryFamilyDescription(cat) || cat?.name || '';
   // Capitalizar primera letra
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
@@ -16789,8 +17019,11 @@ function parseVoiceCommand(text) {
            || state.catsIn.filter(c=>!c.hidden&&!c.system).slice(-1)[0];
       }
     } else {
-      // Egreso en modo negocio → clasificar por tipo
-      if (isGnvVoice(text))
+      // Egreso en modo negocio: primero categoria local especifica, luego reglas generales.
+      const smartCat = detectSmartBusinessExpenseCategory(text);
+      if (smartCat)
+        cat = smartCat;
+      else if (isGnvVoice(text))
         cat = state.catsEx.find(c=>c.id==='cne2') || state.catsEx[0];
       else if (/gasolina|combustible|meti gas|cargue gas|llene/.test(t))
         cat = state.catsEx.find(c=>c.id==='cne3') || state.catsEx[0];
@@ -19928,6 +20161,9 @@ function saveMicTx() {
     category: catName,
     description: desc || catName,
     date: document.getElementById('pvDateEdit').value||todayStr(),
+    hora: currentHm(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     catId,
     cliente:      micParsed?.cliente      ||null,
     servicioTipo: micParsed?.servicioNeg?.label||null,
@@ -19940,7 +20176,8 @@ function saveMicTx() {
     tx.stockOperacion = 'entrada_valor';
     tx.ocultarEnMovimientos = true;
     tx.stockValorOnly = true;
-    tx.noCashFlow = true;  // Compra de stock: NO afecta balance, solo stock valorizado
+    // Compra de stock: SI afecta balance (plata real que sale de caja) y sube stock.
+    delete tx.noCashFlow;
     const compraStockValor = upsertCompraStockValorFromTx(tx);
     ajustarStockValorGeneral(tx.amount);
     registrarMovimientoStockValor('entrada_valor', tx.amount, {
