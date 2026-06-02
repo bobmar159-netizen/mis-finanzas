@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -8451,6 +8451,7 @@ function vincularMovimientoAServicio(txId, servicioId){
   tx.vinculadoServicioFecha = item.fecha || tx.date || todayStr();
   tx.vinculadoServicioDesc = servicioDescVinculo(item);
   tx.vinculadoServicioMonto = servicioMontoVinculo(item);
+  tx.date = item.fecha; // Sincronizar fecha del gasto con el servicio
   refrescarServiciosPorIds([oldId, item.id]);
   saveAll();
   syncToSheets(tx);
@@ -11900,6 +11901,36 @@ function renderAgenda(){
       :trabajos.map(agendaCard).join('')}`;
 }
 
+function sincronizarFechasTransaccionesVinculadas(servicioId, oldFecha, newFecha) {
+  if (!servicioId || !oldFecha || !newFecha || oldFecha === newFecha) return;
+  const allNegTx = load('fnz_neg_tx', []);
+  let changed = false;
+  const updatedTx = allNegTx.map(t => {
+    if (t && String(t.vinculadoServicioId) === String(servicioId)) {
+      changed = true;
+      const newTx = { ...t, date: newFecha };
+      if (newTx.description) {
+        const oldDmy = oldFecha.split('-').reverse().join('/');
+        const newDmy = newFecha.split('-').reverse().join('/');
+        newTx.description = newTx.description.replace(oldDmy, newDmy).replace(oldFecha, newFecha);
+      }
+      return newTx;
+    }
+    return t;
+  });
+  if (changed) {
+    save('fnz_neg_tx', updatedTx);
+    if (state.modo === 'negocio') {
+      state.transactions = updatedTx;
+    }
+    updatedTx.forEach(t => {
+      if (t && String(t.vinculadoServicioId) === String(servicioId)) {
+        syncToSheets(t);
+      }
+    });
+  }
+}
+
 // ── Formulario agregar/editar ──
 function openAddAgenda(tipo, editId, preData){
   const isEdit = !!editId;
@@ -11918,13 +11949,72 @@ function openAddAgenda(tipo, editId, preData){
 
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:${colorTitle};font-family:'Playfair Display',serif">${isEdit?'Editar':(isVisita?'Nueva':'Nuevo')} ${isVisita?'Visita':'Construcción'}</div>
+    
+    ${!isVisita?`
+    <div style="background:#F8F0FF;border:1px solid #9B59B622;border-radius:12px;padding:12px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:700;color:#6C3483;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🔧 Servicios</div>
+      <div class="field" style="margin-bottom:8px"><label class="field-label">Servicio 1 <span style="color:#E74C3C">*</span></label>
+        <select id="ag-servicio" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+          <option value="">Seleccionar servicio...</option>
+          ${serviciosOpts}
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">Servicio 2 (opcional)</label>
+          <select id="ag-servicio2" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
+            <option value="">—</option>
+            ${AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${item&&item.servicio2===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">Servicio 3 (opcional)</label>
+          <select id="ag-servicio3" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
+            <option value="">—</option>
+            ${AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${item&&item.servicio3===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0;margin-top:8px"><label class="field-label" style="font-size:10px">Servicio 4 (opcional)</label>
+        <select id="ag-servicio4" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
+          <option value="">—</option>
+          ${AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${item&&item.servicio4===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="field"><label class="field-label">Precio acordado (S/)</label>
+      <input id="ag-precio" type="number" inputmode="decimal" placeholder="0.00" value="${item?item.precio||'':pre.precio||''}">
+    </div>`:''}
+    
+    ${isVisita?`
+    <div style="background:#F0F9FF;border:1px solid #1565C022;border-radius:12px;padding:12px;margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;color:#1565C0;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">👥 Gestión Comercial</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${['1','2','3','4'].map(i=>`
+          <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">${i}ª Acción</label>
+            <select id="ag-accion${i}" style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%">
+              <option value="">—</option>
+              ${visitasAcciones.map(a=>`
+                <option value="${a}" ${
+                  (item && item['accion'+i]===a) || 
+                  (!item && (
+                    (i==='1' && ((isVisita && a==='se agendó visita') || (!isVisita && a==='se agendó visita'))) ||
+                    (i==='2' && (!isVisita && a==='se agendó construcción'))
+                  ))
+                  ?'selected':''
+                }>${a}</option>
+              `).join('')}
+            </select>
+          </div>
+        `).join('')}
+      </div>
+    </div>` : ''}
+
     <div class="field"><label class="field-label">Cliente</label>
       <input id="ag-cliente" type="text" placeholder="Nombre del cliente" value="${item?item.cliente||'':pre.cliente||''}" 
         style="font-family:'DM Sans',sans-serif;font-weight:600;padding:14px;background:#F1F5F9;border-color:transparent">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div class="field" style="margin-bottom:0"><label class="field-label">${isVisita ? 'Fecha de Visita' : 'Fecha de Construcción'}</label>
-        <input id="ag-fecha" type="date" value="${item?item.fecha:pre.fecha||getAgendaHoy()}"
+        <input id="ag-fecha" type="date" value="${item?item.fecha:getAgendaHoy()}"
           style="padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px">
       </div>
       <div class="field" style="margin-bottom:0"><label class="field-label">Hora (12h)</label>
@@ -12266,6 +12356,9 @@ function saveAgendaItem(editId, tipo){
   }
 
   if(editId || isConversion){
+    if(existente && existente.fecha && existente.fecha !== fecha) {
+      sincronizarFechasTransaccionesVinculadas(finalId, existente.fecha, fecha);
+    }
     state.agenda = state.agenda.map(x=>x.id===finalId ? item : x);
   } else {
     state.agenda.unshift(item);
@@ -12462,12 +12555,15 @@ function confirmarReprogramacion(id){
   const motivo = document.getElementById('reprog-motivo')?.value.trim()||'';
   if(!nFecha){ toast('Seleccioná la nueva fecha','error'); return; }
   
+  const oldFecha = item.fecha;
   item.fecha = nFecha;
   item.hora  = nHora;
   if(item.tipo === 'visita') item.fechaVisita = nFecha;
   if(item.tipo === 'trabajo') item.fechaConstruccion = nFecha;
   item.estado = 'reprogramo';
   item.motivoReprogramacion = motivo;
+  
+  sincronizarFechasTransaccionesVinculadas(id, oldFecha, nFecha);
   
   save('fnz_agenda',state.agenda);
   closeModal();
@@ -13218,6 +13314,7 @@ async function guardarFinalizacion(id){
   item.stockValorConsumido = totalMat;
   item.stockValorSaldo = moneyValue(state.stockValorGeneral);
 
+  const txsParaSincronizar = [];
   state.transactions = (state.transactions||[]).map(t => {
     const sameDayCandidate =
       t.type === 'egreso' &&
@@ -13227,14 +13324,17 @@ async function guardarFinalizacion(id){
       !isMaterialesCategory(t.catId, t.category);
     if(!sameDayCandidate) return t;
     if(gastosVinculadosIds.includes(String(t.id))){
-      return {
+      const upd = {
         ...t,
+        date: item.fecha, // Sincronizar fecha del gasto con el servicio
         vinculadoServicioId: item.id,
         vinculadoServicioCliente: item.cliente || '',
         vinculadoServicioFecha: item.fecha,
         vinculadoServicioDesc: agDesc,
         vinculadoServicioMonto: totalPrecio
       };
+      txsParaSincronizar.push(upd);
+      return upd;
     }
     if(String(t.vinculadoServicioId||'') === String(item.id)){
       const limpio = {...t};
@@ -13243,10 +13343,12 @@ async function guardarFinalizacion(id){
       delete limpio.vinculadoServicioFecha;
       delete limpio.vinculadoServicioDesc;
       delete limpio.vinculadoServicioMonto;
+      txsParaSincronizar.push(limpio);
       return limpio;
     }
     return t;
   });
+  txsParaSincronizar.forEach(t => syncToSheets(t));
 
   let notionRowId = getServicioReporteNotionId(item) || null;
   const token = localStorage.getItem('fnz_notion_token');
@@ -20115,13 +20217,15 @@ function saveMicTx() {
     negocio:      true,
     ...(esGastoPersonalMic ? {esGastoPersonal: true} : {}),
   };
-  const entraAStockValor = tx.type === 'egreso' && targetScope === 'negocio' && isMaterialesCategory(tx.catId, tx.category);
+  const esMateriales = isMaterialesCategory(tx.catId, tx.category);
+  const esAgregados = isAgregadoCategory(tx.catId, tx.category, tx.description);
+  const entraAStockValor = tx.type === 'egreso' && targetScope === 'negocio' && (esMateriales || esAgregados);
   if(entraAStockValor){
     tx.afectaStockValor = true;
     tx.stockOperacion = 'entrada_valor';
     tx.ocultarEnMovimientos = true;
     tx.stockValorOnly = true;
-    tx.noCashFlow = true;  // Compra de stock: NO afecta balance, solo stock valorizado
+    delete tx.noCashFlow; // Compra física: resta del balance general y sube el stock valorizado
     const compraStockValor = upsertCompraStockValorFromTx(tx);
     ajustarStockValorGeneral(tx.amount);
     registrarMovimientoStockValor('entrada_valor', tx.amount, {
