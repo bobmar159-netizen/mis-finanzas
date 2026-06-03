@@ -11960,63 +11960,7 @@ function openAddAgenda(tipo, editId, preData){
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:${colorTitle};font-family:'Playfair Display',serif">${isEdit?'Editar':(isVisita?'Nueva':'Nuevo')} ${isVisita?'Visita':'Construcción'}</div>
     
-    ${!isVisita?`
-    <div style="background:#F8F0FF;border:1px solid #9B59B622;border-radius:12px;padding:12px;margin-bottom:8px">
-      <div style="font-size:11px;font-weight:700;color:#6C3483;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🔧 Servicios</div>
-      <div class="field" style="margin-bottom:8px"><label class="field-label">Servicio 1 <span style="color:#E74C3C">*</span></label>
-        <select id="ag-servicio" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-          <option value="">Seleccionar servicio...</option>
-          ${serviciosOpts}
-        </select>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">Servicio 2 (opcional)</label>
-          <select id="ag-servicio2" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
-            <option value="">—</option>
-            ${AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${item&&item.servicio2===s?'selected':''}>${s}</option>`).join('')}
-          </select>
-        </div>
-        <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">Servicio 3 (opcional)</label>
-          <select id="ag-servicio3" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
-            <option value="">—</option>
-            ${AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${item&&item.servicio3===s?'selected':''}>${s}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="field" style="margin-bottom:0;margin-top:8px"><label class="field-label" style="font-size:10px">Servicio 4 (opcional)</label>
-        <select id="ag-servicio4" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
-          <option value="">—</option>
-          ${AGENDA_SERVICIOS.map(s=>`<option value="${s}" ${item&&item.servicio4===s?'selected':''}>${s}</option>`).join('')}
-        </select>
-      </div>
-    </div>
-    <div class="field"><label class="field-label">Precio acordado (S/)</label>
-      <input id="ag-precio" type="number" inputmode="decimal" placeholder="0.00" value="${item?item.precio||'':pre.precio||''}">
-    </div>`:''}
-    
-    ${isVisita?`
-    <div style="background:#F0F9FF;border:1px solid #1565C022;border-radius:12px;padding:12px;margin-bottom:12px">
-      <div style="font-size:10px;font-weight:800;color:#1565C0;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">👥 Gestión Comercial</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        ${['1','2','3','4'].map(i=>`
-          <div class="field" style="margin-bottom:0"><label class="field-label" style="font-size:10px">${i}ª Acción</label>
-            <select id="ag-accion${i}" style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%">
-              <option value="">—</option>
-              ${visitasAcciones.map(a=>`
-                <option value="${a}" ${
-                  (item && item['accion'+i]===a) || 
-                  (!item && (
-                    (i==='1' && ((isVisita && a==='se agendó visita') || (!isVisita && a==='se agendó visita'))) ||
-                    (i==='2' && (!isVisita && a==='se agendó construcción'))
-                  ))
-                  ?'selected':''
-                }>${a}</option>
-              `).join('')}
-            </select>
-          </div>
-        `).join('')}
-      </div>
-    </div>` : ''}
+
 
     <div class="field"><label class="field-label">Cliente</label>
       <input id="ag-cliente" type="text" placeholder="Nombre del cliente" value="${item?item.cliente||'':pre.cliente||''}" 
@@ -13024,6 +12968,32 @@ function abrirModalCobro(id){
         </div>
       </div>
 
+      <div class="cierre-card">
+        <div class="cierre-section-title" style="margin-bottom:12px">Datos del servicio</div>
+        <div class="cierre-grid-2">
+          <div class="cierre-field"><label>Fecha</label><input id="cobro-fecha" class="cierre-input" type="date" value="${item.fecha||todayStr()}"></div>
+          <div class="cierre-field"><label>Cliente</label><input id="cobro-cliente" class="cierre-input" type="text" value="${item.cliente||''}" placeholder="Cliente"></div>
+        </div>
+        <div class="cierre-grid-2" style="margin-top:10px">
+          <div class="cierre-field"><label>Telefono</label><input id="cobro-telefono" class="cierre-input" type="tel" inputmode="tel" value="${item.telefono||''}" placeholder="987654321"></div>
+          <div class="cierre-field" style="position:relative">
+            <label>Distrito</label>
+            <div style="position:relative">
+              <input id="cobro-distrito" class="cierre-input" type="text" value="${item.ubicacion||''}" placeholder="Escribe el distrito..." autocomplete="off"
+                oninput="distritoComboShow('cobro-distrito','cobro-dist-dd')"
+                onfocus="distritoComboShow('cobro-distrito','cobro-dist-dd')"
+                onblur="setTimeout(()=>{const d=document.getElementById('cobro-dist-dd');if(d)d.style.display='none'},200)"
+                onkeydown="distritoComboKey(event,'cobro-distrito','cobro-dist-dd')">
+              <div id="cobro-dist-dd" class="ubic-dropdown" style="display:none;position:absolute;z-index:999;width:100%;max-height:180px;overflow-y:auto;background:#fff;border:1px solid #C7D5E8;border-radius:10px;box-shadow:0 8px 24px #0002;top:calc(100% + 4px);left:0"></div>
+            </div>
+          </div>
+        </div>
+        <div class="cierre-field" style="margin-top:10px">
+          <label>Observaciones</label>
+          <textarea id="cobro-notas" class="cierre-textarea" placeholder="Notas breves del servicio...">${item.observaciones||item.notas||''}</textarea>
+        </div>
+      </div>
+
       <div class="cierre-section-title" style="padding:0 2px">Servicios con sus gastos</div>
         ${(()=>{
           const mkSvcCard = i => `
@@ -13103,31 +13073,6 @@ function abrirModalCobro(id){
         </div>
       </div>
 
-      <div class="cierre-card">
-        <div class="cierre-section-title" style="margin-bottom:12px">Datos del servicio</div>
-        <div class="cierre-grid-2">
-          <div class="cierre-field"><label>Fecha</label><input id="cobro-fecha" class="cierre-input" type="date" value="${item.fecha||todayStr()}"></div>
-          <div class="cierre-field"><label>Cliente</label><input id="cobro-cliente" class="cierre-input" type="text" value="${item.cliente||''}" placeholder="Cliente"></div>
-        </div>
-        <div class="cierre-grid-2" style="margin-top:10px">
-          <div class="cierre-field"><label>Telefono</label><input id="cobro-telefono" class="cierre-input" type="tel" inputmode="tel" value="${item.telefono||''}" placeholder="987654321"></div>
-          <div class="cierre-field" style="position:relative">
-            <label>Distrito</label>
-            <div style="position:relative">
-              <input id="cobro-distrito" class="cierre-input" type="text" value="${item.ubicacion||''}" placeholder="Escribe el distrito..." autocomplete="off"
-                oninput="distritoComboShow('cobro-distrito','cobro-dist-dd')"
-                onfocus="distritoComboShow('cobro-distrito','cobro-dist-dd')"
-                onblur="setTimeout(()=>{const d=document.getElementById('cobro-dist-dd');if(d)d.style.display='none'},200)"
-                onkeydown="distritoComboKey(event,'cobro-distrito','cobro-dist-dd')">
-              <div id="cobro-dist-dd" class="ubic-dropdown" style="display:none;position:absolute;z-index:999;width:100%;max-height:180px;overflow-y:auto;background:#fff;border:1px solid #C7D5E8;border-radius:10px;box-shadow:0 8px 24px #0002;top:calc(100% + 4px);left:0"></div>
-            </div>
-          </div>
-        </div>
-        <div class="cierre-field" style="margin-top:10px">
-          <label>Observaciones</label>
-          <textarea id="cobro-notas" class="cierre-textarea" placeholder="Notas breves del servicio...">${item.observaciones||item.notas||''}</textarea>
-        </div>
-      </div>
 
       <div class="cierre-total-row">
         <div>
