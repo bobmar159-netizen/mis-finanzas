@@ -2026,6 +2026,100 @@ table.nt tbody tr:hover td,
 
 <script>
 
+class SpeechRecognitionPolyfill {
+  constructor() {
+    this.lang = 'es-PE';
+    this.continuous = true;
+    this.interimResults = true;
+    this.maxAlternatives = 1;
+    this.onstart = null;
+    this.onresult = null;
+    this.onerror = null;
+    this.onend = null;
+    this.listening = false;
+    this.listenerHandle = null;
+    this.lastTranscript = '';
+  }
+  async start() {
+    const SpeechRec = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition;
+    if (!SpeechRec) {
+      if (this.onerror) this.onerror({ error: 'service-not-allowed', message: 'Capacitor SpeechRecognition plugin not found' });
+      return;
+    }
+    try {
+      const hasPerm = await SpeechRec.hasPermission();
+      if (!hasPerm.permission) {
+        const reqPerm = await SpeechRec.requestPermission();
+        if (!reqPerm.permission) {
+          if (this.onerror) this.onerror({ error: 'not-allowed', message: 'Microphone permission denied' });
+          return;
+        }
+      }
+      this.listening = true;
+      if (this.onstart) this.onstart();
+      if (this.listenerHandle) {
+        this.listenerHandle.remove();
+        this.listenerHandle = null;
+      }
+      this.listenerHandle = await SpeechRec.addListener('partialResults', (data) => {
+        if (!this.listening) return;
+        if (data && data.matches && data.matches.length > 0 && this.onresult) {
+          const transcript = data.matches[0];
+          this.lastTranscript = transcript;
+          const resultEvent = {
+            resultIndex: 0,
+            results: [
+              Object.assign([
+                { transcript: transcript }
+              ], { isFinal: false })
+            ]
+          };
+          this.onresult(resultEvent);
+        }
+      });
+      await SpeechRec.start({
+        language: this.lang,
+        maxResults: this.maxAlternatives,
+        partialResults: this.interimResults,
+        popup: false
+      });
+    } catch (err) {
+      console.error('Polyfill start error:', err);
+      if (this.onerror) this.onerror({ error: 'aborted', message: err.message });
+      if (this.onend) this.onend();
+    }
+  }
+  stop() {
+    if (!this.listening) return;
+    this.listening = false;
+    const SpeechRec = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition;
+    if (SpeechRec) {
+      try { SpeechRec.stop(); } catch(e) {}
+    }
+    if (this.listenerHandle) {
+      try { this.listenerHandle.remove(); } catch(e){}
+      this.listenerHandle = null;
+    }
+    if (this.lastTranscript && this.onresult) {
+      const resultEvent = {
+        resultIndex: 0,
+        results: [
+          Object.assign([
+            { transcript: this.lastTranscript }
+          ], { isFinal: true })
+        ]
+      };
+      this.onresult(resultEvent);
+    }
+    if (this.onend) this.onend();
+  }
+}
+
+if (window.Capacitor) {
+  window.SpeechRecognition = SpeechRecognitionPolyfill;
+  window.webkitSpeechRecognition = SpeechRecognitionPolyfill;
+}
+
 const GEMINI_URL = k => `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${k}`;
 
 // ── Colores de hoja de nota ──
