@@ -7091,7 +7091,7 @@ function reloadFromSheets(){
   const url=localStorage.getItem('fnz_sheets_url')||'';
   if(!url) return toast('Primero configura la URL de Sheets','error');
   if(!confirm('¿Restaurar datos desde Sheets?\n\nSe agregarán los datos de Sheets a los que ya tienes. No se borra nada local.')) return;
-  loadFromSheets(true);
+  loadFromSheets(false);
 }
 
 // ★ Enviar TODOS los datos de la app a Sheets de una vez
@@ -11192,6 +11192,7 @@ Dictado: """${text}"""`;
 }
 
 function npOpenVoiceCapture(mode='auto',targetId=''){
+  ensureMicrophonePermission();
   npEnsureStyles();
   document.body.style.overflow='hidden';
   window._npMic={mode,targetId,recording:false,segments:[],seconds:0,parsed:null};
@@ -17570,7 +17571,20 @@ function resetMicModal() {
   if(mfl) mfl.innerHTML    = '';
 }
 
+function ensureMicrophonePermission() {
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => {
+        stream.getTracks().forEach(track => track.stop());
+      })
+      .catch(err => {
+        console.warn('Fallo solicitud de permiso de microfono:', err);
+      });
+  }
+}
+
 function openMicModal() {
+  ensureMicrophonePermission();
   // ★ Detener lista mic si está activo — evita conflicto de 2 instancias SR
   if(listaMicActivo || listaRec){
     listaMicActivo = false;
@@ -24713,6 +24727,7 @@ Dictado: ${JSON.stringify(text)}`;
 }
 
 function npOpenVoiceCapture(mode='auto',targetId=''){
+  ensureMicrophonePermission();
   npEnsureStyles();
   document.getElementById('np-mic')?.remove();
   document.body.style.overflow='hidden';
