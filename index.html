@@ -11842,6 +11842,58 @@ function renderAgenda(){
           style="width:40px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700">✕</button>
       </div>`;
 
+    const servicesDetailHtml = (() => {
+      if (!isServicioFinalizado(item)) return '';
+      const list = [];
+      [1, 2, 3].forEach(i => {
+        const svcName = item['servicio' + i] || (i === 1 ? item.servicio : '');
+        const svcPrecio = item['precio' + i] || (i === 1 ? item.precio : 0);
+        if (svcName || svcPrecio > 0) {
+          list.push({
+            idx: i,
+            name: svcName || 'Servicio ' + i,
+            precio: svcPrecio,
+            materiales: item['materiales' + i] || 0,
+            comida: item['comida' + i] || 0,
+            movilidad: item['movilidad' + i] || 0,
+            agregados: item['agregados' + i] || 0,
+            otros: item['otros_gastos' + i] || 0,
+            meta: item['meta' + i] || 0
+          });
+        }
+      });
+      if (list.length === 0) return '';
+      
+      return `
+        <div style="border: 2px solid #2F4A5933; border-radius: 14px; padding: 12px; background: #F8FAFB; margin-top: 6px;">
+          <div style="font-size: 11px; font-weight: 800; color: #546878; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px;">📋 Resumen de Servicios (${list.length})</div>
+          <div style="display: grid; gap: 8px;">
+            ${list.map(s => {
+              const hasGastos = s.materiales > 0 || s.comida > 0 || s.movilidad > 0 || s.agregados > 0 || s.otros > 0 || s.meta > 0;
+              return `
+                <div style="background: #ffffff; border: 1px solid #E6E8EB; border-radius: 10px; padding: 8px 10px; box-shadow: 0 2px 6px rgba(26,44,53,0.02)">
+                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #E6E8EB; padding-bottom: 5px; margin-bottom: 5px;">
+                    <span style="font-weight: 750; color: var(--text); font-size: 12px;">${s.idx}. ${s.name}</span>
+                    <span style="font-weight: 850; color: var(--gold); font-size: 13px;">S/ ${s.precio.toFixed(2)}</span>
+                  </div>
+                  ${hasGastos ? `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 10.5px; color: var(--muted)">
+                      ${s.materiales > 0 ? `<div>📦 Mat: <strong>S/ ${s.materiales.toFixed(2)}</strong></div>` : ''}
+                      ${s.comida > 0 ? `<div>🍔 Com: <strong>S/ ${s.comida.toFixed(2)}</strong></div>` : ''}
+                      ${s.movilidad > 0 ? `<div>🚗 Mov: <strong>S/ ${s.movilidad.toFixed(2)}</strong></div>` : ''}
+                      ${s.agregados > 0 ? `<div>🔧 Agr: <strong>S/ ${s.agregados.toFixed(2)}</strong></div>` : ''}
+                      ${s.otros > 0 ? `<div>🏷 Otr: <strong>S/ ${s.otros.toFixed(2)}</strong></div>` : ''}
+                      ${s.meta > 0 ? `<div>🎯 Met: <strong>S/ ${s.meta.toFixed(2)}</strong></div>` : ''}
+                    </div>
+                  ` : `<div style="font-size: 10.5px; color: var(--muted); font-style: italic;">Sin gastos declarados</div>`}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    })();
+
     return `
     <div class="ag-card" id="${cardId}">
       <!-- ENCABEZADO: CLICK PARA DESPLEGAR TODO -->
@@ -11865,6 +11917,8 @@ function renderAgenda(){
           ${ubicHtml}
           ${telHtml}
           ${notasHtml}
+          
+          ${servicesDetailHtml}
           
           <!-- BOTONES OPERATIVOS REUBICADOS DENTRO DEL DESPLIEGUE -->
           <div style="margin-top:6px">
@@ -13013,6 +13067,7 @@ function abrirModalCobro(id){
       </div>
 
       <div class="cierre-section-title" style="padding:0 2px">Servicios con sus gastos</div>
+      <div style="border: 2.5px solid #2F4A5933; border-radius: 16px; padding: 10px; background: #F4F7F9; display: grid; gap: 10px; box-sizing: border-box; margin-top: 4px;">
         ${(()=>{
           const mkSvcCard = i => `
           <div class="cierre-service-card">
@@ -13056,6 +13111,7 @@ function abrirModalCobro(id){
               style="display:${hasExtra?'none':'flex'};width:100%;padding:12px 8px;margin:6px 0 0;border:1.5px dashed #A8BCC9;border-radius:12px;background:transparent;color:#546878;font-size:13px;font-weight:700;cursor:pointer;align-items:center;justify-content:center;gap:6px;font-family:'DM Sans',sans-serif"
             >＋ Agregar otro servicio</button>`;
         })()}
+      </div>
 
       <div class="cierre-card">
         <div class="cierre-section">
@@ -15613,88 +15669,115 @@ function loadFromSheets(forzar) {
       let added = 0;
       let changed = false;
 
-      // Agenda
-      if (data.agenda && data.agenda.length) {
-        const local = load('fnz_agenda',[]);
-        const m = _mergeById(local, data.agenda);
-        if(m.length !== local.length){ changed = true; added += Math.max(0, m.length - local.length); }
-        save('fnz_agenda', m); state.agenda = m;
-      }
-
-      // Movimientos negocio — merge por ID Y huella (evita duplicados)
-      if (data.movimientos && data.movimientos.length) {
-        const local = load('fnz_neg_tx',[]);
-        const _normCat = cat => _mapearCategoriaNotion(cat||'').toLowerCase().trim();
-        const _h = t => [t.date||'',t.type||'',Math.round((t.amount||0)*100),_normCat(t.category),(t.cliente||'').toLowerCase().trim()].join('|');
-        const idsSeen    = new Set(local.map(t=>t.id));
-        const huellasSeen= new Set(local.map(_h));
-        const toAdd = (data.movimientos||[]).filter(t => {
-          if(!t||!t.id) return false;
-          if(idsSeen.has(t.id)) return false;
-          const h = _h(t);
-          if(huellasSeen.has(h)) return false;
-          idsSeen.add(t.id); huellasSeen.add(h);
-          return true;
-        });
-        if(toAdd.length > 0){
-          const m = [...local, ...toAdd].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-          save('fnz_neg_tx', m);
-          if (state.modo === 'negocio') state.transactions = m;
-          added += toAdd.length;
-          changed = true;
+      if (forzar) {
+        // OVERWRITE MODE: Clean sync mirroring Sheets exactly to reflect edits/deletions and pull everything
+        if (data.agenda) { save('fnz_agenda', data.agenda); state.agenda = data.agenda; }
+        if (data.movimientos) {
+          const sortedM = [...data.movimientos].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+          save('fnz_neg_tx', sortedM);
+          if (state.modo === 'negocio') state.transactions = sortedM;
+          added += data.movimientos.length;
         }
-      }
-
-      // Movimientos personales
-      if (data.movimientosPersonales && data.movimientosPersonales.length) {
-        const local = load('fnz_tx',[]);
-        const idsSeen = new Set(local.map(t=>t.id));
-        const toAdd = data.movimientosPersonales.filter(t=>t&&t.id&&!idsSeen.has(t.id));
-        if(toAdd.length>0){
-          const m=[...local,...toAdd].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-          save('fnz_tx',m);
-          if(state.modo==='personal') state.transactions=m;
-          added+=toAdd.length;
-          changed = true;
+        if (data.movimientosPersonales) {
+          const sortedP = [...data.movimientosPersonales].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+          save('fnz_tx', sortedP);
+          if (state.modo === 'personal') state.transactions = sortedP;
+          added += data.movimientosPersonales.length;
         }
-      }
+        if (data.deudas) { save('fnz_neg_debts', data.deudas); if (state.modo === 'negocio') state.debts = data.deudas; }
+        if (data.servicios) { save('fnz_neg_services', data.servicios); if (state.modo === 'negocio') state.servicios = data.servicios; }
+        if (data.metas) { save('fnz_neg_metas', data.metas); if (state.modo === 'negocio') state.metas = data.metas; }
+        if (data.notas) { save('fnz_notas', data.notas); state.notas = data.notas; }
+        changed = true;
+      } else {
+        // SAFE MERGE MODE (Boot Auto-Sync): merge to prevent losing offline unsynced local data
+        // Agenda
+        if (data.agenda && data.agenda.length) {
+          const local = load('fnz_agenda',[]);
+          const m = _mergeById(local, data.agenda);
+          if(m.length !== local.length){ changed = true; added += Math.max(0, m.length - local.length); }
+          save('fnz_agenda', m); state.agenda = m;
+        }
 
-      // Deudas
-      if (data.deudas && data.deudas.length) {
-        const local = load('fnz_neg_debts',[]);
-        const m = _mergeById(local, data.deudas);
-        if(m.length !== local.length) changed = true;
-        save('fnz_neg_debts', m);
-        if (state.modo === 'negocio') state.debts = m;
-      }
-      // Servicios
-      if (data.servicios && data.servicios.length) {
-        const local = load('fnz_neg_services',[]);
-        const m = _mergeById(local, data.servicios);
-        if(m.length !== local.length) changed = true;
-        save('fnz_neg_services', m);
-        if (state.modo === 'negocio') state.servicios = m;
-      }
-      // Metas
-      if (data.metas && data.metas.length) {
-        const local = load('fnz_neg_metas',[]);
-        const m = _mergeById(local, data.metas);
-        if(m.length !== local.length) changed = true;
-        save('fnz_neg_metas', m);
-        if (state.modo === 'negocio') state.metas = m;
-      }
-      // Notas
-      if (data.notas && data.notas.length) {
-        const local = load('fnz_notas',[]);
-        const m = _mergeById(local, data.notas);
-        if(m.length !== local.length) changed = true;
-        save('fnz_notas', m); state.notas = m;
+        // Movimientos negocio — merge por ID Y huella (evita duplicados)
+        if (data.movimientos && data.movimientos.length) {
+          const local = load('fnz_neg_tx',[]);
+          const _normCat = cat => _mapearCategoriaNotion(cat||'').toLowerCase().trim();
+          const _h = t => [t.date||'',t.type||'',Math.round((t.amount||0)*100),_normCat(t.category),(t.cliente||'').toLowerCase().trim()].join('|');
+          const idsSeen    = new Set(local.map(t=>t.id));
+          const huellasSeen= new Set(local.map(_h));
+          const toAdd = (data.movimientos||[]).filter(t => {
+            if(!t||!t.id) return false;
+            if(idsSeen.has(t.id)) return false;
+            const h = _h(t);
+            if(huellasSeen.has(h)) return false;
+            idsSeen.add(t.id); huellasSeen.add(h);
+            return true;
+          });
+          if(toAdd.length > 0){
+            const m = [...local, ...toAdd].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+            save('fnz_neg_tx', m);
+            if (state.modo === 'negocio') state.transactions = m;
+            added += toAdd.length;
+            changed = true;
+          }
+        }
+
+        // Movimientos personales
+        if (data.movimientosPersonales && data.movimientosPersonales.length) {
+          const local = load('fnz_tx',[]);
+          const idsSeen = new Set(local.map(t=>t.id));
+          const toAdd = data.movimientosPersonales.filter(t=>t&&t.id&&!idsSeen.has(t.id));
+          if(toAdd.length>0){
+            const m=[...local,...toAdd].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+            save('fnz_tx',m);
+            if(state.modo==='personal') state.transactions=m;
+            added+=toAdd.length;
+            changed = true;
+          }
+        }
+
+        // Deudas
+        if (data.deudas && data.deudas.length) {
+          const local = load('fnz_neg_debts',[]);
+          const m = _mergeById(local, data.deudas);
+          if(m.length !== local.length) changed = true;
+          save('fnz_neg_debts', m);
+          if (state.modo === 'negocio') state.debts = m;
+        }
+        // Servicios
+        if (data.servicios && data.servicios.length) {
+          const local = load('fnz_neg_services',[]);
+          const m = _mergeById(local, data.servicios);
+          if(m.length !== local.length) changed = true;
+          save('fnz_neg_services', m);
+          if (state.modo === 'negocio') state.servicios = m;
+        }
+        // Metas
+        if (data.metas && data.metas.length) {
+          const local = load('fnz_neg_metas',[]);
+          const m = _mergeById(local, data.metas);
+          if(m.length !== local.length) changed = true;
+          save('fnz_neg_metas', m);
+          if (state.modo === 'negocio') state.metas = m;
+        }
+        // Notas
+        if (data.notas && data.notas.length) {
+          const local = load('fnz_notas',[]);
+          const m = _mergeById(local, data.notas);
+          if(m.length !== local.length) changed = true;
+          save('fnz_notas', m); state.notas = m;
+        }
       }
 
       save('fnz_last_load', new Date().toISOString());
       if(changed || forzar || renderPendiente){
         loadStateForModo(state.modo);
-      if(added > 0 || forzar) toast('✓ Sheets: '+added+' registros nuevos cargados');
+        if (forzar) {
+          toast('✓ Sheets: Historial recargado (' + added + ' movimientos)');
+        } else if (added > 0) {
+          toast('✓ Sheets: ' + added + ' registros nuevos cargados');
+        }
         render();
       }
     })
