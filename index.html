@@ -4095,9 +4095,9 @@ function debtSmartFormData(){
   const cleanNum = s => parseFloat(String(s||'').replace(',','.')) || 0;
   const total = Math.max(0, parseInt(document.getElementById('d-ntotal')?.value)||0);
   const paid = Math.max(0, Math.min(total || 9999, parseInt(document.getElementById('d-npag')?.value)||0));
-  const venc = debtIsoDate(document.getElementById('d-vencimiento')?.value || document.getElementById('d-inicio')?.value || todayStr());
-  const dia = Math.max(1, Math.min(31, Number(venc.slice(8,10)) || parseInt(document.getElementById('d-dia-pago')?.value)||1));
-  const inicio = debtAddMonths(venc, -paid, dia);
+  const inicio = debtIsoDate(document.getElementById('d-inicio')?.value || todayStr());
+  const dia = Math.max(1, Math.min(31, Number(inicio.slice(8,10)) || parseInt(document.getElementById('d-dia-pago')?.value)||1));
+  const venc = debtIsoDate(document.getElementById('d-vencimiento')?.value || debtAddMonths(inicio, paid, dia));
   const cuota = cleanNum(document.getElementById('d-cuota')?.value);
   const totalAmount = cleanNum(document.getElementById('d-total')?.value) || cuota * total;
   return {total, paid, venc, dia, inicio, cuota, totalAmount};
@@ -4116,6 +4116,15 @@ function debtSmartPreviewUpdate(){
   const statusEl = document.getElementById('d-smart-status');
   if(endEl) endEl.textContent = debtFmtDate(fin);
   if(countEl) countEl.textContent = data.total ? data.total + ' factura(s)/cuota(s)' : 'Sin cuotas';
+  const lastPaidEl = document.getElementById('d-last-paid-info');
+  if(lastPaidEl){
+    if(data.paid > 0){
+      const lastPaidDate = debtAddMonths(data.inicio, data.paid - 1, data.dia);
+      lastPaidEl.textContent = `Última cuota pagada: Cuota ${data.paid} el ${debtFmtDate(lastPaidDate)}`;
+    } else {
+      lastPaidEl.textContent = 'Ninguna cuota pagada aún';
+    }
+  }
   if(statusEl){
     statusEl.style.background = estado.bg;
     statusEl.style.color = estado.color;
@@ -4747,7 +4756,7 @@ function openAddPrestPers(pre){
     <div class="field"><label class="field-label">Capital (S/)</label><input id="pp-capital" type="number" inputmode="decimal" placeholder="0.00"></div>
     <div class="field"><label class="field-label">Tasa de interés mensual (%)</label><input id="pp-tasa" type="number" inputmode="decimal" placeholder="Ej: 20" step="0.1"></div>
     <div class="field"><label class="field-label">Plazo (meses)</label><input id="pp-plazo" type="number" inputmode="numeric" placeholder="Ej: 3"></div>
-    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="pp-pagadas" type="number" inputmode="numeric" min="0" placeholder="0" value="0"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Esto solo rellena el avance historico del prestamo; no mueve Balance. Para afectar caja usa Registrar pago.</div></div>
+    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="pp-pagadas" type="number" inputmode="numeric" min="0" placeholder="0" value="0" oninput="const d=Math.max(1,Math.min(31,Number(document.getElementById('pp-fecha').value.slice(8,10))||1));document.getElementById('pp-vencimiento').value=debtAddMonths(document.getElementById('pp-fecha').value,parseInt(this.value)||0,d);ppSmartPreviewUpdate('pp')"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Esto solo rellena el avance historico del prestamo; no mueve Balance. Para afectar caja usa Registrar pago.</div></div>
     <div class="field">
       <label class="field-label">Sistema de pago</label>
       <select id="pp-sistema" onchange="calcPPPreview()" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
@@ -4764,7 +4773,8 @@ function openAddPrestPers(pre){
         <option value="unico">Un solo vencimiento</option>
       </select>
     </div>
-    <div class="field"><label class="field-label">Fecha de vencimiento / próximo pago</label><input id="pp-vencimiento" type="date" value="${todayStr()}" onchange="ppSmartPreviewUpdate('pp')"><input id="pp-fecha" type="hidden" value="${todayStr()}"><input id="pp-dia-pago" type="hidden" value="${Number(todayStr().slice(8,10))||1}"></div>
+    <div class="field"><label class="field-label">Fecha en que inicié pagando (1ra cuota)</label><input id="pp-fecha" type="date" value="${todayStr()}" onchange="const d=Math.max(1,Math.min(31,Number(this.value.slice(8,10))||1));document.getElementById('pp-vencimiento').value=debtAddMonths(this.value,parseInt(document.getElementById('pp-pagadas').value)||0,d);ppSmartPreviewUpdate('pp')"></div>
+    <div class="field"><label class="field-label">Fecha de vencimiento / próximo pago</label><input id="pp-vencimiento" type="date" value="${todayStr()}" onchange="const d=Math.max(1,Math.min(31,Number(this.value.slice(8,10))||1));document.getElementById('pp-fecha').value=debtAddMonths(this.value,-(parseInt(document.getElementById('pp-pagadas').value)||0),d);ppSmartPreviewUpdate('pp')"><input id="pp-dia-pago" type="hidden" value="${Number(todayStr().slice(8,10))||1}"></div>
     <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">
       <div style="font-size:10px;color:var(--muted);font-weight:900;text-transform:uppercase;margin-bottom:8px">Plan recurrente inteligente</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px">
@@ -4914,9 +4924,9 @@ function savePrestPers(){
   const tasa=parseFloat(document.getElementById('pp-tasa')?.value||0);
   const plazo=parseInt(document.getElementById('pp-plazo')?.value);
   const cuotasPagadas=ppClampCuotasPagadas(document.getElementById('pp-pagadas')?.value||0, plazo);
-  const fechaVencimiento=debtIsoDate(document.getElementById('pp-vencimiento')?.value||document.getElementById('pp-fecha')?.value||todayStr());
-  const diaPago=Math.max(1, Math.min(31, Number(fechaVencimiento.slice(8,10)) || 1));
-  const fecha=debtAddMonths(fechaVencimiento, -cuotasPagadas, diaPago);
+  const fecha=debtIsoDate(document.getElementById('pp-fecha')?.value || todayStr());
+  const diaPago=Math.max(1, Math.min(31, Number(fecha.slice(8,10)) || 1));
+  const fechaVencimiento=debtIsoDate(document.getElementById('pp-vencimiento')?.value || debtAddMonths(fecha, cuotasPagadas, diaPago));
   const sistema=document.getElementById('pp-sistema')?.value||'solo_interes';
   const repeticion=document.getElementById('pp-repeticion')?.value||'mensual';
   const notas=document.getElementById('pp-notas')?.value.trim()||'';
@@ -5000,7 +5010,7 @@ function editPrestPers(id){
     <div class="field"><label class="field-label">Capital pendiente (S/)</label><input id="ep-pendiente" type="number" inputmode="decimal" value="${p.capitalPendiente}"></div>
     <div class="field"><label class="field-label">Tasa mensual (%)</label><input id="ep-tasa" type="number" inputmode="decimal" step="0.1" value="${p.tasaMensual}"></div>
     <div class="field"><label class="field-label">Plazo (meses)</label><input id="ep-plazo" type="number" inputmode="numeric" value="${p.plazo}"></div>
-    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="ep-pagadas" type="number" inputmode="numeric" min="0" max="${p.plazo}" value="${ppCuotasPagadas(p)}"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Si aumentas este numero, se marca como historial sin mover Balance. Si lo bajas, se retiran pagos ligados sobrantes.</div></div>
+    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="ep-pagadas" type="number" inputmode="numeric" min="0" max="${p.plazo}" value="${ppCuotasPagadas(p)}" oninput="const d=Math.max(1,Math.min(31,Number(document.getElementById('ep-fecha').value.slice(8,10))||1));document.getElementById('ep-vencimiento').value=debtAddMonths(document.getElementById('ep-fecha').value,parseInt(this.value)||0,d);ppSmartPreviewUpdate('ep')"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Si aumentas este numero, se marca como historial sin mover Balance. Si lo bajas, se retiran pagos ligados sobrantes.</div></div>
     <div class="field"><label class="field-label">Notas</label><textarea id="ep-notas" rows="2" style="width:100%;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;resize:vertical">${debtHtml(p.notas||'')}</textarea></div>
     <div class="field">
       <label class="field-label">Repetir</label>
@@ -5009,7 +5019,8 @@ function editPrestPers(id){
         <option value="unico" ${p.repeticion==='unico'?'selected':''}>Un solo vencimiento</option>
       </select>
     </div>
-    <div class="field"><label class="field-label">Fecha de vencimiento / próximo pago</label><input id="ep-vencimiento" type="date" value="${vencimiento}" onchange="ppSmartPreviewUpdate('ep')"><input id="ep-fecha" type="hidden" value="${ppInicio(p)}"><input id="ep-dia-pago" type="hidden" value="${ppDiaPago(p)}"></div>
+    <div class="field"><label class="field-label">Fecha en que inicié pagando (1ra cuota)</label><input id="ep-fecha" type="date" value="${ppInicio(p)}" onchange="const d=Math.max(1,Math.min(31,Number(this.value.slice(8,10))||1));document.getElementById('ep-vencimiento').value=debtAddMonths(this.value,parseInt(document.getElementById('ep-pagadas').value)||0,d);ppSmartPreviewUpdate('ep')"></div>
+    <div class="field"><label class="field-label">Fecha de vencimiento / próximo pago</label><input id="ep-vencimiento" type="date" value="${vencimiento}" onchange="const d=Math.max(1,Math.min(31,Number(this.value.slice(8,10))||1));document.getElementById('ep-fecha').value=debtAddMonths(this.value,-(parseInt(document.getElementById('ep-pagadas').value)||0),d);ppSmartPreviewUpdate('ep')"><input id="ep-dia-pago" type="hidden" value="${ppDiaPago(p)}"></div>
     <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">
       <div style="font-size:10px;color:var(--muted);font-weight:900;text-transform:uppercase;margin-bottom:8px">Plan recurrente inteligente</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px">
@@ -5071,9 +5082,9 @@ function saveEditPrestPers(id){
   const plazo=parseInt(document.getElementById('ep-plazo')?.value);
   const cuotasPagadas=ppClampCuotasPagadas(document.getElementById('ep-pagadas')?.value||0, plazo);
   const sistema=document.getElementById('ep-sistema')?.value||'solo_interes';
-  const fechaVencimiento=debtIsoDate(document.getElementById('ep-vencimiento')?.value||p.fechaVencimiento||ppProximoPago(p)||todayStr());
-  const diaPago=Math.max(1, Math.min(31, Number(fechaVencimiento.slice(8,10)) || 1));
-  const fechaInicio=debtAddMonths(fechaVencimiento, -cuotasPagadas, diaPago);
+  const fechaInicio=debtIsoDate(document.getElementById('ep-fecha')?.value || p.fechaInicio);
+  const diaPago=Math.max(1, Math.min(31, Number(fechaInicio.slice(8,10)) || 1));
+  const fechaVencimiento=debtIsoDate(document.getElementById('ep-vencimiento')?.value || debtAddMonths(fechaInicio, cuotasPagadas, diaPago));
   const repeticion=document.getElementById('ep-repeticion')?.value||'mensual';
   const notas=document.getElementById('ep-notas')?.value.trim()||'';
   if(!nombre||!capital||isNaN(pendiente)||!plazo||!fechaVencimiento) return toast('Completa todos los campos','error');
@@ -8578,11 +8589,12 @@ function openDebtModal(debt, preData){
         <option value="mensual" selected>Mensual (cada mes)</option>
       </select>
     </div>
-    <div class="field"><label class="field-label">Fecha de vencimiento / proximo pago</label><input id="d-vencimiento" type="date" value="${d.fechaVencimiento}" oninput="debtSmartPreviewUpdate()"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">La app usa esta fecha y las cuotas pagadas para calcular automaticamente inicio, final y estado real al dia de hoy.</div></div>
+    <div class="field"><label class="field-label">Fecha en que inicié pagando (1ra cuota)</label><input id="d-inicio" type="date" value="${d.fechaInicio}" onchange="const d=Math.max(1,Math.min(31,Number(this.value.slice(8,10))||1));document.getElementById('d-vencimiento').value=debtAddMonths(this.value,parseInt(document.getElementById('d-npag').value)||0,d);debtSmartPreviewUpdate()"></div>
+    <div class="field"><label class="field-label">Fecha de vencimiento / próximo pago</label><input id="d-vencimiento" type="date" value="${d.fechaVencimiento}" oninput="const d=Math.max(1,Math.min(31,Number(this.value.slice(8,10))||1));document.getElementById('d-inicio').value=debtAddMonths(this.value,-(parseInt(document.getElementById('d-npag').value)||0),d);debtSmartPreviewUpdate()"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">La app usa estas fechas y las cuotas pagadas para calcular automáticamente el cronograma.</div></div>
     <div class="field"><label class="field-label">Total de la factura / deuda (S/)</label><input id="d-total" type="number" inputmode="decimal" placeholder="0.00" value="${d.totalAmount||''}" oninput="debtSmartPreviewUpdate()"></div>
     <div class="field"><label class="field-label">Cuota mensual (S/)</label><input id="d-cuota" type="number" inputmode="decimal" placeholder="0.00" value="${d.cuotaMonto||''}" oninput="debtSmartPreviewUpdate()"></div>
     <div class="field"><label class="field-label">Numero de facturas / cuotas</label><input id="d-ntotal" type="number" inputmode="numeric" placeholder="Ej: 12, 24, 36" value="${d.cuotasTotales||''}" oninput="debtSmartPreviewUpdate()"></div>
-    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="d-npag" type="number" inputmode="numeric" placeholder="0" value="${d.cuotasPagadas||0}" oninput="debtSmartPreviewUpdate()"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Esto rellena el avance historico. Solo Registrar pago/cobro mueve Balance.</div></div>
+    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="d-npag" type="number" inputmode="numeric" placeholder="0" value="${d.cuotasPagadas||0}" oninput="const d=Math.max(1,Math.min(31,Number(document.getElementById('d-inicio').value.slice(8,10))||1));document.getElementById('d-vencimiento').value=debtAddMonths(document.getElementById('d-inicio').value,parseInt(this.value)||0,d);debtSmartPreviewUpdate()"><div id="d-last-paid-info" style="font-size:11px;color:#2563EB;font-weight:bold;margin-top:4px"></div><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Esto rellena el avance historico. Solo Registrar pago/cobro mueve Balance.</div></div>
     <div class="field">
       <label class="field-label">Plan recurrente inteligente</label>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px">
@@ -8596,7 +8608,6 @@ function openDebtModal(debt, preData){
       </div>
       <div id="d-smart-status" style="font-size:11px;font-weight:850;line-height:1.35;margin-top:8px;border:1px solid var(--border);border-radius:10px;padding:9px;background:#F8FAFC;color:var(--muted)">Calculando...</div>
     </div>
-    <input id="d-inicio" type="hidden" value="${d.fechaInicio}">
     <input id="d-dia-pago" type="hidden" value="${d.diaPago}">
     <div class="field"><label class="field-label">Color de la deuda</label><div style="display:flex;gap:10px;flex-wrap:wrap">${DEBT_COLORS.map(c=>`<button type="button" onclick="selectDebtColor(this,'${c}')" style="width:34px;height:34px;border-radius:50%;background:${c};cursor:pointer;border:2px solid ${c===d.color?'#111827':'transparent'};box-shadow:${c===d.color?'0 0 0 3px #E0F2FE':'none'};color:#FFFFFF;font-weight:900;font-size:15px;line-height:1" data-dcolor="${c}" aria-label="Seleccionar color">${c===d.color?'✓':''}</button>`).join('')}</div><div id="d-color-status" style="font-size:11px;color:var(--muted);margin-top:7px">Color seleccionado para diferenciar esta deuda en la lista.</div></div>
     <div class="btn-row" style="margin-top:6px">
@@ -8637,9 +8648,9 @@ function saveDebt(editId){
   const cuotasTotales=parseInt(document.getElementById('d-ntotal').value)||0;
   const cuotasPagadas=parseInt(document.getElementById('d-npag').value)||0;
   const totalAmount=cleanNum(document.getElementById('d-total').value)||cuotaMonto*cuotasTotales;
-  const fechaVencimiento=debtIsoDate(document.getElementById('d-vencimiento')?.value || todayStr());
-  const diaPago=Math.max(1, Math.min(31, Number(fechaVencimiento.slice(8,10))||parseInt(document.getElementById('d-dia-pago')?.value)||1));
-  const fechaInicio=debtAddMonths(fechaVencimiento, -Math.max(0, cuotasPagadas), diaPago);
+  const fechaInicio=debtIsoDate(document.getElementById('d-inicio')?.value || todayStr());
+  const diaPago=Math.max(1, Math.min(31, Number(fechaInicio.slice(8,10))||parseInt(document.getElementById('d-dia-pago')?.value)||1));
+  const fechaVencimiento=debtIsoDate(document.getElementById('d-vencimiento')?.value || debtAddMonths(fechaInicio, cuotasPagadas, diaPago));
   const notas=document.getElementById('d-notas')?.value.trim() || '';
   const repeticion=document.getElementById('d-repeticion')?.value || 'mensual';
   if(!name) return toast('Escribe el nombre de la deuda','error');
@@ -16494,6 +16505,94 @@ function parsePrestamoVoz(text) {
   };
 }
 
+function parsePagoPrestamoVoz(text) {
+  const t = nrm(text);
+  const esPago = /\b(pague|pague|pago|abone|abone|amortice|amortice)\b/.test(t);
+  const esCobro = /\b(cobre|cobre|cobro|recibi|recibi|me pago|me pagaron)\b/.test(t);
+  if (!esPago && !esCobro) return null;
+
+  const amount = extractAmount(text);
+  if (!amount) return null;
+
+  let bestMatch = null;
+  let bestType = null; 
+  let maxLen = 0;
+
+  const personales = state.prestamosPersonales || [];
+  personales.forEach(p => {
+    const pNorm = nrm(p.nombre || '');
+    if (pNorm && t.includes(pNorm)) {
+      if (pNorm.length > maxLen) {
+        maxLen = pNorm.length;
+        bestMatch = p;
+        bestType = 'prestamo';
+      }
+    }
+  });
+
+  const debts = state.debts || [];
+  debts.forEach(d => {
+    const dNorm = nrm(d.name || '');
+    if (dNorm && t.includes(dNorm)) {
+      if (dNorm.length > maxLen) {
+        maxLen = dNorm.length;
+        bestMatch = d;
+        bestType = 'debt';
+      }
+    }
+  });
+
+  if (!bestMatch) return null;
+
+  return {
+    action: esCobro ? 'cobro' : 'pago',
+    type: bestType,
+    item: bestMatch,
+    amount: amount
+  };
+}
+
+function ejecutarPagoDeudaVoz(parsed) {
+  if (!parsed) return;
+  const d = parsed.item;
+  if (parsed.type === 'prestamo') {
+    pagarPrestPers(d.id);
+  } else if (parsed.type === 'debt') {
+    const total = Math.max(0, Math.floor(moneyValue(d.cuotasTotales)));
+    const actual = Math.max(0, Math.floor(moneyValue(d.cuotasPagadas)));
+    if (actual >= total) {
+      toast('Deuda ya completada', 'error');
+      return;
+    }
+    const target = actual + 1;
+    const monto = parsed.amount || moneyValue(d.cuotaMonto);
+    const fecha = todayStr();
+
+    deudaNormalizePagos(d, d);
+    const pagosAntes = deudaPagos(d);
+    let pagos = pagosAntes.slice(0, target);
+    while (pagos.length < target) {
+      const cuotaNum = pagos.length + 1;
+      const esUltimaNueva = cuotaNum === target;
+      pagos.push(deudaBuildPago(d, cuotaNum, {
+        fecha: esUltimaNueva ? fecha : debtAddMonths(deudaInicio(d), cuotaNum - 1, deudaDiaPago(d)),
+        monto,
+        afectaBalance: esUltimaNueva,
+        historico: !esUltimaNueva
+      }));
+    }
+    pagos = pagos.map((p, i) => deudaBuildPago(d, i + 1, p));
+    d.pagos = pagos;
+    d.cuotasPagadas = pagos.length;
+    d.deudaRol = deudaRol(d);
+    deudaReconcilePaymentTxs(d);
+    saveAll();
+    syncSeccionToSheets('deuda', d);
+    render();
+    toast((deudaEsPorCobrar(d)?'Cobro':'Pago') + ' registrado · cuota ' + target + '/' + total + ' · balance actualizado');
+  }
+}
+
 // ── Detectar tipo ingreso / egreso ──
 function detectType(text) {
   const t = nrm(text);
@@ -19977,6 +20076,11 @@ function processVoiceResult(text) {
   }
 
   // ── Préstamo ──
+  const pagoLocal = parsePagoPrestamoVoz(text);
+  if (pagoLocal) {
+    processVoiceResultManual(text);
+    return;
+  }
   const prestamoLocal = parsePrestamoVoz(text);
   if (prestamoLocal) {
     processVoiceResultManual(text);
@@ -20028,6 +20132,13 @@ function processVoiceResultManual(text) {
     const localData = p ? {...p, tipo: tipoF} : {tipo: tipoF};
     _mostrarResumenAgendaEnMic(localData, text, tipoF);
     if(localStorage.getItem('fnz_gemini_key')) rellenarAgendaConGemini(text, tipoF, localData);
+    return;
+  }
+  const pagoLocal = parsePagoPrestamoVoz(text);
+  if(pagoLocal){
+    processVoiceResult._busy = false;
+    document.getElementById('micModal').style.display='none';
+    ejecutarPagoDeudaVoz(pagoLocal);
     return;
   }
   const prestamoLocal = parsePrestamoVoz(text);
