@@ -2636,11 +2636,11 @@ function saveAll(){
 
 // ── Cambiar de modo ──
 function switchModo(nuevo){
-  if(state.modo==='negocio') return;
+  if(state.modo===nuevo) return;
   saveAll(); // guardar estado actual antes de cambiar
-  state.modo = 'negocio';
-  save('fnz_modo', 'negocio');
-  loadStateForModo('negocio');
+  state.modo = nuevo;
+  save('fnz_modo', nuevo);
+  loadStateForModo(nuevo);
   state.page = 'dashboard';
   applyModoTheme();
   render();
@@ -2652,21 +2652,40 @@ function applyModoTheme(){
   const btnP = document.getElementById('btn-modo-personal');
   const btnN = document.getElementById('btn-modo-negocio');
   const title = document.getElementById('header-title');
-  state.modo = 'negocio';
-  save('fnz_modo', 'negocio');
+  const modo = state.modo || 'negocio';
 
   // Tabs visibility
   const tabsP  = document.getElementById('tabs-personal-row1');
   const tabsN1 = document.getElementById('tabs-negocio-row1');
   const tabsN2 = document.getElementById('tabs-negocio-row2');
   const modoToggle = document.querySelector('.modo-toggle');
-  if(modoToggle) modoToggle.style.display = 'none';
-  if(tabsP)  tabsP.style.display  = 'none';
-  if(tabsN1) tabsN1.style.display = 'grid';
-  if(tabsN2) tabsN2.style.display = 'grid';
+  
+  if(modoToggle) modoToggle.style.display = 'flex';
+  
+  if (modo === 'negocio') {
+    if(tabsP)  tabsP.style.display  = 'none';
+    if(tabsN1) tabsN1.style.display = 'grid';
+    if(tabsN2) tabsN2.style.display = 'grid';
+    app.classList.remove('modo-personal');
+    app.classList.add('modo-negocio');
+    if(btnP) btnP.className='modo-btn';
+    if(btnN) btnN.className='modo-btn active-negocio';
+    if(title) title.textContent='Mi Negocio';
+  } else {
+    if(tabsP)  tabsP.style.display  = 'grid';
+    if(tabsN1) tabsN1.style.display = 'none';
+    if(tabsN2) tabsN2.style.display = 'none';
+    app.classList.remove('modo-negocio');
+    app.classList.add('modo-personal');
+    if(btnP) btnP.className='modo-btn active-personal';
+    if(btnN) btnN.className='modo-btn';
+    if(title) title.textContent='Gastos Personales';
+  }
 
   // Redirect to valid page for current mode if needed
-  const validPages = ['dashboard','movimientos','agenda','deudas','inventario','graficos','categorias','servicios','metas','notas','ajustes'];
+  const validPages = modo === 'negocio' 
+    ? ['dashboard','movimientos','agenda','deudas','inventario','graficos','categorias','servicios','metas','notas','ajustes']
+    : ['dashboard','movimientos','deudas','graficos','categorias','servicios','metas','notas','ajustes'];
   if(!validPages.includes(state.page)) state.page = 'dashboard';
 
   // Active tab highlight — mark both personal and negocio tab sets
@@ -2677,11 +2696,6 @@ function applyModoTheme(){
     const el = document.getElementById(id);
     if(el) el.classList.add('active');
   });
-
-  app.classList.add('modo-negocio');
-  if(btnP) btnP.className='modo-btn';
-  if(btnN) btnN.className='modo-btn active-negocio';
-  if(title) title.textContent='Mi Negocio';
 }
 
 // ─────────────────────────────────────────────
@@ -12103,6 +12117,49 @@ function sincronizarFechasTransaccionesVinculadas(servicioId, oldFecha, newFecha
   }
 }
 
+function sincronizarDetallesTransaccionesVinculadas(item) {
+  if (!item || !item.id) return;
+  const storageKey = 'fnz_neg_tx';
+  const allNegTx = load(storageKey, []);
+  let changed = false;
+  
+  const updatedTx = allNegTx.map(t => {
+    if (t && String(t.vinculadoServicioId) === String(item.id)) {
+      changed = true;
+      const newTx = { ...t };
+      newTx.date = item.fecha;
+      newTx.cliente = item.cliente || '';
+      if (item.ubicacion) newTx.ubicacion = item.ubicacion;
+      
+      if (t.type === 'ingreso') {
+        newTx.amount = parseFloat(item.precio) || 0;
+        newTx.category = item.servicio || 'Servicio';
+        newTx.description = (item.servicio || 'Servicio') + 
+          (item.cliente && item.cliente !== '(Sin cliente)' ? ' - ' + item.cliente : '') + 
+          (item.notas ? ' - ' + item.notas : '');
+      }
+      return newTx;
+    }
+    return t;
+  });
+  
+  if (changed) {
+    save(storageKey, updatedTx);
+    if (state.modo === 'negocio') {
+      state.transactions = updatedTx;
+    }
+    
+    updatedTx.forEach(t => {
+      if (t && String(t.vinculadoServicioId) === String(item.id)) {
+        syncToSheets(t);
+        if (!t.afectaStockValor) {
+          syncExpenseTxToNotion(t);
+        }
+      }
+    });
+  }
+}
+
 // ── Formulario agregar/editar ──
 function openAddAgenda(tipo, editId, preData){
   const isEdit = !!editId;
@@ -12493,7 +12550,11 @@ function saveAgendaItem(editId, tipo){
     if(existente && existente.fecha && existente.fecha !== fecha) {
       sincronizarFechasTransaccionesVinculadas(finalId, existente.fecha, fecha);
     }
+    sincronizarDetallesTransaccionesVinculadas(item);
     state.agenda = state.agenda.map(x=>x.id===finalId ? item : x);
+    if (isServicioFinalizado(item)) {
+      scheduleSyncServicioFinalizadoReporte(item);
+    }
   } else {
     state.agenda.unshift(item);
   }
@@ -15804,6 +15865,9 @@ function loadFromSheets(forzar) {
         if (data.servicios) { save('fnz_neg_services', data.servicios); if (state.modo === 'negocio') state.servicios = data.servicios; }
         if (data.metas) { save('fnz_neg_metas', data.metas); if (state.modo === 'negocio') state.metas = data.metas; }
         if (data.notas) { save('fnz_notas', data.notas); state.notas = data.notas; }
+        if (data.inventario) { save('fnz_inventario', data.inventario); state.inventario = data.inventario; }
+        if (data.plantillas) { save('fnz_plantillas', data.plantillas); state.plantillas = data.plantillas; }
+        if (data.movimientosMateriales) { save('fnz_mov_mat', data.movimientosMateriales); state.movimientosMateriales = data.movimientosMateriales; }
         changed = true;
       } else {
         // SAFE MERGE MODE (Boot Auto-Sync): merge to prevent losing offline unsynced local data
@@ -15883,6 +15947,27 @@ function loadFromSheets(forzar) {
           const m = _mergeById(local, data.notas);
           if(m.length !== local.length) changed = true;
           save('fnz_notas', m); state.notas = m;
+        }
+        // Inventario/Materiales
+        if (data.inventario && data.inventario.length) {
+          const local = load('fnz_inventario',[]);
+          const m = _mergeById(local, data.inventario);
+          if(m.length !== local.length) changed = true;
+          save('fnz_inventario', m); state.inventario = m;
+        }
+        // Plantillas
+        if (data.plantillas && data.plantillas.length) {
+          const local = load('fnz_plantillas',[]);
+          const m = _mergeById(local, data.plantillas);
+          if(m.length !== local.length) changed = true;
+          save('fnz_plantillas', m); state.plantillas = m;
+        }
+        // Movimientos materiales
+        if (data.movimientosMateriales && data.movimientosMateriales.length) {
+          const local = load('fnz_mov_mat',[]);
+          const m = _mergeById(local, data.movimientosMateriales);
+          if(m.length !== local.length) changed = true;
+          save('fnz_mov_mat', m); state.movimientosMateriales = m;
         }
       }
 
