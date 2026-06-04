@@ -12514,7 +12514,10 @@ function saveAgendaItem(editId, tipo){
         save('fnz_agenda', state.agenda);
         console.log('Notion ID guardado:', res.id, '| acción:', res.object === 'page' ? (item._notionRowId ? 'PATCH' : 'POST') : '?');
       }
-    }).catch(err => console.warn('Notion error:', err.message));
+    }).catch(err => {
+      console.warn('Notion error:', err.message);
+      toast('⚠ Notion Clientes falló: ' + err.message, 'error');
+    });
   }
 
 
@@ -12713,7 +12716,10 @@ function confirmarReprogramacion(id){
         save('fnz_agenda', state.agenda);
         console.log('Notion reprogramado:', res.id);
       }
-    }).catch(e=>console.warn('Notion reprogramar:', e.message));
+    }).catch(e=>{
+      console.warn('Notion reprogramar:', e.message);
+      toast('⚠ Notion Reprogramar falló: ' + e.message, 'error');
+    });
   }
 
   toast('↻ Reprogramado para '+nFecha);
@@ -12738,7 +12744,10 @@ function _aplicarEstadoAgenda(id, estado){
         save('fnz_agenda', state.agenda);
         console.log('Notion estado actualizado:', estado, res.id);
       }
-    }).catch(e=>console.warn('Notion estado:', e.message));
+    }).catch(e=>{
+      console.warn('Notion estado:', e.message);
+      toast('⚠ Notion Estado falló: ' + e.message, 'error');
+    });
   }
 
   render();
@@ -12844,6 +12853,7 @@ async function syncServicioFinalizadoReporte(item, opts={}){
       save('fnz_agenda', state.agenda);
     }catch(e){
       console.warn('Sync reporte servicio:', e.message);
+      toast('⚠ Notion Reporte falló: ' + e.message, 'error');
     }
   }
 }
