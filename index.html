@@ -2763,7 +2763,7 @@ let state = {
   stockValorGeneral:     load('fnz_stock_valor_general', 0),
   filterMonth:  new Date().getMonth(),
   filterYear:   new Date().getFullYear(),
-  page:         'dashboard',
+  page:         'movimientos',
   chartBar:     null,
   chartPie:     null,
   moneda:       load('fnz_moneda','PEN'),
@@ -3777,7 +3777,7 @@ function renderMovimientos(){
             const cName = mainIng ? `${baseC} - ${mainIng.category}` : baseC;
             const groupCards = groupTxs.map(renderTxCard).join('');
             
-            return `<div style="border:1px dashed #cbd5e1;border-radius:14px;padding:6px;margin-bottom:10px;background:#f8fafc">
+            return `<div style="border:2px solid #a8bcc9;border-radius:16px;padding:10px;margin-bottom:12px;background:#f8fafc;box-shadow:0 4px 12px rgba(26,44,53,0.06)">
               <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px 8px;">
                 <span style="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">📦 Grupo: ${cName}</span>
                 ${ganHtml}
@@ -7245,15 +7245,15 @@ function enviarTodoASheets() {
           row.servicio1 = tx.category;
         }
         row.observaciones = tx.description;
-      } else if (tx.id.endsWith('-mov') || isMovilidadCategory(tx.catId, tx.category, tx.description)) {
+      } else if (tx.id.includes('-mov') || isMovilidadCategory(tx.catId, tx.category, tx.description)) {
         row.movilidad += amt;
-      } else if (tx.id.endsWith('-mat') || isMaterialesCategory(tx.catId, tx.category)) {
+      } else if (tx.id.includes('-mat') || isMaterialesCategory(tx.catId, tx.category)) {
         row.materiales += amt;
-      } else if (tx.id.endsWith('-com') || isComidaCategory(tx.catId, tx.category, tx.description)) {
+      } else if (tx.id.includes('-com') || isComidaCategory(tx.catId, tx.category, tx.description)) {
         row.comida += amt;
-      } else if (tx.id.endsWith('-agr') || tx.category === 'Agregados' || isAgregadoCategory(tx.catId, tx.category, tx.description)) {
+      } else if (tx.id.includes('-agr') || tx.category === 'Agregados' || isAgregadoCategory(tx.catId, tx.category, tx.description)) {
         row.agregados += amt;
-      } else if (tx.id.endsWith('-met') || isMetaCategory(tx.catId, tx.category, tx.description)) {
+      } else if (tx.id.includes('-met') || isMetaCategory(tx.catId, tx.category, tx.description)) {
         row.meta += amt;
       } else {
         row.otros += amt;
@@ -13618,10 +13618,35 @@ async function guardarFinalizacion(id){
   if (crearMovimientosCierre && cobroObj.movilidad_manual > 0) { const txId=rowId+'-mov'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.movilidad_manual, category:'Movilidad', catId:'cne5', description:'Movilidad - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.comida_manual > 0) { const txId=rowId+'-com'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.comida_manual, category:'Comida', catId:'cne_menu', description:'Comida - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.otros_gastos > 0) { const txId=rowId+'-otg'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
-  // Materiales usados en el servicio: reducen el stock valorizado pero NO afectan la caja
-  // (la caja ya se movio cuando se compraron los materiales). Se ocultan de movimientos.
-  if (crearMovimientosCierre && totalMat > 0) { const txId=rowId+'-mat'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:totalMat, category:'Materiales', catId:'cne1', description:'Materiales usados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
-  if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-otr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', catId:'cne_agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
+  // Materiales usados por servicio: reducen el stock valorizado pero NO afectan la caja
+  const mats = [
+    { mat: cobroObj.materiales1, idx: 1 },
+    { mat: cobroObj.materiales2, idx: 2 },
+    { mat: cobroObj.materiales3, idx: 3 }
+  ];
+  mats.forEach(m => {
+    if (crearMovimientosCierre && m.mat > 0) {
+      const txId = rowId + '-mat' + m.idx;
+      nuevosCierreTxIds.push(txId);
+      state.transactions.unshift({
+        id: txId,
+        type: 'egreso',
+        amount: m.mat,
+        category: 'Materiales',
+        catId: 'cne1',
+        description: 'Materiales usados — ' + (servicios[m.idx-1]?.svc || item.servicio || 'Servicio') + ' — ' + (item.cliente||''),
+        vinculadoServicioId: item.id,
+        origenCierreServicio: true,
+        origenServicioMaterial: true,
+        materialUsoServicio: true,
+        noCashFlow: true,
+        afectaStockValor: false,
+        stockOperacion: 'uso_valor',
+        ...baseTx
+      });
+    }
+  });
+  if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-agr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', catId:'cne_agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
   if (crearMovimientosCierre && cobroObj.meta > 0) { const txId=rowId+'-met'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.meta, category:'META', catId:'cne_meta', description:'META - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
   if(crearMovimientosCierre) item.cierreTxIds = nuevosCierreTxIds;
 
@@ -17992,10 +18017,15 @@ function startListeningHandlers(rec) {
         }, espera);
       } else {
         const _textoGeneral = display;
+        let tieneMonto = false;
+        try {
+          tieneMonto = extractAmount(textoParaTimer) > 0;
+        } catch(e) {}
+        const espera = tieneMonto ? 1200 : MIC_SILENCE_MS;
         micSilenceTimer = setTimeout(()=>{
           const texto = (micFullTranscript.trim() || _textoGeneral).trim();
           if(micListening && texto) processVoiceResult(texto);
-        }, MIC_SILENCE_MS);
+        }, espera);
       }
     }
     // ★ Guardar display completo para usar como fallback en el timer
