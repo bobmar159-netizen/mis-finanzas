@@ -271,10 +271,10 @@ body{font-family:'Inter','Roboto',sans-serif;color:var(--text)}
 .mv-icon-egr{background:#FFEBEE}
 .mv-main{flex:1;min-width:0}
 .mv-row1{display:flex;align-items:center;gap:6px;margin-bottom:3px}
-.mv-svc{font-size:15px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.mv-svc{font-size:14px;font-weight:700;color:var(--text);word-break:break-word;line-height:1.2;margin-bottom:2px}
 .mv-badge-ing{background:var(--ing-bg,#EBF1F5);color:var(--ing-text,#2A4455);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;flex-shrink:0;white-space:nowrap}
 .mv-badge-egr{background:#FFEBEE;color:#791F1F;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;flex-shrink:0;white-space:nowrap}
-.mv-cli{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mv-cli{font-size:11.5px;color:var(--muted);word-break:break-word;line-height:1.3;margin-top:4px}
 .mv-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
 .mv-amt{font-size:16px;font-weight:700}
 .mv-amt-ing{color:var(--ing-color,#546878)}
@@ -2804,7 +2804,7 @@ setTimeout(checkReminders, 1500);
 // ─────────────────────────────────────────────
 // UTILS
 // ─────────────────────────────────────────────
-const fmt=n=>'S/ '+Math.abs(Number(n)).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt=n=>(Number(n)<0?'-':'')+'S/ '+Math.abs(Number(n)).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtSign=n=>(n>=0?'+':'-')+fmt(n);
 const todayStr=() => {
   const d = new Date();
@@ -2952,7 +2952,7 @@ function aplicarUsoStockNotionImport(existingTxs, nuevasTx, isFullSync){
 
 function ajustarStockValorGeneral(delta){
   const before = moneyValue(state.stockValorGeneral);
-  const after = Math.max(0, +(before + moneyValue(delta)).toFixed(2));
+  const after = +(before + moneyValue(delta)).toFixed(2);
   state.stockValorGeneral = after;
   return +(after - before).toFixed(2);
 }
@@ -2988,7 +2988,7 @@ function aplicarCorreccionStock(){
   const desc = document.getElementById('corr-desc')?.value.trim() || 'Corrección manual de saldo';
   const anterior = moneyValue(state.stockValorGeneral);
   const delta = +(nuevoSaldo - anterior).toFixed(2);
-  state.stockValorGeneral = Math.max(0, nuevoSaldo);
+  state.stockValorGeneral = nuevoSaldo;
   // Registrar el ajuste en el historial
   ensureLazyData('movimientosMateriales');
   state.movimientosMateriales = state.movimientosMateriales||[];
@@ -3698,6 +3698,20 @@ function renderMovimientos(){
             const subTxt = (clienteTxt ? (clienteTxt+ubicTxt) : (isDebtTx ? (t.description || titleTxt) : (t.category||''))) + linkTxt;
             const cardId = 'mvcard_'+t.id;
 
+            const txHora = (() => {
+              if (t.hora) return t.hora;
+              const idStr = String(t.id || '');
+              const matchTs = idStr.match(/^(\d{10,13})/);
+              if (matchTs) {
+                const ts = parseInt(matchTs[1]);
+                const dateObj = new Date(ts);
+                if (!isNaN(dateObj.getTime())) {
+                  return dateObj.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
+                }
+              }
+              return '';
+            })();
+
             return `
             <div class="mv-card" id="${cardId}" onclick="toggleMvCard('${cardId}')" style="margin-bottom:4px">
               <div class="mv-top">
@@ -3705,8 +3719,11 @@ function renderMovimientos(){
                 <div class="mv-main">
                   <div class="mv-row1">
                     <span class="mv-svc">${debtHtml(titleTxt)}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:2px;margin-bottom:3px;flex-wrap:wrap">
                     <span class="${esIng?'mv-badge-ing':'mv-badge-egr'}">${esIng?'↑ Ingreso':'↓ Egreso'}</span>
                     ${t.esGastoPersonal?`<span style="background:#F3E5F5;color:#7B1FA2;border:1px solid #CE93D8;border-radius:10px;font-size:9px;font-weight:800;padding:2px 7px;white-space:nowrap">👤 Personal</span>`:''}
+                    ${txHora?`<span style="background:#F1F5F9;color:#475569;border:1.5px solid #CBD5E1;border-radius:20px;font-size:9px;font-weight:800;padding:2px 8px;white-space:nowrap">⏰ ${txHora}</span>`:''}
                   </div>
                   <div class="mv-cli">${debtHtml(subTxt)}</div>
                 </div>
