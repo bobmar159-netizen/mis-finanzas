@@ -13443,12 +13443,13 @@ async function guardarFinalizacion(id){
   const totalPrecio = cobroObj.precio1 + cobroObj.precio2 + cobroObj.precio3;
   const totalMat    = cobroObj.materiales1 + cobroObj.materiales2 + cobroObj.materiales3;
   const totalPagado = cobroObj.pagoEfectivo + cobroObj.pagoYape + cobroObj.pagoPlin + cobroObj.pagoTransf + cobroObj.pagoAcuenta;
+  const totalStockUso = +(totalMat + cobroObj.agregados).toFixed(2);
   let stockConsumidoPrev = moneyValue(item.stockValorConsumido);
   if(yaFinalizadoAntes && !stockConsumidoPrev){
-    const prevCampos = moneyValue(item.materiales1) + moneyValue(item.materiales2) + moneyValue(item.materiales3);
+    const prevCampos = moneyValue(item.materiales1) + moneyValue(item.materiales2) + moneyValue(item.materiales3) + moneyValue(item.agregados);
     if(prevCampos > 0) stockConsumidoPrev = prevCampos;
   }
-  const stockConsumoDelta = +(totalMat - stockConsumidoPrev).toFixed(2);
+  const stockConsumoDelta = +(totalStockUso - stockConsumidoPrev).toFixed(2);
   const gastosVinculadosIds = getSelectedGastosCierreIds();
   const gastosVinculados = (state.transactions||[]).filter(t => gastosVinculadosIds.includes(String(t.id)));
   const totalGastosVinculados = gastosVinculados.reduce((s,t) => s + moneyValue(t.amount), 0);
@@ -13527,14 +13528,22 @@ async function guardarFinalizacion(id){
 
   if(stockConsumoDelta !== 0){
     ajustarStockValorGeneral(-stockConsumoDelta);
+    const descParts = [];
+    if (totalMat > 0) descParts.push('Materiales');
+    if (cobroObj.agregados > 0) descParts.push('Agregados');
+    const descStr = descParts.length > 0 
+      ? descParts.join(' y ') + ' usados al cerrar servicio' 
+      : 'Materiales y agregados usados al cerrar servicio';
     registrarMovimientoStockValor(stockConsumoDelta > 0 ? 'uso_valor' : 'devolucion_valor', Math.abs(stockConsumoDelta), {
       fecha: item.fecha,
       id_servicio: item.id,
       cliente: item.cliente || '',
-      descripcion: 'Materiales usados al cerrar servicio'
+      descripcion: descStr
     });
+    const mov = (state.movimientosMateriales || [])[state.movimientosMateriales.length - 1];
+    if(mov && typeof syncMovimientoToSheets === 'function') syncMovimientoToSheets(mov);
   }
-  item.stockValorConsumido = totalMat;
+  item.stockValorConsumido = totalStockUso;
   item.stockValorSaldo = moneyValue(state.stockValorGeneral);
 
   const txsParaSincronizar = [];
