@@ -228,14 +228,56 @@ body{font-family:'Inter','Roboto',sans-serif;color:var(--text)}
 .summary-detail{font-size:12px;color:var(--muted);margin-top:6px}
 .progress-bar{background:#E8ECF0;border-radius:6px;height:7px;overflow:hidden;margin-top:12px}
 .progress-fill{height:100%;border-radius:6px;transition:width 1s ease}
+/* ── Deudas Unificadas (Tik-style) ── */
+.deuda-tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:3px;margin-bottom:14px;box-shadow:0 2px 8px rgba(26,44,53,.06)}
+.deuda-tab{padding:10px 8px;border-radius:11px;border:none;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .25s}
+.deuda-tab.active{background:linear-gradient(135deg,#2E86AB,#3D9EC9);color:#fff;box-shadow:0 3px 12px rgba(46,134,171,.28)}
+.deuda-month{display:flex;justify-content:space-between;align-items:center;padding:10px 4px 7px;margin-top:6px;border-bottom:2px solid var(--border)}
+.deuda-month-label{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:800;color:var(--text);text-transform:capitalize}
+.deuda-month-total{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:800;color:var(--text)}
+.deuda-row{display:flex;align-items:stretch;background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:8px;overflow:hidden;cursor:pointer;transition:border-color .2s,box-shadow .2s;box-shadow:0 2px 8px rgba(26,44,53,.05)}
+.deuda-row:active{border-color:#2E86AB55;box-shadow:0 2px 12px rgba(46,134,171,.12)}
+.deuda-row-date{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 12px;min-width:52px;border-right:1px solid var(--border);background:#F8FAFC}
+.deuda-row-day{font-family:'DM Sans',sans-serif;font-size:18px;font-weight:900;color:var(--text);line-height:1}
+.deuda-row-mon{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-top:2px}
+.deuda-row-body{flex:1;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:0}
+.deuda-row-left{flex:1;min-width:0}
+.deuda-row-name{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.deuda-row-cat{font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.deuda-row-right{text-align:right;flex-shrink:0}
+.deuda-row-amt{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:800}
+.deuda-badge{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.03em;margin-top:3px}
+.deuda-badge.atrasado{background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA}
+.deuda-badge.hoy{background:#FFF7ED;color:#C2410C;border:1px solid #FED7AA}
+.deuda-badge.proximo{background:#FFFBEB;color:#A16207;border:1px solid #FDE68A}
+.deuda-badge.aldia{background:#ECFDF5;color:#047857;border:1px solid #A7F3D0}
+.deuda-badge.completada{background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0}
+.deuda-badge.cobro{background:#ECFDF5;color:#047857;border:1px solid #A7F3D0}
+.deuda-expanded{background:var(--card);border:1px solid #2E86AB44;border-radius:14px;padding:14px;margin-bottom:8px;box-shadow:0 4px 18px rgba(46,134,171,.1);animation:deudaSlide .2s ease}
+@keyframes deudaSlide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.deuda-detail-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:10px 0}
+.deuda-detail-box{background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:7px 8px}
+.deuda-detail-box .label{font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.03em}
+.deuda-detail-box .value{font-size:11px;color:var(--text);font-weight:800;margin-top:2px}
+.deuda-dots{display:flex;gap:4px;flex-wrap:wrap;padding:8px;background:#F8FAFC;border:1px solid var(--border);border-radius:9px;margin-top:8px}
+.deuda-cuotas-info{display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--muted);font-weight:700}
+.deuda-fab{position:fixed;bottom:80px;right:16px;width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#2E86AB,#3D9EC9);color:#fff;border:none;font-size:24px;font-weight:300;cursor:pointer;box-shadow:0 6px 20px rgba(46,134,171,.35);z-index:40;display:flex;align-items:center;justify-content:center;transition:transform .2s}
+.deuda-fab:active{transform:scale(.92)}
+.deuda-pagada-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #EEF2F7}
+.deuda-pagada-check{width:22px;height:22px;border-radius:50%;background:#ECFDF5;border:2px solid #A7F3D0;display:flex;align-items:center;justify-content:center;color:#047857;font-size:11px;font-weight:900;flex-shrink:0}
+.deuda-pagada-info{flex:1;min-width:0}
+.deuda-pagada-name{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.deuda-pagada-detail{font-size:10px;color:var(--muted);margin-top:1px}
+.deuda-pagada-amt{font-size:13px;font-weight:800;color:#047857;flex-shrink:0}
+/* Legacy compatibility */
 .debt-card{background:var(--card);border:1px solid var(--border);border-radius:20px;box-shadow:0 4px 16px rgba(26,44,53,0.07);padding:18px;margin-bottom:12px;position:relative;overflow:hidden}
 .debt-accent{position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px}
 .debt-body{display:flex;align-items:flex-start;gap:12px}
 .debt-info{flex:1}
-.debt-name{font-family:'Playfair Display',serif;font-size:15px;color:var(--text)}
+.debt-name{font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text)}
 .debt-cat{font-size:11px;color:var(--muted);margin-top:2px}
 .debt-pending{text-align:right}
-.debt-pending-amt{font-family:'Playfair Display',serif;font-size:17px}
+.debt-pending-amt{font-family:'DM Sans',sans-serif;font-size:17px}
 .debt-pending-lbl{font-size:10px;color:var(--muted)}
 .cuotas-track{display:flex;gap:4px;flex-wrap:wrap;margin-top:12px}
 .cuota-dot{height:6px;border-radius:3px;transition:background .3s;flex-shrink:0}
@@ -2473,6 +2515,7 @@ function getKeys(modo){
   return {
     tx:                  neg ? 'fnz_neg_tx'       : 'fnz_tx',
     debts:               neg ? 'fnz_neg_debts'    : 'fnz_debts',
+    deudas:              neg ? 'fnz_neg_deudas'   : 'fnz_deudas',
     services:            neg ? 'fnz_neg_services' : 'fnz_services',
     catsIn:              neg ? 'fnz_neg_cats_in'  : 'fnz_cats_in',
     catsEx:              neg ? 'fnz_neg_cats_ex'  : 'fnz_cats_ex',
@@ -2580,17 +2623,116 @@ function syncDefaultCategoriesForMode(isNeg){
   save(k.catsEx, state.catsEx);
 }
 
+// ── Cargar deudas antiguas y migrar a estructura unificada deudas ──
+function migrateDeudas(modo) {
+  const k = getKeys(modo);
+  state.deudas = state.deudas || [];
+  
+  const oldDebts = state.debts || [];
+  const oldPrestPers = state.prestamosPersonales || [];
+  
+  oldDebts.forEach(d => {
+    const items = d.pagos || [];
+    const rol = (d.deudaRol === 'meden' || d.rol === 'meden') ? 'meden' : 'debo';
+    const totalAmount = moneyValue(d.totalAmount) || (moneyValue(d.cuotaMonto) * moneyValue(d.cuotasTotales));
+    const normalized = {
+      id: String(d.id),
+      name: d.name || 'Sin nombre',
+      tipo: d.tipo || (rol === 'meden' ? 'cobro_deuda' : 'tarjeta_credito'),
+      tipoLabel: d.tipoLabel || d.categoria || (rol === 'meden' ? 'Cobro de deuda' : 'Tarjeta de crédito'),
+      rol: rol,
+      notas: d.notes || d.notas || '',
+      cuotaMonto: moneyValue(d.cuotaMonto),
+      totalAmount: totalAmount,
+      cuotasTotales: Math.max(1, Math.floor(moneyValue(d.cuotasTotales) || 1)),
+      cuotasPagadas: Math.max(0, Math.floor(moneyValue(d.cuotasPagadas) || 0)),
+      repeticion: d.repeticion || 'mensual',
+      diaPago: typeof deudaDiaPago === 'function' ? deudaDiaPago(d) : 5,
+      fechaInicio: typeof deudaInicio === 'function' ? deudaInicio(d) : todayStr(),
+      capital: 0,
+      tasaMensual: 0,
+      sistema: 'cuota_fija',
+      capitalPendiente: 0,
+      color: d.color || '#2E86AB',
+      pagos: items.map(p => ({
+        id: p.id || (Date.now() + '_' + Math.random().toString(36).substring(2,7)),
+        cuota: p.cuota || 1,
+        fecha: typeof debtIsoDate === 'function' ? debtIsoDate(p.fecha || todayStr()) : (p.fecha || todayStr()),
+        monto: moneyValue(p.monto),
+        txId: p.txId || '',
+        afectaBalance: p.afectaBalance !== false,
+        historico: !!p.historico
+      })),
+      _migratedFrom: String(d.id)
+    };
+    state.deudas.push(normalized);
+  });
+  
+  oldPrestPers.forEach(p => {
+    const items = p.pagos || [];
+    const rol = p.tipo === 'meden' ? 'meden' : 'debo';
+    const total = Math.max(1, Math.floor(moneyValue(p.plazo) || 1));
+    const paid = typeof ppCuotasPagadas === 'function' ? ppCuotasPagadas(p) : (p.pagos ? p.pagos.length : 0);
+    const normalized = {
+      id: String(p.id),
+      name: p.nombre || 'Sin nombre',
+      tipo: 'prestamo_personal',
+      tipoLabel: 'Préstamo personal',
+      rol: rol,
+      notas: p.notas || '',
+      cuotaMonto: 0,
+      totalAmount: moneyValue(p.capital),
+      cuotasTotales: total,
+      cuotasPagadas: paid,
+      repeticion: 'mensual',
+      diaPago: typeof ppDiaPago === 'function' ? ppDiaPago(p) : 5,
+      fechaInicio: typeof ppInicio === 'function' ? ppInicio(p) : todayStr(),
+      capital: moneyValue(p.capital),
+      tasaMensual: moneyValue(p.tasaMensual),
+      sistema: p.sistema || 'solo_interes',
+      capitalPendiente: moneyValue(p.capitalPendiente),
+      color: '#9B59B6',
+      pagos: items.map(pg => ({
+        id: pg.id || (Date.now() + '_' + Math.random().toString(36).substring(2,7)),
+        cuota: pg.cuotaNum || pg.cuota || 1,
+        fecha: typeof debtIsoDate === 'function' ? debtIsoDate(pg.fecha || todayStr()) : (pg.fecha || todayStr()),
+        monto: moneyValue(pg.monto),
+        montoInteres: moneyValue(pg.montoInteres),
+        montoCapital: moneyValue(pg.montoCapital),
+        txId: pg.txId || '',
+        afectaBalance: pg.afectaBalance !== false,
+        historico: !!pg.historico
+      })),
+      _migratedFrom: String(p.id)
+    };
+    if (typeof calcTablaAmort === 'function') {
+      const tabla = calcTablaAmort(normalized.capital, normalized.tasaMensual, normalized.cuotasTotales, normalized.sistema);
+      normalized.cuotaMonto = tabla[0]?.cuota || (normalized.capital / normalized.cuotasTotales);
+    } else {
+      normalized.cuotaMonto = normalized.capital / normalized.cuotasTotales;
+    }
+    state.deudas.push(normalized);
+  });
+  
+  delete state.debts;
+  delete state.prestamosPersonales;
+  
+  save(k.deudas, state.deudas);
+  localStorage.removeItem(k.debts);
+  localStorage.removeItem(k.prestamosPersonales);
+  console.log('[MisFinanzas] Migración de deudas completada para modo:', modo);
+}
+
 // ── Cargar estado según modo ──
 function loadStateForModo(modo){
   const k = getKeys(modo);
   const isNeg = modo==='negocio';
   state.transactions = load(k.tx,[]);
-  state.debts        = load(k.debts,[]);
+  state.deudas       = load(k.deudas,[]);
   state.servicios    = load(k.services, isNeg ? DEFAULT_SERVICES_NEG : DEFAULT_SERVICES);
   state.catsIn       = load(k.catsIn,   isNeg ? DEFAULT_CATS_NEG_IN  : DEFAULT_CATS_IN);
   state.catsEx       = load(k.catsEx,   isNeg ? DEFAULT_CATS_NEG_EX  : DEFAULT_CATS_EX);
   state.prestamos           = load(k.prestamos, []);
-  state.prestamosPersonales = load(k.prestamosPersonales, []);
   state.metas               = load(k.metas, []);
   state.recordatorios       = load('fnz_recordatorios', []);
   state.sonidos             = state._lazyLoaded?.sonidos ? load('fnz_sonidos', {}) : (state.sonidos || {});
@@ -2603,6 +2745,15 @@ function loadStateForModo(modo){
   state.comprasMateriales   = state._lazyLoaded?.comprasMateriales ? load('fnz_compras_mat', []) : (state.comprasMateriales || []);
   state.stockValorGeneral   = load('fnz_stock_valor_general', 0);
 
+  // Intentar migrar datos si existen claves antiguas
+  const oldDebts = load(k.debts, []);
+  const oldPP = load(k.prestamosPersonales, []);
+  if ((oldDebts && oldDebts.length) || (oldPP && oldPP.length)) {
+    state.debts = oldDebts;
+    state.prestamosPersonales = oldPP;
+    migrateDeudas(modo);
+  }
+
   syncDefaultCategoriesForMode(isNeg);
   normalizeBusinessLabelsForState(isNeg);
   if(typeof deudaReconcileAllPaymentTxs === 'function') deudaReconcileAllPaymentTxs({syncSheets:false});
@@ -2613,12 +2764,11 @@ function loadStateForModo(modo){
 function saveAll(){
   const k = getKeys(state.modo);
   save(k.tx,        state.transactions);
-  save(k.debts,     state.debts);
+  save(k.deudas,    state.deudas);
   save(k.services,  state.servicios);
   save(k.catsIn,    state.catsIn);
   save(k.catsEx,    state.catsEx);
   save(k.prestamos,           state.prestamos);
-  save(k.prestamosPersonales, state.prestamosPersonales);
   save(k.metas,               state.metas);
   save('fnz_recordatorios',   state.recordatorios);
   if(state._lazyLoaded?.sonidos) save('fnz_sonidos', state.sonidos);
@@ -3110,9 +3260,9 @@ function deudaEsPorCobrar(d){
 function deudaRol(d){
   return deudaEsPorCobrar(d) ? 'meden' : 'debo';
 }
-const pendingDebts=()=>state.debts.filter(d=>!deudaEsPorCobrar(d)&&d.cuotasPagadas<d.cuotasTotales);
-const totalDebt=()=>state.debts.filter(d=>!deudaEsPorCobrar(d)).reduce((s,d)=>s+(d.cuotasTotales-d.cuotasPagadas)*d.cuotaMonto,0);
-const totalDebtReceivable=()=>state.debts.filter(deudaEsPorCobrar).reduce((s,d)=>s+(d.cuotasTotales-d.cuotasPagadas)*d.cuotaMonto,0);
+const pendingDebts=()=>state.deudas.filter(d=>!deudaEsPorCobrar(d)&&d.cuotasPagadas<d.cuotasTotales);
+const totalDebt=()=>state.deudas.filter(d=>!deudaEsPorCobrar(d)).reduce((s,d)=>s+(d.cuotasTotales-d.cuotasPagadas)*d.cuotaMonto,0);
+const totalDebtReceivable=()=>state.deudas.filter(deudaEsPorCobrar).reduce((s,d)=>s+(d.cuotasTotales-d.cuotasPagadas)*d.cuotaMonto,0);
 const pendingServices=()=>state.servicios.filter(s=>!s.pagado);
 const totalPendingServices=()=>pendingServices().reduce((s,sv)=>s+sv.monto,0);
 const motivationMsg=(r,n)=>r===0?`🎉 ¡Terminaste de pagar ${n}!`:r===1?'🏁 ¡Una cuota más y listo!':r<=3?`🔥 ¡Solo ${r} cuotas más!`:r<=6?`💪 ¡Vas muy bien! Menos de ${r} meses.`:null;
@@ -3348,15 +3498,17 @@ function renderDashboard(){
 
   // Alerta cuotas de deuda próximas
   const hoy=new Date();
-  const deudaUrgente=(state.debts||[]).filter(d=>{
+  const deudaUrgente=(state.deudas||[]).filter(d=>{
     if(d.cuotasPagadas>=d.cuotasTotales) return false;
-    // Si tiene fecha de vencimiento, avisar con 5 días de anticipación
-    if(d.fechaVencimiento){
-      const fv=new Date(d.fechaVencimiento);
-      const diff=Math.ceil((fv-hoy)/(1000*60*60*24));
-      return diff>=0&&diff<=5;
+    if(deudaEsPorCobrar(d)) return false;
+    const dia = d.diaPago || 5;
+    const limitDate = new Date(hoy.getFullYear(), hoy.getMonth(), dia);
+    let targetDate = limitDate;
+    if (limitDate < hoy) {
+      targetDate = new Date(hoy.getFullYear(), hoy.getMonth() + 1, dia);
     }
-    return false;
+    const diff = Math.ceil((targetDate - hoy) / (1000 * 60 * 60 * 24));
+    return diff >= 0 && diff <= 5;
   });
 
   const urgentHtml=urgent.length?`<div class="card pulse" style="border-color:#E0525244;background:#FEF2F2;margin-bottom:12px">
@@ -4408,9 +4560,9 @@ function deudaReconcilePaymentTxs(d, opts = {}){
   });
 }
 function deudaReconcileAllPaymentTxs(opts = {}){
-  if(!Array.isArray(state.debts) || !state.debts.length) return 0;
+  if(!Array.isArray(state.deudas) || !state.deudas.length) return 0;
   let total = 0;
-  state.debts = state.debts.map(d => {
+  state.deudas = state.deudas.map(d => {
     const item = deudaNormalizePagos(d, d);
     total += deudaPagos(item).length;
     deudaReconcilePaymentTxs(item, opts);
@@ -4421,7 +4573,7 @@ function deudaReconcileAllPaymentTxs(opts = {}){
 }
 function deudaSyncFromPaymentTx(tx){
   if(!tx?.origenDeudaPago) return;
-  const d = (state.debts || []).find(x => String(x.id) === String(tx.debtId));
+  const d = (state.deudas || []).find(x => String(x.id) === String(tx.debtId));
   if(!d) return;
   d.pagos = deudaPagos(d);
   const idx = d.pagos.findIndex(p => String(p.id) === String(tx.debtPagoId) || String(p.txId) === String(tx.id));
@@ -4442,7 +4594,7 @@ function deudaSyncFromPaymentTx(tx){
 }
 function deudaUnlinkFromPaymentTx(tx){
   if(!tx?.origenDeudaPago) return;
-  const d = (state.debts || []).find(x => String(x.id) === String(tx.debtId));
+  const d = (state.deudas || []).find(x => String(x.id) === String(tx.debtId));
   if(!d) return;
   d.pagos = deudaPagos(d).filter(p => String(p.id) !== String(tx.debtPagoId) && String(p.txId) !== String(tx.id));
   d.cuotasPagadas = d.pagos.length;
@@ -4461,230 +4613,302 @@ function renderDebtCard(d){
   const done = restantes === 0;
   const porCobrar = deudaEsPorCobrar(d);
   const roleLabel = porCobrar ? 'Me deben' : 'Yo debo';
-  const saldoLabel = porCobrar ? 'por cobrar' : 'por pagar';
-  const actionLabel = porCobrar ? 'Registrar cobro de cuota' : 'Registrar pago de cuota';
-  const dotSize = d.cuotasTotales <= 12 ? 14 : d.cuotasTotales <= 24 ? 11 : 9;
+  const actionLabel = porCobrar ? 'Registrar cobro' : 'Registrar pago';
   const pagos = deudaPagos(d);
-  const last = pagos[pagos.length - 1] || null;
   const next = deudaProximoPago(d);
   const tiempo = deudaEstadoTiempo(d);
-  const expanded = !!(window._debtExpanded && window._debtExpanded[String(d.id)]);
   const id = debtJs(d.id);
-  const dots = Array.from({length: Math.max(0, Math.floor(moneyValue(d.cuotasTotales)))}, (_,i) => {
-    const filled = i < d.cuotasPagadas;
-    const cuotaFecha = debtAddMonths(deudaInicio(d), i, deudaDiaPago(d));
-    return '<div title="Cuota ' + (i + 1) + ' · ' + debtFmtDate(cuotaFecha) + (filled ? ' · Pagada' : ' · Pendiente') + '" style="width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:' + (filled ? d.color : '#FFFFFF') + ';border:2px solid ' + (filled ? d.color : '#CBD5E1') + ';box-shadow:' + (filled ? '0 0 0 3px rgba(84,104,120,.14)' : 'inset 0 0 0 2px #F8FAFC') + ';flex-shrink:0"></div>';
-  }).join('');
-  const rows = [
-    ['Inicio', debtFmtDate(deudaInicio(d))],
-    ['Final', debtFmtDate(deudaFin(d))],
-    ['Proximo', next ? debtFmtDate(next) : 'Completada'],
-    ['Pagado real', fmt(deudaMontoPagado(d))]
-  ].map(r => '<div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:9px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:800">' + r[0] + '</div><div style="font-size:12px;color:var(--text);font-weight:800;margin-top:2px">' + r[1] + '</div></div>').join('');
-  const pagosHtml = pagos.length
-    ? pagos.slice(-3).reverse().map(p => '<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted);padding:5px 0;border-top:1px solid #EEF2F7"><span>' + (porCobrar ? 'Cobro ' : 'Pago ') + debtHtml(p.cuota || '') + ' · ' + debtFmtDate(p.fecha) + '</span><b style="color:var(--text)">' + fmt(p.monto) + '</b></div>').join('')
-    : '<div style="font-size:11px;color:var(--dim);padding-top:6px">Sin pagos registrados todavia</div>';
-  const details = expanded ? '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + rows + '</div><div style="font-size:11px;color:var(--muted);margin-top:9px">Movimientos ligados al balance: ' + pagos.length + '</div>' + pagosHtml + '</div>' : '';
-  const msg = motivationMsg(restantes, d.name);
-  return '<div class="debt-card" onclick="toggleDebtDetails(\'' + id + '\')" style="opacity:' + (done ? '.68' : '1') + ';cursor:pointer">' +
-    '<div class="debt-accent" style="background:' + d.color + '"></div>' +
-    '<div class="debt-body">' +
-      circleProgress(pct,62,5,d.color,'<span style="font-size:10px;font-weight:700">' + pct + '%</span>') +
-      '<div class="debt-info">' +
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
-          '<div><div class="debt-name">' + debtHtml(d.name) + '</div><div class="debt-cat"><span style="color:' + (porCobrar ? '#047857' : '#B91C1C') + ';font-weight:900">' + roleLabel + '</span> · ' + debtHtml(d.tipo || d.categoria || 'Deuda') + ' · mensual dia ' + deudaDiaPago(d) + '</div><div style="display:inline-flex;margin-top:5px;padding:4px 8px;border-radius:999px;background:' + tiempo.bg + ';color:' + tiempo.color + ';font-size:10px;font-weight:900;border:1px solid ' + tiempo.color + '33">' + tiempo.label + '</div></div>' +
-          '<div class="debt-pending"><div class="debt-pending-amt" style="color:' + (porCobrar ? '#047857' : d.color) + '">' + (done ? 'Completada' : fmt(pendiente)) + '</div>' + (!done ? '<div class="debt-pending-lbl">' + saldoLabel + '</div>' : '') + '</div>' +
-        '</div>' +
-        '<div class="debt-next-main ' + (done ? 'ok' : '') + '" style="border-left-color:' + (done ? '#059669' : d.color) + '">' +
-          '<div class="debt-next-label">' + appIcon('calendar') + '<span>Proximo pago</span></div>' +
-          '<div class="debt-next-date">' + (next ? debtFmtDate(next) : 'Completada') + '</div>' +
-          '<div style="font-size:10px;color:' + tiempo.color + ';font-weight:850;margin-top:3px">' + tiempo.detail + '</div>' +
-        '</div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px">' +
-          '<div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:7px"><div style="font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase">Inicio</div><div style="font-size:11px;color:var(--text);font-weight:900">' + debtFmtDate(deudaInicio(d)) + '</div></div>' +
-          '<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:7px"><div style="font-size:8px;color:#9A3412;font-weight:900;text-transform:uppercase">Proximo</div><div style="font-size:11px;color:#9A3412;font-weight:900">' + (next ? debtFmtDate(next) : 'Listo') + '</div></div>' +
-          '<div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:7px"><div style="font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase">Final</div><div style="font-size:11px;color:var(--text);font-weight:900">' + debtFmtDate(deudaFin(d)) + '</div></div>' +
-        '</div>' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:11px;gap:8px"><span style="font-size:10px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.02em">Cuotas</span><span style="font-size:11px;color:var(--text);font-weight:900">' + d.cuotasPagadas + '/' + d.cuotasTotales + '</span></div>' +
-        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;align-items:center;padding:8px;background:#F8FAFC;border:1px solid var(--border);border-radius:9px">' + dots + '</div>' +
-        '<div class="cuotas-meta"><span><span style="color:var(--gold);font-weight:800">' + d.cuotasPagadas + '</span> pagadas · <span style="color:var(--red);font-weight:800">' + restantes + '</span> pendientes</span><span>' + fmt(d.cuotaMonto) + '/mes</span></div>' +
-      '</div>' +
+  return '<div style="opacity:' + (done ? '.65' : '1') + '">' +
+    '<div class="deuda-detail-grid">' +
+      '<div class="deuda-detail-box"><div class="label">Inicio</div><div class="value">' + debtFmtDate(deudaInicio(d)) + '</div></div>' +
+      '<div class="deuda-detail-box" style="background:#FFF7ED;border-color:#FED7AA"><div class="label" style="color:#9A3412">Próximo</div><div class="value" style="color:#9A3412">' + (next ? debtFmtDate(next) : 'Listo') + '</div></div>' +
+      '<div class="deuda-detail-box"><div class="label">Final</div><div class="value">' + debtFmtDate(deudaFin(d)) + '</div></div>' +
     '</div>' +
-    (msg ? '<div class="motivation">' + debtHtml(msg) + '</div>' : '') +
-    details +
-    '<div style="display:flex;gap:6px;margin-top:12px" onclick="event.stopPropagation()">' +
-      (!done ? '<button onclick="pagarCuota(\'' + id + '\')" style="flex:1;background:' + (porCobrar ? '#047857' : d.color) + ';border:1px solid ' + (porCobrar ? '#047857' : d.color) + ';color:#FFFFFF;border-radius:8px;padding:9px;font-family:\'DM Sans\',sans-serif;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 8px 18px rgba(84,104,120,.18)">' + actionLabel + '</button>' : '') +
-      '<button onclick="openEditDebt(\'' + id + '\')" style="width:36px;height:36px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:13px">✎</button>' +
-      '<button onclick="deleteDebt(\'' + id + '\')" style="width:36px;height:36px;background:none;border:none;color:#E0525266;cursor:pointer;font-size:14px">X</button>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><span style="font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase">Cuotas</span><span style="font-size:11px;color:var(--text);font-weight:900">' + d.cuotasPagadas + '/' + d.cuotasTotales + '</span></div>' +
+    '<div class="deuda-dots">' + Array.from({length: Math.min(48, Math.max(0, Math.floor(moneyValue(d.cuotasTotales))))}, (_,i) => {
+      const filled = i < d.cuotasPagadas;
+      const sz = d.cuotasTotales <= 12 ? 13 : d.cuotasTotales <= 24 ? 10 : 8;
+      return '<div style="width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:' + (filled ? d.color : '#fff') + ';border:2px solid ' + (filled ? d.color : '#CBD5E1') + ';flex-shrink:0"></div>';
+    }).join('') + '</div>' +
+    '<div class="deuda-cuotas-info"><span><span style="color:var(--gold);font-weight:800">' + d.cuotasPagadas + '</span> pagadas · <span style="color:var(--red);font-weight:800">' + restantes + '</span> pendientes</span><span>' + fmt(d.cuotaMonto) + '/mes</span></div>' +
+    '<div style="display:flex;gap:6px;margin-top:10px">' +
+      (!done ? '<button onclick="event.stopPropagation();pagarCuota(\'' + id + '\')" style="flex:1;background:' + (porCobrar ? '#047857' : d.color) + ';border:none;color:#fff;border-radius:10px;padding:10px;font-family:\'DM Sans\',sans-serif;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.15)">' + actionLabel + '</button>' : '') +
+      '<button onclick="event.stopPropagation();openEditDebt(\'' + id + '\')" style="width:36px;height:36px;background:#F8FAFC;border:1px solid var(--border);color:var(--muted);border-radius:10px;cursor:pointer;font-size:13px">✎</button>' +
+      '<button onclick="event.stopPropagation();deleteDebt(\'' + id + '\')" style="width:36px;height:36px;background:#FEF2F2;border:1px solid #FECACA;color:#E05252;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700">✕</button>' +
     '</div>' +
   '</div>';
 }
 
+function renderPPExpandedDetail(p){
+  const total = Math.max(0, Math.floor(moneyValue(p.plazo)));
+  const paid = ppCuotasPagadas(p);
+  const restantes = Math.max(0, total - paid);
+  const done = p.capitalPendiente <= 0 || paid >= total;
+  const porCobrar = p.tipo === 'meden';
+  const next = ppProximoPago(p);
+  const tabla = calcTablaAmort(moneyValue(p.capital), moneyValue(p.tasaMensual), Math.max(1, total), p.sistema || 'solo_interes');
+  const cuotaRow = tabla[paid] || tabla[tabla.length-1] || {interes:0, capitalMes:0, cuota:0};
+  const totalIntPagado = (p.pagos||[]).reduce((s,pg) => s + moneyValue(pg.montoInteres), 0);
+  const dotColor = porCobrar ? '#047857' : '#9B59B6';
+  const id = p.id;
+  return '<div style="opacity:' + (done ? '.65' : '1') + '">' +
+    '<div class="deuda-detail-grid">' +
+      '<div class="deuda-detail-box"><div class="label">Inicio</div><div class="value">' + debtFmtDate(ppInicio(p)) + '</div></div>' +
+      '<div class="deuda-detail-box" style="background:#FAF5FF;border-color:#E9D5FF"><div class="label" style="color:#6C3483">Próximo</div><div class="value" style="color:#6C3483">' + (next ? debtFmtDate(next) : 'Listo') + '</div></div>' +
+      '<div class="deuda-detail-box"><div class="label">Final</div><div class="value">' + debtFmtDate(ppFin(p)) + '</div></div>' +
+    '</div>' +
+    (!done ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">' +
+      '<div style="background:#FEF2F2;border-radius:8px;padding:7px;text-align:center"><div style="font-size:8px;color:#A32D2D;text-transform:uppercase;font-weight:900">Interés/mes</div><div style="font-size:13px;font-weight:700;color:#C62828">' + fmt(cuotaRow.interes) + '</div></div>' +
+      '<div style="background:#FFF3E0;border-radius:8px;padding:7px;text-align:center"><div style="font-size:8px;color:#E65100;text-transform:uppercase;font-weight:900">Total int. pagado</div><div style="font-size:13px;font-weight:700;color:#E65100">' + fmt(totalIntPagado) + '</div></div>' +
+    '</div>' +
+    '<div style="background:#F3F0FF;border-radius:8px;padding:8px;margin-top:6px;display:flex;justify-content:space-between;align-items:center">' +
+      '<div><div style="font-size:8px;color:#6C3483;text-transform:uppercase;font-weight:900">Cuota del mes</div><div style="font-size:14px;font-weight:800;color:#6C3483">' + fmt(cuotaRow.cuota) + '</div></div>' +
+      '<div style="text-align:right;font-size:10px"><div style="color:#9B59B6">' + fmt(cuotaRow.interes) + ' interés</div><div style="color:#2A4455">+ ' + fmt(cuotaRow.capitalMes) + ' capital</div></div>' +
+    '</div>' : '<div style="background:#ECFDF5;border:1px solid #BBF7D0;border-radius:8px;padding:8px;text-align:center;margin-top:8px;font-size:12px;color:#047857;font-weight:700">🎉 Saldado · Int. pagado: ' + fmt(totalIntPagado) + '</div>') +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span style="font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase">Cuotas</span><span style="font-size:11px;color:var(--text);font-weight:900">' + paid + '/' + total + '</span></div>' +
+    '<div class="deuda-dots">' + Array.from({length: Math.min(48, total)}, (_,i) => {
+      const sz = total <= 12 ? 13 : total <= 24 ? 10 : 8;
+      return '<div style="width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:' + (i < paid ? dotColor : '#fff') + ';border:2px solid ' + (i < paid ? dotColor : '#CBD5E1') + ';flex-shrink:0"></div>';
+    }).join('') + '</div>' +
+    '<div class="deuda-cuotas-info"><span><span style="color:#9B59B6;font-weight:800">' + paid + '</span> pagadas · <span style="color:var(--red);font-weight:800">' + restantes + '</span> pendientes</span><span>de ' + total + '</span></div>' +
+    '<div style="font-size:10px;color:#6C3483;margin-top:4px;font-weight:600">' + {solo_interes:'Solo interés mensual',frances:'Cuota fija (francés)',aleman:'Capital fijo (alemán)'}[p.sistema||'solo_interes'] + ' · ' + p.tasaMensual + '% mensual</div>' +
+    (p.notas ? '<div style="font-size:10px;color:var(--muted);margin-top:4px;padding:5px 8px;background:#F8FAFC;border-radius:6px">' + debtHtml(p.notas) + '</div>' : '') +
+    '<div style="display:flex;gap:6px;margin-top:10px">' +
+      (!done ? '<button onclick="event.stopPropagation();pagarPrestPers(\'' + id + '\')" style="flex:1;background:linear-gradient(135deg,#6C3483,#9B59B6);border:none;color:#fff;border-radius:10px;padding:10px;font-family:\'DM Sans\',sans-serif;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(108,52,131,.25)">Registrar pago</button>' : '') +
+      '<button onclick="event.stopPropagation();editPrestPers(\'' + id + '\')" style="width:36px;height:36px;background:#F8FAFC;border:1px solid var(--border);color:var(--muted);border-radius:10px;cursor:pointer;font-size:13px">✎</button>' +
+      '<button onclick="event.stopPropagation();deletePrestPers(\'' + id + '\')" style="width:36px;height:36px;background:#FEF2F2;border:1px solid #FECACA;color:#E05252;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700">✕</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function toggleDeudaDetail(source, id){
+  window._debtExpanded = window._debtExpanded || {};
+  const key = source + '_' + id;
+  window._debtExpanded[key] = !window._debtExpanded[key];
+  render();
+}
+
+function openDeudaMenu(){
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title" style="color:var(--text)">Agregar Deuda</div>
+    <div style="display:grid;gap:10px;margin-top:6px">
+      <button onclick="closeModal();openAddDebt()" style="display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;background:#F8FAFC;border:1px solid var(--border);border-radius:14px;cursor:pointer;text-align:left;transition:border-color .2s" onmouseover="this.style.borderColor='#2E86AB'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#2E86AB,#3D9EC9);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🏦</div>
+        <div><div style="font-size:14px;font-weight:800;color:var(--text);font-family:'DM Sans',sans-serif">Banco / Tarjeta / Otro</div><div style="font-size:11px;color:var(--muted);margin-top:2px">Crédito bancario, hipoteca, tarjeta de crédito, factura recurrente</div></div>
+      </button>
+      <button onclick="closeModal();openAddPrestPers()" style="display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;background:#F8FAFC;border:1px solid var(--border);border-radius:14px;cursor:pointer;text-align:left;transition:border-color .2s" onmouseover="this.style.borderColor='#9B59B6'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#6C3483,#9B59B6);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">👤</div>
+        <div><div style="font-size:14px;font-weight:800;color:var(--text);font-family:'DM Sans',sans-serif">Préstamo Personal</div><div style="font-size:11px;color:var(--muted);margin-top:2px">Con interés mensual, capital, sistema de amortización</div></div>
+      </button>
+    </div>
+    <button class="btn-ghost" onclick="closeModal()" style="width:100%;margin-top:10px">Cancelar</button>`;
+  showModal();
+}
+
 function renderDeudas(){
-  const debts=state.debts||[];
-  const prestPers=state.prestamosPersonales||[];
-  const payableDebts=debts.filter(d=>!deudaEsPorCobrar(d));
-  const receivableDebts=debts.filter(deudaEsPorCobrar);
-  const total=payableDebts.reduce((s,d)=>s+Math.max(0, moneyValue(d.cuotasTotales)-moneyValue(d.cuotasPagadas))*moneyValue(d.cuotaMonto),0);
-  const totalReceivable=receivableDebts.reduce((s,d)=>s+Math.max(0, moneyValue(d.cuotasTotales)-moneyValue(d.cuotasPagadas))*moneyValue(d.cuotaMonto),0);
-  const totalPaid=payableDebts.reduce((s,d)=>s+deudaMontoPagado(d),0);
-  const grandTotal=total+totalPaid;
-  const pctPaid=grandTotal>0?Math.round((totalPaid/grandTotal)*100):0;
+  window._deudaTab = window._deudaTab || 'pendientes';
+  const debts = (state.deudas || []).filter(d => d.tipo !== 'prestamo_personal');
+  const prestPers = (state.deudas || []).filter(d => d.tipo === 'prestamo_personal');
+  const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const MESES3 = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
-  // Calcular cuota préstamo personal (sistema francés)
-  function calcCuota(capital, tasaMensual, plazo){
-    if(!tasaMensual) return capital/plazo;
-    const r=tasaMensual/100;
-    return parseFloat((capital*r*Math.pow(1+r,plazo)/(Math.pow(1+r,plazo)-1)).toFixed(2));
+  // ── Build unified list ──
+  const unified = [];
+
+  debts.forEach(d => {
+    const dd = deudaNormalizePagos({...d}, d);
+    const total = Math.max(0, Math.floor(moneyValue(dd.cuotasTotales)));
+    const paid = Math.max(0, Math.floor(moneyValue(dd.cuotasPagadas)));
+    const restantes = Math.max(0, total - paid);
+    const porCobrar = deudaEsPorCobrar(dd);
+    const next = deudaProximoPago(dd);
+    const estado = deudaEstadoTiempo(dd);
+    unified.push({
+      source:'debt', id:dd.id, name:dd.name||'Sin nombre',
+      tipo:dd.tipo||'Banco', tipoLabel:(porCobrar?'Me deben · ':'') + (dd.tipo||'Banco'),
+      cuotaMonto:moneyValue(dd.cuotaMonto), pendiente:restantes*moneyValue(dd.cuotaMonto),
+      cuotasTotales:total, cuotasPagadas:paid, restantes, porCobrar,
+      next, estado, pct:total>0?Math.round((paid/total)*100):0,
+      diaPago:deudaDiaPago(dd), color:dd.color||'#2E86AB',
+      done:restantes===0, data:dd
+    });
+  });
+
+  prestPers.forEach(p => {
+    const total = Math.max(0, Math.floor(moneyValue(p.plazo)));
+    const paid = ppCuotasPagadas(p);
+    const restantes = Math.max(0, total - paid);
+    const porCobrar = p.tipo === 'meden';
+    const next = ppProximoPago(p);
+    const estado = ppEstadoTiempo(p);
+    const tabla = calcTablaAmort(moneyValue(p.capital), moneyValue(p.tasaMensual), Math.max(1,total), p.sistema||'solo_interes');
+    const cuotaRow = tabla[paid] || tabla[tabla.length-1] || {cuota:0};
+    unified.push({
+      source:'pp', id:p.id, name:p.nombre||'Sin nombre',
+      tipo:'Personal', tipoLabel:(porCobrar?'Me deben · ':'') + 'Personal · ' + p.tasaMensual + '%',
+      cuotaMonto:cuotaRow.cuota||0, pendiente:moneyValue(p.capitalPendiente),
+      cuotasTotales:total, cuotasPagadas:paid, restantes, porCobrar,
+      next, estado, pct:total>0?Math.round((paid/total)*100):0,
+      diaPago:ppDiaPago(p), color:'#9B59B6',
+      done:p.capitalPendiente<=0||paid>=total, data:p
+    });
+  });
+
+  // ── Split pending / completed ──
+  const pending = unified.filter(u => !u.done);
+  const completed = unified.filter(u => u.done);
+
+  // ── Totals ──
+  const totalPorPagar = pending.filter(u=>!u.porCobrar).reduce((s,u)=>s+u.pendiente,0);
+  const totalPorCobrar = pending.filter(u=>u.porCobrar).reduce((s,u)=>s+u.pendiente,0);
+  const totalPaidAmt = unified.filter(u=>!u.porCobrar).reduce((s,u) => {
+    if(u.source==='debt') return s+deudaMontoPagado(u.data);
+    return s+(moneyValue(u.data.capital)-moneyValue(u.data.capitalPendiente));
+  },0);
+  const grand = totalPorPagar + totalPaidAmt;
+  const pctG = grand>0?Math.round((totalPaidAmt/grand)*100):0;
+  const atrasadas = pending.filter(u=>u.estado.tone==='bad').length;
+
+  // ── Group pending by month of next payment ──
+  const groups = {};
+  pending.forEach(u => {
+    const f = u.next || todayStr();
+    const key = f.slice(0,7);
+    if(!groups[key]) groups[key] = {items:[], total:0};
+    groups[key].items.push(u);
+    groups[key].total += u.cuotaMonto;
+    const mm = parseInt(key.slice(5,7))-1;
+    groups[key].label = MESES[mm] + ', ' + key.slice(0,4);
+  });
+  const sortedKeys = Object.keys(groups).sort();
+
+  // ── Render PENDING ──
+  let pendH = '';
+  if(!sortedKeys.length){
+    pendH = '<div style="text-align:center;color:var(--dim);padding:28px 0;font-size:13px">🎉 Sin deudas pendientes</div>';
+  } else {
+    sortedKeys.forEach(key => {
+      const g = groups[key];
+      g.items.sort((a,b) => {
+        const da = String(a.next||'').slice(8,10);
+        const db = String(b.next||'').slice(8,10);
+        return da.localeCompare(db);
+      });
+      pendH += '<div class="deuda-month"><span class="deuda-month-label">' + debtHtml(g.label) + '</span><span class="deuda-month-total">' + fmt(g.total) + '</span></div>';
+      g.items.forEach(u => {
+        const exKey = u.source + '_' + u.id;
+        const expanded = !!(window._debtExpanded && window._debtExpanded[exKey]);
+        const f = u.next || todayStr();
+        const day = f.slice(8,10);
+        const mm = parseInt(f.slice(5,7))-1;
+        const mon = MESES3[mm] || '';
+        const badgeCls = u.estado.tone==='bad'?'atrasado':u.estado.tone==='warn'?(u.estado.days===0?'hoy':'proximo'):'aldia';
+        const amtColor = u.porCobrar?'#047857':(u.estado.tone==='bad'?'#B91C1C':'var(--text)');
+        const bdrColor = u.estado.tone==='bad'?'#FECACA':'var(--border)';
+        const leftBdr = 'border-left:3px solid ' + u.color + ';';
+
+        pendH += '<div class="deuda-row" style="border-color:' + bdrColor + '" onclick="toggleDeudaDetail(\'' + u.source + '\',\'' + debtJs(u.id) + '\')">' +
+          '<div class="deuda-row-date" style="' + leftBdr + 'border-radius:14px 0 0 14px"><span class="deuda-row-day">' + day + '</span><span class="deuda-row-mon">' + mon + '</span></div>' +
+          '<div class="deuda-row-body">' +
+            '<div class="deuda-row-left"><div class="deuda-row-name">' + debtHtml(u.name) + '</div><div class="deuda-row-cat">' + debtHtml(u.tipoLabel) + '</div></div>' +
+            '<div class="deuda-row-right"><div class="deuda-row-amt" style="color:' + amtColor + '">' + fmt(u.cuotaMonto) + '</div><div class="deuda-badge ' + badgeCls + '">' + u.estado.label + '</div></div>' +
+          '</div></div>';
+
+        if(expanded){
+          pendH += '<div class="deuda-expanded">';
+          pendH += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+            '<div><div style="font-size:14px;font-weight:800;color:var(--text)">' + debtHtml(u.name) + '</div>' +
+            '<div style="font-size:10px;color:var(--muted);margin-top:2px">' + debtHtml(u.tipoLabel) + ' · dia ' + u.diaPago + '</div></div>' +
+            '<div style="text-align:right"><div style="font-size:16px;font-weight:900;color:' + u.color + '">' + (u.done?'✓':'') + fmt(u.pendiente) + '</div><div style="font-size:9px;color:var(--muted)">' + (u.porCobrar?'por cobrar':'por pagar') + '</div></div>' +
+          '</div>';
+          pendH += '<div style="background:#F1F5F9;border-radius:8px;padding:6px 10px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+            '<span style="font-size:10px;color:var(--muted);font-weight:800">Progreso</span>' +
+            '<span style="font-size:11px;font-weight:900;color:' + u.color + '">' + u.pct + '%</span></div>' +
+            '<div class="progress-bar" style="margin-top:0;height:5px"><div class="progress-fill" style="width:' + u.pct + '%;background:' + u.color + '"></div></div>';
+          if(u.source==='debt') pendH += renderDebtCard(u.data);
+          else pendH += renderPPExpandedDetail(u.data);
+          pendH += '</div>';
+        }
+      });
+    });
   }
-  function calcMesActual(p){
-    const r=p.tasaMensual/100;
-    const interes=parseFloat((p.capitalPendiente*r).toFixed(2));
-    const sistema=p.sistema||'solo_interes';
-    const pagosHechos=(p.pagos||[]).length;
-    const esUltimoMes=(pagosHechos===p.plazo-1);
-    let capitalMes, cuota;
-    if(sistema==='solo_interes'){
-      // Solo interés cada mes, capital al final
-      capitalMes = esUltimoMes ? p.capitalPendiente : 0;
-      cuota = parseFloat((interes + capitalMes).toFixed(2));
-    } else if(sistema==='aleman'){
-      // Capital fijo
-      capitalMes = parseFloat((p.capital/p.plazo).toFixed(2));
-      if(esUltimoMes) capitalMes = p.capitalPendiente;
-      cuota = parseFloat((interes + capitalMes).toFixed(2));
-    } else {
-      // Francés — cuota fija
-      cuota = calcCuota(p.capital, p.tasaMensual, p.plazo);
-      capitalMes = parseFloat((cuota - interes).toFixed(2));
-    }
-    return {interes, capitalMes, cuota};
+
+  // ── Render PAGADAS ──
+  let pagH = '';
+  const pagoTxs = (state.transactions||[]).filter(t =>
+    (t.origenDeudaPago||t.origenPrestamoPersonalPago) && (t.type==='egreso'||t.type==='ingreso')
+  ).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,40);
+
+  if(completed.length){
+    pagH += '<div style="font-size:11px;font-weight:800;color:var(--gold);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">✅ Deudas completadas (' + completed.length + ')</div>';
+    completed.forEach(u => {
+      const totalPagado = u.source==='debt' ? deudaMontoPagado(u.data) : moneyValue(u.data.capital);
+      pagH += '<div class="deuda-pagada-row"><div class="deuda-pagada-check">✓</div>' +
+        '<div class="deuda-pagada-info"><div class="deuda-pagada-name">' + debtHtml(u.name) + '</div><div class="deuda-pagada-detail">' + u.cuotasTotales + ' cuotas · ' + debtHtml(u.tipo) + '</div></div>' +
+        '<div class="deuda-pagada-amt">' + fmt(totalPagado) + '</div></div>';
+    });
   }
 
-  const debtCards = debts.length===0
-    ? `<div class="card" style="text-align:center;color:var(--dim);padding:20px 0;font-size:13px">Sin deudas registradas</div>`
-    : debts.map(renderDebtCard).join('');
+  if(pagoTxs.length){
+    pagH += '<div style="font-size:11px;font-weight:800;color:var(--blue);margin:' + (completed.length?'14':'0') + 'px 0 8px;text-transform:uppercase;letter-spacing:.04em">📋 Historial de pagos (' + pagoTxs.length + ')</div>';
+    // Group payment txs by month
+    const ptGroups = {};
+    pagoTxs.forEach(tx => {
+      const k = (tx.date||'').slice(0,7);
+      if(!ptGroups[k]) ptGroups[k] = [];
+      ptGroups[k].push(tx);
+    });
+    Object.keys(ptGroups).sort().reverse().forEach(k => {
+      const mm = parseInt(k.slice(5,7))-1;
+      const lbl = MESES[mm] + ', ' + k.slice(0,4);
+      pagH += '<div style="font-size:10px;font-weight:800;color:var(--muted);text-transform:capitalize;padding:8px 0 4px;border-bottom:1px solid var(--border)">' + lbl + '</div>';
+      ptGroups[k].forEach(tx => {
+        const nm = deudaTxNombre(tx)||tx.description||'Pago';
+        const ci = tx.cuotaNumero?' · cuota '+tx.cuotaNumero:'';
+        const isIn = tx.type==='ingreso';
+        pagH += '<div class="deuda-pagada-row">' +
+          '<div class="deuda-pagada-check" style="background:' + (isIn?'#ECFDF5':'#EFF6FF') + ';border-color:' + (isIn?'#A7F3D0':'#BFDBFE') + ';color:' + (isIn?'#047857':'#2563EB') + '">✓</div>' +
+          '<div class="deuda-pagada-info"><div class="deuda-pagada-name">' + debtHtml(nm) + ci + '</div><div class="deuda-pagada-detail">' + debtFmtDate(tx.date) + '</div></div>' +
+          '<div class="deuda-pagada-amt" style="color:' + (isIn?'#047857':'#2563EB') + '">' + fmt(tx.amount) + '</div></div>';
+      });
+    });
+  }
 
-  const ppCards = prestPers.length===0
-    ? `<div class="card" style="text-align:center;color:var(--dim);padding:20px 0;font-size:13px">Sin préstamos personales</div>`
-    : prestPers.map(p=>{
-      const {interes,capitalMes,cuota}=calcMesActual(p);
-      const totalIntPagado=parseFloat((p.pagos||[]).reduce((s,pg)=>s+moneyValue(pg.montoInteres),0).toFixed(2));
-      const pagosH=ppCuotasPagadas(p);
-      const pct=p.plazo>0?Math.round((pagosH/p.plazo)*100):0;
-      const done=p.capitalPendiente<=0 || pagosH>=p.plazo;
-      const restantes=Math.max(0,p.plazo-pagosH);
-      const ppNext=ppProximoPago(p);
-      const ppFinal=ppFin(p);
-      const ppEstado=ppEstadoTiempo(p);
-      const ppDotTotal=Math.max(0, Math.min(36, Math.floor(moneyValue(p.plazo)||0)));
-      const ppDotColor=p.tipo==='meden'?'#047857':'#9B59B6';
-      const ppDots=Array.from({length:ppDotTotal},(_,i)=>{
-        const fechaCuota = ppPagoFecha(p, i + 1);
-        return '<span title="Cuota '+(i+1)+' · '+debtFmtDate(fechaCuota)+(i<pagosH?' · Pagada':' · Pendiente')+'" style="width:'+(ppDotTotal>24?8:ppDotTotal>12?10:12)+'px;height:'+(ppDotTotal>24?8:ppDotTotal>12?10:12)+'px;border-radius:50%;display:inline-block;background:'+(i<pagosH?ppDotColor:'#FFFFFF')+';border:2px solid '+(i<pagosH?ppDotColor:'#CBD5E1')+'"></span>';
-      }).join('');
-      return `<div class="debt-card" style="border-color:${done?'#54687833':'var(--border)'}">
-        <div class="debt-accent" style="background:${done?'var(--gold)':'#9B59B6'}"></div>
-        <!-- Fila 1: círculo + nombre + monto -->
-        <div class="debt-body">
-          ${circleProgress(pct,62,5,done?'var(--gold)':'#9B59B6',`<span style="font-size:10px;font-weight:700">${pct}%</span>`)}
-          <div class="debt-info">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start">
-              <div>
-                <div class="debt-name">${p.nombre}</div>
-                <div class="debt-cat">${p.tipo==='debo'?'Yo debo':'Me deben'} · ${p.tasaMensual}% mensual · dia ${ppDiaPago(p)}</div>
-                <div style="font-size:11px;color:#9B59B6;margin-top:2px;font-weight:500">${{solo_interes:'Solo interés mensual',frances:'Cuota fija (francés)',aleman:'Capital fijo (alemán)'}[p.sistema||'solo_interes']}</div>
-                <div style="display:inline-flex;margin-top:5px;padding:4px 8px;border-radius:999px;background:${ppEstado.bg};color:${ppEstado.color};font-size:10px;font-weight:900;border:1px solid ${ppEstado.color}33">${ppEstado.label}</div>
-                ${p.notas?`<div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.35">${debtHtml(p.notas)}</div>`:''}
-              </div>
-              <div class="debt-pending">
-                <div class="debt-pending-amt" style="color:${done?'var(--gold)':'#9B59B6'}">${done?'✓ Saldado':fmt(p.capitalPendiente)}</div>
-                ${!done?`<div class="debt-pending-lbl">capital pendiente</div>`:''}
-              </div>
-            </div>
-            <div class="debt-next-main ${done?'ok':''}" style="border-left-color:${done?'#059669':ppDotColor};background:${done?'#ECFDF5':'#FAF5FF'};border-color:${done?'#BBF7D0':'#E9D5FF'};margin-top:10px">
-              <div class="debt-next-label" style="color:${done?'#047857':'#6C3483'}">${appIcon('calendar')}<span>Proximo pago</span></div>
-              <div class="debt-next-date" style="color:${done?'#047857':'#6C3483'}">${done?'Completado':(ppNext?debtFmtDate(ppNext):'Sin fecha')}</div>
-              <div style="font-size:10px;color:${ppEstado.color};font-weight:850;margin-top:3px">${ppEstado.detail}</div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px">
-              <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:7px"><div style="font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase">Inicio</div><div style="font-size:11px;color:var(--text);font-weight:900">${debtFmtDate(ppInicio(p))}</div></div>
-              <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:7px"><div style="font-size:8px;color:#9A3412;font-weight:900;text-transform:uppercase">Proximo</div><div style="font-size:11px;color:#9A3412;font-weight:900">${ppNext?debtFmtDate(ppNext):'Listo'}</div></div>
-              <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:7px"><div style="font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase">Final</div><div style="font-size:11px;color:var(--text);font-weight:900">${debtFmtDate(ppFinal)}</div></div>
-            </div>
-            <!-- Cuotas -->
-            <div class="cuotas-meta" style="margin-top:8px">
-              <span><span style="color:#9B59B6;font-weight:600">${pagosH}</span> pagadas · <span style="color:var(--red);font-weight:600">${restantes}</span> restantes</span>
-              <span style="color:var(--muted)">de ${p.plazo} cuotas</span>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;align-items:center;padding:8px;background:#F8FAFC;border:1px solid var(--border);border-radius:9px">${ppDots}</div>
-          </div>
-        </div>
-        <!-- Fila 2: cajas de montos (ancho completo) -->
-        ${done
-          ?`<div style="background:#EBF1F5;border:1px solid #54687833;border-radius:8px;padding:8px;margin-top:10px;text-align:center;font-size:12px;color:var(--gold);font-weight:600">🎉 Préstamo cancelado · Total pagado en intereses: ${fmt(totalIntPagado)}</div>`
-          :`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px">
-              <div style="background:#FEF2F2;border-radius:8px;padding:8px;text-align:center">
-                <div style="font-size:9px;color:#A32D2D;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Interés del mes</div>
-                <div style="font-size:14px;font-weight:600;color:#C62828">${fmt(interes)}</div>
-              </div>
-              <div style="background:#FFF3E0;border-radius:8px;padding:8px;text-align:center">
-                <div style="font-size:9px;color:#E65100;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total interés pagado</div>
-                <div style="font-size:14px;font-weight:600;color:#E65100">${fmt(totalIntPagado)}</div>
-              </div>
-            </div>
-            <div style="background:#F3F0FF;border-radius:8px;padding:8px;margin-top:6px;display:flex;justify-content:space-between;align-items:center">
-              <div>
-                <div style="font-size:9px;color:#6C3483;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Cuota del mes (interés + capital)</div>
-                <div style="font-size:15px;font-weight:700;color:#6C3483">${fmt(cuota)}</div>
-              </div>
-              <div style="text-align:right">
-                <div style="font-size:10px;color:#9B59B6">${fmt(interes)} interés</div>
-                <div style="font-size:10px;color:#2A4455">+ ${fmt(capitalMes)} capital</div>
-              </div>
-            </div>`}
-        <!-- Botones -->
-        <div style="display:flex;gap:6px;margin-top:12px">
-          ${!done?`<button onclick="pagarPrestPers('${p.id}')" style="flex:1;background:#F3F0FF;border:1px solid #9B59B644;color:#6C3483;border-radius:8px;padding:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">✓ Registrar pago</button>`:''}
-          <button onclick="editPrestPers('${p.id}')" style="width:36px;height:36px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:13px" title="Editar">✎</button>
-          <button onclick="deletePrestPers('${p.id}')" style="width:36px;height:36px;background:#FEF2F2;border:1px solid #E0525244;color:#E05252;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700" title="Eliminar">✕</button>
-        </div>
-      </div>`;
-    }).join('');
+  if(!completed.length && !pagoTxs.length){
+    pagH = '<div style="text-align:center;color:var(--dim);padding:28px 0;font-size:13px">Sin pagos registrados todavía</div>';
+  }
 
+  // ── MAIN RETURN ──
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold)">Deudas</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-family:'DM Sans',sans-serif;font-size:18px;font-weight:800;color:var(--text)">💰 Mis Deudas</div>
+      <div style="font-size:11px;color:var(--muted);font-weight:600">${pending.length} pendiente(s) · ${completed.length} completada(s)</div>
     </div>
 
-    <!-- Resumen general -->
-    <div class="summary-card" style="background:linear-gradient(135deg,#EFF6FF,#F8FAFC);border:1px solid #2E86AB33;margin-bottom:16px">
-      <div class="summary-label" style="color:#2E86AB88">Total por pagar</div>
-      <div class="summary-amount" style="color:var(--blue)">${fmt(total)}</div>
-      <div class="summary-detail">${payableDebts.length} por pagar · ${receivableDebts.length ? fmt(totalReceivable)+' por cobrar · ' : ''}${prestPers.length} personal(es)</div>
-      <div style="margin-top:12px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-          <span style="font-size:11px;color:var(--muted)">Progreso general</span>
-          <span style="font-size:11px;color:var(--blue)">${pctPaid}% pagado</span>
+    <div class="summary-card" style="background:linear-gradient(135deg,#0F172A,#1E293B);border:none;margin-bottom:14px">
+      <div class="summary-label" style="color:#94A3B8">Total por pagar</div>
+      <div class="summary-amount" style="color:#F8FAFC;font-size:28px">${fmt(totalPorPagar)}</div>
+      <div class="summary-detail" style="color:#64748B">${pending.filter(u=>!u.porCobrar).length} deuda(s) activa(s)${totalPorCobrar>0?' · <span style="color:#34D399">'+fmt(totalPorCobrar)+' por cobrar</span>':''}${atrasadas?' · <span style="color:#F87171">'+atrasadas+' atrasada(s)</span>':''}</div>
+      <div style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:10px;color:#94A3B8">Progreso general</span>
+          <span style="font-size:10px;color:#60A5FA">${pctG}% pagado</span>
         </div>
-        <div class="progress-bar"><div class="progress-fill" style="width:${pctPaid}%;background:linear-gradient(90deg,var(--blue),#5BA3C9)"></div></div>
+        <div class="progress-bar" style="background:#334155"><div class="progress-fill" style="width:${pctG}%;background:linear-gradient(90deg,#3B82F6,#60A5FA)"></div></div>
       </div>
     </div>
 
-    <!-- SECCIÓN 1: Banco / Tarjeta -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div style="font-size:13px;font-weight:600;color:var(--blue)">🏦 Banco / Tarjeta</div>
-      <button class="btn-ghost" style="border-color:#2E86AB44;color:var(--blue);padding:6px 12px;font-size:12px" onclick="openAddDebt()">＋ Agregar</button>
+    <div class="deuda-tabs">
+      <button class="deuda-tab ${window._deudaTab==='pendientes'?'active':''}" onclick="window._deudaTab='pendientes';render()">📋 Pendientes (${pending.length})</button>
+      <button class="deuda-tab ${window._deudaTab==='pagadas'?'active':''}" onclick="window._deudaTab='pagadas';render()">✅ Pagadas (${completed.length})</button>
     </div>
-    ${debtCards}
 
-    <!-- SECCIÓN 2: Préstamos Personales -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 10px">
-      <div style="font-size:13px;font-weight:600;color:#6C3483">👤 Préstamos Personales</div>
-      <button class="btn-ghost" style="border-color:#9B59B644;color:#6C3483;padding:6px 12px;font-size:12px" onclick="openAddPrestPers()">＋ Agregar</button>
-    </div>
-    ${ppCards}`;
+    ${window._deudaTab==='pendientes' ? pendH : pagH}
+
+    <button class="deuda-fab" onclick="openDeudaMenu()" title="Nueva deuda">＋</button>
+  `;
 }
+
 
 
 // ─────────────────────────────────────────────
@@ -4966,7 +5190,6 @@ function openAddPrestPers(pre){
   showModal();
 }
 
-
 function togglePPTabla(){
   const div=document.getElementById('pp-tabla');
   const btn=document.getElementById('pp-tabla-toggle');
@@ -5013,7 +5236,6 @@ function calcPPPreview(){
   const tbody=document.getElementById('pp-tabla-body');
   const tfoot=document.getElementById('pp-tabla-foot');
   if(tbody){
-    // Filas de datos — si hay más de 6 meses, mostrar todas con scroll
     tbody.innerHTML=tabla.map((r,i)=>`<tr style="background:${i%2===0?'#F8F5FF':'#fff'}">
       <td style="padding:4px 6px;text-align:center;color:#6C3483;font-weight:600">${r.mes}</td>
       <td style="padding:4px 6px;text-align:right;color:#C62828">S/ ${r.interes.toFixed(2)}</td>
@@ -5022,7 +5244,6 @@ function calcPPPreview(){
       <td style="padding:4px 6px;text-align:right;color:var(--muted)">S/ ${r.saldo.toFixed(2)}</td>
     </tr>`).join('');
 
-    // Fila de totales
     const sumInt=parseFloat(tabla.reduce((s,r)=>s+r.interes,0).toFixed(2));
     const sumCap=parseFloat(tabla.reduce((s,r)=>s+r.capitalMes,0).toFixed(2));
     const sumCuota=parseFloat(tabla.reduce((s,r)=>s+r.cuota,0).toFixed(2));
@@ -5036,7 +5257,6 @@ function calcPPPreview(){
       </tr>`;
     }
 
-    // Altura dinámica según cantidad de meses
     const tablaDiv=document.getElementById('pp-tabla');
     if(tablaDiv) tablaDiv.style.maxHeight = tabla.length>6 ? '200px' : 'none';
     if(tablaDiv) tablaDiv.style.overflowY = tabla.length>6 ? 'auto' : 'visible';
@@ -5058,20 +5278,22 @@ function savePrestPers(){
   if(!nombre||!capital||!plazo||!fechaVencimiento) return toast('Completa todos los campos','error');
   const p={
     id:Date.now()+'',
-    nombre, tipo:window._ppTipo||'debo',
+    nombre, name:nombre, rol:window._ppTipo||'debo',
+    tipo:'prestamo_personal', tipoLabel:'Préstamo personal',
     capital, capitalPendiente:capital,
-    tasaMensual:tasa, plazo, sistema,
+    tasaMensual:tasa, plazo, cuotasTotales:plazo, sistema,
     fechaInicio:fecha,
     fechaVencimiento,
     diaPago,
     repeticion,
     notas,
     cuotasPagadas:0,
-    pagos:[]
+    pagos:[],
+    color:'#9B59B6'
   };
   ppApplyCuotasPagadas(p, cuotasPagadas);
-  if(!state.prestamosPersonales) state.prestamosPersonales=[];
-  state.prestamosPersonales.unshift(p);
+  if(!state.deudas) state.deudas=[];
+  state.deudas.unshift(p);
   saveAll();
   console.log('Sincronizando préstamo personal:', p.nombre, p.id);
   syncSeccionToSheets('prestamo', p);
@@ -5080,7 +5302,7 @@ function savePrestPers(){
 }
 
 function pagarPrestPers(id){
-  const p=state.prestamosPersonales.find(x=>x.id===id);
+  const p=state.deudas.find(x=>x.id===id);
   if(!p||p.capitalPendiente<=0) return;
   ppApplyCuotasPagadas(p, ppCuotasPagadas(p), {removeTrimmedTxs:false});
   const tabla=calcTablaAmort(p.capital,p.tasaMensual,p.plazo,p.sistema||'solo_interes');
@@ -5095,7 +5317,7 @@ function pagarPrestPers(id){
   p.pagos.push(pago);
   p.cuotasPagadas=p.pagos.length;
   const totalPago=interes+capitalMes;
-  const tx={id:'prestpers_'+p.id+'_'+pago.id,type:p.tipo==='meden'?'ingreso':'egreso',amount:totalPago,category:p.tipo==='meden'?'Cobro de deuda':'Deudas',catId:p.tipo==='meden'?(state.modo==='negocio'?'cn_cobro_deuda':'ci_deuda_cobro'):(state.modo==='negocio'?'cne_deuda':'ce9'),description:(p.tipo==='meden'?'Cobro de deuda: ':'Pago de deuda: ')+p.nombre,date:pago.fecha,negocio:state.modo==='negocio',moneda:'PEN',origenPrestamoPersonalPago:true,prestamoPersonalId:p.id,prestamoPagoId:pago.id,deudaNombre:p.nombre,deudaRol:p.tipo==='meden'?'meden':'debo'};
+  const tx={id:'prestpers_'+p.id+'_'+pago.id,type:p.rol==='meden'?'ingreso':'egreso',amount:totalPago,category:p.rol==='meden'?'Cobro de deuda':'Deudas',catId:p.rol==='meden'?(state.modo==='negocio'?'cn_cobro_deuda':'ci_deuda_cobro'):(state.modo==='negocio'?'cne_deuda':'ce9'),description:(p.rol==='meden'?'Cobro de deuda: ':'Pago de deuda: ')+p.nombre,date:pago.fecha,negocio:state.modo==='negocio',moneda:'PEN',origenPrestamoPersonalPago:true,prestamoPersonalId:p.id,prestamoPagoId:pago.id,deudaNombre:p.nombre,deudaRol:p.rol==='meden'?'meden':'debo'};
   pago.txId=tx.id;
   state.transactions=state.transactions||[];
   state.transactions.unshift(tx);
@@ -5108,8 +5330,8 @@ function pagarPrestPers(id){
 
 function deletePrestPers(id){
   if(!confirm('¿Eliminar este préstamo?')) return;
-  const prestamo=state.prestamosPersonales.find(p=>p.id===id);
-  state.prestamosPersonales=state.prestamosPersonales.filter(p=>p.id!==id);
+  const prestamo=state.deudas.find(p=>p.id===id);
+  state.deudas=state.deudas.filter(p=>p.id!==id);
   const removed=(state.transactions||[]).filter(t=>t.origenPrestamoPersonalPago&&String(t.prestamoPersonalId)===String(id));
   state.transactions=(state.transactions||[]).filter(t=>!(t.origenPrestamoPersonalPago&&String(t.prestamoPersonalId)===String(id)));
   const url=localStorage.getItem('fnz_sheets_url')||'';
@@ -5120,61 +5342,62 @@ function deletePrestPers(id){
 }
 
 function editPrestPers(id){
-  const p=state.prestamosPersonales.find(x=>x.id===id);
+  const p=state.deudas.find(x=>x.id===id);
   if(!p) return;
   const sistemas=[
     {val:'solo_interes',lbl:'Solo interés mensual + capital al final'},
-    {val:'frances',lbl:'Cuota fija — sistema francés'},
-    {val:'aleman',lbl:'Capital fijo — sistema alemán'},
+    {val:'frances',lbl:'Cuota fija — sistema francés (bancos)'},
+    {val:'aleman',lbl:'Capital fijo — sistema alemán (cuota baja)'}
   ];
   const vencimiento = debtIsoDate(p.fechaVencimiento || ppProximoPago(p) || todayStr());
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-title" style="color:#6C3483">Editar Préstamo Personal</div>
-    <div class="field"><label class="field-label">Nombre</label><input id="ep-nombre" type="text" value="${p.nombre}"></div>
+    <div class="field">
+      <label class="field-label">Quién debe</label>
+      <div class="type-toggle">
+        <button class="type-btn ${p.rol==='debo'?'sel-out':''}" id="ep-debo" onclick="setEPTipo('debo')" style="${p.rol==='debo'?'border-color:#E05252;background:#FEF2F2;color:#E05252':''}">Yo debo</button>
+        <button class="type-btn ${p.rol==='meden'?'sel-in':''}" id="ep-meden" onclick="setEPTipo('meden')" style="${p.rol==='meden'?'border-color:var(--gold);background:#EBF1F5;color:var(--gold)':''}">Me deben</button>
+      </div>
+    </div>
+    <div class="field"><label class="field-label">Nombre</label><input id="ep-nombre" type="text" value="${p.nombre || p.name}"></div>
     <div class="field"><label class="field-label">Capital original (S/)</label><input id="ep-capital" type="number" inputmode="decimal" value="${p.capital}"></div>
     <div class="field"><label class="field-label">Capital pendiente (S/)</label><input id="ep-pendiente" type="number" inputmode="decimal" value="${p.capitalPendiente}"></div>
     <div class="field"><label class="field-label">Tasa mensual (%)</label><input id="ep-tasa" type="number" inputmode="decimal" step="0.1" value="${p.tasaMensual}"></div>
-    <div class="field"><label class="field-label">Plazo (meses)</label><input id="ep-plazo" type="number" inputmode="numeric" value="${p.plazo}"></div>
-    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="ep-pagadas" type="number" inputmode="numeric" min="0" max="${p.plazo}" value="${ppCuotasPagadas(p)}" oninput="const d=Math.max(1,Math.min(31,Number(document.getElementById('ep-fecha').value.slice(8,10))||1));document.getElementById('ep-vencimiento').value=debtAddMonths(document.getElementById('ep-fecha').value,parseInt(this.value)||0,d);ppSmartPreviewUpdate('ep')"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Si aumentas este numero, se marca como historial sin mover Balance. Si lo bajas, se retiran pagos ligados sobrantes.</div></div>
+    <div class="field"><label class="field-label">Plazo (meses)</label><input id="ep-plazo" type="number" inputmode="numeric" value="${p.plazo || p.cuotasTotales}"></div>
+    <div class="field"><label class="field-label">Cuotas pagadas hasta hoy</label><input id="ep-pagadas" type="number" inputmode="numeric" min="0" max="${p.plazo || p.cuotasTotales}" value="${ppCuotasPagadas(p)}" oninput="const d=Math.max(1,Math.min(31,Number(document.getElementById('ep-fecha').value.slice(8,10))||1));document.getElementById('ep-vencimiento').value=debtAddMonths(document.getElementById('ep-fecha').value,parseInt(this.value)||0,d);ppSmartPreviewUpdate('ep')"><div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:6px">Si aumentas este numero, se marca como historial sin mover Balance. Si lo bajas, se retiran pagos ligados sobrantes.</div></div>
     <div class="field"><label class="field-label">Notas</label><textarea id="ep-notas" rows="2" style="width:100%;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;resize:vertical">${debtHtml(p.notas||'')}</textarea></div>
+    <div class="field">
+      <label class="field-label">Sistema de pago</label>
+      <select id="ep-sistema" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
+        ${sistemas.map(x=>`<option value="${x.val}" ${p.sistema===x.val?'selected':''}>${x.lbl}</option>`).join('')}
+      </select>
+    </div>
     <div class="field">
       <label class="field-label">Repetir</label>
       <select id="ep-repeticion" onchange="ppSmartPreviewUpdate('ep')" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-        <option value="mensual" ${(p.repeticion||'mensual')==='mensual'?'selected':''}>Mensual (cada mes)</option>
-        <option value="unico" ${p.repeticion==='unico'?'selected':''}>Un solo vencimiento</option>
+        <option value="mensual" ${p.repeticion==='mensual'?'selected':''}>Mensual</option>
+        <option value="quincenal" ${p.repeticion==='quincenal'?'selected':''}>Quincenal</option>
+        <option value="semanal" ${p.repeticion==='semanal'?'selected':''}>Semanal</option>
+        <option value="diario" ${p.repeticion==='diario'?'selected':''}>Diario</option>
       </select>
     </div>
     <div class="field"><label class="field-label">Fecha en que inicié pagando (1ra cuota)</label><input id="ep-fecha" type="date" value="${ppInicio(p)}" onchange="const d=Math.max(1,Math.min(31,Number(this.value.slice(8,10))||1));document.getElementById('ep-vencimiento').value=debtAddMonths(this.value,parseInt(document.getElementById('ep-pagadas').value)||0,d);ppSmartPreviewUpdate('ep')"></div>
     <div class="field"><label class="field-label">Fecha de vencimiento / próximo pago</label><input id="ep-vencimiento" type="date" value="${vencimiento}" onchange="const d=Math.max(1,Math.min(31,Number(this.value.slice(8,10))||1));document.getElementById('ep-fecha').value=debtAddMonths(this.value,-(parseInt(document.getElementById('ep-pagadas').value)||0),d);ppSmartPreviewUpdate('ep')"><input id="ep-dia-pago" type="hidden" value="${ppDiaPago(p)}"></div>
-    <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">
-      <div style="font-size:10px;color:var(--muted);font-weight:900;text-transform:uppercase;margin-bottom:8px">Plan recurrente inteligente</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px">
-        <button type="button" onclick="ppApplyRecurringPlan(12,'ep')" style="border:1px solid #E9D5FF;background:#FFFFFF;color:#6C3483;border-radius:8px;padding:8px;font-size:11px;font-weight:800">1 año</button>
-        <button type="button" onclick="ppApplyRecurringPlan(36,'ep')" style="border:1px solid #E9D5FF;background:#FFFFFF;color:#6C3483;border-radius:8px;padding:8px;font-size:11px;font-weight:800">3 años</button>
-        <button type="button" onclick="ppApplyRecurringPlan(120,'ep')" style="border:1px solid #E9D5FF;background:#FFFFFF;color:#6C3483;border-radius:8px;padding:8px;font-size:11px;font-weight:800">10 años</button>
+    
+    <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:12px;margin:14px 0 6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div id="ep-smart-status" style="display:inline-flex;padding:5px 9px;border-radius:999px;background:#ECFDF5;color:#047857;border:1px solid #04785733;font-size:11px;font-weight:900">Al dia</div>
       </div>
-      <div id="ep-smart-status" style="display:inline-flex;padding:5px 9px;border-radius:999px;background:#ECFDF5;color:#047857;border:1px solid #04785733;font-size:11px;font-weight:900">Al dia</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px"><div style="font-size:9px;color:var(--muted);font-weight:900;text-transform:uppercase">Final estimado</div><div id="ep-smart-final" style="font-size:12px;color:var(--text);font-weight:900;margin-top:2px">-</div></div>
         <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px"><div style="font-size:9px;color:var(--muted);font-weight:900;text-transform:uppercase">Cantidad</div><div id="ep-smart-count" style="font-size:12px;color:var(--text);font-weight:900;margin-top:2px">Sin cuotas</div></div>
       </div>
     </div>
-    <div class="field"><label class="field-label">Sistema de pago</label>
-      <select id="ep-sistema" style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%">
-        ${sistemas.map(s=>`<option value="${s.val}" ${p.sistema===s.val?'selected':''}>${s.lbl}</option>`).join('')}
-      </select>
-    </div>
-    <div class="field"><label class="field-label">Tipo</label>
-      <div class="type-toggle">
-        <button class="type-btn ${p.tipo==='debo'?'sel-out':''}" id="ep-debo" onclick="setEPTipo('debo')" style="${p.tipo==='debo'?'border-color:#E05252;background:#FEF2F2;color:#E05252':''}">Yo debo</button>
-        <button class="type-btn ${p.tipo==='meden'?'sel-in':''}" id="ep-meden" onclick="setEPTipo('meden')" style="${p.tipo==='meden'?'border-color:var(--gold);background:#EBF1F5;color:var(--gold)':''}">Me deben</button>
-      </div>
-    </div>
-    <div class="btn-row">
+    <div class="btn-row" style="margin-top:14px">
       <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
       <button style="flex:2;background:linear-gradient(135deg,#6C3483,#9B59B6);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:700;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer" onclick="saveEditPrestPers('${id}')">Guardar cambios</button>
     </div>`;
-  window._epTipo=p.tipo||'debo';
+  window._epTipo=p.rol||'debo';
   ['ep-plazo','ep-pagadas','ep-vencimiento','ep-repeticion'].forEach(fid=>{
     setTimeout(()=>{
       const el=document.getElementById(fid);
@@ -5197,7 +5420,7 @@ function setEPTipo(tipo){
 }
 
 function saveEditPrestPers(id){
-  const p=state.prestamosPersonales.find(x=>x.id===id);
+  const p=state.deudas.find(x=>x.id===id);
   if(!p) return;
   const cuotasPrevias=ppCuotasPagadas(p);
   const nombre=document.getElementById('ep-nombre')?.value.trim();
@@ -5677,20 +5900,22 @@ function gfcDiasSinTrabajarConsecutivos() {
 }
 
 function gfcDebtTotal() {
-  const bank = (state.debts || []).reduce((s, d) => {
+  const deudasUser = state.deudas || [];
+  const bank = deudasUser.reduce((s, d) => {
+    if (d.rol !== 'debo' || d.tipo === 'prestamo_personal') return s;
     const restantes = Math.max(0, moneyValue(d.cuotasTotales) - moneyValue(d.cuotasPagadas));
     return s + restantes * moneyValue(d.cuotaMonto);
   }, 0);
   const intereses = (state.prestamos || []).reduce((s, p) => s + moneyValue(p.capitalPendiente), 0);
-  const personales = (state.prestamosPersonales || []).reduce((s, p) => {
-    if (p.tipo && p.tipo !== 'debo') return s;
+  const personales = deudasUser.reduce((s, p) => {
+    if (p.tipo !== 'prestamo_personal' || p.rol !== 'debo') return s;
     return s + moneyValue(p.capitalPendiente);
   }, 0);
   return bank + intereses + personales;
 }
 
 function gfcCalcCuotaPersonal(p) {
-  if (!p || (p.tipo && p.tipo !== 'debo')) return 0;
+  if (!p || p.rol !== 'debo') return 0;
   const capital = moneyValue(p.capital);
   const pendiente = moneyValue(p.capitalPendiente);
   const tasa = moneyValue(p.tasaMensual);
@@ -5706,19 +5931,25 @@ function gfcCalcCuotaPersonal(p) {
 }
 
 function gfcDebtMonthlyPayment() {
-  const bank = (state.debts || []).reduce((s, d) => {
+  const deudasUser = state.deudas || [];
+  const bank = deudasUser.reduce((s, d) => {
+    if (d.rol !== 'debo' || d.tipo === 'prestamo_personal') return s;
     const pendientes = moneyValue(d.cuotasTotales) - moneyValue(d.cuotasPagadas);
     return pendientes > 0 ? s + moneyValue(d.cuotaMonto) : s;
   }, 0);
   const intereses = (state.prestamos || []).reduce((s, p) => s + moneyValue(p.capitalPendiente) * moneyValue(p.tasaMensual) / 100, 0);
-  const personales = (state.prestamosPersonales || []).reduce((s, p) => s + gfcCalcCuotaPersonal(p), 0);
+  const personales = deudasUser.reduce((s, p) => {
+    if (p.tipo !== 'prestamo_personal') return s;
+    return s + gfcCalcCuotaPersonal(p);
+  }, 0);
   return bank + intereses + personales;
 }
 
 function gfcNextDebtPayment() {
   const now = gfStartOfDay(new Date());
   const out = [];
-  (state.debts || []).forEach(d => {
+  (state.deudas || []).forEach(d => {
+    if (d.rol !== 'debo') return;
     if (moneyValue(d.cuotasPagadas) >= moneyValue(d.cuotasTotales)) return;
     const rawDate = d.proximoPago || d.proximo_pago || d.fechaVencimiento || d.vencimiento;
     if (rawDate) {
@@ -6279,23 +6510,26 @@ function gfcCategoryBreakdown(summary) {
 }
 
 function gfcDebtBreakdown() {
-  const deudas = (state.debts || []).map(d => {
-    const restantes = Math.max(0, moneyValue(d.cuotasTotales) - moneyValue(d.cuotasPagadas));
-    return {
-      nombre: d.name || 'Deuda',
-      saldo: restantes * moneyValue(d.cuotaMonto),
-      cuota: restantes > 0 ? moneyValue(d.cuotaMonto) : 0
-    };
-  });
+  const deudasUser = state.deudas || [];
+  const deudas = deudasUser
+    .filter(d => d.tipo !== 'prestamo_personal' && d.rol === 'debo')
+    .map(d => {
+      const restantes = Math.max(0, moneyValue(d.cuotasTotales) - moneyValue(d.cuotasPagadas));
+      return {
+        nombre: d.name || 'Deuda',
+        saldo: restantes * moneyValue(d.cuotaMonto),
+        cuota: restantes > 0 ? moneyValue(d.cuotaMonto) : 0
+      };
+    });
   const prestamos = (state.prestamos || []).map(p => ({
-    nombre: p.nombre || 'Prestamo',
+    nombre: p.nombre || 'Préstamo',
     saldo: moneyValue(p.capitalPendiente),
     cuota: moneyValue(p.capitalPendiente) * moneyValue(p.tasaMensual) / 100
   }));
-  const personales = (state.prestamosPersonales || [])
-    .filter(p => !p.tipo || p.tipo === 'debo')
+  const personales = deudasUser
+    .filter(p => p.tipo === 'prestamo_personal' && p.rol === 'debo')
     .map(p => ({
-      nombre: p.nombre || 'Prestamo personal',
+      nombre: p.nombre || 'Préstamo personal',
       saldo: moneyValue(p.capitalPendiente),
       cuota: gfcCalcCuotaPersonal(p)
     }));
@@ -6317,7 +6551,7 @@ function gfcRecentChanges(limit = 4) {
     });
   });
   if (out.length < limit) {
-    (state.debts || []).slice(0, limit - out.length).forEach(d => out.push({
+    (state.deudas || []).slice(0, limit - out.length).forEach(d => out.push({
       icon: 'D',
       title: 'Deuda en seguimiento',
       detail: [d.name || 'Deuda', 'cuota ' + gfcMoneyText(d.cuotaMonto || 0)].join(' · '),
@@ -6382,7 +6616,7 @@ function gfcBarsList(items, color, emptyText) {
 }
 
 function gfcDebtDots() {
-  const d = (state.debts || []).find(x => moneyValue(x.cuotasTotales) > 0 && moneyValue(x.cuotasPagadas) < moneyValue(x.cuotasTotales)) || (state.debts || [])[0];
+  const d = (state.deudas || []).find(x => moneyValue(x.cuotasTotales) > 0 && moneyValue(x.cuotasPagadas) < moneyValue(x.cuotasTotales)) || (state.deudas || [])[0];
   if (!d) return `<div style="font-size:12px;color:#94A3B8;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:8px;padding:13px;text-align:center;font-weight:850">Sin cuotas activas</div>`;
   const total = Math.max(1, Math.min(36, Math.floor(moneyValue(d.cuotasTotales) || 1)));
   const paid = Math.max(0, Math.min(total, Math.floor(moneyValue(d.cuotasPagadas))));
@@ -7226,7 +7460,7 @@ function enviarTodoASheets() {
 
   const txs    = allStoredTransactions();
   const agenda = state.agenda || [];
-  const deudas = state.debts || [];
+  const deudas = state.deudas || [];
 
   const total = txs.length + agenda.length + deudas.length;
   if (total === 0) return toast('No hay datos para enviar', 'error');
@@ -8665,7 +8899,7 @@ function deleteTx(id){
 // MODALS: DEBT
 // ─────────────────────────────────────────────
 function openAddDebt(pre){ openDebtModal(null, pre); }
-function openEditDebt(id){ openDebtModal(state.debts.find(d=>d.id===id)); }
+function openEditDebt(id){ openDebtModal((state.deudas || []).find(d=>String(d.id)===String(id))); }
 
 function openDebtModal(debt, preData){
   const pre = preData||{};
@@ -8781,7 +9015,7 @@ function saveDebt(editId){
   if(!name) return toast('Escribe el nombre de la deuda','error');
   if(!cuotaMonto) return toast('Escribe la cuota mensual','error');
   if(!cuotasTotales) return toast('Escribe el numero de cuotas','error');
-  const original=editId?(state.debts||[]).find(d=>String(d.id)===String(editId)):null;
+  const original=editId?(state.deudas||[]).find(d=>String(d.id)===String(editId)):null;
   const item=deudaNormalizePagos({
     ...(original || {}),
     id:editId||Date.now()+'',
@@ -8800,25 +9034,25 @@ function saveDebt(editId){
     categoria:'Deuda',
     color:window._debtColor||DEBT_COLORS[0]
   }, original);
-  if(editId)state.debts=(state.debts||[]).map(d=>String(d.id)===String(editId)?item:d);
-  else state.debts.push(item);
+  if(editId)state.deudas=(state.deudas||[]).map(d=>String(d.id)===String(editId)?item:d);
+  else state.deudas.push(item);
   deudaReconcilePaymentTxs(item);
   saveAll();
   syncSeccionToSheets('deuda', item);
   closeModal();render();toast(editId?'Deuda actualizada y balance corregido':'Deuda registrada');
 }
 function deleteDebt(id){
-  const d=(state.debts||[]).find(x=>String(x.id)===String(id));
+  const d=(state.deudas||[]).find(x=>String(x.id)===String(id));
   if(!d)return;
   if(!confirm('Eliminar esta deuda? Tambien se quitaran del balance sus pagos ligados.'))return;
   const removed=deudaRemovePaymentTxs(id);
-  state.debts=(state.debts||[]).filter(d=>String(d.id)!==String(id));
+  state.deudas=(state.deudas||[]).filter(d=>String(d.id)!==String(id));
   saveAll();
   syncSeccionToSheets('deuda_delete',{id});
   render();toast('Deuda eliminada' + (removed?' · pagos retirados del balance':''));
 }
 function pagarCuota(id){
-  const d=(state.debts||[]).find(d=>String(d.id)===String(id));if(!d)return;
+  const d=(state.deudas||[]).find(d=>String(d.id)===String(id));if(!d)return;
   deudaNormalizePagos(d,d);
   const actual = Math.max(0, Math.floor(moneyValue(d.cuotasPagadas)));
   const total = Math.max(0, Math.floor(moneyValue(d.cuotasTotales)));
@@ -8842,7 +9076,7 @@ function pagarCuota(id){
 }
 
 function confirmarPagoDeuda(id){
-  const d=(state.debts||[]).find(d=>String(d.id)===String(id));if(!d)return;
+  const d=(state.deudas||[]).find(d=>String(d.id)===String(id));if(!d)return;
   deudaNormalizePagos(d,d);
   const total = Math.max(0, Math.floor(moneyValue(d.cuotasTotales)));
   const pagosAntes = deudaPagos(d);
@@ -12678,13 +12912,13 @@ function deleteAgendaItem(id){
   );
 
   // ★ Eliminar deudas automáticas asociadas (sufijo _dag)
-  const deudasAsociadas = (state.debts||[]).filter(d=>
+  const deudasAsociadas = (state.deudas||[]).filter(d=>
     d.id === id+'_dag' || d.id.startsWith(id+'_dag')
   );
 
   // Eliminar del state local
   state.transactions = (state.transactions||[]).filter(t=> !txAsociadas.some(tx=>tx.id===t.id));
-  state.debts        = (state.debts||[]).filter(d=> !deudasAsociadas.some(da=>da.id===d.id));
+  state.deudas        = (state.deudas||[]).filter(d=> !deudasAsociadas.some(da=>da.id===d.id));
   state.agenda       = (state.agenda||[]).filter(x=>x.id!==id);
 
   // Sync eliminaciones a Sheets
@@ -13678,9 +13912,26 @@ async function guardarFinalizacion(id){
 
   if (item.estadoPago === 'parcial' && item.montoPendienteCobro > 0) {
     const pendiente = item.montoPendienteCobro;
-    const deudaAuto = { id: Date.now()+'_dag', name:'Saldo pendiente — '+(item.cliente||''), totalAmount: pendiente, cuotaMonto: pendiente, cuotasTotales:1, cuotasPagadas:0, categoria:'Servicio', color:'#9B59B6' };
-    if (!state.debts) state.debts = [];
-    state.debts.push(deudaAuto);
+    const deudaAuto = {
+      id: Date.now()+'_dag',
+      name: 'Saldo pendiente — ' + (item.cliente || ''),
+      tipo: 'cobro_deuda',
+      tipoLabel: 'Cobro de deuda',
+      rol: 'meden',
+      totalAmount: pendiente,
+      cuotaMonto: pendiente,
+      cuotasTotales: 1,
+      cuotasPagadas: 0,
+      repeticion: 'mensual',
+      fechaInicio: todayStr(),
+      diaPago: Number(todayStr().slice(8,10)) || 5,
+      fechaVencimiento: todayStr(),
+      notas: 'Generado automáticamente por saldo pendiente en servicio.',
+      color: '#9B59B6',
+      pagos: []
+    };
+    if (!state.deudas) state.deudas = [];
+    state.deudas.push(deudaAuto);
     syncSeccionToSheets('deuda', deudaAuto);
     toast('⚠ Saldo pendiente: ' + fmt(pendiente) + ' registrado como deuda', 'info');
   }
@@ -14123,7 +14374,8 @@ function exportData(){
     version:2,
     exportDate: new Date().toLocaleString('es-PE'),
     transactions: state.transactions,
-    debts: state.debts,
+    deudas: state.deudas || [],
+    debts: state.deudas || [], // backward compatibility for older apps
     servicios: state.servicios,
     catsIn: state.catsIn,
     catsEx: state.catsEx,
@@ -14155,13 +14407,14 @@ function importData(event){
   reader.onload=function(e){
     try{
       const data=JSON.parse(e.target.result);
-      if(!data.transactions&&!data.debts)return toast('Archivo no válido','error');
+      if(!data.transactions&&!data.debts&&!data.deudas)return toast('Archivo no válido','error');
       
       const numTx = data.transactions ? data.transactions.length : 0;
       if(!confirm(`¿Importar datos del ${data.exportDate||'archivo'}?\n\nEsto reemplazará tus datos actuales y restaurará ${numTx} movimientos.`))return;
       
       if(data.transactions) state.transactions=data.transactions;
-      if(data.debts) state.debts=data.debts;
+      if(data.deudas) state.deudas=data.deudas;
+      else if(data.debts) state.deudas=data.debts;
       if(data.servicios) state.servicios=data.servicios;
       if(data.catsIn) state.catsIn=data.catsIn;
       if(data.catsEx) state.catsEx=data.catsEx;
@@ -14185,7 +14438,7 @@ function resetAllData(){
   if(!confirm('¿Estás completamente seguro? Se borrará TODO incluyendo agenda y notas.'))return;
   // FIX: borrar todos los estados, no solo transacciones y deudas
   state.transactions=[];
-  state.debts=[];
+  state.deudas=[];
   state.servicios=DEFAULT_SERVICES;
   state.catsIn=DEFAULT_CATS_IN;
   state.catsEx=DEFAULT_CATS_EX;
@@ -15912,7 +16165,7 @@ function loadFromSheets(forzar) {
           if (state.modo === 'personal') state.transactions = sortedP;
           added += data.movimientosPersonales.length;
         }
-        if (data.deudas) { save('fnz_neg_debts', data.deudas); if (state.modo === 'negocio') state.debts = data.deudas; }
+        if (data.deudas) { save('fnz_neg_deudas', data.deudas); if (state.modo === 'negocio') state.deudas = data.deudas; }
         if (data.servicios) { save('fnz_neg_services', data.servicios); if (state.modo === 'negocio') state.servicios = data.servicios; }
         if (data.metas) { save('fnz_neg_metas', data.metas); if (state.modo === 'negocio') state.metas = data.metas; }
         if (data.notas) { save('fnz_notas', data.notas); state.notas = data.notas; }
@@ -15970,11 +16223,11 @@ function loadFromSheets(forzar) {
 
         // Deudas
         if (data.deudas && data.deudas.length) {
-          const local = load('fnz_neg_debts',[]);
+          const local = load('fnz_neg_deudas',[]);
           const m = _mergeById(local, data.deudas);
           if(m.length !== local.length) changed = true;
-          save('fnz_neg_debts', m);
-          if (state.modo === 'negocio') state.debts = m;
+          save('fnz_neg_deudas', m);
+          if (state.modo === 'negocio') state.deudas = m;
         }
         // Servicios
         if (data.servicios && data.servicios.length) {
@@ -16756,29 +17009,16 @@ function parsePagoPrestamoVoz(text) {
   if (!amount) return null;
 
   let bestMatch = null;
-  let bestType = null; 
   let maxLen = 0;
 
-  const personales = state.prestamosPersonales || [];
-  personales.forEach(p => {
-    const pNorm = nrm(p.nombre || '');
-    if (pNorm && t.includes(pNorm)) {
-      if (pNorm.length > maxLen) {
-        maxLen = pNorm.length;
-        bestMatch = p;
-        bestType = 'prestamo';
-      }
-    }
-  });
-
-  const debts = state.debts || [];
-  debts.forEach(d => {
-    const dNorm = nrm(d.name || '');
+  const deudas = state.deudas || [];
+  deudas.forEach(d => {
+    const nameStr = d.name || d.nombre || '';
+    const dNorm = nrm(nameStr);
     if (dNorm && t.includes(dNorm)) {
       if (dNorm.length > maxLen) {
         maxLen = dNorm.length;
         bestMatch = d;
-        bestType = 'debt';
       }
     }
   });
@@ -16787,7 +17027,6 @@ function parsePagoPrestamoVoz(text) {
 
   return {
     action: esCobro ? 'cobro' : 'pago',
-    type: bestType,
     item: bestMatch,
     amount: amount
   };
@@ -16796,9 +17035,9 @@ function parsePagoPrestamoVoz(text) {
 function ejecutarPagoDeudaVoz(parsed) {
   if (!parsed) return;
   const d = parsed.item;
-  if (parsed.type === 'prestamo') {
+  if (d.capital != null && d.capital > 0) {
     pagarPrestPers(d.id);
-  } else if (parsed.type === 'debt') {
+  } else {
     const total = Math.max(0, Math.floor(moneyValue(d.cuotasTotales)));
     const actual = Math.max(0, Math.floor(moneyValue(d.cuotasPagadas)));
     if (actual >= total) {
@@ -26648,13 +26887,13 @@ function ajResetLocalData(){
   if(!confirm('Borrar todos los datos locales?\n\nSe mantienen credenciales, tema y nombre.')) return;
   if(!confirm('Confirmacion final: se borraran movimientos, agenda, deudas, notas, metas, servicios, categorias y stock local.')) return;
   [
-    'fnz_neg_tx','fnz_tx','fnz_agenda','fnz_notas','fnz_neg_debts','fnz_debts',
+    'fnz_neg_tx','fnz_tx','fnz_agenda','fnz_notas','fnz_neg_debts','fnz_debts','fnz_neg_deudas','fnz_deudas',
     'fnz_neg_services','fnz_services','fnz_neg_prestamos','fnz_prestamos','fnz_neg_prestpers','fnz_prestpers',
     'fnz_neg_metas','fnz_metas','fnz_neg_presup','fnz_presup','fnz_recordatorios','fnz_sonidos',
     'fnz_inventario','fnz_plantillas','fnz_plantillas_mat','fnz_mov_mat','fnz_compras_mat','fnz_stock_valor_general',
     'fnz_neg_cats_in','fnz_neg_cats_ex','fnz_cats_in','fnz_cats_ex','fnz_category_defaults_version','fnz_neg_category_defaults_version'
   ].forEach(k=>localStorage.removeItem(k));
-  state.transactions=[]; state.debts=[]; state.agenda=[]; state.notas=[]; state.metas=[]; state.prestamos=[]; state.prestamosPersonales=[];
+  state.transactions=[]; state.debts=[]; state.deudas=[]; state.agenda=[]; state.notas=[]; state.metas=[]; state.prestamos=[]; state.prestamosPersonales=[];
   state.presupuesto=[]; state.recordatorios=[]; state.inventario=[]; state.plantillas=[]; state.movimientosMateriales=[]; state.comprasMateriales=[]; state.stockValorGeneral=0;
   state._lazyLoaded={};
   loadStateForModo('negocio');
