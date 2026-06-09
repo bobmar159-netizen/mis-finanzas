@@ -3392,6 +3392,12 @@ function loadStateForModo(modo){
   state.deudas       = load(k.deudas,[]);
   if (Array.isArray(state.deudas)) {
     state.deudas.forEach(d => {
+      if (String(d.id) === 'deu_scotiabank_hipotecario' && d.cuotasPagadas === 22) {
+        d.cuotasPagadas = 23;
+        if (typeof deudaNormalizePagos === 'function') {
+          deudaNormalizePagos(d, d);
+        }
+      }
       if (String(d.id) === 'deu_caja_huancayo_prestamo' && d.cuotasPagadas === 32) {
         d.cuotasPagadas = 31;
         if (typeof deudaNormalizePagos === 'function') {
@@ -3412,7 +3418,7 @@ function loadStateForModo(modo){
       cuotaMonto: 3634.08,
       cuotaMontoFixed: 3634.08,
       cuotasTotales: 36,
-      cuotasPagadas: 22,
+      cuotasPagadas: 23,
       seguroMonto: 101.97,
       tea: 15.95,
       fechaInicio: '2024-05-08',
@@ -5553,7 +5559,7 @@ function renderDeudas() {
     render();
   };
 
-  window.payVirtualBill = window.payVirtualBill || function(debtId, cuotaNum, amountInput) {
+  window.payVirtualBill = window.payVirtualBill || function(debtId, cuotaNum, amountInput, afectaBalanceParam) {
     const d = (state.deudas || []).find(x => String(x.id) === String(debtId));
     if (!d) return;
     
@@ -5569,7 +5575,12 @@ function renderDeudas() {
       return;
     }
 
-    if (!confirm(`¿Estás seguro de registrar este pago de S/ ${paymentAmount.toFixed(2)} para la cuota ${cuotaNum}?`)) return;
+    const afectaBalance = afectaBalanceParam !== false;
+    const confirmMsg = afectaBalance 
+      ? `¿Estás seguro de registrar este pago de S/ ${paymentAmount.toFixed(2)} para la cuota ${cuotaNum}?`
+      : `¿Estás seguro de marcar la cuota ${cuotaNum} como PAGADA HISTÓRICAMENTE con un monto de S/ ${paymentAmount.toFixed(2)}? (No afectará el saldo de tus cuentas)`;
+
+    if (!confirm(confirmMsg)) return;
     
     const id = Date.now() + '_c' + cuotaNum + '_' + Math.random().toString(36).slice(2, 6);
     const fecha = todayStr();
@@ -5580,8 +5591,8 @@ function renderDeudas() {
       cuota: cuotaNum,
       fecha,
       monto: paymentAmount,
-      afectaBalance: true,
-      historico: false
+      afectaBalance: afectaBalance,
+      historico: !afectaBalance
     });
     
     deudaNormalizePagos(d, d);
@@ -5593,9 +5604,15 @@ function renderDeudas() {
     render();
     
     if (paymentAmount >= remaining - 0.05) {
-      toast(`🎉 Cuota ${cuotaNum} pagada por completo (S/ ${(alreadyPaid + paymentAmount).toFixed(2)})`);
+      toast(afectaBalance 
+        ? `🎉 Cuota ${cuotaNum} pagada por completo (S/ ${(alreadyPaid + paymentAmount).toFixed(2)})`
+        : `🎉 Cuota ${cuotaNum} pagada históricamente (S/ ${(alreadyPaid + paymentAmount).toFixed(2)})`
+      );
     } else {
-      toast(`💸 Abono de S/ ${paymentAmount.toFixed(2)} registrado para cuota ${cuotaNum}`);
+      toast(afectaBalance
+        ? `💸 Abono de S/ ${paymentAmount.toFixed(2)} registrado para cuota ${cuotaNum}`
+        : `💸 Abono histórico de S/ ${paymentAmount.toFixed(2)} registrado para cuota ${cuotaNum}`
+      );
     }
   };
 
@@ -5608,6 +5625,7 @@ function renderDeudas() {
     if (pgIdx === -1) return;
     
     const pg = d.pagos[pgIdx];
+    const cuotaNum = pg.cuota;
     const txId = pg.txId || deudaPagoTxId(d.id, pg.id);
     const tx = (state.transactions || []).find(t => String(t.id) === String(txId));
     if (tx) {
@@ -5617,6 +5635,15 @@ function renderDeudas() {
     }
     
     d.pagos.splice(pgIdx, 1);
+
+    // Decrementar d.cuotasPagadas si esta cuota ya no está completamente pagada
+    const table = deudaFrenchAmortizationTable(d);
+    const totalDue = table[cuotaNum - 1] ? table[cuotaNum - 1].cuota : (parseFloat(d.cuotaMonto) || 0);
+    const alreadyPaid = (d.pagos || []).filter(p => Number(p.cuota) === cuotaNum).reduce((s, p) => s + parseFloat(p.monto || 0), 0);
+    if (alreadyPaid < totalDue - 0.05) {
+      d.cuotasPagadas = Math.max(0, Math.min(d.cuotasPagadas, cuotaNum - 1));
+    }
+    
     deudaNormalizePagos(d, d);
     deudaReconcilePaymentTxs(d);
     
@@ -5626,6 +5653,42 @@ function renderDeudas() {
     window._deudaActiveBillId = null;
     render();
     toast('Pago eliminado de la deuda (el balance general no se vio afectado) ✓');
+  };
+
+  window.markDeudaBillAsUnpaid = window.markDeudaBillAsUnpaid || function(debtId, cuotaNum) {
+    if (!confirm(`¿Estás seguro de que deseas marcar la cuota ${cuotaNum} como PENDIENTE (no pagada)? (Esto no afectará el saldo general de tus cuentas)`)) return;
+    const d = (state.deudas || []).find(x => String(x.id) === String(debtId));
+    if (!d) return;
+    
+    // Buscar todos los pagos registrados para esta cuota específica
+    const paymentsForCuota = (d.pagos || []).filter(pg => pg.cuota === cuotaNum);
+    
+    // Desvincular transacciones asociadas para no alterar el saldo
+    paymentsForCuota.forEach(pg => {
+      const txId = pg.txId || deudaPagoTxId(d.id, pg.id);
+      const tx = (state.transactions || []).find(t => String(t.id) === String(txId));
+      if (tx) {
+        delete tx.origenDeudaPago;
+        delete tx.debtId;
+        delete tx.debtPagoId;
+      }
+    });
+    
+    // Remover pagos del array
+    d.pagos = (d.pagos || []).filter(pg => pg.cuota !== cuotaNum);
+    
+    // Decrementar cuotas pagadas
+    d.cuotasPagadas = Math.max(0, cuotaNum - 1);
+    
+    deudaNormalizePagos(d, d);
+    deudaReconcilePaymentTxs(d);
+    
+    saveAll();
+    syncSeccionToSheets('deuda', d);
+    
+    window._deudaActiveBillId = null;
+    render();
+    toast(`La cuota ${cuotaNum} ha sido marcada como pendiente ✓`);
   };
 
   window.editParentDebt = window.editParentDebt || function(debtId) {
@@ -5816,7 +5879,7 @@ function renderDeudas() {
       cuotaMonto: 3634.08,
       cuotaMontoFixed: 3634.08,
       cuotasTotales: 36,
-      cuotasPagadas: 22,
+      cuotasPagadas: 23,
       seguroMonto: 101.97,
       tea: 15.95,
       fechaInicio: '2024-05-08',
@@ -6587,11 +6650,17 @@ function renderDeudas() {
                   <label class="deuda-tik-label" style="margin-bottom:6px">Monto a pagar (S/)</label>
                   <div style="display:flex; gap:8px">
                     <input id="tik-pago-monto" type="number" step="0.01" class="deuda-tik-input" style="flex:1" value="${remainingDue.toFixed(2)}" max="${remainingDue.toFixed(2)}">
-                    <button class="deuda-tik-modal-btn-primary" onclick="window.payVirtualBill('${bill.debtId}', ${bill.cuotaNum}, document.getElementById('tik-pago-monto').value)">Pagar</button>
+                    <button class="deuda-tik-modal-btn-primary" onclick="window.payVirtualBill('${bill.debtId}', ${bill.cuotaNum}, document.getElementById('tik-pago-monto').value, !document.getElementById('tik-chk-no-balance').checked)">Pagar</button>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:6px; margin-top:8px; cursor:pointer" onclick="const chk=document.getElementById('tik-chk-no-balance'); chk.checked=!chk.checked">
+                    <input id="tik-chk-no-balance" type="checkbox" style="width:14px; height:14px; margin:0">
+                    <span style="font-size:11px; color:#475569; font-weight:600">Pago histórico (no afecta el saldo de mis cuentas)</span>
                   </div>
                   <div style="font-size:10.5px; color:#64748B; margin-top:6px; font-weight:600">Puedes ingresar el total de S/ ${remainingDue.toFixed(2)} o un abono parcial.</div>
                 </div>
-              ` : ''}
+              ` : `
+                <button class="deuda-tik-modal-btn" style="color:#B91C1C; border:1px solid rgba(239, 68, 68, 0.1); border-radius:12px; font-weight:700" onclick="window.markDeudaBillAsUnpaid('${bill.debtId}', ${bill.cuotaNum})">Marcar cuota como pendiente ✕</button>
+              `}
               
               <!-- Historial de pagos para esta cuota específica -->
               ${(() => {
