@@ -1920,153 +1920,205 @@ table.nt tbody tr:hover td,
 }
 
 /* ==========================================================================
-   TIK DEUDAS SUB-APP STYLES
+   TIK DEUDAS SUB-APP GLASSMORPHIC STYLES (WHITE GLASS THEME)
    ========================================================================== */
 .deuda-tik-container {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 56px); /* adjusts for the main tab nav bar */
   position: relative;
-  font-family: 'Roboto', 'Inter', sans-serif;
-  background: #ECEFF1;
-  color: #37474F;
-  user-select: none;
+  font-family: 'Inter', 'Roboto', sans-serif;
+  background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+  color: #1E293B;
+  min-height: 100%;
+  box-sizing: border-box;
 }
-@media (max-width: 600px) {
-  .deuda-tik-container {
-    height: calc(100vh - 48px);
-  }
-}
+
 .deuda-tik-header {
-  height: 56px;
-  background: #009688;
-  color: #FFFFFF;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-  z-index: 10;
-  flex-shrink: 0;
+  padding: 0 20px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.02);
 }
+
 .deuda-tik-header-title {
   font-size: 20px;
-  font-weight: 500;
+  font-weight: 800;
+  color: #0F172A;
   flex-grow: 1;
   margin-left: 16px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.025em;
 }
+
 .deuda-tik-header-btn {
-  background: transparent;
-  border: none;
-  color: white;
-  font-size: 22px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  color: #334155;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 18px;
   cursor: pointer;
-  padding: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   outline: none;
 }
+
+.deuda-tik-header-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.deuda-tik-header-btn:active {
+  transform: translateY(0);
+}
+
 .deuda-tik-header-right {
   display: flex;
-  gap: 12px;
+  gap: 10px;
 }
+
+/* Sidebar Drawer Glass */
 .deuda-tik-drawer-overlay {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
-  z-index: 99;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 999;
 }
+
 .deuda-tik-drawer {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
-  width: 280px;
-  height: 100%;
-  background: #E0F2F1;
-  z-index: 100;
-  box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+  width: 300px;
+  height: 100vh;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 1000;
+  box-shadow: 4px 0 30px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
   transform: translateX(-100%);
-  transition: transform 0.25s ease-out;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
 }
+
 .deuda-tik-drawer.open {
   transform: translateX(0);
 }
+
 .deuda-tik-drawer-header {
-  height: 120px;
-  background: #009688;
-  color: white;
+  height: 140px;
+  background: linear-gradient(135deg, rgba(0, 150, 136, 0.1), rgba(0, 150, 136, 0.02));
+  border-bottom: 1px solid rgba(0, 150, 136, 0.1);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 16px;
+  padding: 20px;
 }
+
 .deuda-tik-drawer-header-title {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 900;
+  color: #0f766e;
+  letter-spacing: -0.025em;
 }
+
 .deuda-tik-drawer-header-subtitle {
   font-size: 13px;
-  color: #B2DFDB;
-  margin-top: 4px;
+  color: #0d9488;
+  margin-top: 6px;
+  font-weight: 500;
 }
+
 .deuda-tik-drawer-list {
   flex-grow: 1;
   overflow-y: auto;
-  padding: 8px 0;
+  padding: 12px 10px;
 }
+
 .deuda-tik-drawer-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
+  margin-bottom: 4px;
   cursor: pointer;
-  color: #004D40;
-  font-weight: 500;
-  transition: background 0.2s;
+  color: #334155;
+  font-weight: 600;
+  border-radius: 12px;
+  transition: all 0.2s;
   font-size: 14px;
+  border: 1px solid transparent;
 }
-.deuda-tik-drawer-item:hover, .deuda-tik-drawer-item.active {
-  background: #B2DFDB;
+
+.deuda-tik-drawer-item:hover {
+  background: rgba(255, 255, 255, 0.6);
+  color: #0f766e;
 }
+
+.deuda-tik-drawer-item.active {
+  background: rgba(0, 150, 136, 0.12);
+  color: #0f766e;
+  border-color: rgba(0, 150, 136, 0.15);
+}
+
 .deuda-tik-drawer-item-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
 }
+
 .deuda-tik-drawer-item-icon {
   font-size: 18px;
   width: 24px;
   text-align: center;
 }
+
 .deuda-tik-drawer-badge {
-  background: #80CBC4;
-  color: #004D40;
+  background: rgba(0, 150, 136, 0.15);
+  color: #0f766e;
   font-size: 11px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 20px;
 }
 
 /* Dashboard Actions Grid */
 .deuda-tik-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 1px;
-  background: #CFD8DC;
-  flex-grow: 1;
-  overflow-y: auto;
+  gap: 16px;
+  padding: 20px;
+  box-sizing: border-box;
 }
+
 .deuda-tik-grid-item {
-  background: white;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2074,116 +2126,154 @@ table.nt tbody tr:hover td,
   padding: 24px 16px;
   text-align: center;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.015);
 }
+
+.deuda-tik-grid-item:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
 .deuda-tik-grid-item:active {
-  background-color: #ECEFF1;
+  transform: translateY(0);
 }
+
 .deuda-tik-grid-icon {
-  font-size: 38px;
+  font-size: 36px;
   margin-bottom: 12px;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.05));
 }
+
 .deuda-tik-grid-label {
-  font-size: 13px;
-  font-weight: bold;
-  color: #37474F;
-  line-height: 1.4;
-  padding: 0 8px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #1E293B;
+  line-height: 1.35;
 }
+
 .deuda-tik-grid-sub {
   font-size: 11px;
-  color: #546E7A;
+  color: #64748B;
   margin-top: 6px;
-  font-weight: bold;
+  font-weight: 700;
 }
 
 /* Facturas/Bills List styles */
 .deuda-tik-list-container {
-  flex-grow: 1;
-  overflow-y: auto;
-  padding: 8px 12px;
-  background: #F5F7F8;
-  position: relative;
+  padding: 16px 20px;
+  box-sizing: border-box;
 }
+
 .deuda-tik-group-header {
   display: flex;
   justify-content: space-between;
-  padding: 10px 14px;
-  background: #E0E0E0;
-  font-size: 13px;
-  font-weight: bold;
-  color: #424242;
-  margin: 12px -12px 8px -12px;
-  border-bottom: 1px solid #D5D5D5;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(5px);
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #475569;
+  margin: 20px 0 10px 0;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
+
 .deuda-tik-bill-card {
-  background: white;
-  border: 1px solid #E0E0E0;
-  border-radius: 6px;
-  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 16px;
+  margin-bottom: 10px;
   display: flex;
   align-items: center;
-  padding: 10px;
+  padding: 12px 16px;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: all 0.2s;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.01);
 }
+
+.deuda-tik-bill-card:hover {
+  background: rgba(255, 255, 255, 0.85);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
 .deuda-tik-bill-card:active {
-  background: #FAFAFA;
+  transform: translateY(0);
 }
+
 .deuda-tik-bill-date-box {
-  width: 52px;
-  height: 52px;
-  border-radius: 4px;
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin-right: 12px;
+  margin-right: 14px;
   flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.4);
 }
+
 .deuda-tik-bill-date-day {
-  font-size: 18px;
-  font-weight: bold;
+  font-size: 19px;
+  font-weight: 800;
 }
+
 .deuda-tik-bill-date-month {
   font-size: 10px;
   text-transform: uppercase;
-  font-weight: bold;
+  font-weight: 800;
   margin-top: 1px;
 }
+
 .deuda-tik-bill-date-box.atrasado {
-  background: #FFCDD2;
-  color: #B71C1C;
+  background: rgba(254, 226, 226, 0.7);
+  color: #DC2626;
+  border-color: rgba(239, 68, 68, 0.2);
 }
+
 .deuda-tik-bill-date-box.aldia {
-  background: #E8F5E9;
-  color: #1B5E20;
+  background: rgba(220, 252, 231, 0.7);
+  color: #15803D;
+  border-color: rgba(34, 197, 94, 0.2);
 }
+
 .deuda-tik-bill-date-box.hoy {
-  background: #FFF9C4;
-  color: #F57F17;
+  background: rgba(254, 243, 199, 0.7);
+  color: #B45309;
+  border-color: rgba(245, 158, 11, 0.2);
 }
+
 .deuda-tik-bill-content {
   flex-grow: 1;
   min-width: 0;
-  padding-right: 8px;
+  padding-right: 10px;
 }
+
 .deuda-tik-bill-title {
-  font-size: 14px;
-  font-weight: bold;
-  color: #212121;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #0F172A;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .deuda-tik-bill-subtitle {
-  font-size: 11px;
-  color: #757575;
+  font-size: 11.5px;
+  color: #64748B;
   margin-top: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .deuda-tik-bill-right {
   display: flex;
   flex-direction: column;
@@ -2191,51 +2281,71 @@ table.nt tbody tr:hover td,
   justify-content: center;
   white-space: nowrap;
 }
+
 .deuda-tik-bill-status {
-  font-size: 11px;
-  font-weight: bold;
-  margin-bottom: 2px;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
 }
+
 .deuda-tik-bill-status.atrasado {
-  color: #C2185B;
+  background: rgba(254, 226, 226, 0.6);
+  color: #B91C1C;
 }
+
 .deuda-tik-bill-status.aldia {
-  color: #1B5E20;
+  background: rgba(220, 252, 231, 0.6);
+  color: #15803D;
 }
+
 .deuda-tik-bill-status.hoy {
-  color: #F57F17;
+  background: rgba(254, 243, 199, 0.6);
+  color: #D97706;
 }
+
 .deuda-tik-bill-amount-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 2px;
+  gap: 6px;
+  margin-top: 4px;
 }
+
 .deuda-tik-bill-amount {
-  font-size: 14px;
-  font-weight: bold;
+  font-size: 15px;
+  font-weight: 800;
 }
+
 .deuda-tik-bill-amount.atrasado {
-  color: #B71C1C;
+  color: #B91C1C;
 }
+
 .deuda-tik-bill-amount.aldia {
-  color: #212121;
+  color: #1E293B;
 }
+
 .deuda-tik-bill-runner {
-  font-size: 14px;
-  color: #9E9E9E;
+  font-size: 15px;
+  animation: run-wiggle 1.5s infinite ease-in-out;
+}
+
+@keyframes run-wiggle {
+  0%, 100% { transform: rotate(0deg) translateX(0); }
+  25% { transform: rotate(-5deg) translateX(-1px); }
+  75% { transform: rotate(5deg) translateX(1px); }
 }
 
 /* FAB */
 .deuda-tik-fab {
-  position: absolute;
+  position: fixed;
   bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 56px;
-  height: 56px;
+  right: 24px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
-  background: #009688;
+  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
   color: white;
   border: none;
   font-size: 28px;
@@ -2243,150 +2353,232 @@ table.nt tbody tr:hover td,
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-  z-index: 10;
-  transition: transform 0.2s, background-color 0.2s;
+  box-shadow: 0 8px 30px rgba(13, 148, 136, 0.35);
+  z-index: 100;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   outline: none;
 }
-.deuda-tik-fab:active {
-  background: #00796B;
-  transform: translateX(-50%) scale(0.95);
+
+.deuda-tik-fab:hover {
+  transform: scale(1.08) translateY(-2px);
+  box-shadow: 0 12px 35px rgba(13, 148, 136, 0.45);
 }
 
-/* Tik Form */
+.deuda-tik-fab:active {
+  transform: scale(0.95) translateY(0);
+}
+
+/* Glass Form */
 .deuda-tik-form {
-  padding: 16px 20px;
-  flex-grow: 1;
-  overflow-y: auto;
-  background: #FAFAFA;
+  padding: 24px 20px;
+  box-sizing: border-box;
 }
+
 .deuda-tik-field {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.01);
 }
+
 .deuda-tik-label {
-  font-size: 12px;
-  font-weight: bold;
-  color: #880E4F;
+  font-size: 11px;
+  font-weight: 800;
+  color: #0f766e;
   text-transform: uppercase;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
   display: block;
+  letter-spacing: 0.05em;
 }
+
 .deuda-tik-input {
   width: 100%;
-  border: none;
-  border-bottom: 1px solid #B0BEC5;
-  background: transparent;
-  padding: 6px 0;
-  font-size: 15px;
-  color: #37474F;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14.5px;
+  color: #1E293B;
   outline: none;
-  transition: border-color 0.2s;
-}
-.deuda-tik-input:focus {
-  border-bottom-color: #880E4F;
-}
-.deuda-tik-select {
-  width: 100%;
-  border: none;
-  border-bottom: 1px solid #B0BEC5;
-  background: transparent;
-  padding: 8px 0;
-  font-size: 15px;
-  color: #37474F;
-  outline: none;
-}
-.deuda-tik-select:focus {
-  border-bottom-color: #880E4F;
+  transition: all 0.2s;
+  box-sizing: border-box;
 }
 
-/* Popup Recurring modal */
+.deuda-tik-input:focus {
+  border-color: #0d9488;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+}
+
+.deuda-tik-select {
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14.5px;
+  color: #1E293B;
+  outline: none;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.deuda-tik-select:focus {
+  border-color: #0d9488;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+}
+
+/* Glass Modal Overlay */
 .deuda-tik-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0,0,0,0.5);
+  background: rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: 10000;
 }
+
 .deuda-tik-modal {
   width: 90%;
-  max-width: 380px;
-  background: white;
-  border-radius: 4px;
+  max-width: 420px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 24px;
   padding: 24px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+  box-sizing: border-box;
+  max-height: 90vh;
+  overflow-y: auto;
 }
+
 .deuda-tik-modal-title {
-  font-size: 15px;
-  font-weight: bold;
-  line-height: 1.45;
-  color: #212121;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.4;
+  color: #0F172A;
   margin-bottom: 20px;
+  letter-spacing: -0.01em;
 }
+
 .deuda-tik-modal-option {
   display: flex;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   cursor: pointer;
+  padding: 12px;
+  background: rgba(255,255,255,0.4);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 12px;
+  transition: all 0.2s;
 }
+
+.deuda-tik-modal-option:hover {
+  background: rgba(255,255,255,0.7);
+  border-color: rgba(0, 150, 136, 0.15);
+}
+
 .deuda-tik-modal-option input[type="radio"] {
   margin-right: 12px;
-  width: 20px;
-  height: 20px;
-  accent-color: #009688;
+  width: 18px;
+  height: 18px;
+  accent-color: #0d9488;
 }
+
 .deuda-tik-modal-option-text {
   font-size: 14px;
-  color: #212121;
+  color: #334155;
+  font-weight: 600;
 }
+
 .deuda-tik-modal-custom-row {
   display: flex;
   align-items: center;
   margin-top: 8px;
-  padding-left: 32px;
+  padding-left: 12px;
+  margin-bottom: 12px;
 }
+
 .deuda-tik-modal-spinner {
-  width: 70px;
-  margin-left: 10px;
-  padding: 6px;
-  border: 1px solid #B0BEC5;
-  border-radius: 4px;
+  width: 90px;
+  padding: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
   outline: none;
   font-size: 14px;
+  background: #FFFFFF;
 }
+
 .deuda-tik-modal-spinner:focus {
-  border-color: #009688;
+  border-color: #0d9488;
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.1);
 }
+
 .deuda-tik-modal-footer-text {
   font-size: 12px;
-  color: #616161;
-  margin-top: 20px;
-  line-height: 1.4;
-  font-weight: bold;
+  color: #64748B;
+  margin-top: 16px;
+  line-height: 1.45;
+  font-weight: 600;
+  background: rgba(0, 150, 136, 0.05);
+  padding: 10px 14px;
+  border-radius: 10px;
 }
+
 .deuda-tik-modal-buttons {
   display: flex;
   justify-content: flex-end;
-  gap: 16px;
-  margin-top: 24px;
+  gap: 12px;
+  margin-top: 20px;
 }
+
 .deuda-tik-modal-btn {
   background: transparent;
   border: none;
-  color: #009688;
-  font-weight: bold;
+  color: #0f766e;
+  font-weight: 700;
   font-size: 14px;
   cursor: pointer;
   padding: 8px 16px;
   outline: none;
-  border-radius: 4px;
+  border-radius: 8px;
+  transition: background 0.2s;
 }
+
+.deuda-tik-modal-btn:hover {
+  background: rgba(0, 150, 136, 0.08);
+}
+
+.deuda-tik-modal-btn-primary {
+  background: #0d9488;
+  color: white;
+  border: none;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px 16px;
+  outline: none;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.deuda-tik-modal-btn-primary:hover {
+  background: #0f766e;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2);
+}
+
 .deuda-tik-modal-btn:active {
-  background: #E0F2F1;
+  background: rgba(0, 150, 136, 0.08);
 }
 </style>
 </head>
@@ -3198,6 +3390,35 @@ function loadStateForModo(modo){
   const isNeg = modo==='negocio';
   state.transactions = load(k.tx,[]);
   state.deudas       = load(k.deudas,[]);
+  if (Array.isArray(state.deudas) && !state.deudas.some(d => String(d.name).toLowerCase().includes('scotiabank'))) {
+    const scotiaDebt = {
+      id: 'deu_scotiabank_hipotecario',
+      name: 'Scotiabank Crédito Hipotecario 🏠✨',
+      tipo: 'hipoteca',
+      tipoLabel: 'Hipoteca',
+      rol: 'debo',
+      notes: 'Crédito hipotecario Scotiabank · ¡Ahorro para mi hogar! 🔑',
+      totalAmount: 124329.00,
+      cuotaMonto: 3634.08,
+      cuotaMontoFixed: 3634.08,
+      cuotasTotales: 36,
+      cuotasPagadas: 21,
+      seguroMonto: 101.97,
+      tea: 15.95,
+      fechaInicio: '2024-06-08',
+      diaPago: 8,
+      pagos: [],
+      color: '#C2185B'
+    };
+    state.deudas.unshift(scotiaDebt);
+    if (typeof deudaNormalizePagos === 'function') {
+      deudaNormalizePagos(scotiaDebt, scotiaDebt);
+    }
+    const kSave = getKeys(modo);
+    try {
+      localStorage.setItem(kSave.deudas, JSON.stringify(state.deudas));
+    } catch(e) {}
+  }
   state.servicios    = load(k.services, isNeg ? DEFAULT_SERVICES_NEG : DEFAULT_SERVICES);
   state.catsIn       = load(k.catsIn,   isNeg ? DEFAULT_CATS_NEG_IN  : DEFAULT_CATS_IN);
   state.catsEx       = load(k.catsEx,   isNeg ? DEFAULT_CATS_NEG_EX  : DEFAULT_CATS_EX);
@@ -4693,58 +4914,70 @@ function applyCategoryToTransactions(oldCat, newCat){
   return changed;
 }
 
-function saveCat(editId,type){
-  const name=document.getElementById('cat-name').value.trim();
-  if(!name)return toast('Escribe un nombre para la categoría','error');
-  const finalType=window._catType||type;
-  const allBefore=[...(state.catsIn||[]),...(state.catsEx||[])];
-  const oldCat=editId ? allBefore.find(c=>c.id===editId) : null;
-  const item={
-    ...(oldCat || {}),
-    id:editId||Date.now()+'',
-    name,
-    icon:window._catIcon||oldCat?.icon||'🏷',
-    color:window._catColor||oldCat?.color||CAT_COLORS[0],
-    type:finalType
-  };
-  let updatedMovs = 0;
-  if(editId && oldCat){
-    const used = categoryUsage(oldCat);
-    const structuralChange = oldCat.name !== item.name || oldCat.type !== item.type;
-    if(used.length && structuralChange){
-      const msg = 'Esta categoría ya se usa en ' + used.length + ' movimiento(s).\n\nAceptar: actualizar también esos movimientos al nuevo nombre/tipo.\nCancelar: mantener el historial como está y solo cambiar la categoría para futuros movimientos.';
-      if(confirm(msg)){
-        updatedMovs = applyCategoryToTransactions(oldCat, item);
+function deudaFrenchAmortizationTable(d) {
+  const capital = parseFloat(d.totalAmount) || 0;
+  const tea = parseFloat(d.tea || d.tasaMensual || 0);
+  const plazo = parseInt(d.cuotasTotales) || 1;
+  const seguro = parseFloat(d.seguroMonto || d.seguro || 0);
+  const isFrench = String(d.tipo).toLowerCase() === 'hipoteca' || !!d.amortizacionFrancesa || !!d.tea;
+  const isMonthlyRate = !!d.tasaMensual && !d.tea;
+  const tem = isMonthlyRate ? (tea / 100) : (tea > 0 ? Math.pow(1 + tea/100, 1/12) - 1 : 0);
+  
+  let cuotaFixed = parseFloat(d.cuotaMontoFixed || d.cuotaMonto) || 0;
+  let cuotaFinanciera = 0;
+  
+  if (isFrench) {
+    if (cuotaFixed > seguro) {
+      cuotaFinanciera = cuotaFixed - seguro;
+    } else {
+      if (tem === 0) {
+        cuotaFinanciera = capital / plazo;
+      } else {
+        cuotaFinanciera = (capital * tem) / (1 - Math.pow(1 + tem, -plazo));
       }
+      cuotaFixed = cuotaFinanciera + seguro;
     }
+  } else {
+    cuotaFixed = d.cuotaMonto || (capital / plazo);
+    cuotaFinanciera = cuotaFixed;
   }
-
-  state.catsIn=(state.catsIn||[]).filter(c=>c.id!==item.id);
-  state.catsEx=(state.catsEx||[]).filter(c=>c.id!==item.id);
-  if(finalType==='ingreso') state.catsIn.push(item);
-  else state.catsEx.push(item);
-
-  catPageType=finalType;
-  saveAll();closeModal();render();
-  toast(editId
-    ? ('Categoría actualizada' + (updatedMovs ? ' · ' + updatedMovs + ' movimientos corregidos' : ''))
-    : 'Categoría creada ✓');
+  
+  let saldo = capital;
+  const table = [];
+  for (let i = 1; i <= plazo; i++) {
+    let interes = 0;
+    let capitalAmort = 0;
+    let cuotaTotal = cuotaFixed;
+    
+    if (isFrench) {
+      interes = parseFloat((saldo * tem).toFixed(2));
+      capitalAmort = parseFloat((cuotaFinanciera - interes).toFixed(2));
+      if (i === plazo || saldo - capitalAmort < 0.1) {
+        capitalAmort = saldo;
+      }
+      cuotaTotal = parseFloat((capitalAmort + interes + seguro).toFixed(2));
+    } else {
+      capitalAmort = parseFloat((capital / plazo).toFixed(2));
+      if (i === plazo || saldo - capitalAmort < 0.1) {
+        capitalAmort = saldo;
+      }
+      cuotaTotal = cuotaFixed;
+    }
+    
+    saldo = parseFloat((saldo - capitalAmort).toFixed(2));
+    if (saldo < 0) saldo = 0;
+    
+    table.push({
+      mes: i,
+      interes,
+      capitalMes: capitalAmort,
+      seguro,
+      cuota: cuotaTotal,
+      saldo
+    });
+  }
+  return table;
 }
-
-function deleteCat(id){
-  const all=[...(state.catsIn||[]),...(state.catsEx||[])];
-  const cat=all.find(c=>c.id===id);
-  if(!cat) return;
-  const used = categoryUsage(cat);
-  if(used.length){
-    const msg = 'Esta categoría está usada en ' + used.length + ' movimiento(s).\n\nSi la eliminas, esos movimientos conservarán su nombre actual como historial, pero la categoría ya no aparecerá para nuevos registros.\n\n¿Eliminar de todos modos?';
-    if(!confirm(msg)) return;
-  } else if(!confirm('¿Eliminar esta categoría?')) return;
-  state.catsIn=(state.catsIn||[]).filter(c=>c.id!==id);
-  state.catsEx=(state.catsEx||[]).filter(c=>c.id!==id);
-  saveAll();render();toast(used.length ? 'Categoría eliminada · movimientos conservados' : 'Categoría eliminada');
-}
-
 
 function debtHtml(v){
   return String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -4780,64 +5013,105 @@ function debtFmtDate(v){
 function deudaPagoTxId(debtId, pagoId){
   return 'debtpay_' + String(debtId || '').replace(/[^a-zA-Z0-9_-]/g,'') + '_' + String(pagoId || '').replace(/[^a-zA-Z0-9_-]/g,'');
 }
-function deudaPagos(d){
+
+function deudaPagos(d) {
   return Array.isArray(d?.pagos) ? d.pagos : [];
 }
-function deudaMontoPagado(d){
-  const pagos = deudaPagos(d);
-  if(pagos.length) return pagos.reduce((s,p)=>s + moneyValue(p.monto), 0);
-  return moneyValue(d?.cuotasPagadas) * moneyValue(d?.cuotaMonto);
+
+function deudaCuotaPaid(d, i) {
+  return deudaPagos(d).filter(p => Number(p.cuota) === i).reduce((s, p) => s + parseFloat(p.monto || 0), 0);
 }
-function deudaInicio(d){
+
+function deudaCuotaIsPaid(d, i, table) {
+  const t = table || deudaFrenchAmortizationTable(d);
+  const due = t[i-1] ? t[i-1].cuota : (parseFloat(d.cuotaMonto) || 0);
+  return deudaCuotaPaid(d, i) >= due - 0.05;
+}
+
+function deudaMontoPagado(d) {
+  const pagos = deudaPagos(d);
+  if (pagos.length) return pagos.reduce((s, p) => s + parseFloat(p.monto || 0), 0);
+  return (parseFloat(d?.cuotasPagadas) || 0) * (parseFloat(d?.cuotaMonto) || 0);
+}
+
+function deudaInicio(d) {
   return debtIsoDate(d?.fechaInicio || d?.fechaPrimerPago || d?.createdAt || todayStr());
 }
-function deudaDiaPago(d){
+
+function deudaDiaPago(d) {
   const ini = deudaInicio(d);
   const day = Number(d?.diaPago || ini.slice(8,10));
   return Math.max(1, Math.min(31, day || 1));
 }
-function deudaFin(d){
-  const total = Math.max(1, Math.floor(moneyValue(d?.cuotasTotales) || 1));
+
+function deudaFin(d) {
+  const total = Math.max(1, Math.floor(parseFloat(d?.cuotasTotales) || 1));
   return debtAddMonths(deudaInicio(d), total - 1, deudaDiaPago(d));
 }
-function deudaProximoPago(d){
-  const pagadas = Math.max(0, Math.floor(moneyValue(d?.cuotasPagadas)));
-  const total = Math.max(0, Math.floor(moneyValue(d?.cuotasTotales)));
-  if(pagadas >= total) return '';
-  return debtAddMonths(deudaInicio(d), pagadas, deudaDiaPago(d));
+
+function deudaProximoPago(d) {
+  const total = Math.max(0, Math.floor(parseFloat(d?.cuotasTotales) || 0));
+  const table = deudaFrenchAmortizationTable(d);
+  for (let i = 1; i <= total; i++) {
+    if (!deudaCuotaIsPaid(d, i, table)) {
+      return debtAddMonths(deudaInicio(d), i - 1, deudaDiaPago(d));
+    }
+  }
+  return '';
 }
-function debtDaysBetween(a,b){
+
+function debtDaysBetween(a,b) {
   const da = debtIsoDate(a).split('-').map(Number);
   const db = debtIsoDate(b).split('-').map(Number);
   const ta = Date.UTC(da[0], da[1]-1, da[2]);
   const tb = Date.UTC(db[0], db[1]-1, db[2]);
   return Math.round((tb - ta) / 86400000);
 }
-function deudaCuotasVencidasAlDia(d, ref=todayStr()){
-  const total = Math.max(0, Math.floor(moneyValue(d?.cuotasTotales)));
-  if(!total) return 0;
+
+function deudaCuotasVencidasAlDia(d, ref = todayStr()) {
+  const total = Math.max(0, Math.floor(parseFloat(d?.cuotasTotales) || 0));
+  if (!total) return 0;
   let vencidas = 0;
-  for(let i=0;i<total;i++){
+  for (let i = 0; i < total; i++) {
     const fecha = debtAddMonths(deudaInicio(d), i, deudaDiaPago(d));
-    if(debtDaysBetween(fecha, ref) >= 0) vencidas++;
+    if (debtDaysBetween(fecha, ref) >= 0) vencidas++;
   }
   return vencidas;
 }
-function deudaEstadoTiempo(d, ref=todayStr()){
-  const pagadas = Math.max(0, Math.floor(moneyValue(d?.cuotasPagadas)));
-  const total = Math.max(0, Math.floor(moneyValue(d?.cuotasTotales)));
-  if(total > 0 && pagadas >= total) return {label:'Completada', detail:'Sin cuotas pendientes', tone:'ok', bg:'#ECFDF5', color:'#047857', days:0, atraso:0};
+
+function deudaEstadoTiempo(d, ref = todayStr()) {
+  const total = Math.max(0, Math.floor(parseFloat(d?.cuotasTotales) || 0));
+  const table = deudaFrenchAmortizationTable(d);
+  
+  let fullyPaidCount = 0;
+  for (let i = 1; i <= total; i++) {
+    if (deudaCuotaIsPaid(d, i, table)) fullyPaidCount++;
+  }
+  
+  if (total > 0 && fullyPaidCount >= total) {
+    return {label:'Completada', detail:'Sin cuotas pendientes', tone:'ok', bg:'#ECFDF5', color:'#047857', days:0, atraso:0};
+  }
+  
   const next = deudaProximoPago(d);
-  if(!next) return {label:'Sin fecha', detail:'Falta configurar vencimiento', tone:'muted', bg:'#F8FAFC', color:'#64748B', days:0, atraso:0};
+  if (!next) return {label:'Sin fecha', detail:'Falta configurar vencimiento', tone:'muted', bg:'#F8FAFC', color:'#64748B', days:0, atraso:0};
+  
   const diff = debtDaysBetween(ref, next);
   const vencidas = deudaCuotasVencidasAlDia(d, ref);
-  const atraso = Math.max(0, vencidas - pagadas);
-  if(diff < 0) return {label:'Atrasada', detail:Math.abs(diff) + ' dia(s) vencida' + (atraso ? ' · ' + atraso + ' cuota(s) atrasadas' : ''), tone:'bad', bg:'#FEF2F2', color:'#B91C1C', days:diff, atraso};
-  if(diff === 0) return {label:'Vence hoy', detail:'Esta cuota pertenece al periodo actual', tone:'warn', bg:'#FFF7ED', color:'#C2410C', days:0, atraso};
-  if(diff <= 5) return {label:'Por vencer', detail:'Faltan ' + diff + ' dia(s)', tone:'warn', bg:'#FFFBEB', color:'#A16207', days:diff, atraso};
-  return {label:'Al dia', detail:'Proximo pago en ' + diff + ' dia(s)', tone:'ok', bg:'#ECFDF5', color:'#047857', days:diff, atraso};
+  const atraso = Math.max(0, vencidas - fullyPaidCount);
+  
+  if (diff < 0) {
+    return {label:'Atrasada', detail:Math.abs(diff) + ' día(s) vencida · ' + atraso + ' cuota(s) atrasadas 🏃', tone:'bad', bg:'#FEF2F2', color:'#B91C1C', days:diff, atraso};
+  }
+  if (diff === 0) {
+    return {label:'Vence hoy', detail:'Esta cuota pertenece al periodo actual 💸', tone:'warn', bg:'#FFF7ED', color:'#C2410C', days:0, atraso};
+  }
+  if (diff <= 5) {
+    return {label:'Por vencer', detail:'Faltan ' + diff + ' día(s) ⏰', tone:'warn', bg:'#FFFBEB', color:'#A16207', days:diff, atraso};
+  }
+  return {label:'Al día', detail:'Próximo pago en ' + diff + ' día(s) ✅', tone:'ok', bg:'#ECFDF5', color:'#047857', days:diff, atraso};
 }
-function debtSmartFormData(){
+
+function debtSmartFormData() {
   const cleanNum = s => parseFloat(String(s||'').replace(',','.')) || 0;
   const total = Math.max(0, parseInt(document.getElementById('d-ntotal')?.value)||0);
   const paid = Math.max(0, Math.min(total || 9999, parseInt(document.getElementById('d-npag')?.value)||0));
@@ -4846,47 +5120,68 @@ function debtSmartFormData(){
   const venc = debtIsoDate(document.getElementById('d-vencimiento')?.value || debtAddMonths(inicio, paid, dia));
   const cuota = cleanNum(document.getElementById('d-cuota')?.value);
   const totalAmount = cleanNum(document.getElementById('d-total')?.value) || cuota * total;
-  return {total, paid, venc, dia, inicio, cuota, totalAmount};
+  const tea = cleanNum(document.getElementById('d-tea')?.value);
+  const seguro = cleanNum(document.getElementById('d-seguro')?.value);
+  return {total, paid, venc, dia, inicio, cuota, totalAmount, tea, seguro};
 }
-function debtSmartPreviewUpdate(){
+
+function debtSmartPreviewUpdate() {
   const data = debtSmartFormData();
   const diaEl = document.getElementById('d-dia-pago');
   const inicioEl = document.getElementById('d-inicio');
-  if(diaEl) diaEl.value = data.dia;
-  if(inicioEl) inicioEl.value = data.inicio;
+  if (diaEl) diaEl.value = data.dia;
+  if (inicioEl) inicioEl.value = data.inicio;
+  
   const fin = data.total ? debtAddMonths(data.inicio, data.total - 1, data.dia) : data.venc;
-  const ghost = {fechaInicio:data.inicio, diaPago:data.dia, cuotasTotales:data.total, cuotasPagadas:data.paid, cuotaMonto:data.cuota};
+  const ghost = {
+    fechaInicio: data.inicio,
+    diaPago: data.dia,
+    cuotasTotales: data.total,
+    cuotasPagadas: data.paid,
+    cuotaMonto: data.cuota,
+    cuotaMontoFixed: data.cuota,
+    totalAmount: data.totalAmount,
+    tea: data.tea,
+    seguroMonto: data.seguro,
+    tipo: document.getElementById('d-tipo')?.value || 'Banco'
+  };
+  
   const estado = deudaEstadoTiempo(ghost);
   const endEl = document.getElementById('d-smart-final');
   const countEl = document.getElementById('d-smart-count');
   const statusEl = document.getElementById('d-smart-status');
-  if(endEl) endEl.textContent = debtFmtDate(fin);
-  if(countEl) countEl.textContent = data.total ? data.total + ' factura(s)/cuota(s)' : 'Sin cuotas';
+  if (endEl) endEl.textContent = debtFmtDate(fin);
+  if (countEl) countEl.textContent = data.total ? data.total + ' factura(s)/cuota(s)' : 'Sin cuotas';
+  
   const lastPaidEl = document.getElementById('d-last-paid-info');
-  if(lastPaidEl){
-    if(data.paid > 0){
+  if (lastPaidEl) {
+    if (data.paid > 0) {
       const lastPaidDate = debtAddMonths(data.inicio, data.paid - 1, data.dia);
       lastPaidEl.textContent = `Última cuota pagada: Cuota ${data.paid} el ${debtFmtDate(lastPaidDate)}`;
     } else {
       lastPaidEl.textContent = 'Ninguna cuota pagada aún';
     }
   }
-  if(statusEl){
+  if (statusEl) {
     statusEl.style.background = estado.bg;
     statusEl.style.color = estado.color;
     statusEl.style.borderColor = estado.color + '33';
     statusEl.textContent = estado.label + ' · ' + estado.detail;
   }
 }
-function debtApplyRecurringPlan(months){
+
+function debtApplyRecurringPlan(months) {
   const el = document.getElementById('d-ntotal');
-  if(el) el.value = Math.max(1, Number(months||1));
+  if (el) el.value = Math.max(1, Number(months||1));
   debtSmartPreviewUpdate();
 }
-function deudaBuildPago(d, cuotaNum, pago){
+
+function deudaBuildPago(d, cuotaNum, pago) {
   const id = pago?.id || (Date.now() + '_c' + cuotaNum + '_' + Math.random().toString(36).slice(2,6));
   const fecha = pago?.fecha || debtAddMonths(deudaInicio(d), cuotaNum - 1, deudaDiaPago(d));
-  const monto = moneyValue(pago?.monto || d?.cuotaMonto);
+  const table = deudaFrenchAmortizationTable(d);
+  const row = table[cuotaNum - 1] || {cuota: parseFloat(d.cuotaMonto) || 0};
+  const monto = parseFloat(pago?.monto || row.cuota);
   const afectaBalance = pago?.afectaBalance === true || pago?.balanceAfectado === true;
   return {
     ...(pago || {}),
@@ -4900,17 +5195,20 @@ function deudaBuildPago(d, cuotaNum, pago){
     historico: pago?.historico === true || !afectaBalance
   };
 }
-function deudaPagoAfectaBalance(p){
+
+function deudaPagoAfectaBalance(p) {
   return !!p && (p.afectaBalance === true || p.balanceAfectado === true);
 }
-function deudaTxNombre(tx){
+
+function deudaTxNombre(tx) {
   const raw = String(tx?.deudaNombre || tx?.description || tx?.category || '').trim();
   const m = raw.match(/(?:pago|cobro)(?:\s+de)?\s+(?:deuda|cuota|prestamo|pr[eé]stamo)?\s*(?:[:\\-])?\s*([^·|]+?)(?:\s*·|\s+cuota\s+\d|$)/i);
   let name = (tx?.deudaNombre || (m && m[1]) || '').trim();
   if(!name && /^pago de deuda\s+/i.test(String(tx?.category||''))) name = String(tx.category).replace(/^pago de deuda\s+/i,'').trim();
   return name || 'Deuda';
 }
-function deudaTxLooksLike(tx){
+
+function deudaTxLooksLike(tx) {
   if(!tx) return false;
   const cat = String(tx.category || '').toLowerCase();
   const desc = String(tx.description || '').toLowerCase();
@@ -5141,7 +5439,7 @@ function renderPPExpandedDetail(p){
     }).join('') + '</div>' +
     '<div class="deuda-cuotas-info"><span><span style="color:#9B59B6;font-weight:800">' + paid + '</span> pagadas · <span style="color:var(--red);font-weight:800">' + restantes + '</span> pendientes</span><span>de ' + total + '</span></div>' +
     '<div style="font-size:10px;color:#6C3483;margin-top:4px;font-weight:600">' + {solo_interes:'Solo interés mensual',frances:'Cuota fija (francés)',aleman:'Capital fijo (alemán)'}[p.sistema||'solo_interes'] + ' · ' + p.tasaMensual + '% mensual</div>' +
-    (p.notas ? '<div style="font-size:10px;color:var(--muted);margin-top:4px;padding:5px 8px;background:#F8FAFC;border-radius:6px">' + debtHtml(p.notas) + '</div>' : '') +
+    (p.notes ? '<div style="font-size:10px;color:var(--muted);margin-top:4px;padding:5px 8px;background:#F8FAFC;border-radius:6px">' + debtHtml(p.notes) + '</div>' : '') +
     '<div style="display:flex;gap:6px;margin-top:10px">' +
       (!done ? '<button onclick="event.stopPropagation();pagarPrestPers(\'' + id + '\')" style="flex:1;background:linear-gradient(135deg,#6C3483,#9B59B6);border:none;color:#fff;border-radius:10px;padding:10px;font-family:\'DM Sans\',sans-serif;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(108,52,131,.25)">Registrar pago</button>' : '') +
       '<button onclick="event.stopPropagation();editPrestPers(\'' + id + '\')" style="width:36px;height:36px;background:#F8FAFC;border:1px solid var(--border);color:var(--muted);border-radius:10px;cursor:pointer;font-size:13px">✎</button>' +
@@ -5173,23 +5471,20 @@ function openDeudaMenu(){
     <button class="btn-ghost" onclick="closeModal()" style="width:100%;margin-top:10px">Cancelar</button>`;
   showModal();
 }
-
-function renderDeudas(){
+function renderDeudas() {
   // Initialize window state and helper functions if not already present
   window._deudaSubPage = window._deudaSubPage || 'acciones';
   window._deudaDrawerOpen = !!window._deudaDrawerOpen;
-  window._deudaRecurringModalOpen = !!window._deudaRecurringModalOpen;
-  window._deudaRecurringDraft = window._deudaRecurringDraft || null;
   window._deudaEditId = window._deudaEditId || null;
   window._deudaActiveBillId = window._deudaActiveBillId || null;
   
   window._deudaCategories = window._deudaCategories || [
-    'Tarjeta de crédito/Otro préstamo',
-    'Servicio fijo',
-    'Préstamo personal',
     'Hipoteca',
-    'Préstamo automotriz',
-    'Otro'
+    'Tarjeta de crédito',
+    'Préstamo personal',
+    'Factura recurrente',
+    'Banco',
+    'Personal'
   ];
 
   window.formatDeudaTikDate = window.formatDeudaTikDate || function(isoStr) {
@@ -5217,28 +5512,48 @@ function renderDeudas(){
     render();
   };
 
-  window.payVirtualBill = window.payVirtualBill || function(debtId, cuotaNum) {
+  window.payVirtualBill = window.payVirtualBill || function(debtId, cuotaNum, amountInput) {
     const d = (state.deudas || []).find(x => String(x.id) === String(debtId));
     if (!d) return;
-    const target = d.cuotasPagadas + 1;
-    const monto = d.cuotaMonto;
+    
+    const table = deudaFrenchAmortizationTable(d);
+    const row = table[cuotaNum - 1] || { cuota: parseFloat(d.cuotaMonto) || 0 };
+    const totalDue = row.cuota;
+    const alreadyPaid = deudaCuotaPaid(d, cuotaNum);
+    const remaining = Math.max(0, totalDue - alreadyPaid);
+    
+    const paymentAmount = amountInput !== undefined ? parseFloat(amountInput) : remaining;
+    if (isNaN(paymentAmount) || paymentAmount <= 0) {
+      toast('Por favor ingresa un monto válido mayor a cero', 'error');
+      return;
+    }
+    
+    const id = Date.now() + '_c' + cuotaNum + '_' + Math.random().toString(36).slice(2, 6);
     const fecha = todayStr();
-    deudaNormalizePagos(d, d);
-    let pagos = d.pagos || [];
-    pagos.push(deudaBuildPago(d, target, {
+    
+    d.pagos = d.pagos || [];
+    d.pagos.push({
+      id,
+      cuota: cuotaNum,
       fecha,
-      monto,
+      monto: paymentAmount,
       afectaBalance: true,
       historico: false
-    }));
-    d.pagos = pagos;
-    d.cuotasPagadas = pagos.length;
+    });
+    
+    deudaNormalizePagos(d, d);
     deudaReconcilePaymentTxs(d);
     saveAll();
     syncSeccionToSheets('deuda', d);
+    
     window._deudaActiveBillId = null;
     render();
-    toast(`Pago registrado para ${d.name} · cuota ${target}/${d.cuotasTotales}`);
+    
+    if (paymentAmount >= remaining - 0.05) {
+      toast(`🎉 Cuota ${cuotaNum} pagada por completo (S/ ${(alreadyPaid + paymentAmount).toFixed(2)})`);
+    } else {
+      toast(`💸 Abono de S/ ${paymentAmount.toFixed(2)} registrado para cuota ${cuotaNum}`);
+    }
   };
 
   window.editParentDebt = window.editParentDebt || function(debtId) {
@@ -5264,142 +5579,65 @@ function renderDeudas(){
     const tipo = document.getElementById('tik-tipo').value;
     const name = document.getElementById('tik-nombre').value.trim();
     const notes = document.getElementById('tik-notas').value.trim();
-    const repetir = document.getElementById('tik-repetir').value;
     const fecha = document.getElementById('tik-fecha').value;
-    const monto = parseFloat(document.getElementById('tik-monto').value) || 0;
+    
+    const capital = parseFloat(document.getElementById('tik-capital').value) || 0;
+    const tea = parseFloat(document.getElementById('tik-tea').value) || 0;
+    const seguro = parseFloat(document.getElementById('tik-seguro').value) || 0;
+    const plazo = parseInt(document.getElementById('tik-plazo').value) || 1;
+    const cuotaFixed = parseFloat(document.getElementById('tik-cuota-fixed').value) || 0;
     
     if (!name) { toast('Por favor ingresa un nombre', 'error'); return; }
-    if (monto <= 0) { toast('Por favor ingresa un monto válido', 'error'); return; }
+    if (capital <= 0) { toast('Por favor ingresa el capital inicial', 'error'); return; }
+    if (plazo <= 0) { toast('Por favor ingresa un plazo válido', 'error'); return; }
     
-    const draft = { name, tipo, tipoLabel: tipo, notes, repetir, fecha, monto };
+    const isEdit = !!window._deudaEditId;
+    const targetId = isEdit ? window._deudaEditId : ('deu_' + Date.now());
     
-    if (window._deudaEditId) {
-      const d = (state.deudas || []).find(x => String(x.id) === String(window._deudaEditId));
-      if (d) {
-        d.name = name;
-        d.tipoLabel = tipo;
-        d.notes = notes;
-        d.cuotaMonto = monto;
-        d.fechaInicio = fecha;
-        saveAll();
-        syncSeccionToSheets('deuda', d);
-        window._deudaEditId = null;
-        window._deudaSubPage = 'pendientes';
-        render();
-        toast('Factura actualizada');
-      }
-    } else {
-      if (repetir === 'Único') {
-        const newDeuda = {
-          id: 'deu_' + Date.now(),
-          name,
-          tipo: 'unico',
-          tipoLabel: tipo,
-          rol: 'debo',
-          notes,
-          cuotaMonto: monto,
-          totalAmount: monto,
-          cuotasTotales: 1,
-          cuotasPagadas: 0,
-          fechaInicio: fecha,
-          diaPago: parseInt(fecha.slice(8,10)) || 5,
-          pagos: [],
-          color: '#009688'
-        };
-        state.deudas = state.deudas || [];
-        state.deudas.push(newDeuda);
-        saveAll();
-        syncSeccionToSheets('deuda', newDeuda);
-        window._deudaSubPage = 'pendientes';
-        render();
-        toast('Factura guardada');
-      } else {
-        window._deudaRecurringDraft = draft;
-        window._deudaRecurringModalOpen = true;
-        window._deudaRecurringOption = '3years';
-        window._deudaRecurringCustomCount = 37;
-        window._deudaRecurringCustomDate = todayStr();
-        render();
-      }
+    let d = isEdit ? (state.deudas || []).find(x => String(x.id) === String(targetId)) : {};
+    
+    d.id = targetId;
+    d.name = name;
+    d.tipo = tipo.toLowerCase() === 'hipoteca' ? 'hipoteca' : 'tarjeta_credito';
+    d.tipoLabel = tipo;
+    d.rol = 'debo';
+    d.notes = notes;
+    d.totalAmount = capital;
+    d.tea = tea;
+    d.seguroMonto = seguro;
+    d.cuotasTotales = plazo;
+    d.cuotaMontoFixed = cuotaFixed;
+    d.fechaInicio = fecha;
+    d.diaPago = parseInt(fecha.slice(8,10)) || 8;
+    d.color = d.color || '#0d9488';
+    
+    if (!isEdit) {
+      d.pagos = [];
+      d.cuotasPagadas = 0;
     }
-  };
-
-  window.calculateRecurringDetails = window.calculateRecurringDetails || function(draft, option, customCount, customDate) {
-    const start = draft.fecha || todayStr();
-    const parts = start.split('-');
-    const y = parseInt(parts[0]);
-    const m = parseInt(parts[1]);
-    const d = parseInt(parts[2]);
     
-    let count = 37;
-    let endDate = '';
-    
-    if (option === '1year') {
-      count = 13; // inclusive
-      endDate = (y + 1) + '-' + parts[1] + '-' + parts[2];
-    } else if (option === '3years') {
-      count = 37; // inclusive
-      endDate = (y + 3) + '-' + parts[1] + '-' + parts[2];
-    } else if (option === '10years') {
-      count = 121; // inclusive
-      endDate = (y + 10) + '-' + parts[1] + '-' + parts[2];
-    } else if (option === 'calendar') {
-      const endStr = customDate || todayStr();
-      const startD = new Date(start);
-      const endD = new Date(endStr);
-      let diffMonths = (endD.getFullYear() - startD.getFullYear()) * 12 + (endD.getMonth() - startD.getMonth());
-      count = Math.max(1, diffMonths + 1);
-      endDate = endStr;
-    } else if (option === 'count') {
-      count = Math.max(1, parseInt(customCount) || 12);
-      endDate = debtAddMonths(start, count - 1, d);
+    const tem = tea > 0 ? Math.pow(1 + tea/100, 1/12) - 1 : 0;
+    let computedCuota = cuotaFixed;
+    if (computedCuota <= 0) {
+      const cuotaFinanciera = tem === 0 ? capital / plazo : (capital * tem) / (1 - Math.pow(1 + tem, -plazo));
+      computedCuota = cuotaFinanciera + seguro;
     }
-    return { count, endDate };
-  };
-
-  window.confirmRecurringDeuda = window.confirmRecurringDeuda || function() {
-    const draft = window._deudaRecurringDraft;
-    if (!draft) return;
-    const option = window._deudaRecurringOption || '3years';
-    const customCount = parseInt(window._deudaRecurringCustomCount) || 37;
-    const customDate = window._deudaRecurringCustomDate || todayStr();
+    d.cuotaMonto = parseFloat(computedCuota.toFixed(2));
     
-    const { count, endDate } = window.calculateRecurringDetails(draft, option, customCount, customDate);
+    deudaNormalizePagos(d, d);
     
-    const newDeuda = {
-      id: 'deu_' + Date.now(),
-      name: draft.name,
-      tipo: 'tarjeta_credito',
-      tipoLabel: draft.tipoLabel,
-      rol: 'debo',
-      notes: draft.notes,
-      cuotaMonto: draft.monto,
-      totalAmount: draft.monto * count,
-      cuotasTotales: count,
-      cuotasPagadas: 0,
-      fechaInicio: draft.fecha,
-      diaPago: parseInt(draft.fecha.slice(8,10)) || 5,
-      pagos: [],
-      color: '#009688'
-    };
+    if (!isEdit) {
+      state.deudas = state.deudas || [];
+      state.deudas.push(d);
+    }
     
-    state.deudas = state.deudas || [];
-    state.deudas.push(newDeuda);
     saveAll();
-    syncSeccionToSheets('deuda', newDeuda);
+    syncSeccionToSheets('deuda', d);
     
-    window._deudaRecurringModalOpen = false;
-    window._deudaRecurringDraft = null;
+    window._deudaEditId = null;
     window._deudaSubPage = 'pendientes';
-    
     render();
-    toast('Facturas recurrentes guardadas: ' + count + ' cuotas');
-  };
-
-  window.closeRecurringModal = window.closeRecurringModal || function() {
-    window._deudaRecurringModalOpen = false;
-    window._deudaRecurringDraft = null;
-    render();
+    toast(isEdit ? 'Deuda actualizada' : 'Deuda creada con éxito');
   };
 
   window.addDeudaCategory = window.addDeudaCategory || function() {
@@ -5440,30 +5678,64 @@ function renderDeudas(){
     toast('Archivo CSV descargado');
   };
 
-  // Dynamic virtual installments calculation
+  window.resetDeudasLocal = window.resetDeudasLocal || function() {
+    if (!confirm('¿Seguro que deseas reiniciar los datos de deudas a los valores predeterminados? Se borrarán las otras deudas y se mantendrá el Crédito Hipotecario de Scotiabank.')) return;
+    
+    const scotiaDebt = {
+      id: 'deu_scotiabank_hipotecario',
+      name: 'Scotiabank Crédito Hipotecario 🏠✨',
+      tipo: 'hipoteca',
+      tipoLabel: 'Hipoteca',
+      rol: 'debo',
+      notes: 'Crédito hipotecario Scotiabank · ¡Ahorro para mi hogar! 🔑',
+      totalAmount: 124329.00,
+      cuotaMonto: 3634.08,
+      cuotaMontoFixed: 3634.08,
+      cuotasTotales: 36,
+      cuotasPagadas: 21,
+      seguroMonto: 101.97,
+      tea: 15.95,
+      fechaInicio: '2024-06-08',
+      diaPago: 8,
+      pagos: [],
+      color: '#C2185B'
+    };
+    
+    state.deudas = [scotiaDebt];
+    deudaNormalizePagos(scotiaDebt, scotiaDebt);
+    
+    const k = getKeys(state.modo || 'negocio');
+    save(k.deudas, state.deudas);
+    saveAll();
+    
+    render();
+    toast('Datos de deudas restablecidos ✓');
+  };
+
   const deudas = state.deudas || [];
   const pendingBills = [];
   const paidBills = [];
   
   deudas.forEach(d => {
-    const total = Math.max(1, Math.floor(moneyValue(d.cuotasTotales) || 1));
-    const paid = Math.max(0, Math.floor(moneyValue(d.cuotasPagadas) || 0));
-    const cuotaMonto = moneyValue(d.cuotaMonto) || 0;
+    const total = Math.max(1, Math.floor(parseFloat(d.cuotasTotales) || 1));
     const fechaInicio = d.fechaInicio || todayStr();
-    const diaPago = d.diaPago || parseInt(fechaInicio.slice(8,10)) || 5;
-    const tipoLabel = d.tipoLabel || d.categoria || 'Tarjeta de crédito/Otro préstamo';
-    const color = d.color || '#009688';
+    const diaPago = d.diaPago || parseInt(fechaInicio.slice(8,10)) || 8;
+    const tipoLabel = d.tipoLabel || d.categoria || 'Hipoteca';
+    const color = d.color || '#0d9488';
+    
+    const table = deudaFrenchAmortizationTable(d);
     
     for (let i = 1; i <= total; i++) {
       const dueDate = debtAddMonths(fechaInicio, i - 1, diaPago);
-      const isPaid = (i <= paid);
+      const isPaid = deudaCuotaIsPaid(d, i, table);
+      const row = table[i - 1] || { cuota: parseFloat(d.cuotaMonto) || 0 };
       const bill = {
         id: d.id + '_' + i,
         debtId: d.id,
         debtName: d.name,
         cuotaNum: i,
         cuotasTotales: total,
-        monto: cuotaMonto,
+        monto: row.cuota,
         fechaVencimiento: dueDate,
         pagado: isPaid,
         tipoLabel: tipoLabel,
@@ -5483,71 +5755,68 @@ function renderDeudas(){
   const today = todayStr();
   const monthNames = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   
-  // Page Title mapping
   const titleMap = {
     acciones: 'Todas las acciones',
     pendientes: 'Facturas a pagar',
     pagadas: 'Cuentas pagadas',
-    crear: window._deudaEditId ? 'Editar' : 'Crear',
+    crear: window._deudaEditId ? 'Editar Factura' : 'Nueva Factura',
     reportes: 'Informe de gastos',
     categorias: 'Gestionar categorías',
-    exportar: 'exportar/importar datos'
+    configurar: 'Configuración local',
+    exportar: 'Sincronizar y Exportar'
   };
   
   const pageTitle = titleMap[page] || 'Deudas';
-
-  // --- Sub-page HTML Rendering ---
   let bodyHTML = '';
   
   if (page === 'acciones') {
-    // 8 Grid Cards matching the first screenshot
     bodyHTML = `
       <div class="deuda-tik-grid">
-        <div class="deuda-tik-grid-item" style="background:#FFE0B2; border-bottom:1px solid #CFD8DC; border-right:1px solid #CFD8DC" onclick="window._deudaSubPage='pendientes'; render()">
+        <div class="deuda-tik-grid-item" onclick="window._deudaSubPage='pendientes'; render()">
           <div class="deuda-tik-grid-icon">📋</div>
           <div class="deuda-tik-grid-label">Lista de facturas pendientes</div>
-          <div class="deuda-tik-grid-sub">Total ${pendingBills.length} Facturas</div>
+          <div class="deuda-tik-grid-sub">${pendingBills.length} facturas activas</div>
         </div>
-        <div class="deuda-tik-grid-item" style="background:#E1F5FE; border-bottom:1px solid #CFD8DC" onclick="window._deudaSubPage='pagadas'; render()">
-          <div class="deuda-tik-grid-icon">✓✓</div>
+        <div class="deuda-tik-grid-item" onclick="window._deudaSubPage='pagadas'; render()">
+          <div class="deuda-tik-grid-icon">✅</div>
           <div class="deuda-tik-grid-label">Historial de facturas pagadas</div>
-          <div class="deuda-tik-grid-sub">Total ${paidBills.length} Facturas</div>
+          <div class="deuda-tik-grid-sub">${paidBills.length} facturas pagadas</div>
         </div>
-        <div class="deuda-tik-grid-item" style="background:#E8F5E9; border-bottom:1px solid #CFD8DC; border-right:1px solid #CFD8DC" onclick="window._deudaSubPage='crear'; window._deudaEditId=null; render()">
+        <div class="deuda-tik-grid-item" onclick="window._deudaSubPage='crear'; window._deudaEditId=null; render()">
           <div class="deuda-tik-grid-icon">💳</div>
           <div class="deuda-tik-grid-label">Crear una nueva factura</div>
+          <div class="deuda-tik-grid-sub">Cálculo de amortización</div>
         </div>
-        <div class="deuda-tik-grid-item" style="background:#FFF3E0; border-bottom:1px solid #CFD8DC" onclick="window._deudaSubPage='reportes'; render()">
-          <div class="deuda-tik-grid-icon">📊</div>
+        <div class="deuda-tik-grid-item" onclick="window._deudaSubPage='reportes'; render()">
+          <div class="deuda-tik-grid-icon">📈</div>
           <div class="deuda-tik-grid-label">Informes de gastos futuros/pasados</div>
+          <div class="deuda-tik-grid-sub">Gráficos de amortización</div>
         </div>
-        <div class="deuda-tik-grid-item" style="background:#F5F5F5; border-bottom:1px solid #CFD8DC; border-right:1px solid #CFD8DC" onclick="window._deudaSubPage='categorias'; render()">
-          <div class="deuda-tik-grid-icon">💬</div>
-          <div class="deuda-tik-grid-label">Gestionar las categorías de facturas</div>
+        <div class="deuda-tik-grid-item" onclick="window._deudaSubPage='categorias'; render()">
+          <div class="deuda-tik-grid-icon">🏷️</div>
+          <div class="deuda-tik-grid-label">Gestionar las categorías</div>
+          <div class="deuda-tik-grid-sub">${window._deudaCategories.length} categorías</div>
         </div>
-        <div class="deuda-tik-grid-item" style="background:#FFFDE7; border-bottom:1px solid #CFD8DC" onclick="window.toggleDeudaDrawer(); state.page='ajustes'; render()">
+        <div class="deuda-tik-grid-item" onclick="window._deudaSubPage='configurar'; render()">
           <div class="deuda-tik-grid-icon">⚙️</div>
           <div class="deuda-tik-grid-label">Configurar esta aplicación</div>
+          <div class="deuda-tik-grid-sub">TEA y restablecimiento</div>
         </div>
-        <div class="deuda-tik-grid-item" style="background:#E1F5FE; border-right:1px solid #CFD8DC" onclick="toast('¡Gracias por sugerir nuevas funciones!')">
-          <div class="deuda-tik-grid-icon">💬</div>
-          <div class="deuda-tik-grid-label">Sugerir nueva función</div>
-        </div>
-        <div class="deuda-tik-grid-item" style="background:#FFF3E0" onclick="window._deudaSubPage='exportar'; render()">
+        <div class="deuda-tik-grid-item" style="grid-column: span 2" onclick="window._deudaSubPage='exportar'; render()">
           <div class="deuda-tik-grid-icon">💾</div>
-          <div class="deuda-tik-grid-label">exportar datos de la aplicación a un</div>
+          <div class="deuda-tik-grid-label">Exportar datos e Integración Sheets</div>
+          <div class="deuda-tik-grid-sub">Descarga de CSV y Sincronización</div>
         </div>
       </div>
     `;
   }
   else if (page === 'pendientes') {
-    // List of pending bills grouped by month
     const groups = {};
     pendingBills.sort((a,b) => a.fechaVencimiento.localeCompare(b.fechaVencimiento)).forEach(b => {
       const parts = b.fechaVencimiento.split('-');
       const year = parts[0];
       const monthIndex = parseInt(parts[1] || '1') - 1;
-      const monthNamesLong = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const monthNamesLong = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
       const key = parts[0] + '-' + parts[1];
       if (!groups[key]) {
         groups[key] = {
@@ -5556,8 +5825,12 @@ function renderDeudas(){
           items: []
         };
       }
-      groups[key].items.push(b);
-      groups[key].total += b.monto;
+      
+      const alreadyPaid = deudaCuotaPaid(b.parent, b.cuotaNum);
+      const remainingDue = Math.max(0, b.monto - alreadyPaid);
+      
+      groups[key].items.push({...b, remainingDue});
+      groups[key].total += remainingDue;
     });
 
     const sortedGroupKeys = Object.keys(groups).sort();
@@ -5565,8 +5838,10 @@ function renderDeudas(){
     let listHTML = '';
     if (sortedGroupKeys.length === 0) {
       listHTML = `
-        <div style="text-align:center; padding:40px; color:#9E9E9E; font-size:14px; font-weight:bold">
-          🎉 No tienes facturas pendientes de pago
+        <div style="text-align:center; padding:60px 20px; color:#64748B; background:rgba(255,255,255,0.5); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.4); border-radius:24px; margin:20px; box-shadow:0 8px 32px rgba(0,0,0,0.02)">
+          <div style="font-size:48px; margin-bottom:16px">🎉</div>
+          <div style="font-size:16px; font-weight:800; color:#0F172A">¡Felicidades!</div>
+          <div style="font-size:13px; color:#64748B; margin-top:6px">No tienes facturas pendientes de pago.</div>
         </div>
       `;
     } else {
@@ -5575,21 +5850,27 @@ function renderDeudas(){
         listHTML += `
           <div class="deuda-tik-group-header">
             <span>${g.label}</span>
-            <span>S/ ${g.total.toFixed(2)}</span>
+            <span>Total: S/ ${g.total.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
           </div>
         `;
         g.items.forEach(b => {
           let statusClass = 'aldia';
-          let statusText = 'por vencer';
+          let statusText = 'Pendiente';
+          let hasRunner = false;
+          
           if (b.fechaVencimiento < today) {
             statusClass = 'atrasado';
-            statusText = 'atrasado';
+            statusText = 'Atrasado';
+            hasRunner = true;
           } else if (b.fechaVencimiento === today) {
             statusClass = 'hoy';
-            statusText = 'hoy';
+            statusText = 'Vence hoy';
           }
+          
           const day = b.fechaVencimiento.split('-')[2] || '01';
           const mon = monthNames[parseInt(b.fechaVencimiento.split('-')[1])-1] || 'ene';
+          
+          const isPartial = b.remainingDue < b.monto && b.remainingDue > 0;
           
           listHTML += `
             <div class="deuda-tik-bill-card" onclick="window.openDeudaBillDetail('${b.id}')">
@@ -5598,14 +5879,17 @@ function renderDeudas(){
                 <span class="deuda-tik-bill-date-month">${mon}</span>
               </div>
               <div class="deuda-tik-bill-content">
-                <div class="deuda-tik-bill-title">${b.debtName}</div>
-                <div class="deuda-tik-bill-subtitle">${b.tipoLabel}</div>
+                <div class="deuda-tik-bill-title">${b.debtName} ${hasRunner ? '🏃' : ''}</div>
+                <div class="deuda-tik-bill-subtitle">
+                  ${b.tipoLabel} · Cuota ${b.cuotaNum}/${b.cuotasTotales}
+                  ${isPartial ? `<br><span style="color:#C2185B; font-weight:800">Abonado: S/ ${(b.monto - b.remainingDue).toFixed(2)}</span>` : ''}
+                </div>
               </div>
               <div class="deuda-tik-bill-right">
                 <span class="deuda-tik-bill-status ${statusClass}">${statusText}</span>
                 <div class="deuda-tik-bill-amount-row">
-                  <span class="deuda-tik-bill-amount ${statusClass}">S/ ${b.monto.toFixed(2)}</span>
-                  <span class="deuda-tik-bill-runner">🏃</span>
+                  <span class="deuda-tik-bill-amount ${statusClass}">S/ ${b.remainingDue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                  ${hasRunner ? '<span class="deuda-tik-bill-runner">🏃</span>' : ''}
                 </div>
               </div>
             </div>
@@ -5622,13 +5906,12 @@ function renderDeudas(){
     `;
   }
   else if (page === 'pagadas') {
-    // List of paid bills
     const groups = {};
     paidBills.sort((a,b) => b.fechaVencimiento.localeCompare(a.fechaVencimiento)).forEach(b => {
       const parts = b.fechaVencimiento.split('-');
       const year = parts[0];
       const monthIndex = parseInt(parts[1] || '1') - 1;
-      const monthNamesLong = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const monthNamesLong = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
       const key = parts[0] + '-' + parts[1];
       if (!groups[key]) {
         groups[key] = {
@@ -5646,8 +5929,8 @@ function renderDeudas(){
     let listHTML = '';
     if (sortedGroupKeys.length === 0) {
       listHTML = `
-        <div style="text-align:center; padding:40px; color:#9E9E9E; font-size:14px; font-weight:bold">
-          Sin pagos registrados todavía
+        <div style="text-align:center; padding:40px; color:#64748B">
+          Sin pagos registrados todavía.
         </div>
       `;
     } else {
@@ -5656,7 +5939,7 @@ function renderDeudas(){
         listHTML += `
           <div class="deuda-tik-group-header">
             <span>${g.label}</span>
-            <span>Total Pagado: S/ ${g.total.toFixed(2)}</span>
+            <span>Total Pagado: S/ ${g.total.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
           </div>
         `;
         g.items.forEach(b => {
@@ -5665,19 +5948,19 @@ function renderDeudas(){
           
           listHTML += `
             <div class="deuda-tik-bill-card" onclick="window.openDeudaBillDetail('${b.id}')">
-              <div class="deuda-tik-bill-date-box aldia" style="background:#E8F5E9; color:#1B5E20">
+              <div class="deuda-tik-bill-date-box aldia">
                 <span class="deuda-tik-bill-date-day">${day}</span>
                 <span class="deuda-tik-bill-date-month">${mon}</span>
               </div>
               <div class="deuda-tik-bill-content">
-                <div class="deuda-tik-bill-title">${b.debtName}</div>
+                <div class="deuda-tik-bill-title">${b.debtName} ✅</div>
                 <div class="deuda-tik-bill-subtitle">${b.tipoLabel} · Cuota ${b.cuotaNum}/${b.cuotasTotales}</div>
               </div>
               <div class="deuda-tik-bill-right">
-                <span class="deuda-tik-bill-status aldia">pagado</span>
+                <span class="deuda-tik-bill-status aldia">Pagado</span>
                 <div class="deuda-tik-bill-amount-row">
-                  <span class="deuda-tik-bill-amount aldia">S/ ${b.monto.toFixed(2)}</span>
-                  <span class="deuda-tik-bill-runner" style="color:#4CAF50">✓</span>
+                  <span class="deuda-tik-bill-amount aldia">S/ ${b.monto.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                  <span style="color:#0f766e; font-size:14px; font-weight:950">✓</span>
                 </div>
               </div>
             </div>
@@ -5693,7 +5976,6 @@ function renderDeudas(){
     `;
   }
   else if (page === 'crear') {
-    // Create / Edit Form matching screenshot 4
     let editDeuda = null;
     if (window._deudaEditId) {
       editDeuda = deudas.find(x => String(x.id) === String(window._deudaEditId));
@@ -5702,53 +5984,113 @@ function renderDeudas(){
     const dTipo = editDeuda ? editDeuda.tipoLabel : (window._deudaCategories[0] || '');
     const dNombre = editDeuda ? editDeuda.name : '';
     const dNotas = editDeuda ? (editDeuda.notes || editDeuda.notas || '') : '';
-    const dRepetir = editDeuda ? (editDeuda.repeticion || 'Mensual (cada mes)') : 'Mensual (cada mes)';
     const dFecha = editDeuda ? editDeuda.fechaInicio : todayStr();
-    const dMonto = editDeuda ? editDeuda.cuotaMonto : '';
+    
+    const dCapital = editDeuda ? editDeuda.totalAmount : '';
+    const dTEA = editDeuda ? (editDeuda.tea !== undefined ? editDeuda.tea : editDeuda.tasaMensual) : '';
+    const dSeguro = editDeuda ? (editDeuda.seguroMonto || 0) : '';
+    const dPlazo = editDeuda ? editDeuda.cuotasTotales : '';
+    const dCuotaFixed = editDeuda ? (editDeuda.cuotaMontoFixed || '') : '';
 
     bodyHTML = `
       <div class="deuda-tik-form">
         <div class="deuda-tik-field">
-          <label class="deuda-tik-label">Tipo</label>
-          <select id="tik-tipo" class="deuda-tik-select">
+          <label class="deuda-tik-label">Tipo de deuda</label>
+          <select id="tik-tipo" class="deuda-tik-select" onchange="debtSmartPreviewUpdate()">
             ${window._deudaCategories.map(c => `<option value="${c}" ${c === dTipo ? 'selected' : ''}>${c}</option>`).join('')}
           </select>
         </div>
         
         <div class="deuda-tik-field">
-          <label class="deuda-tik-label">Nombre de Factura</label>
-          <input id="tik-nombre" type="text" class="deuda-tik-input" placeholder="Proporcionar Factura Nombre" value="${dNombre}">
+          <label class="deuda-tik-label">Nombre de Deuda / Banco</label>
+          <input id="tik-nombre" type="text" class="deuda-tik-input" placeholder="Ej: Scotiabank Hipotecario" value="${dNombre}">
         </div>
         
         <div class="deuda-tik-field">
-          <label class="deuda-tik-label">Notas</label>
-          <input id="tik-notas" type="text" class="deuda-tik-input" placeholder="Opcional. Cualquier nota o sugerencia." value="${dNotas}">
+          <label class="deuda-tik-label">Notas o sugerencias</label>
+          <input id="tik-notas" type="text" class="deuda-tik-input" placeholder="Cualquier nota o sugerencia adicional" value="${dNotas}">
         </div>
         
         <div class="deuda-tik-field">
-          <label class="deuda-tik-label">Repetir</label>
-          <select id="tik-repetir" class="deuda-tik-select">
-            <option value="Mensual (cada mes)" ${dRepetir === 'Mensual (cada mes)' ? 'selected' : ''}>Mensual (cada mes)</option>
-            <option value="Quincenal" ${dRepetir === 'Quincenal' ? 'selected' : ''}>Quincenal</option>
-            <option value="Semanal" ${dRepetir === 'Semanal' ? 'selected' : ''}>Semanal</option>
-            <option value="Único" ${dRepetir === 'Único' ? 'selected' : ''}>Único</option>
-          </select>
+          <label class="deuda-tik-label">Capital Inicial (S/)</label>
+          <input id="tik-capital" type="number" step="0.01" class="deuda-tik-input" placeholder="Monto financiado original" value="${dCapital}" oninput="debtSmartPreviewUpdate()">
         </div>
         
         <div class="deuda-tik-field">
-          <label class="deuda-tik-label">Fecha de vencimiento</label>
-          <input id="tik-fecha" type="date" class="deuda-tik-input" value="${dFecha}">
+          <label class="deuda-tik-label">Tasa de Interés Anual (TEA %)</label>
+          <input id="tik-tea" type="number" step="0.01" class="deuda-tik-input" placeholder="Ej: 15.95" value="${dTEA}" oninput="debtSmartPreviewUpdate()">
         </div>
         
         <div class="deuda-tik-field">
-          <label class="deuda-tik-label">Total de la factura</label>
-          <input id="tik-monto" type="number" step="0.01" class="deuda-tik-input" placeholder="Coloque la cantidad aproximada de la factura" value="${dMonto}">
+          <label class="deuda-tik-label">Seguro de Desgravamen Mensual (S/)</label>
+          <input id="tik-seguro" type="number" step="0.01" class="deuda-tik-input" placeholder="Monto de seguro fijo mensual" value="${dSeguro}" oninput="debtSmartPreviewUpdate()">
+        </div>
+        
+        <div class="deuda-tik-field">
+          <label class="deuda-tik-label">Plazo Total (Meses / Cuotas)</label>
+          <input id="tik-plazo" type="number" class="deuda-tik-input" placeholder="Ej: 36, 120, 240" value="${dPlazo}" oninput="debtSmartPreviewUpdate()">
+        </div>
+        
+        <div class="deuda-tik-field">
+          <label class="deuda-tik-label">Cuota Mensual Fija (S/ - Opcional)</label>
+          <input id="tik-cuota-fixed" type="number" step="0.01" class="deuda-tik-input" placeholder="Calculado automáticamente si se deja vacío" value="${dCuotaFixed}" oninput="debtSmartPreviewUpdate()">
+        </div>
+        
+        <div class="deuda-tik-field">
+          <label class="deuda-tik-label">Fecha de primer pago / vencimiento</label>
+          <input id="tik-fecha" type="date" class="deuda-tik-input" value="${dFecha}" onchange="debtSmartPreviewUpdate()">
+        </div>
+
+        <div class="deuda-tik-field" style="background:rgba(13, 148, 136, 0.04)">
+          <span class="deuda-tik-label">Vista Previa Inteligente (Sistema Francés)</span>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px">
+            <div style="background:white; border:1px solid rgba(0,0,0,0.05); border-radius:10px; padding:10px">
+              <div style="font-size:9px; color:#64748B; font-weight:800; text-transform:uppercase">Final estimado</div>
+              <div id="d-smart-final" style="font-size:12px; color:#0F172A; font-weight:900; margin-top:2px">-</div>
+            </div>
+            <div style="background:white; border:1px solid rgba(0,0,0,0.05); border-radius:10px; padding:10px">
+              <div style="font-size:9px; color:#64748B; font-weight:800; text-transform:uppercase">Instalaciones</div>
+              <div id="d-smart-count" style="font-size:12px; color:#0F172A; font-weight:900; margin-top:2px">-</div>
+            </div>
+          </div>
+          <div id="d-smart-status" style="font-size:11px; font-weight:700; line-height:1.45; margin-top:8px; border:1px solid rgba(0,0,0,0.05); border-radius:10px; padding:10px; background:white; color:#64748B">
+            Escribe los valores para ver la proyección del cronograma.
+          </div>
+        </div>
+        
+        <div style="display:flex; gap:12px; margin-top:20px">
+          <button class="deuda-tik-modal-btn" style="flex:1" onclick="window._deudaSubPage='acciones'; render()">Cancelar</button>
+          <button class="deuda-tik-modal-btn-primary" style="flex:2" onclick="window.saveTikDeuda()">Guardar</button>
         </div>
       </div>
     `;
+    
+    setTimeout(() => {
+      const tCapital = document.getElementById('tik-capital');
+      const tCuota = document.getElementById('tik-cuota-fixed');
+      const tPlazo = document.getElementById('tik-plazo');
+      const tFecha = document.getElementById('tik-fecha');
+      const tTea = document.getElementById('tik-tea');
+      const tSeguro = document.getElementById('tik-seguro');
+      
+      window.debtSmartFormData = function() {
+        const cNum = s => parseFloat(String(s||'').replace(',','.')) || 0;
+        const total = Math.max(0, parseInt(tPlazo?.value) || 0);
+        const paid = editDeuda ? editDeuda.cuotasPagadas : 0;
+        const inicio = debtIsoDate(tFecha?.value || todayStr());
+        const dia = Math.max(1, Math.min(31, Number(inicio.slice(8,10)) || 8));
+        const venc = debtIsoDate(tFecha?.value || todayStr());
+        const cuota = cNum(tCuota?.value);
+        const totalAmount = cNum(tCapital?.value);
+        const tea = cNum(tTea?.value);
+        const seguro = cNum(tSeguro?.value);
+        return { total, paid, venc, dia, inicio, cuota, totalAmount, tea, seguro };
+      };
+      
+      debtSmartPreviewUpdate();
+    }, 50);
   }
   else if (page === 'reportes') {
-    // Projections and report matching the reports option
     const next3 = pendingBills.filter(b => b.fechaVencimiento >= today && b.fechaVencimiento <= debtAddMonths(today, 3, 31));
     const next6 = pendingBills.filter(b => b.fechaVencimiento >= today && b.fechaVencimiento <= debtAddMonths(today, 6, 31));
     const next12 = pendingBills.filter(b => b.fechaVencimiento >= today && b.fechaVencimiento <= debtAddMonths(today, 12, 31));
@@ -5757,97 +6099,225 @@ function renderDeudas(){
     const sum6 = next6.reduce((s,b)=>s+b.monto, 0);
     const sum12 = next12.reduce((s,b)=>s+b.monto, 0);
     const sumTotal = pendingBills.reduce((s,b)=>s+b.monto, 0);
-    
     const totalPaid = paidBills.reduce((s,b)=>s+b.monto, 0);
+    
+    let totalCapitalAmortizado = 0;
+    let totalInteresPagado = 0;
+    let totalSeguroPagado = 0;
+    
+    deudas.forEach(d => {
+      const table = deudaFrenchAmortizationTable(d);
+      
+      for (let i = 1; i <= d.cuotasTotales; i++) {
+        const row = table[i - 1];
+        if (!row) continue;
+        const totalCuota = row.cuota;
+        const paidAmount = deudaCuotaPaid(d, i);
+        const pctPaid = totalCuota > 0 ? Math.min(1, paidAmount / totalCuota) : 0;
+        
+        totalCapitalAmortizado += row.capitalMes * pctPaid;
+        totalInteresPagado += row.interes * pctPaid;
+        totalSeguroPagado += row.seguro * pctPaid;
+      }
+    });
+    
+    const grandTotalPaid = totalCapitalAmortizado + totalInteresPagado + totalSeguroPagado;
+    const capitalPct = grandTotalPaid > 0 ? (totalCapitalAmortizado / grandTotalPaid) * 100 : 0;
+    const interestPct = grandTotalPaid > 0 ? (totalInteresPagado / grandTotalPaid) * 100 : 0;
+    const insurancePct = grandTotalPaid > 0 ? (totalSeguroPagado / grandTotalPaid) * 100 : 0;
+    
+    const mainDebt = deudas.find(d => String(d.tipo).toLowerCase() === 'hipoteca') || deudas[0];
+    let mainAmortHTML = '';
+    if (mainDebt) {
+      const t = deudaFrenchAmortizationTable(mainDebt);
+      const remainingBalance = t[mainDebt.cuotasPagadas - 1] ? t[mainDebt.cuotasPagadas - 1].saldo : mainDebt.totalAmount;
+      const progressPct = mainDebt.totalAmount > 0 ? ((mainDebt.totalAmount - remainingBalance) / mainDebt.totalAmount) * 100 : 0;
+      
+      mainAmortHTML = `
+        <div style="background:rgba(255, 255, 255, 0.6); backdrop-filter:blur(10px); border:1px solid rgba(255, 255, 255, 0.4); border-radius:18px; padding:16px; margin-top:20px; box-shadow:0 8px 32px rgba(0,0,0,0.02)">
+          <div style="font-size:12px; color:#0f766e; font-weight:800; text-transform:uppercase; margin-bottom:8px">Progreso de Amortización: ${mainDebt.name}</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+            <span style="font-size:13px; color:#475569">Capital Pendiente:</span>
+            <span style="font-size:15px; font-weight:900; color:#0F172A">S/ ${remainingBalance.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+          </div>
+          <div style="height:10px; background:#E2E8F0; border-radius:5px; overflow:hidden; display:flex">
+            <div style="width:${progressPct}%; background:linear-gradient(90deg, #0d9488, #0f766e)"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:#64748B; margin-top:6px">
+            <span>Amortizado: ${progressPct.toFixed(1)}%</span>
+            <span>Original: S/ ${mainDebt.totalAmount.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+          </div>
+        </div>
+      `;
+    }
 
     bodyHTML = `
-      <div style="padding:16px; flex-grow:1; overflow-y:auto; background:#FAFAFA">
-        <h4 style="margin:0 0 16px 0; color:#37474F; font-size:15px; font-weight:bold; border-bottom:1px solid #CFD8DC; padding-bottom:8px">PROYECCIÓN DE GASTOS</h4>
-        
-        <div class="card" style="margin-bottom:12px; padding:16px; background:white; border:1px solid #CFD8DC; border-radius:8px">
-          <div style="font-size:12px; color:#78909C; font-weight:bold; text-transform:uppercase">Próximos 3 meses</div>
-          <div style="font-size:24px; font-weight:900; color:#009688; margin-top:4px">S/ ${sum3.toFixed(2)}</div>
-          <div style="font-size:11px; color:#546E7A; margin-top:2px">${next3.length} cuotas pendientes</div>
+      <div style="padding:16px; display:flex; flex-direction:column; gap:16px">
+        <div style="background:rgba(255, 255, 255, 0.6); backdrop-filter:blur(10px); border:1px solid rgba(255, 255, 255, 0.4); border-radius:18px; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.02)">
+          <div style="font-size:12px; color:#0f766e; font-weight:800; text-transform:uppercase; margin-bottom:12px">Distribución de Historial de Pagos</div>
+          <div style="font-size:24px; font-weight:900; color:#0F172A; margin-bottom:14px">S/ ${grandTotalPaid.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+          
+          <div style="height:24px; background:#E2E8F0; border-radius:12px; overflow:hidden; display:flex; margin-bottom:16px; border:1px solid rgba(255,255,255,0.4)">
+            ${totalCapitalAmortizado > 0 ? `<div style="width:${capitalPct}%; background:#0d9488; display:flex; align-items:center; justify-content:center; color:white; font-size:9px; font-weight:900" title="Capital">Cap</div>` : ''}
+            ${totalInteresPagado > 0 ? `<div style="width:${interestPct}%; background:#D97706; display:flex; align-items:center; justify-content:center; color:white; font-size:9px; font-weight:900" title="Interés">Int</div>` : ''}
+            ${totalSeguroPagado > 0 ? `<div style="width:${insurancePct}%; background:#2563EB; display:flex; align-items:center; justify-content:center; color:white; font-size:9px; font-weight:900" title="Seguro">Seg</div>` : ''}
+          </div>
+          
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px">
+            <div style="border-left:4px solid #0d9488; padding-left:8px">
+              <div style="font-size:9px; color:#64748B; font-weight:800">CAPITAL</div>
+              <div style="font-size:12px; font-weight:800; color:#0d9488">${capitalPct.toFixed(1)}%</div>
+              <div style="font-size:10px; color:#475569">S/ ${totalCapitalAmortizado.toFixed(0)}</div>
+            </div>
+            <div style="border-left:4px solid #D97706; padding-left:8px">
+              <div style="font-size:9px; color:#64748B; font-weight:800">INTERÉS</div>
+              <div style="font-size:12px; font-weight:800; color:#D97706">${interestPct.toFixed(1)}%</div>
+              <div style="font-size:10px; color:#475569">S/ ${totalInteresPagado.toFixed(0)}</div>
+            </div>
+            <div style="border-left:4px solid #2563EB; padding-left:8px">
+              <div style="font-size:9px; color:#64748B; font-weight:800">SEGUROS</div>
+              <div style="font-size:12px; font-weight:800; color:#2563EB">${insurancePct.toFixed(1)}%</div>
+              <div style="font-size:10px; color:#475569">S/ ${totalSeguroPagado.toFixed(0)}</div>
+            </div>
+          </div>
         </div>
         
-        <div class="card" style="margin-bottom:12px; padding:16px; background:white; border:1px solid #CFD8DC; border-radius:8px">
-          <div style="font-size:12px; color:#78909C; font-weight:bold; text-transform:uppercase">Próximos 6 meses</div>
-          <div style="font-size:24px; font-weight:900; color:#009688; margin-top:4px">S/ ${sum6.toFixed(2)}</div>
-          <div style="font-size:11px; color:#546E7A; margin-top:2px">${next6.length} cuotas pendientes</div>
-        </div>
-        
-        <div class="card" style="margin-bottom:12px; padding:16px; background:white; border:1px solid #CFD8DC; border-radius:8px">
-          <div style="font-size:12px; color:#78909C; font-weight:bold; text-transform:uppercase">Próximos 12 meses</div>
-          <div style="font-size:24px; font-weight:900; color:#009688; margin-top:4px">S/ ${sum12.toFixed(2)}</div>
-          <div style="font-size:11px; color:#546E7A; margin-top:2px">${next12.length} cuotas pendientes</div>
+        <div style="background:rgba(255, 255, 255, 0.6); backdrop-filter:blur(10px); border:1px solid rgba(255, 255, 255, 0.4); border-radius:18px; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.02)">
+          <div style="font-size:12px; color:#0f766e; font-weight:800; text-transform:uppercase; margin-bottom:16px">Proyección de Gastos Futuros</div>
+          
+          <div style="display:flex; flex-direction:column; gap:12px">
+            <div>
+              <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:800; margin-bottom:4px">
+                <span style="color:#475569">Próximos 3 meses</span>
+                <span style="color:#0F172A">S/ ${sum3.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+              </div>
+              <div style="height:8px; background:#E2E8F0; border-radius:4px; overflow:hidden">
+                <div style="width:${sumTotal > 0 ? (sum3 / sumTotal) * 100 : 0}%; height:100%; background:#0d9488"></div>
+              </div>
+              <div style="font-size:10px; color:#64748B; margin-top:2px">${next3.length} cuotas activas</div>
+            </div>
+            
+            <div>
+              <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:800; margin-bottom:4px">
+                <span style="color:#475569">Próximos 6 meses</span>
+                <span style="color:#0F172A">S/ ${sum6.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+              </div>
+              <div style="height:8px; background:#E2E8F0; border-radius:4px; overflow:hidden">
+                <div style="width:${sumTotal > 0 ? (sum6 / sumTotal) * 100 : 0}%; height:100%; background:#0d9488"></div>
+              </div>
+              <div style="font-size:10px; color:#64748B; margin-top:2px">${next6.length} cuotas activas</div>
+            </div>
+            
+            <div>
+              <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:800; margin-bottom:4px">
+                <span style="color:#475569">Próximos 12 meses</span>
+                <span style="color:#0F172A">S/ ${sum12.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+              </div>
+              <div style="height:8px; background:#E2E8F0; border-radius:4px; overflow:hidden">
+                <div style="width:${sumTotal > 0 ? (sum12 / sumTotal) * 100 : 0}%; height:100%; background:#0d9488"></div>
+              </div>
+              <div style="font-size:10px; color:#64748B; margin-top:2px">${next12.length} cuotas activas</div>
+            </div>
+          </div>
         </div>
 
-        <div class="card" style="margin-bottom:16px; padding:16px; background:#ECEFF1; border:1px solid #B0BEC5; border-radius:8px">
-          <div style="font-size:12px; color:#546E7A; font-weight:bold; text-transform:uppercase">Total Pendiente Absoluto</div>
-          <div style="font-size:26px; font-weight:900; color:#C2185B; margin-top:4px">S/ ${sumTotal.toFixed(2)}</div>
-          <div style="font-size:11px; color:#546E7A; margin-top:2px">Historial de pagos totales realizados: S/ ${totalPaid.toFixed(2)}</div>
+        <div style="background:rgba(239, 68, 68, 0.05); border:1px solid rgba(239, 68, 68, 0.15); border-radius:18px; padding:16px; box-sizing:border-box">
+          <div style="font-size:12px; color:#B91C1C; font-weight:800; text-transform:uppercase; margin-bottom:4px">Total Pendiente Absoluto</div>
+          <div style="font-size:26px; font-weight:900; color:#B91C1C">S/ ${sumTotal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+          <div style="font-size:11px; color:#7F1D1D; margin-top:6px; font-weight:600">Historial acumulado de pagos: S/ ${totalPaid.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
         </div>
         
-        <button class="btn" style="background:#009688; color:white; width:100%" onclick="window._deudaSubPage='acciones'; render()">Volver</button>
+        ${mainAmortHTML}
+        
+        <button class="deuda-tik-modal-btn-primary" style="width:100%" onclick="window._deudaSubPage='acciones'; render()">Volver al Panel</button>
       </div>
     `;
   }
   else if (page === 'categorias') {
-    // Categories management page
     bodyHTML = `
-      <div style="padding:16px; flex-grow:1; overflow-y:auto; background:#FAFAFA">
-        <h4 style="margin:0 0 16px 0; color:#37474F; font-size:15px; font-weight:bold; border-bottom:1px solid #CFD8DC; padding-bottom:8px">CATEGORÍAS DE FACTURAS</h4>
-        
-        <div style="display:flex; gap:8px; margin-bottom:20px">
-          <input id="tik-new-cat" type="text" class="deuda-tik-input" style="flex-grow:1; border:1px solid #B0BEC5; border-radius:4px; padding:8px 12px; font-size:14px" placeholder="Nueva Categoría">
-          <button class="btn" style="background:#009688; color:white; padding:0 16px" onclick="window.addDeudaCategory()">＋</button>
+      <div style="padding:16px; display:flex; flex-direction:column; gap:16px">
+        <div style="background:rgba(255, 255, 255, 0.6); backdrop-filter:blur(10px); border:1px solid rgba(255, 255, 255, 0.4); border-radius:18px; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.02)">
+          <div style="font-size:12px; color:#0f766e; font-weight:800; text-transform:uppercase; margin-bottom:12px">Agregar Nueva Categoría</div>
+          <div style="display:flex; gap:8px">
+            <input id="tik-new-cat" type="text" class="deuda-tik-input" style="flex-grow:1; border:1px solid rgba(0,0,0,0.08)" placeholder="Nombre de categoría">
+            <button class="deuda-tik-modal-btn-primary" onclick="window.addDeudaCategory()">＋</button>
+          </div>
         </div>
         
-        <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px">
+        <div style="display:flex; flex-direction:column; gap:8px">
           ${window._deudaCategories.map(c => `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:12px 16px; border:1px solid #E0E0E0; border-radius:6px">
-              <span style="font-size:14px; font-weight:bold; color:#37474F">${c}</span>
-              <button class="btn-ghost" style="color:#C2185B; padding:4px 8px; font-size:13px; min-height:auto" onclick="window.deleteDeudaCategory('${c}')">✕</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.7); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.4); padding:14px 18px; border-radius:16px; box-shadow:0 4px 15px rgba(0,0,0,0.01)">
+              <span style="font-size:14.5px; font-weight:800; color:#1E293B">🏷️ ${c}</span>
+              <button class="deuda-tik-modal-btn" style="color:#C2185B; padding:4px 8px; font-size:14px" onclick="window.deleteDeudaCategory('${c}')">✕</button>
             </div>
           `).join('')}
         </div>
         
-        <button class="btn" style="background:#009688; color:white; width:100%" onclick="window._deudaSubPage='acciones'; render()">Volver</button>
+        <button class="deuda-tik-modal-btn-primary" style="width:100%" onclick="window._deudaSubPage='acciones'; render()">Volver</button>
+      </div>
+    `;
+  }
+  else if (page === 'configurar') {
+    bodyHTML = `
+      <div style="padding:16px; display:flex; flex-direction:column; gap:16px">
+        <div style="background:rgba(255, 255, 255, 0.6); backdrop-filter:blur(10px); border:1px solid rgba(255, 255, 255, 0.4); border-radius:18px; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.02)">
+          <div style="font-size:12px; color:#0f766e; font-weight:800; text-transform:uppercase; margin-bottom:12px">Parámetros Predeterminados</div>
+          
+          <div style="margin-bottom:12px">
+            <label class="deuda-tik-label">TEA de Referencia (%)</label>
+            <input id="tik-default-tea" type="number" step="0.01" class="deuda-tik-input" style="border:1px solid rgba(0,0,0,0.08)" placeholder="Ej: 15.95" value="15.95">
+          </div>
+          <button class="deuda-tik-modal-btn-primary" style="width:100%" onclick="toast('Configuración guardada localmente ✓')">Guardar Parámetros</button>
+        </div>
+        
+        <div style="background:rgba(239, 68, 68, 0.05); border:1px solid rgba(239, 68, 68, 0.15); border-radius:18px; padding:20px; display:flex; flex-direction:column; gap:12px">
+          <div style="font-size:12px; color:#B91C1C; font-weight:800; text-transform:uppercase">Zona de Peligro</div>
+          <p style="margin:0; font-size:12.5px; color:#7F1D1D; line-height:1.45; font-weight:600">Restablece la sección de deudas a su estado predeterminado. Esto eliminará las deudas adicionales y re-insertará el Crédito Hipotecario Scotiabank por defecto.</p>
+          <button class="deuda-tik-modal-btn-primary" style="background:#DC2626; color:white; border-color:#DC2626" onclick="window.resetDeudasLocal()">Restablecer Datos de Deudas</button>
+        </div>
+        
+        <button class="deuda-tik-modal-btn" style="width:100%" onclick="window._deudaSubPage='acciones'; render()">Volver al Panel</button>
       </div>
     `;
   }
   else if (page === 'exportar') {
-    // Export options
     bodyHTML = `
-      <div style="padding:16px; flex-grow:1; overflow-y:auto; background:#FAFAFA">
-        <h4 style="margin:0 0 16px 0; color:#37474F; font-size:15px; font-weight:bold; border-bottom:1px solid #CFD8DC; padding-bottom:8px">EXPORTAR / IMPORTAR DATOS</h4>
-        
-        <div class="card" style="margin-bottom:16px; padding:20px; background:white; border:1px solid #CFD8DC; border-radius:8px; display:flex; flex-direction:column; gap:12px">
-          <p style="margin:0; font-size:13px; color:#546E7A; line-height:1.5">Puedes descargar todas tus deudas registradas en formato CSV para abrirlas en Microsoft Excel o Google Sheets.</p>
-          <button class="btn" style="background:#009688; color:white" onclick="window.exportDeudasToCSV()">Descargar Archivo CSV</button>
+      <div style="padding:16px; display:flex; flex-direction:column; gap:16px">
+        <div style="background:rgba(255, 255, 255, 0.6); backdrop-filter:blur(10px); border:1px solid rgba(255, 255, 255, 0.4); border-radius:18px; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.02)">
+          <div style="font-size:12px; color:#0f766e; font-weight:800; text-transform:uppercase; margin-bottom:8px">Exportar a CSV</div>
+          <p style="margin:0 0 16px 0; font-size:12.5px; color:#64748B; line-height:1.5">Descarga tus deudas en formato CSV compatible con Excel o Google Sheets.</p>
+          <button class="deuda-tik-modal-btn-primary" style="width:100%" onclick="window.exportDeudasToCSV()">Descargar Archivo CSV</button>
         </div>
         
-        <div class="card" style="margin-bottom:20px; padding:20px; background:white; border:1px solid #CFD8DC; border-radius:8px; display:flex; flex-direction:column; gap:12px">
-          <p style="margin:0; font-size:13px; color:#546E7A; line-height:1.5">Sincroniza y envía de inmediato toda la información de tus deudas, transacciones y agenda a tu hoja de Google Sheets configurada.</p>
-          <button class="btn" style="background:#2E73AB; color:white" onclick="enviarTodoASheets()">Sincronizar ahora con Sheets</button>
+        <div style="background:rgba(255, 255, 255, 0.6); backdrop-filter:blur(10px); border:1px solid rgba(255, 255, 255, 0.4); border-radius:18px; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.02)">
+          <div style="font-size:12px; color:#0f766e; font-weight:800; text-transform:uppercase; margin-bottom:8px">Sincronizar con Google Sheets</div>
+          <p style="margin:0 0 16px 0; font-size:12.5px; color:#64748B; line-height:1.5">Envía de inmediato toda la información de tus deudas y transacciones a la hoja configurada.</p>
+          <button class="deuda-tik-modal-btn-primary" style="background:#2E73AB; color:white; width:100%" onclick="enviarTodoASheets()">Sincronizar ahora con Sheets</button>
         </div>
         
-        <button class="btn" style="background:#009688; color:white; width:100%" onclick="window._deudaSubPage='acciones'; render()">Volver</button>
+        <button class="deuda-tik-modal-btn-primary" style="width:100%" onclick="window._deudaSubPage='acciones'; render()">Volver al Panel</button>
       </div>
     `;
   }
 
-  // --- Drawer Overlay and Sidebar Drawer HTML ---
+  // --- Drawer Sidebar ---
   let drawerHTML = '';
   if (window._deudaDrawerOpen) {
     drawerHTML = `
       <div class="deuda-tik-drawer-overlay" onclick="window.toggleDeudaDrawer()"></div>
       <div class="deuda-tik-drawer open">
         <div class="deuda-tik-drawer-header">
-          <div class="deuda-tik-drawer-header-title">Tik Deudas</div>
+          <div class="deuda-tik-drawer-header-title">Tik Deudas 🏠✨</div>
           <div class="deuda-tik-drawer-header-subtitle">Gestión de facturas y deudas</div>
         </div>
         <div class="deuda-tik-drawer-list">
+          <div class="deuda-tik-drawer-item ${page === 'acciones' ? 'active' : ''}" onclick="window._deudaSubPage='acciones'; window.toggleDeudaDrawer()">
+            <div class="deuda-tik-drawer-item-left">
+              <span class="deuda-tik-drawer-item-icon">🏠</span>
+              <span>Todas las acciones</span>
+            </div>
+          </div>
+          
           <div class="deuda-tik-drawer-item ${page === 'pendientes' ? 'active' : ''}" onclick="window._deudaSubPage='pendientes'; window.toggleDeudaDrawer()">
             <div class="deuda-tik-drawer-item-left">
               <span class="deuda-tik-drawer-item-icon">📋</span>
@@ -5858,7 +6328,7 @@ function renderDeudas(){
           
           <div class="deuda-tik-drawer-item ${page === 'pagadas' ? 'active' : ''}" onclick="window._deudaSubPage='pagadas'; window.toggleDeudaDrawer()">
             <div class="deuda-tik-drawer-item-left">
-              <span class="deuda-tik-drawer-item-icon">✓✓</span>
+              <span class="deuda-tik-drawer-item-icon">✅</span>
               <span>Cuentas pagadas</span>
             </div>
             <span class="deuda-tik-drawer-badge">${paidBills.length}</span>
@@ -5867,56 +6337,35 @@ function renderDeudas(){
           <div class="deuda-tik-drawer-item ${page === 'crear' ? 'active' : ''}" onclick="window._deudaSubPage='crear'; window._deudaEditId=null; window.toggleDeudaDrawer()">
             <div class="deuda-tik-drawer-item-left">
               <span class="deuda-tik-drawer-item-icon">💳</span>
-              <span>Crear nueva cuenta</span>
+              <span>Nueva Factura</span>
             </div>
           </div>
           
           <div class="deuda-tik-drawer-item ${page === 'reportes' ? 'active' : ''}" onclick="window._deudaSubPage='reportes'; window.toggleDeudaDrawer()">
             <div class="deuda-tik-drawer-item-left">
-              <span class="deuda-tik-drawer-item-icon">📊</span>
+              <span class="deuda-tik-drawer-item-icon">📈</span>
               <span>Informe de gastos</span>
             </div>
           </div>
           
           <div class="deuda-tik-drawer-item ${page === 'categorias' ? 'active' : ''}" onclick="window._deudaSubPage='categorias'; window.toggleDeudaDrawer()">
             <div class="deuda-tik-drawer-item-left">
-              <span class="deuda-tik-drawer-item-icon">💬</span>
-              <span>Gestionar categorías</span>
+              <span class="deuda-tik-drawer-item-icon">🏷️</span>
+              <span>Categorías</span>
             </div>
           </div>
           
-          <div class="deuda-tik-drawer-item" onclick="window.toggleDeudaDrawer(); state.page='ajustes'; render()">
+          <div class="deuda-tik-drawer-item ${page === 'configurar' ? 'active' : ''}" onclick="window._deudaSubPage='configurar'; window.toggleDeudaDrawer()">
             <div class="deuda-tik-drawer-item-left">
               <span class="deuda-tik-drawer-item-icon">⚙️</span>
-              <span>Configuración</span>
-            </div>
-          </div>
-          
-          <div class="deuda-tik-drawer-item" onclick="window.toggleDeudaDrawer(); toast('¡Gracias por tus comentarios!')">
-            <div class="deuda-tik-drawer-item-left">
-              <span class="deuda-tik-drawer-item-icon">💬</span>
-              <span>Comentarios/Sugerencias</span>
+              <span>Configuración local</span>
             </div>
           </div>
           
           <div class="deuda-tik-drawer-item ${page === 'exportar' ? 'active' : ''}" onclick="window._deudaSubPage='exportar'; window.toggleDeudaDrawer()">
             <div class="deuda-tik-drawer-item-left">
               <span class="deuda-tik-drawer-item-icon">💾</span>
-              <span>exportar/importar datos</span>
-            </div>
-          </div>
-          
-          <div class="deuda-tik-drawer-item" onclick="window.toggleDeudaDrawer(); toast('Enlace copiado')">
-            <div class="deuda-tik-drawer-item-left">
-              <span class="deuda-tik-drawer-item-icon">🔗</span>
-              <span>Compartir esta aplicación</span>
-            </div>
-          </div>
-          
-          <div class="deuda-tik-drawer-item ${page === 'acciones' ? 'active' : ''}" onclick="window._deudaSubPage='acciones'; window.toggleDeudaDrawer()">
-            <div class="deuda-tik-drawer-item-left">
-              <span class="deuda-tik-drawer-item-icon">🏠</span>
-              <span>Todas las acciones</span>
+              <span>Exportar y Sheets</span>
             </div>
           </div>
         </div>
@@ -5924,41 +6373,76 @@ function renderDeudas(){
     `;
   }
 
-  // --- Bill Detail Modal Overlay ---
+  // --- Bill Detail / Payment / Abono Modal ---
   let detailModalHTML = '';
   if (window._deudaActiveBillId) {
-    // Find virtual bill
     const allV = [...pendingBills, ...paidBills];
     const bill = allV.find(b => b.id === window._deudaActiveBillId);
     if (bill) {
+      const alreadyPaid = deudaCuotaPaid(bill.parent, bill.cuotaNum);
+      const remainingDue = Math.max(0, bill.monto - alreadyPaid);
+      
+      const t = deudaFrenchAmortizationTable(bill.parent);
+      const rowDetails = t[bill.cuotaNum - 1] || { interes:0, capitalMes:bill.monto, seguro:0 };
+      
       detailModalHTML = `
         <div class="deuda-tik-modal-overlay" onclick="window.closeDeudaBillDetail()">
           <div class="deuda-tik-modal" onclick="event.stopPropagation()">
-            <div style="font-size:18px; font-weight:bold; margin-bottom:6px; color:#212121">${bill.debtName}</div>
-            <div style="font-size:12px; color:#757575; margin-bottom:16px">${bill.tipoLabel} · Cuota ${bill.cuotaNum}/${bill.cuotasTotales}</div>
+            <div style="font-size:18px; font-weight:800; margin-bottom:6px; color:#0f766e">Detalle de Cuota</div>
+            <div style="font-size:15px; font-weight:800; margin-bottom:4px; color:#0F172A">${bill.parent.name}</div>
+            <div style="font-size:12px; color:#64748B; margin-bottom:16px">${bill.tipoLabel} · Cuota ${bill.cuotaNum} de ${bill.cuotasTotales}</div>
             
-            <div style="background:#F5F7F8; padding:12px; border-radius:6px; margin-bottom:20px; border:1px solid #E0E0E0">
-              <div style="display:flex; justify-content:space-between; margin-bottom:8px">
-                <span style="font-size:13px; color:#757575">Vencimiento:</span>
-                <span style="font-size:13px; font-weight:bold; color:#212121">${formatDeudaTikDate(bill.fechaVencimiento)}</span>
-              </div>
-              <div style="display:flex; justify-content:space-between; margin-bottom:8px">
-                <span style="font-size:13px; color:#757575">Monto de cuota:</span>
-                <span style="font-size:13px; font-weight:bold; color:#212121">S/ ${bill.monto.toFixed(2)}</span>
+            <div style="background:rgba(255,255,255,0.5); padding:14px; border-radius:16px; margin-bottom:20px; border:1px solid rgba(0,0,0,0.05); box-shadow:0 4px 15px rgba(0,0,0,0.01); display:flex; flex-direction:column; gap:8px">
+              <div style="display:flex; justify-content:space-between">
+                <span style="font-size:12.5px; color:#64748B">Vencimiento:</span>
+                <span style="font-size:12.5px; font-weight:800; color:#0F172A">${formatDeudaTikDate(bill.fechaVencimiento)}</span>
               </div>
               <div style="display:flex; justify-content:space-between">
-                <span style="font-size:13px; color:#757575">Estado:</span>
-                <span style="font-size:13px; font-weight:bold; color:${bill.pagado ? '#1B5E20' : '#B71C1C'}">${bill.pagado ? '✓ Pagada' : 'Pendiente'}</span>
+                <span style="font-size:12.5px; color:#64748B">Monto de cuota:</span>
+                <span style="font-size:12.5px; font-weight:800; color:#0F172A">S/ ${bill.monto.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+              </div>
+              
+              <!-- Desglose de Amortización si aplica -->
+              ${rowDetails.interes > 0 || rowDetails.seguro > 0 ? `
+                <div style="border-top:1px dashed rgba(0,0,0,0.08); padding-top:8px; margin-top:4px; display:flex; flex-direction:column; gap:4px">
+                  <div style="display:flex; justify-content:space-between; font-size:11px; color:#475569">
+                    <span>Capital Amortizado:</span>
+                    <span>S/ ${rowDetails.capitalMes.toFixed(2)}</span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; font-size:11px; color:#D97706">
+                    <span>Interés (${bill.parent.tea}% TEA):</span>
+                    <span>S/ ${rowDetails.interes.toFixed(2)}</span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; font-size:11px; color:#2563EB">
+                    <span>Seguros / Otros:</span>
+                    <span>S/ ${rowDetails.seguro.toFixed(2)}</span>
+                  </div>
+                </div>
+              ` : ''}
+              
+              <div style="border-top:1px solid rgba(0,0,0,0.05); padding-top:8px; display:flex; justify-content:space-between; align-items:center">
+                <span style="font-size:12.5px; color:#64748B">Estado de pago:</span>
+                <span style="font-size:12.5px; font-weight:900; color:${bill.pagado ? '#15803D' : (alreadyPaid > 0 ? '#D97706' : '#B91C1C')}">
+                  ${bill.pagado ? '✓ Completamente Pagada' : (alreadyPaid > 0 ? `Abonada (Pendiente S/ ${remainingDue.toFixed(2)})` : 'Pendiente')}
+                </span>
               </div>
             </div>
             
             <div style="display:flex; flex-direction:column; gap:8px">
               ${!bill.pagado ? `
-                <button class="btn" style="background:#009688; color:white; width:100%" onclick="window.payVirtualBill('${bill.debtId}', ${bill.cuotaNum})">Registrar pago</button>
+                <div style="background:rgba(13, 148, 136, 0.04); border:1px solid rgba(13, 148, 136, 0.1); border-radius:16px; padding:12px; margin-bottom:8px">
+                  <label class="deuda-tik-label" style="margin-bottom:6px">Monto a pagar (S/)</label>
+                  <div style="display:flex; gap:8px">
+                    <input id="tik-pago-monto" type="number" step="0.01" class="deuda-tik-input" style="flex:1" value="${remainingDue.toFixed(2)}" max="${remainingDue.toFixed(2)}">
+                    <button class="deuda-tik-modal-btn-primary" onclick="window.payVirtualBill('${bill.debtId}', ${bill.cuotaNum}, document.getElementById('tik-pago-monto').value)">Pagar</button>
+                  </div>
+                  <div style="font-size:10.5px; color:#64748B; margin-top:6px; font-weight:600">Puedes ingresar el total de S/ ${remainingDue.toFixed(2)} o un abono parcial.</div>
+                </div>
               ` : ''}
-              <button class="btn-ghost" style="width:100%; border:1px solid #CFD8DC; border-radius:4px" onclick="window.editParentDebt('${bill.debtId}')">Editar deudas completas</button>
-              <button class="btn-ghost" style="color:#B71C1C; width:100%; border:1px solid #FFCDD2; border-radius:4px" onclick="window.deleteParentDebt('${bill.debtId}')">Eliminar deuda completa</button>
-              <button class="btn-ghost" style="width:100%" onclick="window.closeDeudaBillDetail()">Cerrar</button>
+              
+              <button class="deuda-tik-modal-btn" style="width:100%; border:1px solid rgba(0,0,0,0.05); border-radius:12px; margin-top:4px" onclick="window.editParentDebt('${bill.debtId}')">Editar deuda completa ✎</button>
+              <button class="deuda-tik-modal-btn" style="color:#B91C1C; width:100%; border:1px solid rgba(239, 68, 68, 0.1); border-radius:12px" onclick="window.deleteParentDebt('${bill.debtId}')">Eliminar deuda completa ✕</button>
+              <button class="deuda-tik-modal-btn" style="width:100%" onclick="window.closeDeudaBillDetail()">Cerrar</button>
             </div>
           </div>
         </div>
@@ -5966,78 +6450,11 @@ function renderDeudas(){
     }
   }
 
-  // --- Recurring Finalization Modal Overlay ---
-  let recurringModalHTML = '';
-  if (window._deudaRecurringModalOpen && window._deudaRecurringDraft) {
-    const draft = window._deudaRecurringDraft;
-    const option = window._deudaRecurringOption || '3years';
-    const customCount = parseInt(window._deudaRecurringCustomCount) || 37;
-    const customDate = window._deudaRecurringCustomDate || todayStr();
-    
-    const { count, endDate } = window.calculateRecurringDetails(draft, option, customCount, customDate);
-    const endDateFmt = formatDeudaTikDate(endDate);
-
-    recurringModalHTML = `
-      <div class="deuda-tik-modal-overlay">
-        <div class="deuda-tik-modal" style="max-width:400px">
-          <div class="deuda-tik-modal-title">proporcione la fecha de finalización de la factura recurrente o</div>
-          
-          <div class="deuda-tik-modal-option" onclick="window._deudaRecurringOption='1year'; render()">
-            <input type="radio" name="recOpt" ${option === '1year' ? 'checked' : ''}>
-            <span class="deuda-tik-modal-option-text">generar facturas para el próximo 1 (un) año</span>
-          </div>
-          
-          <div class="deuda-tik-modal-option" onclick="window._deudaRecurringOption='3years'; render()">
-            <input type="radio" name="recOpt" ${option === '3years' ? 'checked' : ''}>
-            <span class="deuda-tik-modal-option-text">generar facturas para los próximos 3 (tres) años</span>
-          </div>
-          
-          <div class="deuda-tik-modal-option" onclick="window._deudaRecurringOption='10years'; render()">
-            <input type="radio" name="recOpt" ${option === '10years' ? 'checked' : ''}>
-            <span class="deuda-tik-modal-option-text">generar facturas para los próximos 10 (diez) años</span>
-          </div>
-          
-          <div class="deuda-tik-modal-option" onclick="window._deudaRecurringOption='calendar'; render()">
-            <input type="radio" name="recOpt" ${option === 'calendar' ? 'checked' : ''}>
-            <span class="deuda-tik-modal-option-text">seleccione la fecha de finalización en el calendario</span>
-          </div>
-          ${option === 'calendar' ? `
-            <div class="deuda-tik-modal-custom-row">
-              <input id="tik-modal-calendar" type="date" class="deuda-tik-input" value="${customDate}" onchange="window._deudaRecurringCustomDate=this.value; render()" style="padding:4px">
-            </div>
-          ` : ''}
-          
-          <div class="deuda-tik-modal-option" onclick="window._deudaRecurringOption='count'; render()">
-            <input type="radio" name="recOpt" ${option === 'count' ? 'checked' : ''}>
-            <span class="deuda-tik-modal-option-text">crea este número de facturas</span>
-          </div>
-          ${option === 'count' ? `
-            <div class="deuda-tik-modal-custom-row">
-              <input id="tik-modal-spinner" type="number" class="deuda-tik-modal-spinner" value="${customCount}" oninput="window._deudaRecurringCustomCount=this.value; render()" min="1" max="500">
-            </div>
-          ` : ''}
-          
-          <div class="deuda-tik-modal-footer-text">
-            fecha de finalización considerada:${endDateFmt}<br><br>
-            crea este número de facturas : ${count}
-          </div>
-          
-          <div class="deuda-tik-modal-buttons">
-            <button class="deuda-tik-modal-btn" onclick="window.closeRecurringModal()">CANCELAR</button>
-            <button class="deuda-tik-modal-btn" onclick="window.confirmRecurringDeuda()">BUENO</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
   // --- Top Header Right Buttons ---
   let headerRightHTML = '';
   if (page === 'crear') {
-    // Save floppy disk icon
     headerRightHTML = `<button class="deuda-tik-header-btn" onclick="window.saveTikDeuda()" title="Guardar">💾</button>`;
   } else {
-    // Home + Help icons
     headerRightHTML = `
       <button class="deuda-tik-header-btn" onclick="window._deudaSubPage='acciones'; render()" title="Inicio">🏠</button>
       <button class="deuda-tik-header-btn" onclick="toast('Ayuda de Deudas: Usa el menú para crear, pagar e informar tus cuentas.')" title="Ayuda">❓</button>
@@ -6058,7 +6475,6 @@ function renderDeudas(){
       ${bodyHTML}
       ${drawerHTML}
       ${detailModalHTML}
-      ${recurringModalHTML}
     </div>
   `;
 }
