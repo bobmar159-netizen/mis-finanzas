@@ -3390,6 +3390,16 @@ function loadStateForModo(modo){
   const isNeg = modo==='negocio';
   state.transactions = load(k.tx,[]);
   state.deudas       = load(k.deudas,[]);
+  if (Array.isArray(state.deudas)) {
+    state.deudas.forEach(d => {
+      if (String(d.id) === 'deu_caja_huancayo_prestamo' && d.cuotasPagadas === 32) {
+        d.cuotasPagadas = 31;
+        if (typeof deudaNormalizePagos === 'function') {
+          deudaNormalizePagos(d, d);
+        }
+      }
+    });
+  }
   if (Array.isArray(state.deudas) && !state.deudas.some(d => String(d.name).toLowerCase().includes('scotiabank'))) {
     const scotiaDebt = {
       id: 'deu_scotiabank_hipotecario',
@@ -3402,10 +3412,10 @@ function loadStateForModo(modo){
       cuotaMonto: 3634.08,
       cuotaMontoFixed: 3634.08,
       cuotasTotales: 36,
-      cuotasPagadas: 21,
+      cuotasPagadas: 22,
       seguroMonto: 101.97,
       tea: 15.95,
-      fechaInicio: '2024-06-08',
+      fechaInicio: '2024-05-08',
       diaPago: 8,
       pagos: [],
       color: '#C2185B'
@@ -3419,6 +3429,36 @@ function loadStateForModo(modo){
       localStorage.setItem(kSave.deudas, JSON.stringify(state.deudas));
     } catch(e) {}
   }
+  if (Array.isArray(state.deudas) && !state.deudas.some(d => String(d.name).toLowerCase().includes('huancayo'))) {
+    const huancayoDebt = {
+      id: 'deu_caja_huancayo_prestamo',
+      name: 'Caja Huancayo 🏦✨',
+      tipo: 'prestamo',
+      tipoLabel: 'Préstamo',
+      rol: 'debo',
+      notes: 'CMAC Huancayo S.A. · Paulina Reyes Flores de Saucedo 📋',
+      totalAmount: 130000.00,
+      cuotaMonto: 3394.15,
+      cuotaMontoFixed: 3394.15,
+      cuotasTotales: 54,
+      cuotasPagadas: 31,
+      seguroMonto: 59.20,
+      tea: 15.62,
+      fechaInicio: '2023-08-15',
+      diaPago: 15,
+      pagos: [],
+      color: '#FF6B00'
+    };
+    state.deudas.unshift(huancayoDebt);
+    if (typeof deudaNormalizePagos === 'function') {
+      deudaNormalizePagos(huancayoDebt, huancayoDebt);
+    }
+    const kSave = getKeys(modo);
+    try {
+      localStorage.setItem(kSave.deudas, JSON.stringify(state.deudas));
+    } catch(e) {}
+  }
+  state.papeleraDeudas = load(modo === 'negocio' ? 'fnz_neg_papelera_deudas' : 'fnz_papelera_deudas', []);
   state.servicios    = load(k.services, isNeg ? DEFAULT_SERVICES_NEG : DEFAULT_SERVICES);
   state.catsIn       = load(k.catsIn,   isNeg ? DEFAULT_CATS_NEG_IN  : DEFAULT_CATS_IN);
   state.catsEx       = load(k.catsEx,   isNeg ? DEFAULT_CATS_NEG_EX  : DEFAULT_CATS_EX);
@@ -3471,6 +3511,7 @@ function saveAll(){
   if(state._lazyLoaded?.comprasMateriales) save('fnz_compras_mat', state.comprasMateriales);
   save('fnz_stock_valor_general', state.stockValorGeneral||0);
   save('fnz_nombre_usuario',  state.nombreUsuario||'');
+  save(state.modo === 'negocio' ? 'fnz_neg_papelera_deudas' : 'fnz_papelera_deudas', state.papeleraDeudas || []);
   // NO llamar syncToSheets() aquí — cada función llama su propio sync
 }
 
@@ -5527,6 +5568,8 @@ function renderDeudas() {
       toast('Por favor ingresa un monto válido mayor a cero', 'error');
       return;
     }
+
+    if (!confirm(`¿Estás seguro de registrar este pago de S/ ${paymentAmount.toFixed(2)} para la cuota ${cuotaNum}?`)) return;
     
     const id = Date.now() + '_c' + cuotaNum + '_' + Math.random().toString(36).slice(2, 6);
     const fecha = todayStr();
@@ -5556,6 +5599,35 @@ function renderDeudas() {
     }
   };
 
+  window.deleteSingleDeudaPayment = window.deleteSingleDeudaPayment || function(debtId, pagoId) {
+    if (!confirm('¿Estás seguro de que deseas eliminar este pago? (El balance general de tus cuentas no se verá afectado)')) return;
+    const d = (state.deudas || []).find(x => String(x.id) === String(debtId));
+    if (!d) return;
+    
+    const pgIdx = (d.pagos || []).findIndex(x => String(x.id) === String(pagoId));
+    if (pgIdx === -1) return;
+    
+    const pg = d.pagos[pgIdx];
+    const txId = pg.txId || deudaPagoTxId(d.id, pg.id);
+    const tx = (state.transactions || []).find(t => String(t.id) === String(txId));
+    if (tx) {
+      delete tx.origenDeudaPago;
+      delete tx.debtId;
+      delete tx.debtPagoId;
+    }
+    
+    d.pagos.splice(pgIdx, 1);
+    deudaNormalizePagos(d, d);
+    deudaReconcilePaymentTxs(d);
+    
+    saveAll();
+    syncSeccionToSheets('deuda', d);
+    
+    window._deudaActiveBillId = null;
+    render();
+    toast('Pago eliminado de la deuda (el balance general no se vio afectado) ✓');
+  };
+
   window.editParentDebt = window.editParentDebt || function(debtId) {
     window._deudaEditId = debtId;
     window._deudaActiveBillId = null;
@@ -5564,15 +5636,66 @@ function renderDeudas() {
   };
 
   window.deleteParentDebt = window.deleteParentDebt || function(debtId) {
-    if (!confirm('¿Seguro que deseas eliminar esta deuda y todas sus cuotas por completo?')) return;
-    state.deudas = (state.deudas || []).filter(x => String(x.id) !== String(debtId));
-    deudaRemovePaymentTxs(debtId);
-    saveAll();
-    const url = localStorage.getItem('fnz_sheets_url') || '';
-    if (url) _sendToSheets(url, {type: 'deuda_delete', id: debtId, timestamp: 'deu_del_' + debtId + '_' + Date.now()});
+    if (!confirm('¿Seguro que deseas eliminar esta deuda? Se guardará en la papelera para poder restaurarla si lo deseas.')) return;
+    const debt = (state.deudas || []).find(x => String(x.id) === String(debtId));
+    if (debt) {
+      state.papeleraDeudas = state.papeleraDeudas || [];
+      const removedTxs = (state.transactions || []).filter(t => String(t.debtId) === String(debtId) || String(t.prestamoPersonalId) === String(debtId));
+      debt.papeleraTxs = removedTxs;
+      debt.deletedAt = new Date().toISOString();
+      state.papeleraDeudas.push(debt);
+
+      state.deudas = (state.deudas || []).filter(x => String(x.id) !== String(debtId));
+      deudaRemovePaymentTxs(debtId);
+      saveAll();
+      const url = localStorage.getItem('fnz_sheets_url') || '';
+      if (url) _sendToSheets(url, {type: 'deuda_delete', id: debtId, timestamp: 'deu_del_' + debtId + '_' + Date.now()});
+    }
     window._deudaActiveBillId = null;
     render();
-    toast('Deuda eliminada por completo');
+    toast('Deuda movida a la Papelera');
+  };
+
+  window.restoreParentDebt = window.restoreParentDebt || function(debtId) {
+    state.papeleraDeudas = state.papeleraDeudas || [];
+    const idx = state.papeleraDeudas.findIndex(x => String(x.id) === String(debtId));
+    if (idx !== -1) {
+      const debt = state.papeleraDeudas[idx];
+      state.papeleraDeudas.splice(idx, 1);
+      state.deudas = state.deudas || [];
+      state.deudas.push(debt);
+
+      if (Array.isArray(debt.papeleraTxs)) {
+        state.transactions = state.transactions || [];
+        debt.papeleraTxs.forEach(t => {
+          if (!state.transactions.some(x => x.id === t.id)) {
+            state.transactions.unshift(t);
+          }
+        });
+        delete debt.papeleraTxs;
+      }
+      saveAll();
+      syncSeccionToSheets('deuda', debt);
+      render();
+      toast('Deuda restaurada exitosamente ✓');
+    }
+  };
+
+  window.purgeParentDebt = window.purgeParentDebt || function(debtId) {
+    if (!confirm('¿Seguro que deseas eliminar definitivamente esta deuda de la papelera? Esta acción no se puede deshacer.')) return;
+    state.papeleraDeudas = state.papeleraDeudas || [];
+    state.papeleraDeudas = state.papeleraDeudas.filter(x => String(x.id) !== String(debtId));
+    saveAll();
+    render();
+    toast('Deuda eliminada permanentemente ❌');
+  };
+
+  window.emptyPapeleraDeudas = window.emptyPapeleraDeudas || function() {
+    if (!confirm('¿Seguro que deseas vaciar la papelera de deudas? Se borrarán definitivamente todos los elementos.')) return;
+    state.papeleraDeudas = [];
+    saveAll();
+    render();
+    toast('Papelera vaciada');
   };
 
   window.saveTikDeuda = window.saveTikDeuda || function() {
@@ -5592,6 +5715,7 @@ function renderDeudas() {
     if (plazo <= 0) { toast('Por favor ingresa un plazo válido', 'error'); return; }
     
     const isEdit = !!window._deudaEditId;
+    if (isEdit && !confirm('¿Estás seguro de guardar los cambios editados de esta deuda?')) return;
     const targetId = isEdit ? window._deudaEditId : ('deu_' + Date.now());
     
     let d = isEdit ? (state.deudas || []).find(x => String(x.id) === String(targetId)) : {};
@@ -5679,7 +5803,7 @@ function renderDeudas() {
   };
 
   window.resetDeudasLocal = window.resetDeudasLocal || function() {
-    if (!confirm('¿Seguro que deseas reiniciar los datos de deudas a los valores predeterminados? Se borrarán las otras deudas y se mantendrá el Crédito Hipotecario de Scotiabank.')) return;
+    if (!confirm('¿Seguro que deseas reiniciar los datos de deudas a los valores predeterminados? Se borrarán las otras deudas y se mantendrán el Crédito Hipotecario de Scotiabank y el Préstamo de Caja Huancayo.')) return;
     
     const scotiaDebt = {
       id: 'deu_scotiabank_hipotecario',
@@ -5692,17 +5816,38 @@ function renderDeudas() {
       cuotaMonto: 3634.08,
       cuotaMontoFixed: 3634.08,
       cuotasTotales: 36,
-      cuotasPagadas: 21,
+      cuotasPagadas: 22,
       seguroMonto: 101.97,
       tea: 15.95,
-      fechaInicio: '2024-06-08',
+      fechaInicio: '2024-05-08',
       diaPago: 8,
       pagos: [],
       color: '#C2185B'
     };
+
+    const cajaHuancayoDebt = {
+      id: 'deu_caja_huancayo_prestamo',
+      name: 'Caja Huancayo 🏦✨',
+      tipo: 'prestamo',
+      tipoLabel: 'Préstamo',
+      rol: 'debo',
+      notes: 'CMAC Huancayo S.A. · Paulina Reyes Flores de Saucedo 📋',
+      totalAmount: 130000.00,
+      cuotaMonto: 3394.15,
+      cuotaMontoFixed: 3394.15,
+      cuotasTotales: 54,
+      cuotasPagadas: 31,
+      seguroMonto: 59.20,
+      tea: 15.62,
+      fechaInicio: '2023-08-15',
+      diaPago: 15,
+      pagos: [],
+      color: '#FF6B00'
+    };
     
-    state.deudas = [scotiaDebt];
+    state.deudas = [scotiaDebt, cajaHuancayoDebt];
     deudaNormalizePagos(scotiaDebt, scotiaDebt);
+    deudaNormalizePagos(cajaHuancayoDebt, cajaHuancayoDebt);
     
     const k = getKeys(state.modo || 'negocio');
     save(k.deudas, state.deudas);
@@ -5987,7 +6132,7 @@ function renderDeudas() {
     const dFecha = editDeuda ? editDeuda.fechaInicio : todayStr();
     
     const dCapital = editDeuda ? editDeuda.totalAmount : '';
-    const dTEA = editDeuda ? (editDeuda.tea !== undefined ? editDeuda.tea : editDeuda.tasaMensual) : '';
+    const dTEA = editDeuda ? (editDeuda.tea !== undefined ? editDeuda.tea : editDeuda.tasaMensual) : (parseFloat(localStorage.getItem('fnz_deuda_default_tea')) || 15.95);
     const dSeguro = editDeuda ? (editDeuda.seguroMonto || 0) : '';
     const dPlazo = editDeuda ? editDeuda.cuotasTotales : '';
     const dCuotaFixed = editDeuda ? (editDeuda.cuotaMontoFixed || '') : '';
@@ -6258,6 +6403,14 @@ function renderDeudas() {
     `;
   }
   else if (page === 'configurar') {
+    const defaultTea = parseFloat(localStorage.getItem('fnz_deuda_default_tea')) || 15.95;
+    window.saveDeudaConfig = window.saveDeudaConfig || function() {
+      const teaInput = document.getElementById('tik-default-tea');
+      const teaVal = parseFloat(teaInput?.value) || 15.95;
+      localStorage.setItem('fnz_deuda_default_tea', teaVal);
+      toast('Configuración guardada localmente ✓');
+    };
+
     bodyHTML = `
       <div style="padding:16px; display:flex; flex-direction:column; gap:16px">
         <div style="background:rgba(255, 255, 255, 0.6); backdrop-filter:blur(10px); border:1px solid rgba(255, 255, 255, 0.4); border-radius:18px; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.02)">
@@ -6265,9 +6418,9 @@ function renderDeudas() {
           
           <div style="margin-bottom:12px">
             <label class="deuda-tik-label">TEA de Referencia (%)</label>
-            <input id="tik-default-tea" type="number" step="0.01" class="deuda-tik-input" style="border:1px solid rgba(0,0,0,0.08)" placeholder="Ej: 15.95" value="15.95">
+            <input id="tik-default-tea" type="number" step="0.01" class="deuda-tik-input" style="border:1px solid rgba(0,0,0,0.08)" placeholder="Ej: 15.95" value="${defaultTea}">
           </div>
-          <button class="deuda-tik-modal-btn-primary" style="width:100%" onclick="toast('Configuración guardada localmente ✓')">Guardar Parámetros</button>
+          <button class="deuda-tik-modal-btn-primary" style="width:100%" onclick="window.saveDeudaConfig()">Guardar Parámetros</button>
         </div>
         
         <div style="background:rgba(239, 68, 68, 0.05); border:1px solid rgba(239, 68, 68, 0.15); border-radius:18px; padding:20px; display:flex; flex-direction:column; gap:12px">
@@ -6440,6 +6593,28 @@ function renderDeudas() {
                 </div>
               ` : ''}
               
+              <!-- Historial de pagos para esta cuota específica -->
+              ${(() => {
+                const cuotaPagos = (bill.parent.pagos || []).filter(pg => pg.cuota === bill.cuotaNum);
+                if (cuotaPagos.length === 0) return '';
+                return `
+                  <div style="margin-top:4px; border-top:1px solid rgba(0,0,0,0.05); padding-top:10px; margin-bottom:8px">
+                    <div style="font-size:12px; font-weight:700; color:#475569; margin-bottom:8px">Abonos / Pagos Registrados:</div>
+                    <div style="display:flex; flex-direction:column; gap:6px">
+                      ${cuotaPagos.map(pg => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.02); padding:8px 12px; border-radius:10px; border:1px solid rgba(0,0,0,0.03)">
+                          <div style="display:flex; flex-direction:column">
+                            <span style="font-size:12px; font-weight:700; color:#0F172A">S/ ${pg.monto.toFixed(2)}</span>
+                            <span style="font-size:10px; color:#64748B">${formatDeudaTikDate(pg.fecha)}</span>
+                          </div>
+                          <button class="deuda-tik-modal-btn" style="color:#B91C1C; border:none; background:transparent; padding:4px 8px; font-size:12px; cursor:pointer; margin:0; width:auto; display:inline-block" onclick="window.deleteSingleDeudaPayment('${bill.debtId}', '${pg.id}')">🗑️ Eliminar</button>
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+                `;
+              })()}
+
               <button class="deuda-tik-modal-btn" style="width:100%; border:1px solid rgba(0,0,0,0.05); border-radius:12px; margin-top:4px" onclick="window.editParentDebt('${bill.debtId}')">Editar deuda completa ✎</button>
               <button class="deuda-tik-modal-btn" style="color:#B91C1C; width:100%; border:1px solid rgba(239, 68, 68, 0.1); border-radius:12px" onclick="window.deleteParentDebt('${bill.debtId}')">Eliminar deuda completa ✕</button>
               <button class="deuda-tik-modal-btn" style="width:100%" onclick="window.closeDeudaBillDetail()">Cerrar</button>
@@ -10708,6 +10883,7 @@ function saveService(editId){
   const monto=parseFloat(document.getElementById('s-monto').value);
   const venceDia=parseInt(document.getElementById('s-dia').value)||15;
   if(!name||!monto)return toast('Completa nombre y monto','error');
+  if(editId && !confirm('¿Estás seguro de guardar los cambios editados de este servicio?')) return;
   const item={id:editId||Date.now()+'',name,monto,venceDia,icon:window._svcIcon||'💡',pagado:false,categoria:'Básico'};
   if(editId)state.servicios=state.servicios.map(s=>s.id===editId?{...s,...item,pagado:s.pagado}:s);
   else state.servicios.push(item);
@@ -10716,7 +10892,7 @@ function saveService(editId){
   closeModal();render();toast(editId?'Servicio actualizado':'Servicio agregado ✓');
 }
 function deleteService(id){
-  if(!confirm('¿Eliminar?'))return;
+  if(!confirm('¿Estás seguro de que deseas eliminar este servicio?'))return;
   const svc=state.servicios.find(s=>s.id===id);
   state.servicios=state.servicios.filter(s=>s.id!==id);
   saveAll();
@@ -10724,6 +10900,14 @@ function deleteService(id){
   render();toast('Eliminado');
 }
 function toggleService(id){
+  const currentSvc = state.servicios.find(s => s.id === id);
+  if (currentSvc) {
+    if (!currentSvc.pagado) {
+      if (!confirm(`¿Estás seguro de registrar el pago de "${currentSvc.name}"?`)) return;
+    } else {
+      if (!confirm(`¿Estás seguro de marcar "${currentSvc.name}" como no pagado?`)) return;
+    }
+  }
   state.servicios=state.servicios.map(s=>s.id===id?{...s,pagado:!s.pagado}:s);
   saveAll();
   const s=state.servicios.find(s=>s.id===id);
