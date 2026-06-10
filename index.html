@@ -9364,56 +9364,56 @@ function enviarTodoASheets() {
   if (total === 0) return toast('No hay datos para enviar', 'error');
 
   // ★ Agrupar transacciones de Notion en Trabajos (Reporte Diario)
-  const notionRows = {};
+  const trabajosMap = new Map();
   const txsNormales = [];
-  
+  const baseTrabajo = (id, tx) => ({
+    id: normalizeNotionPageId(id),
+    fecha: tx.date || todayStr(),
+    cliente: tx.cliente || '(Sin cliente)',
+    telefono: tx.contacto || '',
+    contacto: tx.contacto || '',
+    ubicacion: tx.ubicacion || '',
+    distrito: tx.ubicacion || '',
+    formaPago1: tx.formaPago || '',
+    formaPago2: '',
+    servicio1:'', materiales1:0, precio1:0,
+    servicio2:'', materiales2:0, precio2:0,
+    servicio3:'', materiales3:0, precio3:0,
+    comida:0, otros_gastos:0, agregados:0, movilidad:0, meta:0,
+    observaciones: tx.description || '',
+    _notionRowId:id
+  });
+
   txs.forEach(tx => {
-    if (tx._importadoDeNotion && tx._notionRowId) {
-      if (!notionRows[tx._notionRowId]) {
-        notionRows[tx._notionRowId] = {
-          id: normalizeNotionPageId(tx._notionRowId), // Base ID
-          fecha: tx.date,
-          cliente: tx.cliente || '(Sin cliente)',
-          telefono: tx.contacto || '',
-          ubicacion: tx.ubicacion || '',
-          formaPago: tx.formaPago || '',
-          ingreso: 0, movilidad: 0, materiales: 0, comida: 0, agregados: 0, otros: 0, otros_gastos: 0, meta: 0,
-          servicio1: '', servicio2: '', servicio3: '', servicio4: '', observaciones: ''
-        };
-      }
-      const row = notionRows[tx._notionRowId];
-      const amt = parseFloat(tx.amount) || 0;
-      if (tx.type === 'ingreso') {
-        row.ingreso += amt;
-        if (tx._servicios && tx._servicios.length > 0) {
-          row.servicio1 = tx._servicios[0] || '';
-          row.servicio2 = tx._servicios[1] || '';
-          row.servicio3 = tx._servicios[2] || '';
-          row.servicio4 = tx._servicios[3] || '';
-        } else {
-          row.servicio1 = tx.category;
-        }
-        row.observaciones = tx.description;
-      } else if (tx.id.includes('-mov') || isMovilidadCategory(tx.catId, tx.category, tx.description)) {
-        row.movilidad += amt;
-      } else if (tx.id.includes('-mat') || isMaterialesCategory(tx.catId, tx.category)) {
-        row.materiales += amt;
-      } else if (tx.id.includes('-com') || isComidaCategory(tx.catId, tx.category, tx.description)) {
-        row.comida += amt;
-      } else if (tx.id.includes('-agr') || tx.category === 'Agregados' || isAgregadoCategory(tx.catId, tx.category, tx.description)) {
-        row.agregados += amt;
-      } else if (tx.id.includes('-met') || isMetaCategory(tx.catId, tx.category, tx.description)) {
-        row.meta += amt;
+    if (tx && tx._importadoDeNotion && tx._notionRowId) {
+      const id = tx._notionRowId;
+      let row = trabajosMap.get(id) || baseTrabajo(id, tx);
+      if (tx._notionTrabajo) {
+        row = { ...row, ...tx._notionTrabajo, id: normalizeNotionPageId(id) };
       } else {
-        row.otros += amt;
-        row.otros_gastos += amt;
+        const amt = parseFloat(tx.amount) || 0;
+        const svcMatch = String(tx.id || '').match(/-svc(\d+)$/);
+        if (tx.type === 'ingreso' && svcMatch) {
+          const n = Math.max(1, Math.min(3, Number(svcMatch[1]) || 1));
+          row['servicio' + n] = row['servicio' + n] || tx.category || 'Servicio';
+          row['precio' + n] = (parseFloat(row['precio' + n]) || 0) + amt;
+        } else if (tx.type === 'egreso') {
+          const cat = String(tx.category || '').toLowerCase();
+          if (cat.includes('material')) row.materiales1 = (parseFloat(row.materiales1) || 0) + amt;
+          else if (isComidaCategory(tx.catId, tx.category, tx.description)) row.comida = (parseFloat(row.comida) || 0) + amt;
+          else if (isMovilidadCategory(tx.catId, tx.category, tx.description)) row.movilidad = (parseFloat(row.movilidad) || 0) + amt;
+          else if (isAgregadoCategory(tx.catId, tx.category, tx.description)) row.agregados = (parseFloat(row.agregados) || 0) + amt;
+          else if (isMetaCategory(tx.catId, tx.category, tx.description)) row.meta = (parseFloat(row.meta) || 0) + amt;
+          else row.otros_gastos = (parseFloat(row.otros_gastos) || 0) + amt;
+        }
       }
+      trabajosMap.set(id, row);
     } else {
       txsNormales.push(tx);
     }
   });
 
-  const trabajos = Object.values(notionRows);
+  const trabajos = Array.from(trabajosMap.values());
   const totalReal = txsNormales.length + trabajos.length + agenda.length + deudas.length;
 
   if (!confirm(`¿Enviar TODO a Sheets?\n\n· ${txsNormales.length} movimientos libres\n· ${trabajos.length} trabajos (Reporte Diario)\n· ${agenda.length} elementos de agenda\n· ${deudas.length} deudas\n\nLos registros de Notion se enviarán unidos al Reporte Diario.`)) return;
@@ -13429,211 +13429,7 @@ function _notionResultsToCSV(results){
   }
   return rows.join('\n');
 }
-async function npGeminiOrganize(text,mode,local){
-  const key=localStorage.getItem('fnz_gemini_key');
-  if(!key) return local;
-  const prompt=`Eres asistente de notas para una app financiera en Peru. Organiza el dictado en JSON valido.
-Modo solicitado: ${mode}.
-Si es lista, detecta tipo compras|mercado|materiales|gastos|tareas e items con precio en soles cuando exista.
-Si es reunion, resume y extrae acuerdos, pendientes, fechas y gastos mencionados.
-Formato:
-{"kind":"smart_list|meeting|doc","titulo":"...","listType":"compras","items":[{"texto":"...","cantidad":1,"precio":0,"total":0,"done":false}],"transcript":"...","resumen":"...","acuerdos":["..."],"tareas":["..."],"gastos":["..."],"texto":"..."}
-Dictado: """${text}"""`;
-  try{
-    const r=await fetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:.1,maxOutputTokens:900,responseMimeType:'application/json'}})});
-    const d=await r.json();
-    const raw=(d?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```json|```/g,'').trim();
-    const p=JSON.parse(raw);
-    if(p.kind==='smart_list'||p.items?.length){
-      return {kind:'smart_list',titulo:p.titulo||local.titulo||'Lista',listType:p.listType||local.listType||'compras',items:(p.items||local.items||[]).map(npNormalizeItem),confidence:.95};
-    }
-    if(p.kind==='meeting'||p.resumen){
-      return {kind:'meeting',titulo:p.titulo||local.titulo||'Reunion con IA',transcript:p.transcript||text,resumen:p.resumen||'',acuerdos:p.acuerdos||[],tareas:p.tareas||[],gastos:p.gastos||[],confidence:.95};
-    }
-    return {kind:'doc',titulo:p.titulo||'Nota dictada',texto:p.texto||text,confidence:.9};
-  }catch(e){
-    console.warn('Notas Gemini fallo:',e);
-    return local;
-  }
-}
 
-function npOpenVoiceCapture(mode='auto',targetId=''){
-  ensureMicrophonePermission();
-  npEnsureStyles();
-  document.body.style.overflow='hidden';
-  window._npMic={mode,targetId,recording:false,segments:[],seconds:0,parsed:null};
-  document.body.insertAdjacentHTML('beforeend',`<div class="np-ov" id="np-mic">
-    <div class="np-mic-box">
-      <div class="np-mic-title">Microfono inteligente</div>
-      <div class="np-mic-sub">Local primero para listas y precios. Gemini se usa para reuniones, textos largos o cuando la lista necesita organizarse mejor.</div>
-      <div class="np-mic-tabs">
-        ${['auto','list','meeting','text'].map(k=>`<button class="${mode===k?'on':''}" onclick="npMicMode('${k}')">${k==='auto'?'Auto':k==='list'?'Lista':k==='meeting'?'Reunion':'Texto'}</button>`).join('')}
-      </div>
-      <div class="np-timer" id="np-mic-timer">00:00</div>
-      <div class="np-transcript" id="np-mic-text">Toca iniciar y dicta. Ej: gaseosa 2 con 50, snacks 3, materiales 67.</div>
-      <div class="np-preview" id="np-mic-preview"></div>
-      <div class="np-mic-actions">
-        <button onclick="npCloseMic()">Cancelar</button>
-        <button class="primary" id="np-mic-main" onclick="npMicToggle()">Iniciar</button>
-      </div>
-      <div class="np-mic-actions">
-        <button onclick="npMicProcess(true)">Mejorar con IA</button>
-        <button class="primary" id="np-mic-save" onclick="npMicCommit()" style="display:none">Crear nota</button>
-      </div>
-    </div>
-  </div>`);
-}
-function npMicMode(m){ if(window._npMic) window._npMic.mode=m; document.querySelectorAll('.np-mic-tabs button').forEach(b=>b.classList.remove('on')); event?.target?.classList.add('on'); }
-function npMicToggle(){ window._npMic?.recording ? npMicStop() : npMicStart(); }
-function npMicStart(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){toast('Necesitas Chrome para usar microfono','error');return;}
-  const m=window._npMic;if(!m)return;
-  m.recording=true;m.segments=[];m.seconds=0;m.parsed=null;
-  document.getElementById('np-mic-main').textContent='Detener';
-  m.timer=setInterval(()=>{m.seconds++;const mm=String(Math.floor(m.seconds/60)).padStart(2,'0');const ss=String(m.seconds%60).padStart(2,'0');const el=document.getElementById('np-mic-timer');if(el)el.textContent=mm+':'+ss;},1000);
-  const rec=new SR();m.rec=rec;rec.lang='es-PE';rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
-  rec.onresult=e=>{
-    let interim='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      const seg=_deduplicarTranscript((e.results[i][0].transcript||'').trim());
-      if(!seg) continue;
-      if(e.results[i].isFinal){
-        const last=nrm(m.segments[m.segments.length-1]||'');
-        const now=nrm(seg);
-        if(now && now!==last && !last.includes(now)) m.segments.push(seg);
-      } else interim += ' ' + seg;
-    }
-    const display=_deduplicarTranscript([...m.segments.slice(-4),interim].join(' '));
-    const el=document.getElementById('np-mic-text');
-    if(el){el.textContent=display||'Escuchando...';el.scrollTop=el.scrollHeight;}
-  };
-  rec.onerror=e=>{ if(e.error!=='no-speech'&&e.error!=='aborted') npMicStop(); };
-  rec.onend=()=>{ if(m.recording) setTimeout(()=>{try{rec.start();}catch(e){}},250); };
-  try{rec.start();}catch(e){}
-}
-function npMicStop(){
-  const m=window._npMic;if(!m)return;
-  m.recording=false;clearInterval(m.timer);if(m.rec)try{m.rec.stop();}catch(e){}
-  const btn=document.getElementById('np-mic-main');if(btn)btn.textContent='Grabar mas';
-  npMicProcess(false);
-}
-async function npMicProcess(forceGemini){
-  const m=window._npMic;if(!m)return;
-  const text=_deduplicarTranscript(m.segments.join(' ')).trim();
-  if(!text){toast('No hay texto grabado','error');return;}
-  let local=npParseSmartInput(text,m.mode);
-  const needsGemini=forceGemini || local.kind==='meeting' || local.confidence<.7;
-  const prev=document.getElementById('np-mic-preview');
-  if(prev){prev.style.display='block';prev.textContent='Organizando...';}
-  const parsed=needsGemini?await npGeminiOrganize(text,m.mode,local):local;
-  m.parsed=parsed;
-  if(prev){
-    if(parsed.kind==='smart_list') prev.innerHTML=`<b>${npEsc(parsed.titulo)}</b><br>${parsed.items.map(i=>`${npEsc(i.texto)} ${npMoney(i.total||i.precio)?npFmt(i.total||i.precio):''}`).join('<br>')}<br><b>Total: ${npFmt(npListTotal(parsed.items))}</b>`;
-    else if(parsed.kind==='meeting') prev.innerHTML=`<b>${npEsc(parsed.titulo)}</b><br>${npEsc(parsed.resumen||'Transcripcion lista para resumir.')}`;
-    else prev.textContent=parsed.texto||text;
-  }
-  const save=document.getElementById('np-mic-save');if(save)save.style.display='block';
-}
-function npMicCommit(){
-  const m=window._npMic;if(!m)return;
-  const p=m.parsed||npParseSmartInput(m.segments.join(' '),m.mode);
-  let note=null;
-  if(p.kind==='smart_list'){
-    if(m.targetId){
-      note=(state.notas||[]).find(n=>String(n.id)===String(m.targetId));
-      if(note){ note.npKind='smart_list'; note.tipo='lista'; note.items=[...(note.items||[]).map(npNormalizeItem),...(p.items||[])]; note.listType=note.listType||p.listType; note.modificado=new Date().toISOString(); }
-    }
-    if(!note){ note=npBlankList(p.listType,p.titulo); note.id=Date.now()+''; note.items=(p.items||[]).map(npNormalizeItem); note.creado=note.modificado=new Date().toISOString(); state.notas.unshift(note); }
-  } else if(p.kind==='meeting'){
-    note={id:Date.now()+'',npKind:'meeting',tipo:'audio',titulo:p.titulo||'Reunion con IA',transcript:p.transcript||m.segments.join(' '),resumen:p.resumen||'',acuerdos:p.acuerdos||[],tareas:p.tareas||[],gastos:p.gastos||[],texto:p.resumen||'',creado:new Date().toISOString(),modificado:new Date().toISOString()};
-    state.notas.unshift(note);
-  } else {
-    note={id:Date.now()+'',npKind:'doc',tipo:'texto',titulo:p.titulo||'Nota dictada',texto:(p.texto||m.segments.join(' ')).replace(/\n/g,'<br>'),creado:new Date().toISOString(),modificado:new Date().toISOString()};
-    state.notas.unshift(note);
-  }
-  save('fnz_notas',state.notas);
-  npCloseMic();render();toast('Nota creada');
-  if(note) setTimeout(()=>npOpenNote(note.id),120);
-}
-function npCloseMic(){ const m=window._npMic;if(m?.recording)npMicStop();clearInterval(m?.timer);document.getElementById('np-mic')?.remove();document.body.style.overflow='';window._npMic=null; }
-
-async function npImproveCurrentList(){
-  const ed=window._npEditor;if(!ed||ed.mode!=='list')return;
-  npCollectListRows();
-  const text=ed.note.items.map(i=>`${i.texto} ${i.total||i.precio||''}`).join(', ');
-  const p=await npGeminiOrganize(text,'list',{kind:'smart_list',titulo:ed.note.titulo,listType:ed.note.listType,items:ed.note.items,confidence:.6});
-  if(p.kind==='smart_list'){ed.note.titulo=p.titulo||ed.note.titulo;ed.note.listType=p.listType||ed.note.listType;ed.note.items=p.items.map(npNormalizeItem);document.getElementById('np-title').value=ed.note.titulo;npRenderListRows();toast('Lista ordenada con IA');}
-}
-async function npMeetingSummarize(){
-  const ed=window._npEditor;if(!ed||ed.mode!=='meeting')return;
-  const transcript=document.getElementById('np-meet-transcript')?.value||'';
-  const p=await npGeminiOrganize(transcript,'meeting',{kind:'meeting',transcript,confidence:.4});
-  if(p.kind==='meeting'){
-    document.getElementById('np-title').value=p.titulo||document.getElementById('np-title').value;
-    document.getElementById('np-meet-resumen').value=p.resumen||'';
-    document.getElementById('np-meet-acuerdos').value=(p.acuerdos||[]).join('\n');
-    document.getElementById('np-meet-tareas').value=(p.tareas||[]).join('\n');
-    toast('Resumen generado');
-  }
-}
-async function npDocImprove(){
-  const ed=window._npEditor;if(!ed||ed.mode!=='doc')return;
-  const txt=document.getElementById('np-doc-text')?.value||'';
-  const p=await npGeminiOrganize(txt,'text',{kind:'doc',texto:txt,confidence:.4});
-  if(p.texto){document.getElementById('np-doc-text').value=p.texto;toast('Texto mejorado');}
-}
-
-function npOpenShareFromEditor(){
-  let n=null;
-  if(window._npEditor?.mode==='list') n=npSaveList(false);
-  else if(window._npEditor?.mode==='meeting') n=npSaveMeeting(false);
-  else if(window._npEditor?.mode==='doc') n=npSaveDoc(false);
-  if(n) npOpenShare(n.id);
-}
-function npNoteText(n){
-  const kind=npNoteKind(n);
-  let text=(n.titulo||'Nota')+'\n\n';
-  if(kind==='smart_list'){
-    text+=(n.items||[]).map(i=>`${i.done?'✓':'○'} ${i.texto}${npMoney(i.total||i.precio)?' - '+npFmt(i.total||i.precio):''}`).join('\n');
-    text+='\n\nTotal: '+npFmt(npListTotal(n.items));
-  } else if(kind==='meeting'){
-    text+='Resumen:\n'+(n.resumen||'')+'\n\nAcuerdos:\n'+(n.acuerdos||[]).map(x=>'- '+x).join('\n')+'\n\nPendientes:\n'+(n.tareas||[]).map(x=>'- '+x).join('\n');
-  } else text+=npPlain(n.texto||'');
-  return text.trim();
-}
-function npOpenShare(id){
-  const n=(state.notas||[]).find(x=>String(x.id)===String(id));if(!n)return;
-  document.getElementById('modal-content').innerHTML=`<div class="modal-title" style="color:#172033">Compartir</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:14px">${npEsc(n.titulo||'Nota')}</div>
-    <div style="display:grid;gap:9px">
-      <button class="share-btn" onclick="npShareWhatsApp('${id}')"><div class="share-icon whatsapp">${appIcon('phone')}</div><div class="share-label"><b>WhatsApp texto</b><div class="share-desc">Enviar lista o resumen</div></div></button>
-      <button class="share-btn" onclick="npShareEmail('${id}')"><div class="share-icon copy">${appIcon('document')}</div><div class="share-label"><b>Correo</b><div class="share-desc">Abrir email con contenido</div></div></button>
-      <button class="share-btn" onclick="npExportPDF('${id}')"><div class="share-icon pdf">${appIcon('document')}</div><div class="share-label"><b>PDF</b><div class="share-desc">Vista imprimible premium</div></div></button>
-      <button class="share-btn" onclick="closeModal();exportarNotaA4WhatsApp('${id}')"><div class="share-icon excel">${appIcon('image')}</div><div class="share-label"><b>JPG A4 / compartir</b><div class="share-desc">Hoja visual para WhatsApp</div></div></button>
-    </div>`;
-  showModal();
-}
-function npShareWhatsApp(id){const n=state.notas.find(x=>String(x.id)===String(id));if(!n)return;window.open('https://wa.me/?text='+encodeURIComponent(npNoteText(n)),'_blank');closeModal();}
-function npShareEmail(id){const n=state.notas.find(x=>String(x.id)===String(id));if(!n)return;location.href='mailto:?subject='+encodeURIComponent(n.titulo||'Nota')+'&body='+encodeURIComponent(npNoteText(n));closeModal();}
-function npExportPDF(id){
-  const n=state.notas.find(x=>String(x.id)===String(id));if(!n)return;
-  const body=npNoteText(n).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])).replace(/\n/g,'<br>');
-  const win=window.open('','_blank');if(!win){toast('Permite ventanas emergentes','error');return;}
-  win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+npEsc(n.titulo||'Nota')+'</title><style>body{font-family:Inter,Arial,sans-serif;background:#f7f8fa;margin:0;padding:28px}.page{background:white;max-width:760px;margin:auto;padding:36px;border-radius:18px;box-shadow:0 20px 60px rgba(15,23,42,.12)}h1{font-size:28px;margin:0 0 18px;color:#172033}.body{font-size:15px;line-height:1.7;color:#263244}.foot{margin-top:28px;border-top:1px solid #e5e7eb;padding-top:12px;font-size:11px;color:#64748B}@media print{body{background:#fff;padding:0}.page{box-shadow:none;border-radius:0}}</style></head><body><div class="page"><h1>'+npEsc(n.titulo||'Nota')+'</h1><div class="body">'+body+'</div><div class="foot">Mis Finanzas App · '+new Date().toLocaleString('es-PE')+'</div></div><script>setTimeout(()=>window.print(),300)<\\/script></body></html>');
-  win.document.close();closeModal();
-}
-
-// Entradas antiguas redirigidas al flujo nuevo para evitar contaminacion.
-function abrirNotaTypeMenu(){ npShowTemplates(); }
-function abrirModoLista(tipo,tituloInicial){ npOpenSmartList(null,/mercado/i.test(tituloInicial||'')?'mercado':'compras',{titulo:tituloInicial||'Lista inteligente'}); }
-function abrirGrabarAudio(){ npOpenVoiceCapture('auto'); }
-function notaAgregarVoz(notaId){ npOpenVoiceCapture('auto',notaId); }
-function notaAgregarVozGemini(notaId){ npOpenVoiceCapture('auto',notaId); }
-function abrirEditorNotaBloque(editId){ if(editId) npOpenNote(editId); else npOpenDoc(null); }
-function abrirEditorNota(editId){ if(editId) npOpenNote(editId); else npOpenDoc(null); }
-function openEditNotaLista(n){ npOpenSmartList((typeof n==='object'?n.id:n),'compras'); }
-function abrirModalCompartir(id){ npOpenShare(id); }
 
 // ═══════════════════════════════════════════════
 // SONIDOS Y RECORDATORIOS
@@ -27468,6 +27264,40 @@ function npExportPDF(id){
   const win=window.open('','_blank'); if(!win){ toast('Permite ventanas emergentes','error'); return; }
   win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+npEsc(n.titulo||'Nota')+'</title><style>body{font-family:Inter,Arial,sans-serif;background:#f7f8fa;margin:0;padding:28px}.page{background:white;max-width:760px;margin:auto;padding:36px;border-radius:18px;box-shadow:0 20px 60px rgba(15,23,42,.12)}h1{font-size:28px;margin:0 0 18px;color:#172033}.body{font-size:15px;line-height:1.7;color:#263244}.foot{margin-top:28px;border-top:1px solid #e5e7eb;padding-top:12px;font-size:11px;color:#64748B}@media print{body{background:#fff;padding:0}.page{box-shadow:none;border-radius:0}}</style></head><body><div class="page"><h1>'+npEsc(n.titulo||'Nota')+'</h1><div class="body">'+body+'</div><div class="foot">Mis Finanzas App · '+new Date().toLocaleString('es-PE')+'</div></div><script>setTimeout(()=>window.print(),300)<\\/script></body></html>');
   win.document.close(); closeModal();
+}
+
+async function npImproveCurrentList(){
+  const ed=window._npEditor;if(!ed||ed.mode!=='list')return;
+  npCollectListRows();
+  const text=ed.note.items.map(i=>`${i.texto} ${i.total||i.precio||''}`).join(', ');
+  const p=await npGeminiOrganize(text,'list',{kind:'smart_list',titulo:ed.note.titulo,listType:ed.note.listType,items:ed.note.items,confidence:.6});
+  if(p.kind==='smart_list'){ed.note.titulo=p.titulo||ed.note.titulo;ed.note.listType=p.listType||ed.note.listType;ed.note.items=p.items.map(npNormalizeItem);document.getElementById('np-title').value=ed.note.titulo;npRenderListRows();toast('Lista ordenada con IA');}
+}
+async function npMeetingSummarize(){
+  const ed=window._npEditor;if(!ed||ed.mode!=='meeting')return;
+  const transcript=document.getElementById('np-meet-transcript')?.value||'';
+  const p=await npGeminiOrganize(transcript,'meeting',{kind:'meeting',transcript,confidence:.4});
+  if(p.kind==='meeting'){
+    document.getElementById('np-title').value=p.titulo||document.getElementById('np-title').value;
+    document.getElementById('np-meet-resumen').value=p.resumen||'';
+    document.getElementById('np-meet-acuerdos').value=(p.acuerdos||[]).join('\n');
+    document.getElementById('np-meet-tareas').value=(p.tareas||[]).join('\n');
+    toast('Resumen generado');
+  }
+}
+async function npDocImprove(){
+  const ed=window._npEditor;if(!ed||ed.mode!=='doc')return;
+  const txt=document.getElementById('np-doc-text')?.value||'';
+  const p=await npGeminiOrganize(txt,'text',{kind:'doc',texto:txt,confidence:.4});
+  if(p.texto){document.getElementById('np-doc-text').value=p.texto;toast('Texto mejorado');}
+}
+
+function npOpenShareFromEditor(){
+  let n=null;
+  if(window._npEditor?.mode==='list') n=npSaveList(false);
+  else if(window._npEditor?.mode==='meeting') n=npSaveMeeting(false);
+  else if(window._npEditor?.mode==='doc') n=npSaveDoc(false);
+  if(n) npOpenShare(n.id);
 }
 
 
