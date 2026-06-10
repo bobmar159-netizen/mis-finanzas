@@ -3519,9 +3519,6 @@ function saveAll(){
   save('fnz_nombre_usuario',  state.nombreUsuario||'');
   save(state.modo === 'negocio' ? 'fnz_neg_papelera_deudas' : 'fnz_papelera_deudas', state.papeleraDeudas || []);
   // NO llamar syncToSheets() aquí — cada función llama su propio sync
-  if (typeof triggerCloudBackupDebounced === 'function') {
-    triggerCloudBackupDebounced();
-  }
 }
 
 // ── Cambiar de modo ──
@@ -9364,32 +9361,34 @@ function enviarTodoASheets() {
   if (total === 0) return toast('No hay datos para enviar', 'error');
 
   // ★ Agrupar transacciones de Notion en Trabajos (Reporte Diario)
-  const trabajosMap = new Map();
+  const notionRows = {};
   const txsNormales = [];
-  const baseTrabajo = (id, tx) => ({
-    id: normalizeNotionPageId(id),
-    fecha: tx.date || todayStr(),
-    cliente: tx.cliente || '(Sin cliente)',
-    telefono: tx.contacto || '',
-    contacto: tx.contacto || '',
-    ubicacion: tx.ubicacion || '',
-    distrito: tx.ubicacion || '',
-    formaPago1: tx.formaPago || '',
-    formaPago2: '',
-    servicio1:'', materiales1:0, precio1:0,
-    servicio2:'', materiales2:0, precio2:0,
-    servicio3:'', materiales3:0, precio3:0,
-    comida:0, otros_gastos:0, agregados:0, movilidad:0, meta:0,
-    observaciones: tx.description || '',
-    _notionRowId:id
-  });
-
+  
   txs.forEach(tx => {
     if (tx && tx._importadoDeNotion && tx._notionRowId) {
       const id = tx._notionRowId;
-      let row = trabajosMap.get(id) || baseTrabajo(id, tx);
+      if (!notionRows[id]) {
+        notionRows[id] = {
+          id: normalizeNotionPageId(id), // Base ID
+          fecha: tx.date || todayStr(),
+          cliente: tx.cliente || '',
+          telefono: tx.contacto || '',
+          contacto: tx.contacto || '',
+          ubicacion: tx.ubicacion || '',
+          distrito: tx.ubicacion || '',
+          formaPago1: tx.formaPago || '',
+          formaPago2: '',
+          servicio1:'', materiales1:0, precio1:0,
+          servicio2:'', materiales2:0, precio2:0,
+          servicio3:'', materiales3:0, precio3:0,
+          comida:0, otros_gastos:0, agregados:0, movilidad:0, meta:0,
+          observaciones: tx.description || '',
+          _notionRowId: id
+        };
+      }
+      let row = notionRows[id];
       if (tx._notionTrabajo) {
-        row = { ...row, ...tx._notionTrabajo, id: normalizeNotionPageId(id) };
+        notionRows[id] = { ...row, ...tx._notionTrabajo, id: normalizeNotionPageId(id) };
       } else {
         const amt = parseFloat(tx.amount) || 0;
         const svcMatch = String(tx.id || '').match(/-svc(\d+)$/);
@@ -9407,13 +9406,12 @@ function enviarTodoASheets() {
           else row.otros_gastos = (parseFloat(row.otros_gastos) || 0) + amt;
         }
       }
-      trabajosMap.set(id, row);
     } else {
       txsNormales.push(tx);
     }
   });
 
-  const trabajos = Array.from(trabajosMap.values());
+  const trabajos = Object.values(notionRows);
   const totalReal = txsNormales.length + trabajos.length + agenda.length + deudas.length;
 
   if (!confirm(`¿Enviar TODO a Sheets?\n\n· ${txsNormales.length} movimientos libres\n· ${trabajos.length} trabajos (Reporte Diario)\n· ${agenda.length} elementos de agenda\n· ${deudas.length} deudas\n\nLos registros de Notion se enviarán unidos al Reporte Diario.`)) return;
@@ -13429,8 +13427,6 @@ function _notionResultsToCSV(results){
   }
   return rows.join('\n');
 }
-
-
 // ═══════════════════════════════════════════════
 // SONIDOS Y RECORDATORIOS
 // ═══════════════════════════════════════════════
@@ -16129,131 +16125,6 @@ function importData(event){
   reader.readAsText(file);
   event.target.value='';
 }
-
-let backupTimeoutId = null;
-function triggerCloudBackupDebounced() {
-  if (backupTimeoutId) clearTimeout(backupTimeoutId);
-  backupTimeoutId = setTimeout(() => {
-    performCloudBackup();
-  }, 5000);
-}
-
-function performCloudBackup(manual = false) {
-  const url = localStorage.getItem('fnz_sheets_url') || '';
-  if (!url) {
-    if (manual) toast('Configura primero la URL de Google Sheets en los ajustes.', 'error');
-    return;
-  }
-  
-  const data = {
-    version: 2,
-    exportDate: new Date().toLocaleString('es-PE'),
-    transactions: state.transactions || [],
-    deudas: state.deudas || [],
-    debts: state.deudas || [],
-    servicios: state.servicios || [],
-    catsIn: state.catsIn || [],
-    catsEx: state.catsEx || [],
-    prestamos: state.prestamos || [],
-    metas: state.metas || [],
-    recordatorios: state.recordatorios || [],
-    agenda: state.agenda || [],
-    notas: state.notas || [],
-    presupuesto: state.presupuesto || [],
-    inventario: state.inventario || [],
-    plantillas: state.plantillas || [],
-    movimientosMateriales: state.movimientosMateriales || [],
-    comprasMateriales: state.comprasMateriales || [],
-    stockValorGeneral: state.stockValorGeneral || 0,
-    nombreUsuario: state.nombreUsuario || ''
-  };
-  
-  const payload = {
-    type: 'backup',
-    backupJsonStr: JSON.stringify(data, null, 2)
-  };
-  
-  fetch(url, {
-    method: 'POST',
-    mode: 'no-cors',
-    body: JSON.stringify(payload)
-  })
-  .then(() => {
-    const timeStr = new Date().toLocaleString('es-PE');
-    localStorage.setItem('fnz_last_cloud_backup_time', timeStr);
-    const timeEl = document.getElementById('cloud-backup-time');
-    if (timeEl) timeEl.innerHTML = `Último auto-respaldo: ${timeStr}`;
-    if (manual) toast('🎉 Copia de seguridad en la Nube actualizada con éxito', 'success');
-  })
-  .catch(err => {
-    console.error('Error in cloud backup:', err);
-    if (manual) toast('Error al subir copia de seguridad: ' + err.message, 'error');
-  });
-}
-
-window.triggerCloudBackupManual = function() {
-  toast('⏳ Creando copia de seguridad en la Nube...');
-  performCloudBackup(true);
-};
-
-window.restoreFromCloudBackup = function() {
-  const url = localStorage.getItem('fnz_sheets_url') || '';
-  if (!url) {
-    toast('Configura primero la URL de Google Sheets en los ajustes.', 'error');
-    return;
-  }
-  
-  if (!confirm('¿Estás seguro de restaurar tus datos desde el respaldo en Google Drive? Esto reemplazará TODOS los datos actuales de tu app local.')) return;
-  
-  toast('⏳ Solicitando copia de seguridad a Google Drive...');
-  
-  fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + 'action=get_backup')
-    .then(res => {
-      if (!res.ok) throw new Error('Error de servidor al obtener el backup: ' + res.status);
-      return res.json();
-    })
-    .then(data => {
-      if (!data.ok) {
-        throw new Error(data.error || 'Respaldo no encontrado en Drive');
-      }
-      if (!data.found || !data.backupData) {
-        toast('No se encontró ningún archivo de respaldo en tu Google Drive.', 'error');
-        return;
-      }
-      
-      const backup = data.backupData;
-      const numTx = backup.transactions ? backup.transactions.length : 0;
-      
-      if (!confirm(`Se encontró una copia del ${backup.exportDate || 'fecha desconocida'} con ${numTx} movimientos.\n\n¿Deseas restaurarla ahora? (Tus datos locales serán reemplazados)`)) return;
-      
-      if (backup.transactions) state.transactions = backup.transactions;
-      if (backup.deudas) state.deudas = backup.deudas;
-      else if (backup.debts) state.deudas = backup.debts;
-      if (backup.servicios) state.servicios = backup.servicios;
-      if (backup.catsIn) state.catsIn = backup.catsIn;
-      if (backup.catsEx) state.catsEx = backup.catsEx;
-      if (backup.prestamos) state.prestamos = backup.prestamos;
-      if (backup.metas) state.metas = backup.metas;
-      if (backup.recordatorios) state.recordatorios = backup.recordatorios;
-      if (backup.agenda) state.agenda = backup.agenda;
-      if (backup.notas) state.notas = backup.notas;
-      if (backup.presupuesto) state.presupuesto = backup.presupuesto;
-      if (backup.inventario) state.inventario = backup.inventario;
-      if (backup.plantillas) state.plantillas = backup.plantillas;
-      if (backup.movimientosMateriales) state.movimientosMateriales = backup.movimientosMateriales;
-      if (backup.comprasMateriales) state.comprasMateriales = backup.comprasMateriales;
-      if (backup.stockValorGeneral !== undefined) state.stockValorGeneral = backup.stockValorGeneral;
-      if (backup.nombreUsuario !== undefined) state.nombreUsuario = backup.nombreUsuario;
-      
-      saveAll();
-      render();
-      toast('🎉 ¡Datos restaurados con éxito desde la Nube!', 'success');
-    })
-    .catch(err => {
-      console.error(err);
-      toast('Error al importar de la nube: ' + err.message, 'error');
-    });
-};
 
 function clearTransactions(){
   if(!confirm('¿Eliminar TODOS los movimientos? Esta acción no se puede deshacer.'))return;
@@ -27266,40 +27137,6 @@ function npExportPDF(id){
   win.document.close(); closeModal();
 }
 
-async function npImproveCurrentList(){
-  const ed=window._npEditor;if(!ed||ed.mode!=='list')return;
-  npCollectListRows();
-  const text=ed.note.items.map(i=>`${i.texto} ${i.total||i.precio||''}`).join(', ');
-  const p=await npGeminiOrganize(text,'list',{kind:'smart_list',titulo:ed.note.titulo,listType:ed.note.listType,items:ed.note.items,confidence:.6});
-  if(p.kind==='smart_list'){ed.note.titulo=p.titulo||ed.note.titulo;ed.note.listType=p.listType||ed.note.listType;ed.note.items=p.items.map(npNormalizeItem);document.getElementById('np-title').value=ed.note.titulo;npRenderListRows();toast('Lista ordenada con IA');}
-}
-async function npMeetingSummarize(){
-  const ed=window._npEditor;if(!ed||ed.mode!=='meeting')return;
-  const transcript=document.getElementById('np-meet-transcript')?.value||'';
-  const p=await npGeminiOrganize(transcript,'meeting',{kind:'meeting',transcript,confidence:.4});
-  if(p.kind==='meeting'){
-    document.getElementById('np-title').value=p.titulo||document.getElementById('np-title').value;
-    document.getElementById('np-meet-resumen').value=p.resumen||'';
-    document.getElementById('np-meet-acuerdos').value=(p.acuerdos||[]).join('\n');
-    document.getElementById('np-meet-tareas').value=(p.tareas||[]).join('\n');
-    toast('Resumen generado');
-  }
-}
-async function npDocImprove(){
-  const ed=window._npEditor;if(!ed||ed.mode!=='doc')return;
-  const txt=document.getElementById('np-doc-text')?.value||'';
-  const p=await npGeminiOrganize(txt,'text',{kind:'doc',texto:txt,confidence:.4});
-  if(p.texto){document.getElementById('np-doc-text').value=p.texto;toast('Texto mejorado');}
-}
-
-function npOpenShareFromEditor(){
-  let n=null;
-  if(window._npEditor?.mode==='list') n=npSaveList(false);
-  else if(window._npEditor?.mode==='meeting') n=npSaveMeeting(false);
-  else if(window._npEditor?.mode==='doc') n=npSaveDoc(false);
-  if(n) npOpenShare(n.id);
-}
-
 
 
 // ======================================================================
@@ -28901,16 +28738,6 @@ function renderAjustes(){
          <div class="aj-row" style="margin-top:8px">
            <button class="aj-btn primary" onclick="exportData()">${appIcon('download')} Exportar datos</button>
            <label class="aj-btn soft" style="cursor:pointer">${appIcon('upload')} Importar datos<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
-         </div>
-         <div class="aj-status" style="margin-top:8px; border-top:1px dashed var(--border); padding-top:8px">
-           ☁️ <b>Copia de seguridad en la Nube (Google Drive)</b>: Se actualiza automáticamente 5 segundos después de cada cambio en tu celular si tienes configurada la URL de Sheets.
-           <div id="cloud-backup-time" style="font-size:11px; color:var(--muted); margin-top:4px">
-             Último auto-respaldo: ${localStorage.getItem('fnz_last_cloud_backup_time') || 'Ninguno'}
-           </div>
-         </div>
-         <div class="aj-row" style="margin-top:8px">
-           <button class="aj-btn primary" onclick="window.triggerCloudBackupManual()" style="background:#0284c7; border-color:#0284c7">${appIcon('cloud')} Respaldar en la Nube</button>
-           <button class="aj-btn soft" onclick="window.restoreFromCloudBackup()" style="color:#0284c7; border-color:rgba(2,132,199,0.3)">${appIcon('cloud')} Restaurar de la Nube</button>
          </div>`)}\r
       ${sec('seguridad','trash','Seguridad','Borrado controlado, cache de Notion y credenciales.',
         `<div class="aj-status">Locales: <b>${countNegTx}</b> movimientos negocio, <b>${countPerTx}</b> personales, <b>${countAgenda}</b> agenda, <b>${countNotas}</b> notas, <b>${countStockHist}</b> historial stock.</div>
