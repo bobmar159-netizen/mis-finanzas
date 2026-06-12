@@ -5676,6 +5676,7 @@ function renderDeudas() {
       historico: !afectaBalance
     });
     
+    d.cuotasPagadas = Math.max(d.cuotasPagadas || 0, cuotaNum);
     deudaNormalizePagos(d, d);
     deudaReconcilePaymentTxs(d);
     saveAll();
