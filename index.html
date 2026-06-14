@@ -4377,6 +4377,21 @@ function renderDashboard(){
     ${recentHtml}`;
 }
 
+function getCanonicalSvcId(id) {
+  if (!id) return '';
+  const cleanId = String(id).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '');
+  const svc = (state.agenda || []).find(s => String(s.id) === cleanId || (s._notionRowId && String(s._notionRowId) === cleanId));
+  if (svc) {
+    return svc._notionRowId || svc.id;
+  }
+  return cleanId;
+}
+
+function isSameServicio(id1, id2) {
+  if (!id1 || !id2) return false;
+  return getCanonicalSvcId(id1) === getCanonicalSvcId(id2);
+}
+
 // ── Ganancia neta de un ingreso de servicio ──────────────────────────────
 // Funciona para Notion (_notionTrabajo) y servicios cerrados desde la app.
 function getGananciaServicio(t) {
@@ -4384,13 +4399,13 @@ function getGananciaServicio(t) {
   // Caso 1: importado de Notion con datos del trabajo
   if (t.vinculadoServicioId) {
     const rawSvcId = t.vinculadoServicioId;
-    const baseSvcId = String(rawSvcId).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '');
+    const baseSvcId = getCanonicalSvcId(rawSvcId);
     const egresos = (state.transactions||[]).filter(tx => {
-      const txSvcId = tx.vinculadoServicioId ? String(tx.vinculadoServicioId).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '') : '';
+      const txSvcId = tx.vinculadoServicioId ? getCanonicalSvcId(tx.vinculadoServicioId) : '';
       return txSvcId === baseSvcId && tx.type === 'egreso' && !tx.ocultarEnMovimientos;
     });
     const ingresos = (state.transactions||[]).filter(tx => {
-      const txSvcId = tx.vinculadoServicioId ? String(tx.vinculadoServicioId).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '') : '';
+      const txSvcId = tx.vinculadoServicioId ? getCanonicalSvcId(tx.vinculadoServicioId) : '';
       return txSvcId === baseSvcId && tx.type === 'ingreso';
     });
     const totalIng = ingresos.reduce((s,tx)=>s+(+(tx.amount||0)),0);
@@ -4624,7 +4639,7 @@ window.filterMovimientosList = function() {
           if (g !== null) {
             tieneServicios = true;
             const uid = t.vinculadoServicioId || t._notionRowId || t.id;
-            const baseUid = uid ? String(uid).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '') : '';
+            const baseUid = uid ? getCanonicalSvcId(uid) : '';
             if (!svcContados.has(baseUid)) {
               svcContados.add(baseUid);
               ganDia += g;
@@ -4651,7 +4666,7 @@ window.filterMovimientosList = function() {
       txs.forEach(t => {
         const rawSvcId = t.vinculadoServicioId || t._notionRowId || t._notionTrabajo?.id;
         if (rawSvcId && (t.vinculadoServicioId || t._notionTrabajo || t.origenServicioMaterial || t.origenCierreServicio || t._importadoDeNotion)) {
-          const svcId = String(rawSvcId).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '');
+          const svcId = getCanonicalSvcId(rawSvcId);
           if(!svcGroups[svcId]) svcGroups[svcId] = [];
           svcGroups[svcId].push(t);
         } else {
@@ -7743,7 +7758,7 @@ function gfIsServicioTx(t) {
 
 function gfServicioId(t) {
   const rawId = t.vinculadoServicioId || t._notionRowId || t.servicioId || t._notionTrabajo?.id || t.id || `${t.date}-${t.category}-${t.amount}`;
-  return rawId ? String(rawId).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '') : '';
+  return rawId ? getCanonicalSvcId(rawId) : '';
 }
 
 function gfcRange(key, start, end, label) {
@@ -10648,7 +10663,12 @@ function serviciosCandidatosParaTx(tx){
 
 function refrescarServiciosPorIds(ids){
   [...new Set((ids || []).filter(Boolean).map(String))].forEach(id => {
-    const item = (state.agenda || []).find(a => String(a.id) === id);
+    const canonicalId = getCanonicalSvcId(id);
+    const item = (state.agenda || []).find(a => {
+      const aId = getCanonicalSvcId(a.id);
+      const aNotionId = a._notionRowId ? getCanonicalSvcId(a._notionRowId) : '';
+      return aId === canonicalId || (aNotionId && aNotionId === canonicalId);
+    });
     if(!item || !isServicioFinalizado(item)) return;
     recalcularGastosVinculadosServicio(item);
     scheduleSyncServicioFinalizadoReporte(item);
@@ -10723,7 +10743,7 @@ function openVincularServicioTx(id, opts={}){
   const txJsId = svcLinkJs(tx.id);
   const servicios = serviciosCandidatosParaTx(tx);
   const actualId = String(tx.vinculadoServicioId || '');
-  const actual = actualId ? (state.agenda || []).find(a => String(a.id) === actualId) : null;
+  const actual = actualId ? (state.agenda || []).find(a => isSameServicio(a.id, actualId)) : null;
   const qRaw = String(st.q || '').trim();
   const q = normSimpleText(qRaw);
   const fechaFiltro = String(st.fecha || '');
@@ -10735,7 +10755,7 @@ function openVincularServicioTx(id, opts={}){
     return true;
   };
   const row = (a) => {
-    const selected = String(a.id) === actualId;
+    const selected = isSameServicio(a.id, actualId);
     const total = servicioMontoVinculo(a);
     const svcId = svcLinkJs(a.id);
     return `<button type="button" onclick="vincularMovimientoAServicio('${txJsId}','${svcId}')" style="width:100%;border:1px solid ${selected?'#2F6F53':'#E5E7EB'};background:${selected?'#EEF7F2':'#FFFFFF'};border-radius:14px;padding:12px;text-align:left;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;font-family:'DM Sans',sans-serif;cursor:pointer">
@@ -10799,19 +10819,19 @@ function vincularMovimientoAServicio(txId, servicioId){
   if(!tx || !item) return toast('No se pudo vincular', 'error');
   if(!txPuedeVincularServicio(tx)) return toast('Ese movimiento no se puede migrar desde aqui', 'error');
   const oldId = tx.vinculadoServicioId || '';
-  tx.vinculadoServicioId = item.id;
+  tx.vinculadoServicioId = item._notionRowId || item.id;
   tx.vinculadoServicioCliente = item.cliente || '';
   tx.vinculadoServicioFecha = item.fecha || tx.date || todayStr();
   tx.vinculadoServicioDesc = servicioDescVinculo(item);
   tx.vinculadoServicioMonto = servicioMontoVinculo(item);
   tx.date = item.fecha; // Sincronizar fecha del gasto con el servicio
-  refrescarServiciosPorIds([oldId, item.id]);
+  refrescarServiciosPorIds([oldId, item._notionRowId || item.id]);
   saveAll();
   syncToSheets(tx);
   if(!tx.afectaStockValor) syncExpenseTxToNotion(tx);
   closeModal();
   render();
-  toast(oldId && String(oldId) !== String(item.id) ? 'Movimiento migrado a otro servicio' : 'Movimiento vinculado al servicio');
+  toast(oldId && !isSameServicio(oldId, item.id) ? 'Movimiento migrado a otro servicio' : 'Movimiento vinculado al servicio');
 }
 
 function desvincularMovimientoDeServicio(txId){
@@ -10844,10 +10864,10 @@ function deleteTx(id){
     removeCompraStockValorByTx(tx);
   }
   const rawLinkedId = tx?.vinculadoServicioId || null;
-  const linkedServicioId = rawLinkedId ? String(rawLinkedId).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '') : null;
+  const linkedServicioId = rawLinkedId ? getCanonicalSvcId(rawLinkedId) : null;
   state.transactions=(state.transactions||[]).filter(t=>t.id!==id);
   if(linkedServicioId){
-    const item = (state.agenda||[]).find(a=>String(a.id)===String(linkedServicioId));
+    const item = (state.agenda||[]).find(a=>isSameServicio(a.id, linkedServicioId));
     if(item && isServicioFinalizado(item)){
       recalcularGastosVinculadosServicio(item);
       scheduleSyncServicioFinalizadoReporte(item);
@@ -14117,7 +14137,7 @@ function sincronizarFechasTransaccionesVinculadas(servicioId, oldFecha, newFecha
   const allNegTx = load('fnz_neg_tx', []);
   let changed = false;
   const updatedTx = allNegTx.map(t => {
-    if (t && String(t.vinculadoServicioId) === String(servicioId)) {
+    if (t && isSameServicio(t.vinculadoServicioId, servicioId)) {
       changed = true;
       const newTx = { ...t, date: newFecha };
       if (newTx.description) {
@@ -14135,7 +14155,7 @@ function sincronizarFechasTransaccionesVinculadas(servicioId, oldFecha, newFecha
       state.transactions = updatedTx;
     }
     updatedTx.forEach(t => {
-      if (t && String(t.vinculadoServicioId) === String(servicioId)) {
+      if (t && isSameServicio(t.vinculadoServicioId, servicioId)) {
         syncToSheets(t);
       }
     });
@@ -14149,7 +14169,7 @@ function sincronizarDetallesTransaccionesVinculadas(item) {
   let changed = false;
   
   const updatedTx = allNegTx.map(t => {
-    if (t && String(t.vinculadoServicioId) === String(item.id)) {
+    if (t && isSameServicio(t.vinculadoServicioId, item.id)) {
       changed = true;
       const newTx = { ...t };
       newTx.date = item.fecha;
@@ -14175,7 +14195,7 @@ function sincronizarDetallesTransaccionesVinculadas(item) {
     }
     
     updatedTx.forEach(t => {
-      if (t && String(t.vinculadoServicioId) === String(item.id)) {
+      if (t && isSameServicio(t.vinculadoServicioId, item.id)) {
         syncToSheets(t);
         if (!t.afectaStockValor) {
           syncExpenseTxToNotion(t);
@@ -14899,7 +14919,7 @@ function getGastosVinculadosServicio(item){
   if(!agendaId) return [];
   return (state.transactions || []).filter(t =>
     t && t.type === 'egreso' &&
-    String(t.vinculadoServicioId || '') === agendaId &&
+    isSameServicio(t.vinculadoServicioId, agendaId) &&
     !t.origenCierreServicio &&
     !isStockValueTx(t) &&
     !isMaterialesCategory(t.catId, t.category)
@@ -15029,7 +15049,7 @@ function getGastosSugeridosCierre(item){
       if(!fechas.has(t.date)) return false;
       if(t.origenCierreServicio) return false;
       if(t.afectaStockValor || isMaterialesCategory(t.catId, t.category)) return false;
-      if(t.vinculadoServicioId && String(t.vinculadoServicioId) !== agendaId) return false;
+      if(t.vinculadoServicioId && !isSameServicio(t.vinculadoServicioId, agendaId)) return false;
       if(/-(mov|otg|otr|mat\d*)$/.test(String(t.id||''))) return false;
       return true;
     })
@@ -15058,7 +15078,7 @@ function renderGastosSugeridosCierre(item){
   }
   return `<div class="cierre-expense-list">
     ${gastos.map(t => {
-      const checked = String(t.vinculadoServicioId||'') === agendaId ? 'checked' : '';
+      const checked = isSameServicio(t.vinculadoServicioId, agendaId) ? 'checked' : '';
       const desc = t.description && t.description !== t.category ? t.description : (t.cliente||'Sin detalle');
       return `
       <label class="cierre-expense-row">
@@ -15548,7 +15568,7 @@ async function guardarFinalizacion(id){
       : 'Materiales y agregados usados al cerrar servicio';
     registrarMovimientoStockValor(stockConsumoDelta > 0 ? 'uso_valor' : 'devolucion_valor', Math.abs(stockConsumoDelta), {
       fecha: item.fecha,
-      id_servicio: item.id,
+      id_servicio: item._notionRowId || item.id,
       cliente: item.cliente || '',
       descripcion: descStr
     });
@@ -15571,7 +15591,7 @@ async function guardarFinalizacion(id){
       const upd = {
         ...t,
         date: item.fecha, // Sincronizar fecha del gasto con el servicio
-        vinculadoServicioId: item.id,
+        vinculadoServicioId: item._notionRowId || item.id,
         vinculadoServicioCliente: item.cliente || '',
         vinculadoServicioFecha: item.fecha,
         vinculadoServicioDesc: agDesc,
@@ -15580,7 +15600,7 @@ async function guardarFinalizacion(id){
       txsParaSincronizar.push(upd);
       return upd;
     }
-    if(String(t.vinculadoServicioId||'') === String(item.id)){
+    if(isSameServicio(t.vinculadoServicioId, item.id)){
       const limpio = {...t};
       delete limpio.vinculadoServicioId;
       delete limpio.vinculadoServicioCliente;
@@ -15636,7 +15656,7 @@ async function guardarFinalizacion(id){
         category: s.svc,
         description: s.svc + ' — ' + (item.cliente||''),
         formaPago: cobroObj.pagoYape > 0 ? 'Yape' : cobroObj.pagoPlin > 0 ? 'Plin' : cobroObj.pagoTransf > 0 ? 'Transferencia' : cobroObj.pagoAcuenta > 0 ? 'A cuenta' : 'Efectivo',
-        vinculadoServicioId: item.id,
+        vinculadoServicioId: item._notionRowId || item.id,
         origenCierreServicio: true,
         ...baseTx
       });
@@ -15653,9 +15673,9 @@ async function guardarFinalizacion(id){
   const pagosMethods = pagos.filter(p => p.val > 0).map(p => p.name);
   item.formaPago1 = pagosMethods[0] || '';
   item.formaPago2 = pagosMethods[1] || '';
-  if (crearMovimientosCierre && cobroObj.movilidad_manual > 0) { const txId=rowId+'-mov'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.movilidad_manual, category:'Movilidad', catId:'cne5', description:'Movilidad - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
-  if (crearMovimientosCierre && cobroObj.comida_manual > 0) { const txId=rowId+'-com'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.comida_manual, category:'Comida', catId:'cne_menu', description:'Comida - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
-  if (crearMovimientosCierre && cobroObj.otros_gastos > 0) { const txId=rowId+'-otg'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.movilidad_manual > 0) { const txId=rowId+'-mov'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.movilidad_manual, category:'Movilidad', catId:'cne5', description:'Movilidad - '+agDesc, vinculadoServicioId:item._notionRowId || item.id, origenCierreServicio:true, ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.comida_manual > 0) { const txId=rowId+'-com'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.comida_manual, category:'Comida', catId:'cne_menu', description:'Comida - '+agDesc, vinculadoServicioId:item._notionRowId || item.id, origenCierreServicio:true, ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.otros_gastos > 0) { const txId=rowId+'-otg'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.otros_gastos, category:'Otros Egresos', description:'Otros Gastos - '+agDesc, vinculadoServicioId:item._notionRowId || item.id, origenCierreServicio:true, ...baseTx }); }
   // Materiales usados por servicio: reducen el stock valorizado pero NO afectan la caja
   const mats = [
     { mat: cobroObj.materiales1, idx: 1 },
@@ -15673,7 +15693,7 @@ async function guardarFinalizacion(id){
         category: 'Materiales',
         catId: 'cne1',
         description: 'Materiales usados — ' + (servicios[m.idx-1]?.svc || item.servicio || 'Servicio') + ' — ' + (item.cliente||''),
-        vinculadoServicioId: item.id,
+        vinculadoServicioId: item._notionRowId || item.id,
         origenCierreServicio: true,
         origenServicioMaterial: true,
         materialUsoServicio: true,
@@ -15684,8 +15704,8 @@ async function guardarFinalizacion(id){
       });
     }
   });
-  if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-agr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', catId:'cne_agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
-  if (crearMovimientosCierre && cobroObj.meta > 0) { const txId=rowId+'-met'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.meta, category:'META', catId:'cne_meta', description:'META - '+agDesc, vinculadoServicioId:item.id, origenCierreServicio:true, ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.agregados > 0) { const txId=rowId+'-agr'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.agregados, category:'Agregados', catId:'cne_agregados', description:'Agregados - '+agDesc, vinculadoServicioId:item._notionRowId || item.id, origenCierreServicio:true, origenServicioMaterial:true, materialUsoServicio:true, noCashFlow:true, afectaStockValor:false, stockOperacion:'uso_valor', ...baseTx }); }
+  if (crearMovimientosCierre && cobroObj.meta > 0) { const txId=rowId+'-met'; nuevosCierreTxIds.push(txId); state.transactions.unshift({ id: txId, type:'egreso', amount:cobroObj.meta, category:'META', catId:'cne_meta', description:'META - '+agDesc, vinculadoServicioId:item._notionRowId || item.id, origenCierreServicio:true, ...baseTx }); }
   if(crearMovimientosCierre) item.cierreTxIds = nuevosCierreTxIds;
 
   if (item.estadoPago === 'parcial' && item.montoPendienteCobro > 0) {
