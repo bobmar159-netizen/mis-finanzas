@@ -12482,7 +12482,7 @@ async function _pushToNotion(item, cobroObj) {
   // Detectar si el ID es un UUID de Notion (8-4-4-4-12)
   const isNotionGuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(id);
   cobroObj = cobroObj || {};
-  const notionCandidate = getServicioReporteNotionId?.(item) || item._notionFinanceRowId || item._notionReporteRowId || item.notionFinanceId || item.notionReporteId || null;
+  const notionCandidate = getSvcNotionId(item) || null;
   const pageId = isNotionGuid(notionCandidate) ? notionCandidate : null;
 
   const props = await _fetchNotionSchema(token, dbId);
@@ -12563,11 +12563,12 @@ async function _pushToNotion(item, cobroObj) {
   if (obsFinal) setProp(findCol('observaciones','observacion','notas','nota','descripcion'), obsFinal);
 
   // 6. Ejecutar Petición (POST para crear, PATCH para actualizar)
-  const notionUrl = pageId ? 'https://api.notion.com/v1/pages/' + pageId : 'https://api.notion.com/v1/pages';
-  const proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
+  let method = pageId ? 'PATCH' : 'POST';
+  let notionUrl = pageId ? 'https://api.notion.com/v1/pages/' + pageId : 'https://api.notion.com/v1/pages';
+  let proxyUrl  = 'https://corsproxy.io/?' + encodeURIComponent(notionUrl);
 
-  const res = await fetch(proxyUrl, {
-    method: pageId ? 'PATCH' : 'POST',
+  let res = await fetch(proxyUrl, {
+    method: method,
     headers: {
       'Authorization': 'Bearer ' + token,
       'Notion-Version': '2022-06-28',
@@ -12576,8 +12577,26 @@ async function _pushToNotion(item, cobroObj) {
     body: JSON.stringify(payload)
   });
 
+  if (pageId && !res.ok) {
+    // Si falló una actualización con PATCH (ej. la página fue eliminada o el ID no es válido en Notion),
+    // intentamos crearla como nueva usando POST
+    console.warn(`Notion PATCH failed with status ${res.status}. Falling back to POST...`);
+    payload.parent = { database_id: dbId };
+    const createUrl = 'https://api.notion.com/v1/pages';
+    const createProxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(createUrl);
+    res = await fetch(createProxyUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+  }
+
   if (!res.ok) {
-    const error = await res.json();
+    const error = await res.json().catch(() => ({ message: 'Error desconocido de Notion' }));
     throw new Error(error.message || 'Error en Notion');
   }
   return await res.json();
@@ -15623,7 +15642,7 @@ async function guardarFinalizacion(id){
   });
   txsParaSincronizar.forEach(t => syncToSheets(t));
 
-  let notionRowId = getServicioReporteNotionId(item) || null;
+  let notionRowId = getSvcNotionId(item) || null;
   const token = localStorage.getItem('fnz_notion_token');
   const dbId  = localStorage.getItem('fnz_notion_dbid');
   if (token && dbId) {
