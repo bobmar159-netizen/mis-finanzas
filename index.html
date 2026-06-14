@@ -4377,12 +4377,21 @@ function renderDashboard(){
     ${recentHtml}`;
 }
 
+function getSvcNotionId(s) {
+  if (!s) return '';
+  return s._notionRowId || s._notionFinanceRowId || s._notionReporteRowId || s.notionFinanceId || s.notionReporteId || s.reporteNotionId || '';
+}
+
 function getCanonicalSvcId(id) {
   if (!id) return '';
-  const cleanId = String(id).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '');
-  const svc = (state.agenda || []).find(s => String(s.id) === cleanId || (s._notionRowId && String(s._notionRowId) === cleanId));
+  const cleanId = String(id).trim().toLowerCase().replace(/-(svc\d+|com|mov|otr|otg|mat\d*|agr|met)$/i, '');
+  const svc = (state.agenda || []).find(s => {
+    const sId = String(s.id).toLowerCase();
+    const sNotion = getSvcNotionId(s).toLowerCase();
+    return sId === cleanId || (sNotion && sNotion === cleanId);
+  });
   if (svc) {
-    return svc._notionRowId || svc.id;
+    return getSvcNotionId(svc).toLowerCase() || String(svc.id).toLowerCase();
   }
   return cleanId;
 }
