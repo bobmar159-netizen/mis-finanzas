@@ -4383,13 +4383,16 @@ function getGananciaServicio(t) {
   if (t.type !== 'ingreso') return null;
   // Caso 1: importado de Notion con datos del trabajo
   if (t.vinculadoServicioId) {
-    const svcId = t.vinculadoServicioId;
-    const egresos = (state.transactions||[]).filter(tx =>
-      tx.vinculadoServicioId === svcId && tx.type === 'egreso' && !tx.ocultarEnMovimientos
-    );
-    const ingresos = (state.transactions||[]).filter(tx =>
-      tx.vinculadoServicioId === svcId && tx.type === 'ingreso'
-    );
+    const rawSvcId = t.vinculadoServicioId;
+    const baseSvcId = String(rawSvcId).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '');
+    const egresos = (state.transactions||[]).filter(tx => {
+      const txSvcId = tx.vinculadoServicioId ? String(tx.vinculadoServicioId).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '') : '';
+      return txSvcId === baseSvcId && tx.type === 'egreso' && !tx.ocultarEnMovimientos;
+    });
+    const ingresos = (state.transactions||[]).filter(tx => {
+      const txSvcId = tx.vinculadoServicioId ? String(tx.vinculadoServicioId).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '') : '';
+      return txSvcId === baseSvcId && tx.type === 'ingreso';
+    });
     const totalIng = ingresos.reduce((s,tx)=>s+(+(tx.amount||0)),0);
     const totalEgr = egresos.reduce((s,tx)=>s+(+(tx.amount||0)),0);
     if (totalIng <= 0) return null;
@@ -4616,12 +4619,28 @@ window.filterMovimientosList = function() {
       let ganDia = 0;
       let tieneServicios = false;
       txs.forEach(t => {
-        if (t.type !== 'ingreso') return;
-        const g = getGananciaServicio(t);
-        if (g !== null) tieneServicios = true;
-        if (g === null) { ganDia += (+(t.amount||0)); return; }
-        const uid = t.vinculadoServicioId || t._notionRowId || t.id;
-        if (!svcContados.has(uid)) { svcContados.add(uid); ganDia += g; }
+        if (t.type === 'ingreso') {
+          const g = getGananciaServicio(t);
+          if (g !== null) {
+            tieneServicios = true;
+            const uid = t.vinculadoServicioId || t._notionRowId || t.id;
+            const baseUid = uid ? String(uid).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '') : '';
+            if (!svcContados.has(baseUid)) {
+              svcContados.add(baseUid);
+              ganDia += g;
+            }
+          } else {
+            ganDia += moneyValue(t.amount);
+          }
+        } else if (t.type === 'egreso') {
+          const rawSvcId = t.vinculadoServicioId || t._notionRowId || t._notionTrabajo?.id;
+          const isLinked = !!(rawSvcId && (t.vinculadoServicioId || t._notionTrabajo || t.origenServicioMaterial || t.origenCierreServicio || t._importadoDeNotion));
+          if (!isLinked) {
+            if (isCashFlowTx(t)) {
+              ganDia -= moneyValue(t.amount);
+            }
+          }
+        }
       });
       const soloGastos = !tieneServicios && txs.some(t => t.type === 'egreso');
       const ganDiaColor = ganDia >= 0 ? '#099268' : '#C62828';
@@ -4630,8 +4649,9 @@ window.filterMovimientosList = function() {
       const svcGroups = {};
       const looseTxs = [];
       txs.forEach(t => {
-        const svcId = t.vinculadoServicioId || t._notionRowId || t._notionTrabajo?.id;
-        if (svcId && (t.vinculadoServicioId || t._notionTrabajo || t.origenServicioMaterial || t.origenCierreServicio || t._importadoDeNotion)) {
+        const rawSvcId = t.vinculadoServicioId || t._notionRowId || t._notionTrabajo?.id;
+        if (rawSvcId && (t.vinculadoServicioId || t._notionTrabajo || t.origenServicioMaterial || t.origenCierreServicio || t._importadoDeNotion)) {
+          const svcId = String(rawSvcId).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '');
           if(!svcGroups[svcId]) svcGroups[svcId] = [];
           svcGroups[svcId].push(t);
         } else {
@@ -5304,6 +5324,41 @@ function debtApplyRecurringPlan(months) {
   debtSmartPreviewUpdate();
 }
 
+window.updateTikUltimoPago = function() {
+  const tFecha = document.getElementById('tik-fecha');
+  const tPagadas = document.getElementById('tik-cuotas-pagadas');
+  const tUltimo = document.getElementById('tik-ultimo-pago');
+  if (!tFecha || !tPagadas || !tUltimo) return;
+
+  const start = tFecha.value || todayStr();
+  const n = parseInt(tPagadas.value) || 0;
+  const dia = Math.max(1, Math.min(31, Number(start.slice(8,10)) || 8));
+
+  if (n > 0) {
+    tUltimo.value = debtIsoDate(debtAddMonths(start, n - 1, dia));
+  } else {
+    tUltimo.value = '';
+  }
+  debtSmartPreviewUpdate();
+};
+
+window.updateTikFechaInicioPorUltimoPago = function() {
+  const tFecha = document.getElementById('tik-fecha');
+  const tPagadas = document.getElementById('tik-cuotas-pagadas');
+  const tUltimo = document.getElementById('tik-ultimo-pago');
+  if (!tFecha || !tPagadas || !tUltimo) return;
+
+  const last = tUltimo.value;
+  if (!last) return;
+  const n = parseInt(tPagadas.value) || 0;
+  if (n > 0) {
+    const dia = Math.max(1, Math.min(31, Number(last.slice(8,10)) || 8));
+    const start = debtIsoDate(debtAddMonths(last, -(n - 1), dia));
+    tFecha.value = start;
+  }
+  debtSmartPreviewUpdate();
+};
+
 function deudaBuildPago(d, cuotaNum, pago) {
   const id = pago?.id || (Date.now() + '_c' + cuotaNum + '_' + Math.random().toString(36).slice(2,6));
   const fecha = pago?.fecha || debtAddMonths(deudaInicio(d), cuotaNum - 1, deudaDiaPago(d));
@@ -5880,9 +5935,10 @@ function renderDeudas() {
     d.diaPago = parseInt(fecha.slice(8,10)) || 8;
     d.color = d.color || '#0d9488';
     
+    const cuotasPagadasInput = Math.max(0, parseInt(document.getElementById('tik-cuotas-pagadas')?.value) || 0);
+    d.cuotasPagadas = cuotasPagadasInput;
     if (!isEdit) {
       d.pagos = [];
-      d.cuotasPagadas = 0;
     }
     
     const tem = tea > 0 ? Math.pow(1 + tea/100, 1/12) - 1 : 0;
@@ -6281,6 +6337,12 @@ function renderDeudas() {
     const dSeguro = editDeuda ? (editDeuda.seguroMonto || 0) : '';
     const dPlazo = editDeuda ? editDeuda.cuotasTotales : '';
     const dCuotaFixed = editDeuda ? (editDeuda.cuotaMontoFixed || '') : '';
+    const dPagadas = editDeuda ? editDeuda.cuotasPagadas : 0;
+    let dUltimo = '';
+    if (dPagadas > 0) {
+      const dia = Math.max(1, Math.min(31, Number(dFecha.slice(8,10)) || 8));
+      dUltimo = debtIsoDate(debtAddMonths(dFecha, dPagadas - 1, dia));
+    }
 
     bodyHTML = `
       <div class="deuda-tik-form">
@@ -6328,7 +6390,17 @@ function renderDeudas() {
         
         <div class="deuda-tik-field">
           <label class="deuda-tik-label">Fecha de primer pago / vencimiento</label>
-          <input id="tik-fecha" type="date" class="deuda-tik-input" value="${dFecha}" onchange="debtSmartPreviewUpdate()">
+          <input id="tik-fecha" type="date" class="deuda-tik-input" value="${dFecha}" onchange="window.updateTikUltimoPago()">
+        </div>
+
+        <div class="deuda-tik-field">
+          <label class="deuda-tik-label">Cuotas Pagadas hasta hoy</label>
+          <input id="tik-cuotas-pagadas" type="number" class="deuda-tik-input" placeholder="Ej: 0" value="${dPagadas}" oninput="window.updateTikUltimoPago()">
+        </div>
+
+        <div class="deuda-tik-field">
+          <label class="deuda-tik-label">Fecha del último pago</label>
+          <input id="tik-ultimo-pago" type="date" class="deuda-tik-input" value="${dUltimo}" onchange="window.updateTikFechaInicioPorUltimoPago()">
         </div>
 
         <div class="deuda-tik-field" style="background:rgba(13, 148, 136, 0.04)">
@@ -6366,7 +6438,7 @@ function renderDeudas() {
       window.debtSmartFormData = function() {
         const cNum = s => parseFloat(String(s||'').replace(',','.')) || 0;
         const total = Math.max(0, parseInt(tPlazo?.value) || 0);
-        const paid = editDeuda ? editDeuda.cuotasPagadas : 0;
+        const paid = Math.max(0, parseInt(document.getElementById('tik-cuotas-pagadas')?.value) || 0);
         const inicio = debtIsoDate(tFecha?.value || todayStr());
         const dia = Math.max(1, Math.min(31, Number(inicio.slice(8,10)) || 8));
         const venc = debtIsoDate(tFecha?.value || todayStr());
@@ -7670,7 +7742,8 @@ function gfIsServicioTx(t) {
 }
 
 function gfServicioId(t) {
-  return t.vinculadoServicioId || t._notionRowId || t.servicioId || t._notionTrabajo?.id || t.id || `${t.date}-${t.category}-${t.amount}`;
+  const rawId = t.vinculadoServicioId || t._notionRowId || t.servicioId || t._notionTrabajo?.id || t.id || `${t.date}-${t.category}-${t.amount}`;
+  return rawId ? String(rawId).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '') : '';
 }
 
 function gfcRange(key, start, end, label) {
@@ -10770,7 +10843,8 @@ function deleteTx(id){
     });
     removeCompraStockValorByTx(tx);
   }
-  const linkedServicioId = tx?.vinculadoServicioId || null;
+  const rawLinkedId = tx?.vinculadoServicioId || null;
+  const linkedServicioId = rawLinkedId ? String(rawLinkedId).replace(/-(svc\d|com|mov|otr|otg|mat\d*|agr|met)$/, '') : null;
   state.transactions=(state.transactions||[]).filter(t=>t.id!==id);
   if(linkedServicioId){
     const item = (state.agenda||[]).find(a=>String(a.id)===String(linkedServicioId));
@@ -15003,8 +15077,8 @@ function _cierreExpenseValue(item, key, slot){
   const direct = item?.[key + slot];
   if(direct !== undefined && direct !== null && direct !== '') return moneyValue(direct);
   if(slot !== 1) return 0;
-  if(key === 'comida') return moneyValue(item?.comidaManualCierre ?? item?.comida);
-  if(key === 'movilidad') return moneyValue(item?.movilidadManualCierre ?? item?.movilidad);
+  if(key === 'comida') return moneyValue(item?.comida);
+  if(key === 'movilidad') return moneyValue(item?.movilidad);
   if(key === 'otros_gastos') return moneyValue(item?.otros_gastos ?? item?.otros);
   return moneyValue(item?.[key]);
 }
@@ -15389,11 +15463,15 @@ async function guardarFinalizacion(id){
   const totalGastosVinculados = gastosVinculados.reduce((s,t) => s + moneyValue(t.amount), 0);
   const totalComidaVinculada = gastosVinculados.filter(t => isComidaCategory(t.catId, t.category, t.description)).reduce((s,t) => s + moneyValue(t.amount), 0);
   const totalMovilidadVinculada = gastosVinculados.filter(t => isMovilidadCategory(t.catId, t.category, t.description)).reduce((s,t) => s + moneyValue(t.amount), 0);
-  const comidaManual = moneyValue(cobroObj.comida);
-  const movilidadManual = moneyValue(cobroObj.movilidad);
+  const totalComidaInput = moneyValue(cobroObj.comida);
+  const totalMovilidadInput = moneyValue(cobroObj.movilidad);
+  const comidaManual = Math.max(0, +(totalComidaInput - totalComidaVinculada).toFixed(2));
+  const movilidadManual = Math.max(0, +(totalMovilidadInput - totalMovilidadVinculada).toFixed(2));
+
   cobroObj.comida_manual = comidaManual;
   cobroObj.comida_vinculada = totalComidaVinculada;
   cobroObj.comida = +(comidaManual + totalComidaVinculada).toFixed(2);
+
   cobroObj.movilidad_manual = movilidadManual;
   cobroObj.movilidad_vinculada = totalMovilidadVinculada;
   cobroObj.movilidad = +(movilidadManual + totalMovilidadVinculada).toFixed(2);
