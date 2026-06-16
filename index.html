@@ -4390,6 +4390,50 @@ function getCanonicalSvcId(id) {
     const sNotion = getSvcNotionId(s).toLowerCase();
     return sId === cleanId || (sNotion && sNotion === cleanId);
   });
+  
+  if (svc) {
+    const p1 = parseFloat(svc.precio1 || svc.precio || 0) || 0;
+    const p2 = parseFloat(svc.precio2 || 0) || 0;
+    const p3 = parseFloat(svc.precio3 || 0) || 0;
+    const mainSlot = (p1 > 0) ? 1 : ((p2 > 0) ? 2 : ((p3 > 0) ? 3 : 1));
+    const canonicalBase = getSvcNotionId(svc).toLowerCase() || String(svc.id).toLowerCase();
+
+    // 1. Si el ID original contiene un sufijo de servicio (-svc1, -svc2, -svc3), lo mantenemos.
+    if (/-svc\d+$/i.test(String(id))) {
+      return String(id).trim().toLowerCase().replace(/^(.*)-svc(\d+)$/i, (m, prefix, slot) => {
+        return canonicalBase + '-svc' + slot;
+      });
+    }
+
+    // 2. Si el ID original contiene un sufijo de materiales (-mat1, -mat2, -mat3), lo asociamos a su respectivo servicio.
+    const matMatch = String(id).match(/-mat(\d+)$/i);
+    if (matMatch) {
+      return canonicalBase + '-svc' + matMatch[1];
+    }
+
+    // 3. Para egresos generales sin un slot específico o si es el ID base, asociamos al slot principal.
+    return canonicalBase + '-svc' + mainSlot;
+  }
+
+  // Fallback si no se encuentra en la agenda
+  if (/-svc\d+$/i.test(String(id))) {
+    return String(id).trim().toLowerCase();
+  }
+  const matMatch = String(id).match(/-mat(\d+)$/i);
+  if (matMatch) {
+    return cleanId + '-svc' + matMatch[1];
+  }
+  return cleanId + '-svc1';
+}
+
+function getBaseSvcId(id) {
+  if (!id) return '';
+  const cleanId = String(id).trim().toLowerCase().replace(/-(svc\d+|com|mov|otr|otg|mat\d*|agr|met)$/i, '');
+  const svc = (state.agenda || []).find(s => {
+    const sId = String(s.id).toLowerCase();
+    const sNotion = getSvcNotionId(s).toLowerCase();
+    return sId === cleanId || (sNotion && sNotion === cleanId);
+  });
   if (svc) {
     return getSvcNotionId(svc).toLowerCase() || String(svc.id).toLowerCase();
   }
@@ -4398,24 +4442,25 @@ function getCanonicalSvcId(id) {
 
 function isSameServicio(id1, id2) {
   if (!id1 || !id2) return false;
-  return getCanonicalSvcId(id1) === getCanonicalSvcId(id2);
+  return getBaseSvcId(id1) === getBaseSvcId(id2);
 }
 
 // ── Ganancia neta de un ingreso de servicio ──────────────────────────────
 // Funciona para Notion (_notionTrabajo) y servicios cerrados desde la app.
 function getGananciaServicio(t) {
   if (t.type !== 'ingreso') return null;
-  // Caso 1: importado de Notion con datos del trabajo
-  if (t.vinculadoServicioId) {
-    const rawSvcId = t.vinculadoServicioId;
+  if (t.vinculadoServicioId || t._notionRowId) {
+    const rawSvcId = t.type === 'ingreso' ? t.id : t.vinculadoServicioId;
     const baseSvcId = getCanonicalSvcId(rawSvcId);
     const egresos = (state.transactions||[]).filter(tx => {
-      const txSvcId = tx.vinculadoServicioId ? getCanonicalSvcId(tx.vinculadoServicioId) : '';
-      return txSvcId === baseSvcId && tx.type === 'egreso' && !tx.ocultarEnMovimientos;
+      const txSvcId = tx.type === 'ingreso' ? tx.id : (tx.vinculadoServicioId || tx._notionRowId || '');
+      const canonical = txSvcId ? getCanonicalSvcId(txSvcId) : '';
+      return canonical === baseSvcId && tx.type === 'egreso' && !tx.ocultarEnMovimientos;
     });
     const ingresos = (state.transactions||[]).filter(tx => {
-      const txSvcId = tx.vinculadoServicioId ? getCanonicalSvcId(tx.vinculadoServicioId) : '';
-      return txSvcId === baseSvcId && tx.type === 'ingreso';
+      const txSvcId = tx.type === 'ingreso' ? tx.id : (tx.vinculadoServicioId || tx._notionRowId || '');
+      const canonical = txSvcId ? getCanonicalSvcId(txSvcId) : '';
+      return canonical === baseSvcId && tx.type === 'ingreso';
     });
     const totalIng = ingresos.reduce((s,tx)=>s+(+(tx.amount||0)),0);
     const totalEgr = egresos.reduce((s,tx)=>s+(+(tx.amount||0)),0);
@@ -4647,7 +4692,7 @@ window.filterMovimientosList = function() {
           const g = getGananciaServicio(t);
           if (g !== null) {
             tieneServicios = true;
-            const uid = t.vinculadoServicioId || t._notionRowId || t.id;
+            const uid = t.id;
             const baseUid = uid ? getCanonicalSvcId(uid) : '';
             if (!svcContados.has(baseUid)) {
               svcContados.add(baseUid);
@@ -4673,7 +4718,7 @@ window.filterMovimientosList = function() {
       const svcGroups = {};
       const looseTxs = [];
       txs.forEach(t => {
-        const rawSvcId = t.vinculadoServicioId || t._notionRowId || t._notionTrabajo?.id;
+        const rawSvcId = t.type === 'ingreso' ? t.id : (t.vinculadoServicioId || t._notionRowId || t._notionTrabajo?.id);
         if (rawSvcId && (t.vinculadoServicioId || t._notionTrabajo || t.origenServicioMaterial || t.origenCierreServicio || t._importadoDeNotion)) {
           const svcId = getCanonicalSvcId(rawSvcId);
           if(!svcGroups[svcId]) svcGroups[svcId] = [];
