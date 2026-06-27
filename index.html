@@ -4445,22 +4445,28 @@ function isSameServicio(id1, id2) {
   return getBaseSvcId(id1) === getBaseSvcId(id2);
 }
 
+function getTxCanonicalSvcId(t) {
+  if (!t) return '';
+  // Si la transacción tiene un ID propio que contiene sufijos de servicio o materiales de cierre
+  if (t.id && (t.origenCierreServicio || t.origenServicioMaterial || /-(svc\d+|mat\d*|com|mov|otr|otg|agr|met)$/i.test(String(t.id)))) {
+    return getCanonicalSvcId(t.id);
+  }
+  // De lo contrario, usar el ID de vinculación
+  const rawId = t.vinculadoServicioId || t._notionRowId || t._notionTrabajo?.id || t.id;
+  return getCanonicalSvcId(rawId);
+}
+
 // ── Ganancia neta de un ingreso de servicio ──────────────────────────────
 // Funciona para Notion (_notionTrabajo) y servicios cerrados desde la app.
 function getGananciaServicio(t) {
   if (t.type !== 'ingreso') return null;
   if (t.vinculadoServicioId || t._notionRowId) {
-    const rawSvcId = t.type === 'ingreso' ? t.id : t.vinculadoServicioId;
-    const baseSvcId = getCanonicalSvcId(rawSvcId);
+    const baseSvcId = getTxCanonicalSvcId(t);
     const egresos = (state.transactions||[]).filter(tx => {
-      const txSvcId = tx.type === 'ingreso' ? tx.id : (tx.vinculadoServicioId || tx._notionRowId || '');
-      const canonical = txSvcId ? getCanonicalSvcId(txSvcId) : '';
-      return canonical === baseSvcId && tx.type === 'egreso' && !tx.ocultarEnMovimientos;
+      return getTxCanonicalSvcId(tx) === baseSvcId && tx.type === 'egreso' && !tx.ocultarEnMovimientos;
     });
     const ingresos = (state.transactions||[]).filter(tx => {
-      const txSvcId = tx.type === 'ingreso' ? tx.id : (tx.vinculadoServicioId || tx._notionRowId || '');
-      const canonical = txSvcId ? getCanonicalSvcId(txSvcId) : '';
-      return canonical === baseSvcId && tx.type === 'ingreso';
+      return getTxCanonicalSvcId(tx) === baseSvcId && tx.type === 'ingreso';
     });
     const totalIng = ingresos.reduce((s,tx)=>s+(+(tx.amount||0)),0);
     const totalEgr = egresos.reduce((s,tx)=>s+(+(tx.amount||0)),0);
@@ -4718,9 +4724,9 @@ window.filterMovimientosList = function() {
       const svcGroups = {};
       const looseTxs = [];
       txs.forEach(t => {
-        const rawSvcId = t.type === 'ingreso' ? t.id : (t.vinculadoServicioId || t._notionRowId || t._notionTrabajo?.id);
-        if (rawSvcId && (t.vinculadoServicioId || t._notionTrabajo || t.origenServicioMaterial || t.origenCierreServicio || t._importadoDeNotion)) {
-          const svcId = getCanonicalSvcId(rawSvcId);
+        const isLinked = !!(t.vinculadoServicioId || t._notionRowId || t._notionTrabajo?.id || t.origenServicioMaterial || t.origenCierreServicio || t._importadoDeNotion);
+        if (isLinked) {
+          const svcId = getTxCanonicalSvcId(t);
           if(!svcGroups[svcId]) svcGroups[svcId] = [];
           svcGroups[svcId].push(t);
         } else {
@@ -7811,8 +7817,7 @@ function gfIsServicioTx(t) {
 }
 
 function gfServicioId(t) {
-  const rawId = t.vinculadoServicioId || t._notionRowId || t.servicioId || t._notionTrabajo?.id || t.id || `${t.date}-${t.category}-${t.amount}`;
-  return rawId ? getCanonicalSvcId(rawId) : '';
+  return t ? getTxCanonicalSvcId(t) : '';
 }
 
 function gfcRange(key, start, end, label) {
