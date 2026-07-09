@@ -178,6 +178,440 @@ body{font-family:'Inter','Roboto',sans-serif;color:var(--text)}
 #app{height:100vh;display:flex;flex-direction:column;width:100%;max-width:430px;margin:0 auto;overflow:hidden}
 #header{background:var(--bg);border-bottom:1px solid var(--border);padding:16px 20px 0;flex-shrink:0}
 #content{flex:1;overflow-y:auto;padding:18px 18px 100px}
+
+/* ── AGENDA FULLSCREEN Y CALENDARIO SEMANAL ── */
+#app.page-agenda-fullscreen #header {
+  display: none !important;
+}
+#app.page-agenda-fullscreen #content {
+  padding: 0 !important;
+  height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+.agenda-fs-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: #F8FAFC;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+}
+.agenda-fs-header {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  padding: 12px 14px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 20px rgba(148, 163, 184, 0.05);
+}
+.agenda-fs-search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.agenda-back-btn {
+  background: #F1F5F9;
+  border: none;
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #475569;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.agenda-back-btn:active {
+  transform: scale(0.92);
+}
+.agenda-search-box {
+  position: relative;
+  flex: 1;
+}
+.agenda-search-box input {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #E2E8F0;
+  border-radius: 20px;
+  padding: 0 32px 0 36px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #1E293B;
+  outline: none;
+  background: #F8FAFC;
+  transition: all 0.2s ease;
+}
+.agenda-search-box input:focus {
+  border-color: var(--gold);
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.12);
+}
+.agenda-search-box .search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  transition: stroke 0.2s;
+}
+.agenda-search-box input:focus ~ .search-icon {
+  stroke: var(--gold);
+}
+.agenda-search-box .clear-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: #94A3B8;
+  cursor: pointer;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.agenda-date-picker-wrapper {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+}
+.agenda-date-picker-wrapper input[type="date"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+.agenda-date-btn {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #F1F5F9;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #475569;
+  cursor: pointer;
+  z-index: 1;
+}
+.agenda-mic-btn {
+  background: #FFF1F2;
+  border: none;
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #E11D48;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.agenda-mic-btn:active {
+  transform: scale(0.92);
+}
+.agenda-fs-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  background: #F8FAFC;
+  border-radius: 12px;
+  padding: 6px 12px;
+  border: 1px solid #E2E8F0;
+}
+.agenda-nav-arrow {
+  background: none;
+  border: none;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gold);
+  cursor: pointer;
+  padding: 0 6px;
+  transition: transform 0.1s;
+}
+.agenda-nav-arrow:active {
+  transform: scale(0.9);
+}
+.agenda-nav-title {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  color: #1E293B;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.agenda-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  margin-top: 10px;
+}
+.agenda-week-day-box {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 8px 4px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+}
+.agenda-week-day-box.today {
+  border-color: var(--gold);
+  background: #FFFDF5;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.08);
+}
+.agenda-week-day-box.selected {
+  background: linear-gradient(135deg, #1E293B, #0F172A);
+  border-color: #0F172A;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+}
+.agenda-week-day-name {
+  font-size: 9px;
+  font-weight: 700;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.agenda-week-day-box.selected .agenda-week-day-name {
+  color: #94A3B8;
+}
+.agenda-week-day-number {
+  font-size: 15px;
+  font-weight: 800;
+  color: #1E293B;
+  margin: 2px 0;
+}
+.agenda-week-day-box.selected .agenda-week-day-number {
+  color: #FFFFFF;
+}
+.agenda-week-day-dots {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  min-height: 6px;
+}
+.agenda-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.agenda-dot.trabajo {
+  background: #F97316;
+}
+.agenda-dot.visita {
+  background: #0EA5E9;
+}
+.agenda-action-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.agenda-action-row button {
+  flex: 1;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 8px 4px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.15s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.02);
+}
+.agenda-action-row button:active {
+  transform: scale(0.95);
+}
+.agenda-fs-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scroll-behavior: smooth;
+}
+.agenda-day-block {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(148, 163, 184, 0.02);
+}
+.agenda-day-block.today {
+  border-color: var(--gold);
+  box-shadow: 0 4px 16px rgba(212, 175, 55, 0.08);
+  background: #FFFDF9;
+}
+.agenda-day-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #1E293B;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #F1F5F9;
+  padding-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.agenda-day-count {
+  background: #F1F5F9;
+  color: #475569;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 9.5px;
+  font-weight: 800;
+}
+.agenda-day-empty {
+  font-size: 11.5px;
+  color: #94A3B8;
+  text-align: center;
+  padding: 8px 0;
+  font-style: italic;
+}
+.agenda-item-card {
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  background: #FFFFFF;
+  position: relative;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.01);
+  user-select: none;
+}
+.agenda-item-card:hover {
+  border-color: #CBD5E1;
+  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.06);
+}
+.agenda-item-card.open {
+  border-color: #94A3B8;
+  box-shadow: 0 6px 16px rgba(148, 163, 184, 0.1);
+}
+.agenda-item-card.dragging {
+  opacity: 0.5;
+  border: 2px dashed var(--gold) !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+  transform: scale(0.97) rotate(0.5deg);
+  z-index: 9999;
+}
+.agenda-item-card.visita {
+  border-left: 4px solid #0EA5E9 !important;
+}
+.agenda-item-card.trabajo {
+  border-left: 4px solid #F97316 !important;
+}
+.agenda-item-head {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.agenda-item-time {
+  font-size: 11px;
+  font-weight: 800;
+  min-width: 66px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  text-align: center;
+  font-family: inherit;
+}
+.agenda-item-time.trabajo {
+  background: #FFF2E8;
+  color: #EA580C;
+  border: 1px solid #FFEDD5;
+}
+.agenda-item-time.visita {
+  background: #F0F9FF;
+  color: #0284C7;
+  border: 1px solid #E0F2FE;
+}
+.agenda-item-name {
+  flex: 1;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #1E293B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agenda-item-pill {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2.5px 6.5px;
+  border-radius: 12px;
+  text-transform: uppercase;
+}
+.agenda-item-chevron {
+  font-size: 9.5px;
+  color: #94A3B8;
+  transition: transform 0.25s ease;
+  margin-left: 2px;
+}
+.agenda-item-card.open .agenda-item-chevron {
+  transform: rotate(180deg);
+}
+.agenda-item-drag-handle {
+  cursor: grab;
+  font-size: 13.5px;
+  color: #94A3B8;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+.agenda-item-drag-handle:active {
+  cursor: grabbing;
+}
+.agenda-item-expand {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.agenda-item-detail {
+  padding: 12px;
+  border-top: 1px dashed #E2E8F0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #FAFBFD;
+}
+.drag-over-marker-above {
+  border-top: 4px solid #10B981 !important;
+  box-shadow: 0 -4px 10px rgba(16, 185, 129, 0.12);
+}
+.drag-over-marker-below {
+  border-bottom: 4px solid #10B981 !important;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.12);
+}
 .h-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:10px}
 .h-top>div:first-child{min-width:0;flex:1}
 .h-top>div:last-child{flex-shrink:0}
@@ -3583,6 +4017,16 @@ function applyModoTheme(){
     const el = document.getElementById(id);
     if(el) el.classList.add('active');
   });
+
+  // Pantalla completa para la agenda semanal
+  const header = document.getElementById('header');
+  if (state.page === 'agenda') {
+    if (app) app.classList.add('page-agenda-fullscreen');
+    if (header) header.style.display = 'none';
+  } else {
+    if (app) app.classList.remove('page-agenda-fullscreen');
+    if (header) header.style.display = '';
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -13961,85 +14405,90 @@ function parseUbicacionLink(ubicacion){
 }
 
 function renderAgenda(){
-  if(!window._agendaFiltro) window._agendaFiltro='todos';
-  if(!window._agendaVista) window._agendaVista='lista';
+  // Inicializaciones
+  if (!window._agendaRefDate) {
+    window._agendaRefDate = new Date();
+  }
+  if (typeof window._agendaSearchText === 'undefined') {
+    window._agendaSearchText = '';
+  }
+  if (!window._agendaFiltro) {
+    window._agendaFiltro = 'todos';
+  }
+  if (typeof window._agendaActiveDayStr === 'undefined') {
+    window._agendaActiveDayStr = '';
+  }
 
-  const todos = (state.agenda||[]).slice().sort((a,b)=>{
-    const da=a.fecha+(a.hora||'00:00'), db=b.fecha+(b.hora||'00:00');
-    return da.localeCompare(db);
-  });
+  const refDate = window._agendaRefDate;
+  const dayOfWeek = refDate.getDay();
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(refDate);
+  monday.setDate(refDate.getDate() + diffToMonday);
+  monday.setHours(12, 0, 0, 0);
 
-  // Aplicar filtro con nuevos estados
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    days.push(d);
+  }
+
+  const getDStr = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const monthsAbbr = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const startDay = days[0].getDate();
+  const startMonth = monthsAbbr[days[0].getMonth()];
+  const endDay = days[6].getDate();
+  const endMonth = monthsAbbr[days[6].getMonth()];
+  const year = days[6].getFullYear();
+  
+  let weekTitle = `${startDay} ${startMonth} - ${endDay} ${endMonth} ${year}`;
+  if (startMonth === endMonth) {
+    weekTitle = `${startDay} - ${endDay} ${startMonth} ${year}`;
+  }
+
+  // Filtrado de items general (para la búsqueda inteligente)
+  const q = window._agendaSearchText ? normSimpleText(window._agendaSearchText) : '';
+  const matchesFilter = (item) => {
+    if (!q) return true;
+    const textToSearch = normSimpleText([item.cliente, item.servicio, item.ubicacion, item.notas].filter(Boolean).join(' '));
+    return textToSearch.includes(q);
+  };
+
   const _migEst = s => ({completado:'se_finalizo',cancelado:'se_desanimo'}[s]||s||'agendado');
-  const items = todos.filter(x=>{
-    const est = _migEst(x.estado);
+  const matchesStatusFilter = (item) => {
+    const est = _migEst(item.estado);
     if(window._agendaFiltro==='activos')       return ['agendado','pendiente','reprogramo'].includes(est);
     if(window._agendaFiltro==='finalizados')   return est==='se_finalizo';
     if(window._agendaFiltro==='no_realizados') return est==='se_desanimo';
     return true;
-  });
-  const visitas  = items.filter(x=>x.tipo==='visita');
-  const trabajos = items.filter(x=>x.tipo==='trabajo');
+  };
 
-  // Vista semanal
-  const hoy=new Date();
-  const semana=[];
-  for(let i=0;i<7;i++){
-    const d=new Date(hoy);d.setDate(hoy.getDate()+i);
-    semana.push(d);
-  }
-  const DIAS_CORTO=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-  const semanaHtml=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:14px">
-    ${semana.map(d=>{
-      const ds=d.toISOString().split('T')[0];
-      const hayTrab=todos.some(a=>a.fecha===ds&&a.tipo==='trabajo');
-      const hayVis=todos.some(a=>a.fecha===ds&&a.tipo==='visita');
-      const esHoy=ds===hoy.toISOString().split('T')[0];
-      return `<div style="background:${esHoy?'var(--gold)':'var(--card)'};border:1px solid ${esHoy?'var(--gold)':'var(--border)'};border-radius:10px;padding:6px 2px;text-align:center;cursor:pointer" onclick="switchPage('agenda')">
-        <div style="font-size:9px;color:${esHoy?'#0D0D0F':'var(--muted)'};text-transform:uppercase;letter-spacing:.04em">${DIAS_CORTO[d.getDay()]}</div>
-        <div style="font-size:15px;font-weight:600;color:${esHoy?'#0D0D0F':'var(--text)'};margin:2px 0">${d.getDate()}</div>
-        <div style="display:flex;justify-content:center;gap:2px;min-height:8px">
-          ${hayTrab?`<div style="width:6px;height:6px;border-radius:50%;background:#F47C3C"></div>`:''}
-          ${hayVis?`<div style="width:6px;height:6px;border-radius:50%;background:#3D6677"></div>`:''}
-        </div>
-      </div>`;
-    }).join('')}
-  </div>
-  <div style="display:flex;gap:12px;margin-bottom:14px;font-size:11px;color:var(--muted)">
-    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F47C3C;margin-right:4px"></span>Trabajo</span>
-    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3D6677;margin-right:4px"></span>Visita</span>
-  </div>`;
-
+  // Renderizar las tarjetas
   function agendaCard(item){
     const est = AGENDA_ESTADOS[_migEst(item.estado)] || AGENDA_ESTADOS['agendado'];
     const dias = diasHastaLabel(item.fecha);
     const ubic = parseUbicacionLink(item.ubicacion);
     const isVisita = item.tipo==='visita';
     const cardId = 'agcard_'+item.id;
-    const estaActivo = ['agendado','pendiente','reprogramo'].includes(_migEst(item.estado));
 
-    const icono = isVisita
-      ? `<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 2C9.1 2 6 5.1 6 9C6 14.5 13 24 13 24C13 24 20 14.5 20 9C20 5.1 16.9 2 13 2Z" fill="#3D6677"/><circle cx="13" cy="9" r="3.5" fill="#FFFFFF"/></svg>`
-      : `<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 3C13 3 8.5 7.5 8.5 12.5C8.5 14 8.9 15.3 9.7 16.3C9.5 15.7 9.4 15.1 9.4 14.4C9.4 12.2 11.5 10 11.5 8C12.6 10.2 14.1 11.7 14.1 14C14.1 15 13.8 15.9 13.3 16.7C14.7 15.3 15.6 13.5 15.6 11.5C15.6 7 13 3 13 3Z" fill="#F47C3C"/><path d="M13 23C10.5 23 8.5 21 8.5 18.5C8.5 17 9.4 15.7 10.8 15C10.7 16.2 11.5 17.5 13 18.5C14.5 17.5 15.3 16.2 15.2 15C16.6 15.7 17.5 17 17.5 18.5C17.5 21 15.5 23 13 23Z" fill="#C8520A"/></svg>`;
-    const iconBg = isVisita ? '#EAF1F6' : '#FFF2E8';
-
-    const [y,m,d] = (item.fecha||'').split('-');
-    const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-    const fechaLbl = y ? `${parseInt(d)} ${meses[parseInt(m)-1]}` : '—';
-    const horaLbl = item.hora ? horaTo12(item.hora) : '';
-
-    const precioBadge = !isVisita && item.precio
-      ? `<span class="ag-card-pill" style="background:#F3F0FF;color:#534AB7">S/ ${fmt(item.precio).replace('S/ ','')}</span>`
-      : '';
+    const horaLbl = item.hora ? horaTo12(item.hora) : 'Sin Hora';
+    const typeLabel = isVisita ? 'Visita' : 'Trabajo';
+    const typeClass = isVisita ? 'visita' : 'trabajo';
 
     const ubicHtml = ubic.link
       ? `<a href="${ubic.link}" target="_blank" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;background:#EEF4FF;border:1px solid #2E86AB33;border-radius:8px;padding:6px 11px;font-size:12px;color:#1565C0;text-decoration:none;font-weight:600">${ubic.display} ↗</a>`
-      : `<div style="font-size:12px;color:var(--muted)">${ubic.display}</div>`;
+      : `<div style="font-size:12px;color:var(--muted)">📍 ${ubic.display}</div>`;
 
     const precioHtml = !isVisita && item.precio
-      ? `<div style="background:#F3F0FF;border-radius:10px;padding:9px 13px;display:flex;justify-content:space-between;align-items:center">
+      ? `<div style="background:#F3F0FF;border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:11px;color:#534AB7;font-weight:600">Precio acordado</span>
-          <span style="font-size:17px;font-weight:700;color:#534AB7;font-family:'Playfair Display',serif">${fmt(item.precio)}</span>
+          <span style="font-size:15px;font-weight:700;color:#534AB7">${fmt(item.precio)}</span>
         </div>` : '';
 
     const telHtml = item.telefono
@@ -14048,42 +14497,12 @@ function renderAgenda(){
     const notasHtml = item.notas
       ? `<div style="background:#FFFBEB;border:1px solid #EF9F2733;border-radius:8px;padding:8px 11px;font-size:12px;color:#633806">📝 ${item.notas}</div>` : '';
 
-    const pagoBadge = item.estadoPago
-      ? `<span class="ag-card-pill" style="background:${(AGENDA_PAGO[item.estadoPago]||{}).bg||'#F5F5F5'};color:${(AGENDA_PAGO[item.estadoPago]||{}).color||'#333'}">${(AGENDA_PAGO[item.estadoPago]||{}).label||''}</span>` : '';
-    const montoP = item.montoPendienteCobro>0
-      ? `<span class="ag-card-pill" style="background:#FAEEDA;color:#633806">Pendiente: S/ ${item.montoPendienteCobro.toFixed(2)}</span>` : '';
-
-    // Chip de stock consumido (solo en servicios finalizados con materiales)
     const stockConsumidoHtml = isServicioFinalizado(item) && (item.stockValorConsumido > 0)
       ? `<div style="background:#FFF8E6;border:1px solid #E9D8A655;border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:11px;color:#9A6B00;font-weight:700">📦 Stock consumido</span>
           <span style="font-size:14px;font-weight:800;color:#9A6B00">-${fmt(item.stockValorConsumido)}</span>
         </div>`
       : '';
-    const cierreBtnLabel = isServicioFinalizado(item) ? 'Editar cierre' : 'Finalizar y Cobrar';
-
-    const accionesHtml = `
-      <div class="ag-card-actions" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 4px">
-        <button class="ag-act-btn" style="background:#EEEDFE;border:1px solid #AFA9EC;color:#3C3489;padding:10px;font-size:11px;font-weight:700;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px"
-          onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','reprogramo')">🔄 Reprogramar</button>
-        <button class="ag-act-btn" style="background:#F1EFE8;border:1px solid #B4B2A9;color:#444441;padding:10px;font-size:11px;font-weight:700;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px"
-          onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','se_desanimo')">✗ Desanimó</button>
-        ${!isVisita
-          ? `<button class="ag-act-btn" style="background:#EBF1F5;border:1px solid #A8BCC9;color:#2A4455;grid-column: span 2;padding:12px;font-size:12px;font-weight:800;border-radius:10px;cursor:pointer"
-              onclick="event.stopPropagation();abrirModalCobro('${item.id}')">✓ ${cierreBtnLabel}</button>`
-          : `<button class="ag-act-btn" style="background:#FFF3E0;border:1px solid #FFCC80;color:#BF360C;grid-column: span 2;padding:12px;font-size:12px;font-weight:800;border-radius:10px;cursor:pointer"
-              onclick="event.stopPropagation();convertirVisitaATrabajo('${item.id}')">🔨 Agendó Construcción</button>`}
-      </div>`;
-
-    const secundariosHtml = `
-      <div style="display:flex;gap:6px;margin-top:4px">
-        <button onclick="event.stopPropagation();editAgendaItem('${item.id}')"
-          style="flex:1;padding:9px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">✎ Editar</button>
-        ${item.telefono ? `<button onclick="event.stopPropagation();abrirWhatsAppAgenda('${item.id}')"
-          style="width:40px;background:#EBF1F5;border:1px solid #A8BCC9;color:#2A4455;border-radius:10px;cursor:pointer;font-size:18px">💬</button>` : ''}
-        <button onclick="event.stopPropagation();deleteAgendaItem('${item.id}')"
-          style="width:40px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700">✕</button>
-      </div>`;
 
     const servicesDetailHtml = (() => {
       if (!isServicioFinalizado(item)) return '';
@@ -14108,19 +14527,19 @@ function renderAgenda(){
       if (list.length === 0) return '';
       
       return `
-        <div style="border: 2px solid #2F4A5933; border-radius: 14px; padding: 12px; background: #F8FAFB; margin-top: 6px;">
-          <div style="font-size: 11px; font-weight: 800; color: #546878; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px;">📋 Resumen de Servicios (${list.length})</div>
-          <div style="display: grid; gap: 8px;">
+        <div style="border: 1px solid #2F4A5922; border-radius: 10px; padding: 10px; background: #F8FAFB; margin-top: 4px;">
+          <div style="font-size: 10px; font-weight: 800; color: #546878; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px;">📋 Resumen de Servicios</div>
+          <div style="display: grid; gap: 6px;">
             ${list.map(s => {
               const hasGastos = s.materiales > 0 || s.comida > 0 || s.movilidad > 0 || s.agregados > 0 || s.otros > 0 || s.meta > 0;
               return `
-                <div style="background: #ffffff; border: 1px solid #E6E8EB; border-radius: 10px; padding: 8px 10px; box-shadow: 0 2px 6px rgba(26,44,53,0.02)">
-                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #E6E8EB; padding-bottom: 5px; margin-bottom: 5px;">
-                    <span style="font-weight: 750; color: var(--text); font-size: 12px;">${s.idx}. ${s.name}</span>
-                    <span style="font-weight: 850; color: var(--gold); font-size: 13px;">S/ ${s.precio.toFixed(2)}</span>
+                <div style="background: #ffffff; border: 1px solid #E6E8EB; border-radius: 8px; padding: 6px 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.01)">
+                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #E6E8EB; padding-bottom: 4px; margin-bottom: 4px;">
+                    <span style="font-weight: 750; color: var(--text); font-size: 11px;">${s.idx}. ${s.name}</span>
+                    <span style="font-weight: 850; color: var(--gold); font-size: 12px;">S/ ${s.precio.toFixed(2)}</span>
                   </div>
                   ${hasGastos ? `
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 10.5px; color: var(--muted)">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3px; font-size: 9.5px; color: var(--muted)">
                       ${s.materiales > 0 ? `<div>📦 Mat: <strong>S/ ${s.materiales.toFixed(2)}</strong></div>` : ''}
                       ${s.comida > 0 ? `<div>🍔 Com: <strong>S/ ${s.comida.toFixed(2)}</strong></div>` : ''}
                       ${s.movilidad > 0 ? `<div>🚗 Mov: <strong>S/ ${s.movilidad.toFixed(2)}</strong></div>` : ''}
@@ -14128,7 +14547,7 @@ function renderAgenda(){
                       ${s.otros > 0 ? `<div>🏷 Otr: <strong>S/ ${s.otros.toFixed(2)}</strong></div>` : ''}
                       ${s.meta > 0 ? `<div>🎯 Met: <strong>S/ ${s.meta.toFixed(2)}</strong></div>` : ''}
                     </div>
-                  ` : `<div style="font-size: 10.5px; color: var(--muted); font-style: italic;">Sin gastos declarados</div>`}
+                  ` : `<div style="font-size: 9.5px; color: var(--muted); font-style: italic;">Sin gastos</div>`}
                 </div>
               `;
             }).join('')}
@@ -14137,40 +14556,50 @@ function renderAgenda(){
       `;
     })();
 
-    return `
-    <div class="ag-card" id="${cardId}">
-      <!-- ENCABEZADO: CLICK PARA DESPLEGAR TODO -->
-      <div class="ag-card-head" onclick="toggleAgendaCard('${cardId}')" style="padding:14px 16px; display:flex; gap:12px; align-items:center; cursor:pointer">
-        <div class="ag-card-icon" style="width:52px; height:52px; border-radius:50%; background:${iconBg}; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 3px 10px rgba(0,0,0,0.10)">${icono}</div>
-        <div class="ag-card-body" style="flex:1; min-width:0">
-          <div class="ag-card-nombre" style="font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.2; margin-bottom:5px">${item.cliente||'Sin cliente'}</div>
-          <div class="ag-card-meta" style="display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin-bottom:4px">
-            <span class="ag-card-pill" style="background:${dias.bg};color:${dias.color}; font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px">${dias.txt}</span>
-            <span style="font-size:12px; color:var(--muted); font-weight:600">${fechaLbl}${horaLbl?' · '+horaLbl:''}</span>
-            <span class="ag-card-pill" style="background:${est.bg};color:${est.color}; font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px">${est.label}</span>
-          </div>
-          ${item.ubicacion ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">📍 ${item.ubicacion}</div>` : ''}
-        </div>
-        <div class="ag-card-chevron" style="font-size:12px; color:var(--muted); transition:transform .22s">▾</div>
-      </div>
+    const cierreBtnLabel = isServicioFinalizado(item) ? 'Editar cierre' : 'Finalizar y Cobrar';
 
-      <!-- DETALLE DESPLEGABLE -->
-      <div class="ag-card-expand" style="max-height:0; overflow:hidden; transition:max-height .28s ease">
-        <div class="ag-card-detail" style="padding:0 16px 16px; display:flex; flex-direction:column; gap:10px; border-top:1px solid var(--border); padding-top:12px">
+    const accionesHtml = `
+      <div style="margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 2px">
+        <button style="background:#EEEDFE; border:1px solid #AFA9EC; color:#3C3489; padding:8px; font-size:10.5px; font-weight:700; border-radius:8px; cursor:pointer"
+          onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','reprogramo')">🔄 Reprogramar</button>
+        <button style="background:#F1EFE8; border:1px solid #B4B2A9; color:#444441; padding:8px; font-size:10.5px; font-weight:700; border-radius:8px; cursor:pointer"
+          onclick="event.stopPropagation();cambiarEstadoAgenda('${item.id}','se_desanimo')">✗ Desanimó</button>
+        ${!isVisita
+          ? `<button style="background:#EBF1F5; border:1px solid #A8BCC9; color:#2A4455; grid-column: span 2; padding:10px; font-size:11.5px; font-weight:800; border-radius:8px; cursor:pointer"
+              onclick="event.stopPropagation();abrirModalCobro('${item.id}')">✓ ${cierreBtnLabel}</button>`
+          : `<button style="background:#FFF3E0; border:1px solid #FFCC80; color:#BF360C; grid-column: span 2; padding:10px; font-size:11.5px; font-weight:800; border-radius:8px; cursor:pointer"
+              onclick="event.stopPropagation();convertirVisitaATrabajo('${item.id}')">🔨 Agendó Construcción</button>`}
+      </div>`;
+
+    const secundariosHtml = `
+      <div style="display:flex; gap:5px; margin-top:4px">
+        <button onclick="event.stopPropagation();editAgendaItem('${item.id}')"
+          style="flex:1; padding:7px; background:none; border:1px solid var(--border); color:var(--muted); border-radius:8px; font-family:inherit; font-size:11px; font-weight:600; cursor:pointer">✎ Editar</button>
+        ${item.telefono ? `<button onclick="event.stopPropagation();abrirWhatsAppAgenda('${item.id}')"
+          style="width:34px; height:34px; background:#EBF1F5; border:1px solid #A8BCC9; color:#2A4455; border-radius:8px; cursor:pointer; font-size:15px; display:flex; align-items:center; justify-content:center">💬</button>` : ''}
+        <button onclick="event.stopPropagation();deleteAgendaItem('${item.id}')"
+          style="width:34px; height:34px; background:#FCEBEB; border:1px solid #F09595; color:#791F1F; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center">✕</button>
+      </div>`;
+
+    return `
+    <div class="agenda-item-card ${typeClass}" id="${cardId}" draggable="true">
+      <div class="agenda-item-head" onclick="toggleAgendaFSItem('${cardId}')">
+        <div class="agenda-item-drag-handle">☰</div>
+        <div class="agenda-item-time ${typeClass}">${horaLbl}</div>
+        <div class="agenda-item-name">${item.cliente||'Sin cliente'}</div>
+        <span class="agenda-item-pill" style="background:${est.bg};color:${est.color}">${est.label}</span>
+        <div class="agenda-item-chevron">▼</div>
+      </div>
+      <div class="agenda-item-expand">
+        <div class="agenda-item-detail">
           ${ubicHtml}
           ${telHtml}
           ${notasHtml}
-          
+          ${precioHtml}
+          ${stockConsumidoHtml}
           ${servicesDetailHtml}
-          
-          <!-- BOTONES OPERATIVOS REUBICADOS DENTRO DEL DESPLIEGUE -->
-          <div style="margin-top:6px">
-            ${accionesHtml}
-          </div>
-
-          <!-- ACCIONES SECUNDARIAS -->
-          <div style="border-top:1px solid #F1F5F9; margin-top:6px; padding-top:10px">
-            ${stockConsumidoHtml}
+          ${accionesHtml}
+          <div style="border-top:1px solid var(--border); margin-top:4px; padding-top:6px">
             ${secundariosHtml}
           </div>
         </div>
@@ -14178,36 +14607,362 @@ function renderAgenda(){
     </div>`;
   }
 
-  // Filtros
-  const filtroHtml=`<div style="display:flex;gap:6px;margin-bottom:14px">
-    ${[['todos','Todos'],['activos','Activos'],['finalizados','Finalizados'],['no_realizados','No realizados']].map(([k,l])=>
-      `<button onclick="window._agendaFiltro='${k}';render()" style="font-size:11px;padding:5px 12px;border-radius:20px;border:1px solid ${window._agendaFiltro===k?'var(--gold)':'var(--border)'};background:${window._agendaFiltro===k?'#FFF8EC':'transparent'};color:${window._agendaFiltro===k?'var(--gold)':'var(--muted)'};font-weight:${window._agendaFiltro===k?'600':'400'};cursor:pointer;font-family:'DM Sans',sans-serif">${l}</button>`
-    ).join('')}
-  </div>`;
+  // Generar la grilla de días Lunes a Domingo
+  const daysOfWeekFull = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
+  const bodyHtml = days.map(d => {
+    const dStr = getDStr(d);
+    const dayItems = (state.agenda || []).filter(item => {
+      return item.fecha === dStr && matchesFilter(item) && matchesStatusFilter(item);
+    });
+
+    // Ordenar cronológicamente por hora
+    dayItems.sort((a, b) => {
+      const hA = a.hora || '23:59';
+      const hB = b.hora || '23:59';
+      return hA.localeCompare(hB);
+    });
+
+    const itemsHtml = dayItems.length === 0
+      ? `<div class="agenda-day-empty">Sin visitas ni trabajos</div>`
+      : dayItems.map(agendaCard).join('');
+
+    const isToday = dStr === getDStr(new Date());
+    const titleStyle = isToday ? 'color: var(--gold); border-bottom: 2px solid var(--gold);' : '';
+
+    return `
+      <div class="agenda-day-block" data-date="${dStr}">
+        <div class="agenda-day-title" style="${titleStyle}">
+          <span>${daysOfWeekFull[d.getDay()]} ${d.getDate()}</span>
+          <span class="agenda-day-count">${dayItems.length}</span>
+        </div>
+        <div class="agenda-day-list">
+          ${itemsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Filtros de estado (Pills en la cabecera)
+  const filtroHtml = `
+    <div style="display:flex; gap:4px; overflow-x:auto; padding:2px 0 4px; margin-top:6px; scrollbar-width: none;">
+      ${[['todos','Todos'],['activos','Activos'],['finalizados','Finalizados'],['no_realizados','No realizados']].map(([k,l])=>
+        `<button onclick="window._agendaFiltro='${k}';render()" style="font-size:10.5px; padding:6px 12px; border-radius:20px; border:1.5px solid ${window._agendaFiltro===k?'var(--gold)':'#E2E8F0'}; background:${window._agendaFiltro===k?'#FFF8EC':'#FFFFFF'}; color:${window._agendaFiltro===k?'var(--gold)':'#64748B'}; font-weight:${window._agendaFiltro===k?'800':'600'}; cursor:pointer; font-family:inherit; flex-shrink:0; outline:none; transition: all 0.2s;">${l}</button>`
+      ).join('')}
+    </div>`;
+
+  // Estructura completa de la vista a pantalla completa
+  setTimeout(() => initAgendaDragAndDrop(), 50);
 
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--gold)">Agenda</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
-        <button onclick="openAddAgenda('visita')" style="background:#EAF1F6;border:1px solid #3D667744;color:#2A4F60;border-radius:10px;padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">＋ Visita</button>
-        <button onclick="openAddAgenda('trabajo')" style="background:#FFF2E8;border:1px solid #F47C3C44;color:#C8520A;border-radius:10px;padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">🔥 Trabajo</button>
-        <button onclick="openRegistrarServicioDirecto()" style="background:#EDF7F2;border:1px solid #2F7D6444;color:#2F6F53;border-radius:10px;padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer">＋ Registrar</button>
+    <div class="agenda-fs-container">
+      <div class="agenda-fs-header">
+        <!-- Fila 1: Retorno, Buscador, Microfono, Selector de fecha -->
+        <div class="agenda-fs-search-row">
+          <button class="agenda-back-btn" onclick="switchPage('dashboard')" title="Volver al inicio">←</button>
+          <div class="agenda-search-box">
+            <input type="text" placeholder="Buscar cliente..." value="${window._agendaSearchText}" oninput="onAgendaSearchInput(this.value)">
+            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            ${window._agendaSearchText ? `<button class="clear-btn" onclick="clearAgendaSearch()">✕</button>` : ''}
+          </div>
+          <div class="agenda-date-picker-wrapper" title="Buscar por fecha">
+            <input type="date" value="${getDStr(refDate)}" oninput="onAgendaDatePickerInput(this.value)">
+            <button class="agenda-date-btn">📅</button>
+          </div>
+          <button class="agenda-mic-btn" onclick="openAgendaVoz()" title="Agenda por voz">🎙</button>
+        </div>
+
+        <!-- Fila 2: Navegación semanal -->
+        <div class="agenda-fs-nav-row">
+          <button class="agenda-nav-arrow" onclick="prevAgendaWeek()">&lt;</button>
+          <span class="agenda-nav-title">${weekTitle}</span>
+          <button class="agenda-nav-arrow" onclick="nextAgendaWeek()">&gt;</button>
+        </div>
+
+        <!-- Filtros de estado -->
+        ${filtroHtml}
+
+        <!-- Fila 3: Botones de registro rápido -->
+        <div class="agenda-action-row">
+          <button class="btn-visita" onclick="openAddAgenda('visita')">＋ Visita</button>
+          <button class="btn-trabajo" onclick="openAddAgenda('trabajo')">🔥 Trabajo</button>
+          <button class="btn-registrar" onclick="openRegistrarServicioDirecto()">＋ Registrar</button>
+        </div>
+      </div>
+
+      <!-- Cuerpo principal scrollable -->
+      <div class="agenda-fs-body">
+        ${bodyHtml}
       </div>
     </div>
-    ${semanaHtml}
-    ${filtroHtml}
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <div style="font-size:13px;font-weight:600;color:#1565C0">👁 Visitas (${visitas.length})</div>
-    </div>
-    ${visitas.length===0
-      ?`<div class="card" style="text-align:center;color:var(--dim);padding:16px 0;font-size:13px;margin-bottom:14px">Sin visitas</div>`
-      :visitas.map(agendaCard).join('')}
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">
-      <div style="font-size:13px;font-weight:600;color:#6C3483">🔧 Trabajos (${trabajos.length})</div>
-    </div>
-    ${trabajos.length===0
-      ?`<div class="card" style="text-align:center;color:var(--dim);padding:16px 0;font-size:13px">Sin trabajos</div>`
-      :trabajos.map(agendaCard).join('')}`;
+  `;
+}
+
+// Funciones globales para control de navegación y búsqueda de la Agenda Fullscreen
+function scrollToAgendaDay(dayStr) {
+  window._agendaActiveDayStr = dayStr;
+  
+  document.querySelectorAll('.agenda-week-day-box').forEach(box => {
+    box.classList.remove('selected');
+    if (box.dataset.date === dayStr) {
+      box.classList.add('selected');
+    }
+  });
+
+  const block = document.querySelector(`.agenda-day-block[data-date="${dayStr}"]`);
+  if (block) {
+    const container = document.querySelector('.agenda-fs-body');
+    if (container) {
+      const topOffset = block.offsetTop - container.offsetTop;
+      container.scrollTo({ top: topOffset, behavior: 'smooth' });
+    } else {
+      block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+}
+
+function prevAgendaWeek() {
+  const d = window._agendaRefDate || new Date();
+  d.setDate(d.getDate() - 7);
+  window._agendaRefDate = d;
+  render();
+}
+
+function nextAgendaWeek() {
+  const d = window._agendaRefDate || new Date();
+  d.setDate(d.getDate() + 7);
+  window._agendaRefDate = d;
+  render();
+}
+
+function onAgendaSearchInput(val) {
+  window._agendaSearchText = val;
+  if (val.trim()) {
+    const q = normSimpleText(val.trim());
+    const match = (state.agenda || []).find(item => {
+      const matchText = normSimpleText([item.cliente, item.servicio, item.ubicacion, item.notes, item.notas].filter(Boolean).join(' '));
+      return matchText.includes(q);
+    });
+    if (match && match.fecha) {
+      window._agendaRefDate = new Date(match.fecha + 'T12:00:00');
+    }
+  }
+  render();
+}
+
+function clearAgendaSearch() {
+  window._agendaSearchText = '';
+  render();
+}
+
+function onAgendaDatePickerInput(val) {
+  if (val) {
+    window._agendaRefDate = new Date(val + 'T12:00:00');
+    render();
+  }
+}
+
+function toggleAgendaFSItem(cardId) {
+  const el = document.getElementById(cardId);
+  if (!el) return;
+  const expand = el.querySelector('.agenda-item-expand');
+  if (!expand) return;
+  const isOpen = el.classList.contains('open');
+  
+  // Cerrar otras tarjetas abiertas para mantenerlo super limpio
+  document.querySelectorAll('.agenda-item-card.open').forEach(c => {
+    if (c !== el) {
+      const exp = c.querySelector('.agenda-item-expand');
+      if (exp) exp.style.maxHeight = '0';
+      c.classList.remove('open');
+    }
+  });
+
+  if (isOpen) {
+    expand.style.maxHeight = '0';
+    el.classList.remove('open');
+  } else {
+    expand.style.maxHeight = expand.scrollHeight + 'px';
+    el.classList.add('open');
+  }
+}
+
+// ── Lógica de Drag & Drop para Agenda (Mouse y Táctil) ──
+let _agendaDragItem = null;
+
+function initAgendaDragAndDrop() {
+  const cards = document.querySelectorAll('.agenda-item-card');
+  cards.forEach(card => {
+    // Eventos drag standard para escritorio/mouse
+    card.addEventListener('dragstart', (e) => {
+      _agendaDragItem = card;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', card.id);
+    });
+
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      document.querySelectorAll('.agenda-item-card').forEach(c => {
+        c.classList.remove('drag-over-marker-above', 'drag-over-marker-below');
+      });
+      _agendaDragItem = null;
+    });
+
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!_agendaDragItem || _agendaDragItem === card) return;
+      const rect = card.getBoundingClientRect();
+      const midpoint = rect.top + rect.height / 2;
+      if (e.clientY < midpoint) {
+        card.classList.add('drag-over-marker-above');
+        card.classList.remove('drag-over-marker-below');
+      } else {
+        card.classList.add('drag-over-marker-below');
+        card.classList.remove('drag-over-marker-above');
+      }
+    });
+
+    card.addEventListener('dragleave', () => {
+      card.classList.remove('drag-over-marker-above', 'drag-over-marker-below');
+    });
+
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      card.classList.remove('drag-over-marker-above', 'drag-over-marker-below');
+      if (!_agendaDragItem || _agendaDragItem === card) return;
+      
+      const draggedId = _agendaDragItem.id.replace('agcard_', '');
+      const targetId = card.id.replace('agcard_', '');
+      
+      const draggedItem = (state.agenda || []).find(item => String(item.id) === draggedId);
+      const targetItem = (state.agenda || []).find(item => String(item.id) === targetId);
+      
+      if (draggedItem && targetItem) {
+        const rect = card.getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        const isAbove = e.clientY < midpoint;
+        
+        reubicarActividadAgenda(draggedItem, targetItem, isAbove);
+      }
+    });
+  });
+
+  // Soporte táctil móvil (Touch events)
+  let touchDragged = null;
+  let longPressTimer = null;
+
+  cards.forEach(card => {
+    const handle = card.querySelector('.agenda-item-drag-handle');
+    if (!handle) return;
+
+    handle.addEventListener('touchstart', (e) => {
+      longPressTimer = setTimeout(() => {
+        touchDragged = card;
+        card.classList.add('dragging');
+        if (navigator.vibrate) navigator.vibrate(30);
+      }, 200); // 200ms de presión para empezar arrastre
+    });
+
+    handle.addEventListener('touchmove', (e) => {
+      if (!touchDragged) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+      const targetCard = elem ? elem.closest('.agenda-item-card') : null;
+      
+      document.querySelectorAll('.agenda-item-card').forEach(c => {
+        c.classList.remove('drag-over-marker-above', 'drag-over-marker-below');
+      });
+
+      if (targetCard && targetCard !== touchDragged) {
+        const rect = targetCard.getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        if (touch.clientY < midpoint) {
+          targetCard.classList.add('drag-over-marker-above');
+        } else {
+          targetCard.classList.add('drag-over-marker-below');
+        }
+      }
+    });
+
+    handle.addEventListener('touchend', (e) => {
+      clearTimeout(longPressTimer);
+      if (!touchDragged) return;
+      
+      touchDragged.classList.remove('dragging');
+      const touch = e.changedTouches[0];
+      const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+      const targetCard = elem ? elem.closest('.agenda-item-card') : null;
+      
+      if (targetCard && targetCard !== touchDragged) {
+        const draggedId = touchDragged.id.replace('agcard_', '');
+        const targetId = targetCard.id.replace('agcard_', '');
+        const draggedItem = (state.agenda || []).find(item => String(item.id) === draggedId);
+        const targetItem = (state.agenda || []).find(item => String(item.id) === targetId);
+        
+        if (draggedItem && targetItem) {
+          const rect = targetCard.getBoundingClientRect();
+          const midpoint = rect.top + rect.height / 2;
+          const isAbove = touch.clientY < midpoint;
+          
+          reubicarActividadAgenda(draggedItem, targetItem, isAbove);
+        }
+      }
+      
+      document.querySelectorAll('.agenda-item-card').forEach(c => {
+        c.classList.remove('drag-over-marker-above', 'drag-over-marker-below');
+      });
+      touchDragged = null;
+    });
+
+    handle.addEventListener('touchcancel', () => {
+      clearTimeout(longPressTimer);
+      if (touchDragged) touchDragged.classList.remove('dragging');
+      touchDragged = null;
+      document.querySelectorAll('.agenda-item-card').forEach(c => {
+        c.classList.remove('drag-over-marker-above', 'drag-over-marker-below');
+      });
+    });
+  });
+}
+
+function reubicarActividadAgenda(draggedItem, targetItem, isAbove) {
+  // Guardar fecha original para sincronización
+  const oldFecha = draggedItem.fecha;
+  draggedItem.fecha = targetItem.fecha;
+  
+  // Calcular y asignar la nueva hora aproximada para ordenar chronologicamente
+  if (targetItem.hora) {
+    const [h, m] = targetItem.hora.split(':').map(Number);
+    const delta = isAbove ? -5 : 5;
+    let newMin = m + delta;
+    let newHour = h;
+    if (newMin >= 60) {
+      newMin -= 60;
+      newHour = Math.min(23, newHour + 1);
+    } else if (newMin < 0) {
+      newMin += 60;
+      newHour = Math.max(0, newHour - 1);
+    }
+    draggedItem.hora = `${String(newHour).padStart(2,'0')}:${String(newMin).padStart(2,'0')}`;
+  } else {
+    draggedItem.hora = isAbove ? '08:00' : '17:00';
+  }
+
+  // Guardar local y remotamente
+  save('fnz_agenda', state.agenda);
+  saveAll();
+  
+  // Sincronizar cambios en Sheets
+  syncAgendaToSheets(draggedItem);
+  
+  // Sincronizar en Notion si está configurado
+  if (localStorage.getItem('fnz_notion_token') && localStorage.getItem('fnz_notion_dbid_clientes')) {
+    _pushToNotionClientes(draggedItem).catch(err => console.error('Notion sync drag error:', err));
+  }
+
+  render();
+  toast('Actividad reprogramada correctamente a ' + draggedItem.fecha + ' ' + draggedItem.hora);
 }
 
 function sincronizarFechasTransaccionesVinculadas(servicioId, oldFecha, newFecha) {
@@ -14680,6 +15435,9 @@ function saveAgendaItem(editId, tipo){
     }
   } else {
     state.agenda.unshift(item);
+  }
+  if (fecha) {
+    window._agendaRefDate = new Date(fecha + 'T12:00:00');
   }
   save('fnz_agenda', state.agenda);
   syncAgendaToSheets(item);
@@ -16232,14 +16990,30 @@ function saveAgendaVoz(){
   const p=window._avParsed;
   if(!p) return;
   if(!state.agenda) state.agenda=[];
-  state.agenda.unshift({
+  const item = {
     id:Date.now()+'', tipo:p.tipo, cliente:p.cliente||'Sin cliente',
     fecha:p.fecha, hora:p.hora, servicio:p.servicio, precio:p.precio,
     ubicacion:p.ubicacion, telefono:p.telefono||'', notas:p.notas||'', estado:'pendiente'
-  });
+  };
+  state.agenda.unshift(item);
+  if (p.fecha) {
+    window._agendaRefDate = new Date(p.fecha + 'T12:00:00');
+  }
   save('fnz_agenda',state.agenda);
+  syncAgendaToSheets(item);
+
+  // Push a Notion si está configurado
+  if (localStorage.getItem('fnz_notion_token') && localStorage.getItem('fnz_notion_dbid_clientes')) {
+    _pushToNotionClientes(item).then(res => {
+      if (res && res.id) {
+        state.agenda = state.agenda.map(x => x.id === item.id ? { ...x, _notionRowId: res.id } : x);
+        save('fnz_agenda', state.agenda);
+      }
+    }).catch(err => console.warn('Notion sync error voice:', err));
+  }
+
   closeModal(); render();
-  toast((p.tipo==='visita'?'Visita':'Trabajo')+' agregado por voz ✓');
+  toast((p.tipo==='visita'?'Visita':'Trabajo')+' agregado por voz y sincronizado ✓');
 }
 
 // ─────────────────────────────────────────────
