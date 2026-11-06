@@ -128,6 +128,25 @@ test('P0.3.1: Preview exige una configuración funcional explícita e impide Pro
   }
 });
 
+test('F04: Preview de referencias aisladas acepta únicamente su política canónica', () => {
+  const ownerReferences = developmentEnv({
+    VERCEL_ENV: 'preview',
+    YARBI_PREVIEW_OWNER_REFERENCES_ONLY: 'true',
+    YARBI_PREVIEW_SUPABASE_PROJECT_REF: ISOLATED_REF,
+    SUPABASE_URL: `https://${ISOLATED_REF}.supabase.co`,
+    SUPABASE_SECRET_KEY: 'isolated-service-key-not-real-123456789012345678',
+    YARBI_TRACE_HMAC_KEY: 'trace-hmac-isolated-not-real-123456789012345678'
+  });
+  const valid = validateServerRouteConfig({ env: ownerReferences });
+  assert.equal(valid.ok, true);
+  const productionRef = validateServerRouteConfig({ env: { ...ownerReferences, YARBI_PREVIEW_SUPABASE_PROJECT_REF: 'haifktjvyhbsazmiyqps' } });
+  assert.equal(productionRef.ok, false);
+  assert.equal(productionRef.code, 'owner_reference_preview_project_is_production');
+  const external = validateServerRouteConfig({ env: { ...ownerReferences, NOTION_TOKEN: 'must-not-be-present' } });
+  assert.equal(external.ok, false);
+  assert.equal(external.code, 'owner_reference_preview_external_forbidden:NOTION_TOKEN');
+});
+
 test('P0.3.1: no hay fallback literal activo y la guardia se evalúa antes del primer efecto', () => {
   const forbidden = /process\.env\.SUPABASE_URL\s*\|\|\s*['"]https:\/\/haifktjvyhbsazmiyqps\.supabase\.co/;
   const forbiddenBackend = /process\.env\.(?:AI_PROCESSOR_URL|APP_ORIGIN)\s*\|\|[^\n]*misfinanzas-backend\.vercel\.app/;

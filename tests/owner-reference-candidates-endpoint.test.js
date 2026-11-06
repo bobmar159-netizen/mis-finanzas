@@ -70,7 +70,7 @@ async function invoke({ token = 'jwt-owner-a', body = { understanding: { constra
   const restore = setEnv(); const original = global.fetch; const calls = []; const ledger = [];
   try {
     global.fetch = mockFetch(calls, ledger);
-    const handler = require('../api/assistant/reference-candidates'); const res = responseBox();
+    const handler = require('../api_handlers/assistant/reference-candidates'); const res = responseBox();
     await handler({ method: 'POST', url: '/api/assistant/reference-candidates', headers: { authorization: 'Bearer ' + token }, body }, res);
     return { ...res.value, calls, ledger };
   } finally { global.fetch = original; restore(); }
@@ -109,6 +109,16 @@ test('H/I: la ruta está limitada a Preview, POST y a un bearer; otras rutas no 
   assert.equal(decidePreviewOwnerReferenceRequest({ method: 'POST', url: '/api/assistant/reference-candidates', headers: {} }, ENV).status, 401);
   const prod = { ...ENV, VERCEL_ENV: 'production' };
   assert.equal(decidePreviewOwnerReferenceRequest({ method: 'POST', url: '/api/assistant/reference-candidates', headers: { authorization: 'Bearer jwt-owner-a' } }, prod).allow, false);
+});
+
+test('auth-config: únicamente el bootstrap público exacto queda disponible en Preview aislado', () => {
+  const allowed = decidePreviewOwnerReferenceRequest({ method: 'GET', url: '/api/assistant/preferences?action=auth-config', headers: {} }, ENV);
+  assert.equal(allowed.allow, true);
+  assert.equal(allowed.code, 'owner_reference_preview_auth_config_allowed');
+  assert.equal(decidePreviewOwnerReferenceRequest({ method: 'POST', url: '/api/assistant/preferences?action=auth-config', headers: {} }, ENV).allow, false);
+  assert.equal(decidePreviewOwnerReferenceRequest({ method: 'GET', url: '/api/assistant/preferences?action=account-settings', headers: {} }, ENV).allow, false);
+  assert.equal(decidePreviewOwnerReferenceRequest({ method: 'GET', url: '/api/assistant/preferences?action=auth-config&extra=1', headers: {} }, ENV).allow, false);
+  assert.equal(decidePreviewOwnerReferenceRequest({ method: 'GET', url: '/api/assistant/preferences?action=auth-config', headers: {} }, { ...ENV, VERCEL_ENV: 'production' }).allow, false);
 });
 
 test('J: presupuesto local de lectura queda medido sin egress ni llamadas de IA', async () => {

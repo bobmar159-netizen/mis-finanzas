@@ -629,7 +629,14 @@ module.exports = async function handler(req, res) {
   const action = clean(req.query?.action || '', 40).toLowerCase();
   if (action === 'auth-callback' && req.method === 'GET') return authCallbackPage(res);
   if (action === 'auth-config' && req.method === 'GET') {
-    return res.status(200).json({ ok: true, supabaseUrl: SUPABASE_URL, publishableKey: SUPABASE_PUBLISHABLE_KEY });
+    return res.status(200).json({
+      ok: true,
+      supabaseUrl: SUPABASE_URL,
+      publishableKey: SUPABASE_PUBLISHABLE_KEY,
+      // Solo habilita el formulario de contraseña sintética en el Preview
+      // aislado de referencias. No concede permisos y no expone secretos.
+      previewOwnerReferencesOnly: process.env.VERCEL_ENV === 'preview' && String(process.env.YARBI_PREVIEW_OWNER_REFERENCES_ONLY || '').trim().toLowerCase() === 'true'
+    });
   }
   if (action === 'account-settings') {
     if (!['GET', 'POST'].includes(req.method)) return responseError(res, 405, 'Método no permitido');

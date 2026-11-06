@@ -7,7 +7,39 @@
   const synonyms = { instalacion:['instalacion','instalar','nueva'], reparacion:['reparacion','reparar','arreglo'], punto:['punto','adicional','extension'], visita:['visita','agenda','coordinar'] };
 
   function currentOwner() { return String(window.gfcYarbiOwnerId || window.gfcOwnerAccountId || '').trim(); }
-  function accountToken() { return typeof window.gfcAccountAccessToken === 'function' ? window.gfcAccountAccessToken() : ''; }
+  function safeCode(value) { return String(value || '').trim().replace(/[^a-z0-9_.:-]/gi, '').slice(0, 96); }
+  // La Bandeja puede cargarse antes que el script principal en algunos WebViews.
+  // Conserva el contrato de la función global, pero recupera la sesión aislada
+  // directamente como respaldo seguro para no confundir una sesión válida con
+  // una sesión ausente. El token nunca se renderiza ni se registra.
+  function accountToken() {
+    const fromGlobal = typeof window.gfcAccountAccessToken === 'function' ? window.gfcAccountAccessToken() : '';
+    if (fromGlobal) return fromGlobal;
+    try {
+      return window.localStorage.getItem('gfc_supabase_access_token_v1')
+        || window.sessionStorage.getItem('gfc_supabase_access_token_v1')
+        || '';
+    } catch (_) {
+      return '';
+    }
+  }
+  async function freshAccountToken(force) {
+    if (typeof window.gfcAccountFreshAccessToken === 'function') {
+      return String(await window.gfcAccountFreshAccessToken({ force: force === true }) || '');
+    }
+    return accountToken();
+  }
+  async function authenticatedRequest(url, init) {
+    let token = await freshAccountToken(false);
+    if (!token) return null;
+    const request = bearer => ({ ...(init || {}), headers:{ ...((init && init.headers) || {}), Authorization:'Bearer '+bearer } });
+    let response = await fetch(url, request(token));
+    if (response.status === 401 && typeof window.gfcAccountFreshAccessToken === 'function') {
+      token = await freshAccountToken(true);
+      if (token) response = await fetch(url, request(token));
+    }
+    return response;
+  }
   function apiOrigin() { return typeof window.gfcRuntimeApiOrigin === 'function' ? window.gfcRuntimeApiOrigin() : window.location.origin; }
   function localContacts() {
     const state = window.state || {};
@@ -46,26 +78,24 @@
     return { reason:'ok', rows:[...deduped.values()].sort((a,b) => b.score-a.score || a.id-b.id).slice(0,12) };
   }
   async function searchCrm(query, options) {
-    const token=accountToken();
-    if(!token) return { reason:'session_required', rows:[] };
     const source=options&&typeof options==='object'?options:{};
     try {
-      const response=await fetch(new URL('/api/assistant/crm-search',apiOrigin()).toString(),{
-        method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+      const response=await authenticatedRequest(new URL('/api/assistant/crm-search',apiOrigin()).toString(),{
+        method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({query:String(query||'').slice(0,240),filters:source.filters||{},page:source.page||1,limit:12})
       });
+      if(!response) return { reason:'session_required', rows:[] };
       const payload=await response.json().catch(()=>({}));
-      if(!response.ok||payload.ok!==true) return { reason:payload.error==='owner_reference_unauthorized'?'session_required':'crm_unavailable',rows:[] };
+      if(!response.ok||payload.ok!==true) return { reason:payload.error==='owner_reference_unauthorized'?'session_required':'crm_unavailable',code:safeCode(payload.error),rows:[] };
       return { reason:'ok',rows:(Array.isArray(payload.results)?payload.results:[]).map(row=>({id:row.contact_id,name:row.display_name||'Sin nombre',district:row.district||'',service:row.latest_service||'',status:row.commercial_status||'frío',hits:Array.isArray(row.matched_fields)?row.matched_fields:[]})),pagination:payload.pagination||null };
-    } catch (_) { return { reason:'crm_unavailable',rows:[] }; }
+    } catch (_) { return { reason:'crm_unavailable',code:'crm_request_failed',rows:[] }; }
   }
   async function loadDossier(contactId) {
-    const token=accountToken();
-    if(!token) return {reason:'session_required'};
     try {
-      const response=await fetch(new URL('/api/assistant/crm-dossier',apiOrigin()).toString(),{
-        method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({contact_id:Number(contactId)})
+      const response=await authenticatedRequest(new URL('/api/assistant/crm-dossier',apiOrigin()).toString(),{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contact_id:Number(contactId)})
       });
+      if(!response) return {reason:'session_required'};
       const payload=await response.json().catch(()=>({}));
       if(!response.ok||payload.ok!==true) return {reason:payload.error==='owner_reference_unauthorized'?'session_required':'crm_unavailable'};
       if(payload.outcome!=='dossier_found'||!payload.dossier) return {reason:payload.outcome||'crm_unavailable'};
@@ -80,8 +110,12 @@
   }
   function renderResults(root, result) {
     const target = root.querySelector('[data-results]');
-    if (result.reason === 'session_required') { target.innerHTML='<p>Inicia sesión con el propietario autorizado para consultar el CRM.</p>'; return; }
-    if (result.reason === 'crm_unavailable') { target.innerHTML='<p>La consulta CRM no está disponible ahora. No se usó ningún fallback hacia otro entorno.</p>'; return; }
+    if (result.reason === 'session_required') {
+      target.innerHTML='<p>Inicia sesión con el propietario autorizado para consultar el CRM.</p><button data-open-account style="padding:8px 10px;border:1px solid #BFD9CE;border-radius:9px;background:#F0FAF5;color:#15684A;font-weight:800">Activar cuenta de Preview</button>';
+      target.querySelector('[data-open-account]').onclick=()=>{ root.remove(); if(typeof window.gfcOpenYarbiAccount==='function') window.gfcOpenYarbiAccount(); };
+      return;
+    }
+    if (result.reason === 'crm_unavailable') { target.innerHTML='<p>La consulta CRM no está disponible ahora. No se usó ningún fallback hacia otro entorno.</p><small style="display:block;color:#667085;margin-top:6px">Diagnóstico seguro: '+esc(result.code || 'crm_unavailable')+'</small>'; return; }
     target.innerHTML = result.rows.length ? result.rows.map(row => '<article class="gfc-pc-result"><b>'+esc(row.name)+'</b><br><small>'+esc([row.district,row.service,row.status].filter(Boolean).join(' · '))+' · coincidencias: '+esc(row.hits.join(', '))+'</small><br><button data-contact="'+esc(row.id)+'" style="margin-top:7px;padding:5px 7px;border:1px solid #D8E2E9;border-radius:7px;background:#fff;font-weight:800">Ver expediente</button></article>').join('') : '<p>No hay coincidencias en tu alcance CRM autorizado.</p>';
     target.querySelectorAll('[data-contact]').forEach(button=>button.onclick=()=>window.gfcOpenYarbiCrmDossier(button.dataset.contact));
   }

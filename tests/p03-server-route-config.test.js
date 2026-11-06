@@ -13,10 +13,10 @@ const ISOLATED_REF = 'uevilhbstnmmdlgyshlv';
 const DEPLOYMENT_HOST = 'p03-synthetic-preview.vercel.app';
 const routes = [
   { file: 'api/actions/approve.js', processor: 'none' },
-  { file: 'api/assistant/collections.js', processor: 'none' },
-  { file: 'api/assistant/command.js', processor: 'none' },
-  { file: 'api/assistant/preferences.js', processor: 'none' },
-  { file: 'api/assistant/scheduled-followups.js', processor: 'required' },
+  { file: 'api/assistant/collections.js', stagedFile: 'api_handlers/assistant/collections.js', processor: 'none' },
+  { file: 'api/assistant/command.js', stagedFile: 'api_handlers/assistant/command.js', processor: 'none' },
+  { file: 'api/assistant/preferences.js', stagedFile: 'api_handlers/assistant/preferences.js', processor: 'none' },
+  { file: 'api/assistant/scheduled-followups.js', stagedFile: 'api_handlers/assistant/scheduled-followups.js', processor: 'required' },
   { file: 'api/assistant/send-whatsapp.js', processor: 'optional' },
   { file: 'api/supabase-secure.js', processor: 'none' }
 ];
@@ -27,6 +27,10 @@ function configOptions(route, env) {
     requireProcessor: route.processor === 'required',
     optionalProcessor: route.processor === 'optional'
   };
+}
+
+function sourceFile(route) {
+  return route.stagedFile || route.file;
 }
 
 function isolatedEnv(overrides = {}) {
@@ -70,7 +74,7 @@ function responseCapture() {
 }
 
 function loadRoute(route) {
-  const file = path.join(ROOT, route.file);
+  const file = path.join(ROOT, sourceFile(route));
   if (!/\bexport default\b/.test(fs.readFileSync(file, 'utf8'))) {
     delete require.cache[file];
     return require(file);
@@ -124,11 +128,30 @@ test('P0.3.1: Preview exige una configuración funcional explícita e impide Pro
   }
 });
 
+test('F04: Preview de referencias aisladas acepta únicamente su política canónica', () => {
+  const ownerReferences = developmentEnv({
+    VERCEL_ENV: 'preview',
+    YARBI_PREVIEW_OWNER_REFERENCES_ONLY: 'true',
+    YARBI_PREVIEW_SUPABASE_PROJECT_REF: ISOLATED_REF,
+    SUPABASE_URL: `https://${ISOLATED_REF}.supabase.co`,
+    SUPABASE_SECRET_KEY: 'isolated-service-key-not-real-123456789012345678',
+    YARBI_TRACE_HMAC_KEY: 'trace-hmac-isolated-not-real-123456789012345678'
+  });
+  const valid = validateServerRouteConfig({ env: ownerReferences });
+  assert.equal(valid.ok, true);
+  const productionRef = validateServerRouteConfig({ env: { ...ownerReferences, YARBI_PREVIEW_SUPABASE_PROJECT_REF: 'haifktjvyhbsazmiyqps' } });
+  assert.equal(productionRef.ok, false);
+  assert.equal(productionRef.code, 'owner_reference_preview_project_is_production');
+  const external = validateServerRouteConfig({ env: { ...ownerReferences, NOTION_TOKEN: 'must-not-be-present' } });
+  assert.equal(external.ok, false);
+  assert.equal(external.code, 'owner_reference_preview_external_forbidden:NOTION_TOKEN');
+});
+
 test('P0.3.1: no hay fallback literal activo y la guardia se evalúa antes del primer efecto', () => {
   const forbidden = /process\.env\.SUPABASE_URL\s*\|\|\s*['"]https:\/\/haifktjvyhbsazmiyqps\.supabase\.co/;
   const forbiddenBackend = /process\.env\.(?:AI_PROCESSOR_URL|APP_ORIGIN)\s*\|\|[^\n]*misfinanzas-backend\.vercel\.app/;
   for (const route of routes) {
-    const source = fs.readFileSync(path.join(ROOT, route.file), 'utf8');
+    const source = fs.readFileSync(path.join(ROOT, sourceFile(route)), 'utf8');
     assert.doesNotMatch(source, forbidden, route.file + ': production Supabase fallback');
     assert.doesNotMatch(source, forbiddenBackend, route.file + ': production backend fallback');
     assert.match(source, /validateServerRouteConfig/, route.file + ': central policy import');
