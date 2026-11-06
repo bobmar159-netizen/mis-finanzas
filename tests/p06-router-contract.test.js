@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const assistantRoutes = Object.freeze({
-  chat: 'chat.js', collections: 'collections.js', command: 'command.js', 'crm-search': 'crm-search.js', 'live-token': 'live-token.js',
+  chat: 'chat.js', collections: 'collections.js', command: 'command.js', 'crm-dossier': 'crm-dossier.js', 'crm-search': 'crm-search.js', 'live-token': 'live-token.js',
   'owner-action': 'owner-action.js', 'owner-inbox': 'owner-inbox.js', preferences: 'preferences.js',
   'proactive-loop': 'proactive-loop.js', 'reference-candidates': 'reference-candidates.js', 'scheduled-followups': 'scheduled-followups.js'
 });

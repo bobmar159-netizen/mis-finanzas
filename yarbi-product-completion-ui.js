@@ -59,10 +59,23 @@
       return { reason:'ok',rows:(Array.isArray(payload.results)?payload.results:[]).map(row=>({id:row.contact_id,name:row.display_name||'Sin nombre',district:row.district||'',service:row.latest_service||'',status:row.commercial_status||'frío',hits:Array.isArray(row.matched_fields)?row.matched_fields:[]})),pagination:payload.pagination||null };
     } catch (_) { return { reason:'crm_unavailable',rows:[] }; }
   }
+  async function loadDossier(contactId) {
+    const token=accountToken();
+    if(!token) return {reason:'session_required'};
+    try {
+      const response=await fetch(new URL('/api/assistant/crm-dossier',apiOrigin()).toString(),{
+        method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({contact_id:Number(contactId)})
+      });
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok||payload.ok!==true) return {reason:payload.error==='owner_reference_unauthorized'?'session_required':'crm_unavailable'};
+      if(payload.outcome!=='dossier_found'||!payload.dossier) return {reason:payload.outcome||'crm_unavailable'};
+      return {reason:'ok',dossier:payload.dossier,timeline:Array.isArray(payload.timeline)?payload.timeline:[]};
+    } catch (_) { return {reason:'crm_unavailable'}; }
+  }
   function style() {
     if (document.getElementById('yarbi-product-completion-style')) return;
     const node = document.createElement('style'); node.id='yarbi-product-completion-style';
-    node.textContent = '.gfc-pc-launch{position:fixed;right:14px;bottom:84px;z-index:10002;border:1px solid #BFD9CE;border-radius:999px;background:#F0FAF5;color:#15684A;padding:9px 12px;font:800 12px Inter,Arial;box-shadow:0 5px 18px rgba(0,0,0,.12)}.gfc-pc-shade{position:fixed;inset:0;z-index:10030;background:rgba(15,23,42,.36);display:flex;align-items:flex-end}.gfc-pc-panel{width:100%;max-width:520px;max-height:88vh;overflow:auto;background:#fff;border-radius:20px 20px 0 0;margin:auto;padding:17px;font:14px Inter,Arial;color:#172033}.gfc-pc-panel h2{margin:0 0 4px;font-size:18px}.gfc-pc-panel p{color:#64748B;line-height:1.4}.gfc-pc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:13px 0}.gfc-pc-grid button,.gfc-pc-search button{padding:10px;border:1px solid #D8E2E9;border-radius:10px;background:#F8FBFC;color:#172033;font-weight:800}.gfc-pc-search{display:flex;gap:7px;margin:10px 0}.gfc-pc-search input{min-width:0;flex:1;padding:10px;border:1px solid #BFCFDB;border-radius:10px}.gfc-pc-result{padding:9px 0;border-top:1px solid #EEF1F3}.gfc-pc-result small{color:#667085}.gfc-pc-close{float:right;border:0;background:none;font-size:18px;cursor:pointer}';
+    node.textContent = '.gfc-pc-launch{position:fixed;right:14px;bottom:84px;z-index:10002;border:1px solid #BFD9CE;border-radius:999px;background:#F0FAF5;color:#15684A;padding:9px 12px;font:800 12px Inter,Arial;box-shadow:0 5px 18px rgba(0,0,0,.12)}.gfc-pc-shade{position:fixed;inset:0;z-index:10030;background:rgba(15,23,42,.36);display:flex;align-items:flex-end}.gfc-pc-panel{width:100%;max-width:520px;max-height:88vh;overflow:auto;background:#fff;border-radius:20px 20px 0 0;margin:auto;padding:17px;font:14px Inter,Arial;color:#172033}.gfc-pc-panel h2{margin:0 0 4px;font-size:18px}.gfc-pc-panel p{color:#64748B;line-height:1.4}.gfc-pc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:13px 0}.gfc-pc-grid button,.gfc-pc-search button,.gfc-pc-dossier-back{padding:10px;border:1px solid #D8E2E9;border-radius:10px;background:#F8FBFC;color:#172033;font-weight:800}.gfc-pc-search{display:flex;gap:7px;margin:10px 0}.gfc-pc-search input{min-width:0;flex:1;padding:10px;border:1px solid #BFCFDB;border-radius:10px}.gfc-pc-result{padding:9px 0;border-top:1px solid #EEF1F3}.gfc-pc-result small{color:#667085}.gfc-pc-close{float:right;border:0;background:none;font-size:18px;cursor:pointer}.gfc-pc-timeline{border-left:2px solid #D8E2E9;margin:13px 0 0 5px;padding-left:11px}.gfc-pc-event{padding:0 0 11px}.gfc-pc-event small{display:block;color:#667085;margin-top:2px}.gfc-pc-facts{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:12px 0}.gfc-pc-fact{padding:8px;border-radius:9px;background:#F8FBFC;color:#344054}.gfc-pc-fact b{display:block;color:#172033;font-size:11px;margin-bottom:2px}';
     document.head.appendChild(node);
   }
   function renderResults(root, result) {
@@ -71,6 +84,12 @@
     if (result.reason === 'crm_unavailable') { target.innerHTML='<p>La consulta CRM no está disponible ahora. No se usó ningún fallback hacia otro entorno.</p>'; return; }
     target.innerHTML = result.rows.length ? result.rows.map(row => '<article class="gfc-pc-result"><b>'+esc(row.name)+'</b><br><small>'+esc([row.district,row.service,row.status].filter(Boolean).join(' · '))+' · coincidencias: '+esc(row.hits.join(', '))+'</small><br><button data-contact="'+esc(row.id)+'" style="margin-top:7px;padding:5px 7px;border:1px solid #D8E2E9;border-radius:7px;background:#fff;font-weight:800">Ver expediente</button></article>').join('') : '<p>No hay coincidencias en tu alcance CRM autorizado.</p>';
     target.querySelectorAll('[data-contact]').forEach(button=>button.onclick=()=>window.gfcOpenYarbiCrmDossier(button.dataset.contact));
+  }
+  function dossierMarkup(result) {
+    const dossier=result.dossier||{};
+    const facts=[['Teléfono',dossier.phone],['Servicio',dossier.service],['Estado comercial',dossier.commercial_status],['Último paso',dossier.conversation_brief],['Ubicación',dossier.location||dossier.district],['Pendiente',Array.isArray(dossier.missing)&&dossier.missing.length?dossier.missing.join(', '):'Sin datos obligatorios pendientes']];
+    const timeline=(result.timeline||[]).map(event=>'<div class="gfc-pc-event"><b>'+esc(event.label||'Registro')+'</b><small>'+esc(event.at||'Sin fecha')+(event.detail?' · '+esc(event.detail):'')+'</small></div>').join('')||'<p>No hay historial verificable disponible todavía.</p>';
+    return '<button class="gfc-pc-dossier-back">← Volver a resultados</button><h2 style="margin-top:14px">'+esc(dossier.client_name||'Expediente')+'</h2><p>Expediente de solo lectura dentro del alcance del propietario autenticado.</p><div class="gfc-pc-facts">'+facts.filter(item=>item[1]).map(item=>'<div class="gfc-pc-fact"><b>'+esc(item[0])+'</b>'+esc(item[1])+'</div>').join('')+'</div><h3 style="font-size:14px;margin:16px 0 4px">Historial reciente</h3><div class="gfc-pc-timeline">'+timeline+'</div>';
   }
   function open() {
     style(); document.querySelector('.gfc-pc-shade')?.remove();
@@ -101,7 +120,13 @@
     const id=Number(contactId); if(!Number.isSafeInteger(id)||id<=0) return;
     if(typeof window.gfcOpenClientDossier==='function') return window.gfcOpenClientDossier(id);
     if(typeof window.openClientDossier==='function') return window.openClientDossier(id);
-    if(typeof window.toast==='function') window.toast('El expediente se abrirá desde CRM para el contacto seleccionado.','info');
+    style(); document.querySelector('.gfc-pc-shade')?.remove();
+    const root=document.createElement('div'); root.className='gfc-pc-shade'; root.innerHTML='<section class="gfc-pc-panel" role="dialog" aria-label="Expediente CRM"><button class="gfc-pc-close" aria-label="Cerrar">×</button><p>Cargando expediente autorizado…</p></section>'; document.body.appendChild(root);
+    root.querySelector('.gfc-pc-close').onclick=()=>root.remove(); root.addEventListener('click',event=>{if(event.target===root)root.remove();});
+    loadDossier(id).then(result=>{
+      const panel=root.querySelector('.gfc-pc-panel'); if(!panel||result.reason!=='ok'){ if(panel) panel.innerHTML='<button class="gfc-pc-close" aria-label="Cerrar">×</button><p>'+(result.reason==='session_required'?'Inicia sesión con el propietario autorizado para abrir el expediente.':'No se pudo abrir el expediente CRM. No se utilizó otro entorno.')+'</p>'; panel?.querySelector('.gfc-pc-close')?.addEventListener('click',()=>root.remove()); return; }
+      panel.innerHTML='<button class="gfc-pc-close" aria-label="Cerrar">×</button>'+dossierMarkup(result); panel.querySelector('.gfc-pc-close').onclick=()=>root.remove(); panel.querySelector('.gfc-pc-dossier-back').onclick=()=>{root.remove();open();};
+    });
   };
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
 })();

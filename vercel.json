@@ -16,6 +16,7 @@
     { "src": "/api/assistant/chat", "dest": "/api/assistant-router.js?__p06_route=chat" },
     { "src": "/api/assistant/collections", "dest": "/api/assistant-router.js?__p06_route=collections" },
     { "src": "/api/assistant/command", "dest": "/api/assistant-router.js?__p06_route=command" },
+    { "src": "/api/assistant/crm-dossier", "dest": "/api/assistant-router.js?__p06_route=crm-dossier" },
     { "src": "/api/assistant/crm-search", "dest": "/api/assistant-router.js?__p06_route=crm-search" },
     { "src": "/api/assistant/live-token", "dest": "/api/assistant-router.js?__p06_route=live-token" },
     { "src": "/api/assistant/owner-action", "dest": "/api/assistant-router.js?__p06_route=owner-action" },
