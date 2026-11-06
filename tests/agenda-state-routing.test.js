@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const command = fs.readFileSync(path.join(__dirname, '..', 'api', 'assistant', 'command.js'), 'utf8');
+const command = fs.readFileSync(path.join(__dirname, '..', 'api_handlers', 'assistant', 'command.js'), 'utf8');
 const deletion = fs.readFileSync(path.join(__dirname, '..', 'api', 'actions', 'approve.js'), 'utf8');
 
 test('agenda routing separates future construction from finalized service', () => {

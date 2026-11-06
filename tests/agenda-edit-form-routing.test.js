@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'api', 'assistant', 'command.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'api_handlers', 'assistant', 'command.js'), 'utf8');
 
 test('open agenda form is a trusted edit context, not a new agenda', () => {
   assert.match(source, /const pendingDraft = compactPendingDraft\(body\.pendingDraft\)/);

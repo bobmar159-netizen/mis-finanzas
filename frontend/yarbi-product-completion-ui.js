@@ -69,7 +69,7 @@
       const payload=await response.json().catch(()=>({}));
       if(!response.ok||payload.ok!==true) return {reason:payload.error==='owner_reference_unauthorized'?'session_required':'crm_unavailable'};
       if(payload.outcome!=='dossier_found'||!payload.dossier) return {reason:payload.outcome||'crm_unavailable'};
-      return {reason:'ok',dossier:payload.dossier,timeline:Array.isArray(payload.timeline)?payload.timeline:[]};
+      return {reason:'ok',dossier:payload.dossier,activities:payload.activities||null,timeline:Array.isArray(payload.timeline)?payload.timeline:[]};
     } catch (_) { return {reason:'crm_unavailable'}; }
   }
   function style() {
@@ -89,7 +89,8 @@
     const dossier=result.dossier||{};
     const facts=[['Teléfono',dossier.phone],['Servicio',dossier.service],['Estado comercial',dossier.commercial_status],['Último paso',dossier.conversation_brief],['Ubicación',dossier.location||dossier.district],['Pendiente',Array.isArray(dossier.missing)&&dossier.missing.length?dossier.missing.join(', '):'Sin datos obligatorios pendientes']];
     const timeline=(result.timeline||[]).map(event=>'<div class="gfc-pc-event"><b>'+esc(event.label||'Registro')+'</b><small>'+esc(event.at||'Sin fecha')+(event.detail?' · '+esc(event.detail):'')+'</small></div>').join('')||'<p>No hay historial verificable disponible todavía.</p>';
-    return '<button class="gfc-pc-dossier-back">← Volver a resultados</button><h2 style="margin-top:14px">'+esc(dossier.client_name||'Expediente')+'</h2><p>Expediente de solo lectura dentro del alcance del propietario autenticado.</p><div class="gfc-pc-facts">'+facts.filter(item=>item[1]).map(item=>'<div class="gfc-pc-fact"><b>'+esc(item[0])+'</b>'+esc(item[1])+'</div>').join('')+'</div><h3 style="font-size:14px;margin:16px 0 4px">Historial reciente</h3><div class="gfc-pc-timeline">'+timeline+'</div>';
+    const activities=result.activities||{}; const activityText=(rows,empty)=>Array.isArray(rows)&&rows.length?rows.slice(0,4).map(row=>'<div class="gfc-pc-event"><b>'+esc(row.service||row.type||'Actividad')+'</b><small>'+esc([row.date,row.time,row.state].filter(Boolean).join(' · '))+'</small></div>').join(''):('<p>'+esc(empty)+'</p>');
+    return '<button class="gfc-pc-dossier-back">← Volver a resultados</button><h2 style="margin-top:14px">'+esc(dossier.client_name||'Expediente')+'</h2><p>Expediente de solo lectura dentro del alcance del propietario autenticado.</p><div class="gfc-pc-facts">'+facts.filter(item=>item[1]).map(item=>'<div class="gfc-pc-fact"><b>'+esc(item[0])+'</b>'+esc(item[1])+'</div>').join('')+'</div><h3 style="font-size:14px;margin:16px 0 4px">Agenda y seguimiento</h3><div class="gfc-pc-facts"><div class="gfc-pc-fact"><b>Próximas</b>'+activityText(activities.upcoming,'Sin próximas actividades.')+'</div><div class="gfc-pc-fact"><b>Pendientes</b>'+activityText(activities.pending,'Sin pendientes.')+'</div></div><h3 style="font-size:14px;margin:16px 0 4px">Historial reciente</h3><div class="gfc-pc-timeline">'+timeline+'</div>';
   }
   function open() {
     style(); document.querySelector('.gfc-pc-shade')?.remove();

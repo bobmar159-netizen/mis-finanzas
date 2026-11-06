@@ -13,7 +13,11 @@ const frontend = path.join(root, 'frontend');
 const productionOrigin = 'https://misfinanzas-backend.vercel.app';
 
 function run(target, output, environment = {}, extraArgs = []) {
-  execFileSync(process.execPath, [build, `--target=${target}`, `--out=${output}`, ...extraArgs], { cwd: root, env: { ...process.env, ...environment }, stdio: 'pipe' });
+  const env = { ...process.env, ...environment };
+  // Cada caso controla explícitamente el origen Android; nunca hereda el de
+  // una terminal que estuviera preparando un build anterior.
+  if (target === 'android' && !Object.prototype.hasOwnProperty.call(environment, 'YARBI_ANDROID_API_ORIGIN')) delete env.YARBI_ANDROID_API_ORIGIN;
+  execFileSync(process.execPath, [build, `--target=${target}`, `--out=${output}`, ...extraArgs], { cwd: root, env, stdio: 'pipe' });
 }
 
 test('P0.2I: source preserves Android-only flows and backend owner inbox', () => {
