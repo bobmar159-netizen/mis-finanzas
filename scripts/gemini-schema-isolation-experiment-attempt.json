@@ -1,0 +1,11 @@
+{
+  "phase": "gemini_schema_isolation_experiment",
+  "state": "preview_request_dispatched",
+  "deployment_id": "dpl_3DYubXPHpzYWhZDZm3hJsGfg9BjZ",
+  "preview": "https://misfinanzas-backend-hbn29m0zt-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "fixture_id": "F3G-SERVICE",
+  "omitted_property": "generationConfig.responseJsonSchema",
+  "automatic_retries": 0,
+  "dispatched_at": "2026-11-03T05:05:51.596Z"
+}

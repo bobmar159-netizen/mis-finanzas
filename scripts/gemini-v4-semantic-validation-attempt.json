@@ -1,0 +1,45 @@
+{
+  "phase": "gemini_v4_semantic_validation",
+  "state": "preview_batch_dispatched",
+  "preview": "https://misfinanzas-backend-jgw4u05s9-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "fixture_count": 32,
+  "max_calls": 32,
+  "automatic_retries": 0,
+  "execute_false": true,
+  "local_preflight": [
+    {
+      "file": "test-yarbi-compact-understanding-local.cjs",
+      "ok": true,
+      "passed": 12,
+      "total": 12
+    },
+    {
+      "file": "test-yarbi-polarity-proposal-local.cjs",
+      "ok": true,
+      "passed": 18,
+      "total": 18
+    },
+    {
+      "file": "test-yarbi-v4-v1-integration-local.cjs",
+      "ok": true,
+      "passed": 15,
+      "total": 15
+    },
+    {
+      "file": "test-yarbi-v4-adapter-hardening-local.cjs",
+      "ok": true,
+      "passed": 14,
+      "total": 14
+    },
+    {
+      "file": "test-gemini-v4-semantic-validation-local.cjs",
+      "ok": true,
+      "passed": 5,
+      "total": 5
+    }
+  ],
+  "dispatched_at": "2026-11-04T04:19:06.366Z",
+  "credentials_persisted": false,
+  "utterances_persisted": false
+}

@@ -1,0 +1,65 @@
+{
+  "phase": "yarbi_v4_forensic_local",
+  "source_batch": {
+    "fixture_count": 32,
+    "semantic_pass": "18/32",
+    "provider_http_200": 32,
+    "critical_security_failures": 0,
+    "raw_provider_responses_persisted": false
+  },
+  "historical_failures": [
+    { "fixture_id": "F3V4G-02", "family": "correccion", "stage": "v4_hardener", "code": "proposed_mention_invalid" },
+    { "fixture_id": "F3V4G-05", "family": "continuidad", "stage": "semantic_assertions", "code": "v4_semantic_assertions_failed" },
+    { "fixture_id": "F3V4G-09", "family": "temporal", "stage": "v4_hardener", "code": "proposed_mention_invalid" },
+    { "fixture_id": "F3V4G-10", "family": "continuidad", "stage": "semantic_assertions", "code": "v4_semantic_assertions_failed" },
+    { "fixture_id": "F3V4G-13", "family": "correccion", "stage": "semantic_assertions", "code": "v4_semantic_assertions_failed" },
+    { "fixture_id": "F3V4G-15", "family": "correccion", "stage": "semantic_assertions", "code": "v4_semantic_assertions_failed" },
+    { "fixture_id": "F3V4G-16", "family": "temporal", "stage": "v4_hardener", "code": "proposed_mention_invalid" },
+    { "fixture_id": "F3V4G-17", "family": "correccion", "stage": "semantic_assertions", "code": "v4_semantic_assertions_failed" },
+    { "fixture_id": "F3V4F-04", "family": "temporal", "stage": "v4_hardener", "code": "proposed_mention_invalid" },
+    { "fixture_id": "F3V4F-07", "family": "continuidad", "stage": "v4_hardener", "code": "proposed_mention_invalid" },
+    { "fixture_id": "F3V4F-09", "family": "correccion", "stage": "v4_hardener", "code": "proposed_mention_invalid" },
+    { "fixture_id": "F3V4F-12", "family": "correccion", "stage": "semantic_assertions", "code": "v4_semantic_assertions_failed" },
+    { "fixture_id": "F3V4F-13", "family": "referencia", "stage": "semantic_assertions", "code": "v4_semantic_assertions_failed" },
+    { "fixture_id": "F3V4F-14", "family": "identificacion", "stage": "v4_hardener", "code": "proposed_mention_invalid" }
+  ],
+  "diagnostic_rules": [
+    {
+      "rule_id": "normalized_attribute_roundtrip",
+      "stage": "v4_hardener",
+      "field_paths": ["mentions[*].attributes.days", "mentions[*].attributes.day_part", "mentions[*].attributes.present"],
+      "status": "DEMONSTRATED_LOCAL",
+      "finding": "The validation route normalizes a provider result before handing it to the hardener; the normalized form flattens attributes while the strict validator expects them nested."
+    },
+    {
+      "rule_id": "correction_pairing_by_dimension",
+      "stage": "v4_hardener",
+      "field_paths": ["mentions[*].kind", "mentions[*].polarity", "control.correction"],
+      "status": "DEMONSTRATED_LOCAL",
+      "finding": "A correction must pair an affirmed and negated mention of the same comparable dimension, without rejecting independent mentions in other dimensions."
+    },
+    {
+      "rule_id": "mention_scoped_negation",
+      "stage": "v4_hardener",
+      "field_paths": ["mentions[*].polarity", "mentions[*].value"],
+      "status": "DEMONSTRATED_LOCAL",
+      "finding": "A negation directed at one mention must not render independent, source-verified mentions unusable."
+    },
+    {
+      "rule_id": "raw_provider_field_rejection",
+      "stage": "historical_provider_output",
+      "field_paths": [],
+      "status": "NOT_PROVEN",
+      "finding": "The evidence intentionally contains no raw provider response, so no historical provider field can be attributed with certainty."
+    }
+  ],
+  "local_regression": {
+    "suite": "test-yarbi-v4-forensic-regression-local.cjs",
+    "passed": 6,
+    "total": 6,
+    "network_calls": 0,
+    "commercial_actions": 0
+  },
+  "sensitive_data_persisted": false,
+  "external_calls_made_for_this_diagnostic": 0
+}

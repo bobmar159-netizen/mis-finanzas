@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "proxy": {
+    "entrypoint": "proxy.js",
+    "matcher": ["/api/:path*"]
+  }
+}

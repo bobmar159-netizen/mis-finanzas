@@ -1,0 +1,656 @@
+
+> mis-finanzas-app@1.0.0 test:unit
+> node --test tests/daily-close.test.js tests/fast-read-path.test.js tests/greeting-first.test.js tests/habit-learning.test.js tests/latency-stages.test.js tests/mentor-briefing.test.js tests/operational-cycle.test.js tests/proactive-alerts.test.js tests/processing-status.test.js tests/visual-status-chips.test.js
+
+✔ daily close: lists only due unconfirmed agenda records and asks one at a time (1.5792ms)
+✖ daily close: behavior excludes future and already completed records (14.6657ms)
+✔ daily close: behavior requires a clear answer for each outcome (1.5197ms)
+✔ daily close: updates an exact agenda id only after explicit verbal evidence (0.5154ms)
+✖ daily close: waits for canonical Supabase confirmation and reports pending sync honestly (2.5911ms)
+✔ fast read: exact client queries use local structured data before cache and Supabase (1.5416ms)
+✖ fast read: all structured tiers declare that raw history was not used (1.3018ms)
+✖ fast read: raw WhatsApp fallback runs only after structured memory misses (5.3962ms)
+✔ fast read: a stale local mirror responds immediately and refreshes in background (0.7917ms)
+✔ greeting: manual Live activation requests one initial greeting (2.8287ms)
+✖ greeting: startup phrase is short and contains no date, time or old task (1.2049ms)
+✔ greeting: recovery never generates a new startup greeting (1.3566ms)
+✔ greeting: greeting turn is not stored as conversational memory (0.7808ms)
+✔ habits: accepts only traceable outgoing evidence (2.1322ms)
+✔ habits: rejects weak, unsupported or incoming-only guesses (0.1797ms)
+✔ habits: frontend requires explicit yes before permanent instruction (11.0709ms)
+✔ latency: diagnostics expose the eight required interaction stages (3.0424ms)
+✔ latency: client resolution and Supabase timing wrap real data access (1.8244ms)
+✔ latency: processing, generation, first audio and playback have independent markers (2.0291ms)
+✔ latency: instrumentation remains diagnostic and does not alter VAD decisions (0.4411ms)
+✔ latency: client lookup prioritizes structured memory before message scans (0.5871ms)
+✖ mentor: uses a deterministic read-only briefing before advice (3.6385ms)
+✔ mentor: briefing labels evidence and never executes a prepared action (0.7145ms)
+✔ cycle: agenda exposes planned, actual and next action independently (1.854ms)
+✔ cycle: a planned date never proves execution (0.4916ms)
+✖ proactive alerts: prioritizes balances and due unconfirmed work (2.4337ms)
+✖ proactive alerts: location without linked agenda is a signal, not a completed visit (1.0829ms)
+✖ proactive alerts: an availability conflict is a high-priority reprogramming prompt, never an automatic change (0.8471ms)
+✖ proactive alerts: proactive scope emits at most one unseen alert per session (0.9526ms)
+✔ proactive alerts: visual strip is silent and live rule forbids alerts in the greeting (2.1648ms)
+✔ processing status: structured reads are labeled as consultation, not reprocessing (1.6022ms)
+✔ processing status: write-capable tools use a distinct execution label (0.8781ms)
+✖ processing status: manual update downloads the mirror and never starts AI analysis (1.7732ms)
+✖ processing status: real background work remains visible as background (1.6796ms)
+✔ visual chips: completed visit is shown as Visitado (2.9964ms)
+✔ visual chips: completed work and pending balance are both visible (2.0773ms)
+✔ visual chips: Agenda and CRM reuse the same renderer (2.1186ms)
+✔ visual chips: a completed visit counts as executed in the operational cycle (0.304ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 26
+ℹ fail 12
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 146.3937
+
+✖ failing tests:
+
+test at tests\daily-close.test.js:33:1
+✖ daily close: behavior excludes future and already completed records (14.6657ms)
+  ReferenceError: gfcYarbiConversationInboxRead is not defined
+      at Object.gfcBuildDailyClose (evalmachine.<anonymous>:48:31)
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\daily-close.test.js:40:26)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+
+test at tests\daily-close.test.js:65:1
+✖ daily close: waits for canonical Supabase confirmation and reports pending sync honestly (2.5911ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /telefono/. Input:
+  
+  'async function gfcRecordDailyOutcome(args) {\n' +
+    "  const agendaId = String(args?.agenda_id || '').trim();\n" +
+    "  const outcome = String(args?.outcome || '').toLowerCase();\n" +
+    "  const allowed = new Set(['completed', 'reprogrammed', 'cancelled', 'not_done']);\n" +
+    "  if (!agendaId || !allowed.has(outcome)) return { ok: false, error: 'invalid_daily_outcome' };\n" +
+    "  const item = (state.agenda || []).find(item => String(item?.id || '') === agendaId);\n" +
+    "  if (!item) return { ok: false, error: 'agenda_id_not_found' };\n" +
+    '  const cycleBefore = gfcAgendaOperationalCycle(item);\n' +
+    '  const inputText = gfcDailyCloseInputText();\n' +
+    '  if (!gfcDailyCloseOutcomeSupported(outcome, inputText)) {\n' +
+    "    return { ok: false, error: 'explicit_confirmation_required', instruction: 'No cambies la agenda. Pide una respuesta clara sobre este evento.' };\n" +
+    '  }\n' +
+    '\n' +
+    "  const previousDate = String(item.fecha || '');\n" +
+    "  if (outcome === 'reprogrammed') {\n" +
+    "    const newDate = String(args?.new_date || '').slice(0, 10);\n" +
+    '    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(newDate) || newDate < gfcLimaClock().date) {\n' +
+    "      return { ok: false, error: 'valid_future_date_required', instruction: 'Pregunta la nueva fecha antes de modificar la agenda.' };\n" +
+    '    }\n' +
+    "    const motivoReprogramacion = String(args?.reason || 'Reprogramado durante el cierre diario').slice(0, 240);\n" +
+    '    const opened = gfcRequestYarbiAgendaConfirmation({\n' +
+    "      intent: 'update_agenda', action_type: 'reprogramar', agenda_id: agendaId,\n" +
+    "      client_name: item.cliente || '', phone: item.telefono || '', date: newDate,\n" +
+    "      time: String(args?.new_time || item.hora || '').slice(0, 5), new_status: 'reprogramado',\n" +
+    '      description: motivoReprogramacion\n' +
+    '    });\n' +
+    "    return { ok: true, agenda_id: agendaId, outcome, form_opened: true, saved: false, previous_date: previousDate, new_date: newDate, instruction: opened.reply + ' No afirmes que fue reprogramado hasta que el Maestro diga guardalo.' };\n" +
+    '  }\n' +
+    "  if (cycleBefore.actual.status !== 'unconfirmed') {\n" +
+    "    return { ok: false, error: 'outcome_already_confirmed', current_status: cycleBefore.actual.status, instruction: 'Si el Maestro desea corregir o reabrir este registro, usa prepare_confirmed_action para abrir el formulario de edición.' };\n" +
+    '  }\n' +
+    "  item.estado = outcome === 'completed' ? 'se_finalizo' : outcome === 'cancelled' ? 'se_desanimo' : 'seguimiento';\n" +
+    '  item.resultadoConfirmadoEn = new Date().toISOString();\n' +
+    "  item.resultadoConfirmadoPor = 'yarbi_daily_close';\n" +
+    '\n' +
+    "  save('fnz_agenda', state.agenda);\n" +
+    "  const sheetsUrl = localStorage.getItem('fnz_sheets_url') || '';\n" +
+    "  if (sheetsUrl && typeof _sendToSheets === 'function') {\n" +
+    "    _sendToSheets(sheetsUrl, { type: 'agenda_estado', agenda_estado: { id: item.id, estado: item.estado, estadoPago: item.estadoPago || '-', montoPagado: item.montoPagado || 0, montoPendienteCobro:item.montoPendienteCobro || 0, tipo:item.tipo, fechaReprogramado:item.fechaReprogramado || '' } });\n" +
+    '  }\n' +
+    '\n' +
+    '  const remoteSynced = await gfcSyncAgendaItemToSupabase(item.id, item, { silent: true });\n' +
+    "  if (localStorage.getItem('fnz_notion_token') && localStorage.getItem('fnz_notion_dbid_clientes') && typeof _pushToNotionClientes === 'function') {\n" +
+    "    void _pushToNotionClientes(item).catch(error => gfcChatDiag('daily-close-notion-pending', { agendaId, message: error?.message || String(error) }));\n" +
+    '  }\n' +
+    '  void gfcAgentAuditEvent({\n' +
+    "    module: 'agenda',\n" +
+    "    action_type: 'daily_close_' + outcome,\n" +
+    "    status: remoteSynced ? 'executed' : 'pending_sync',\n" +
+    "    target_type: 'agenda',\n" +
+    '    target_id: agendaId,\n' +
+    '    confirmation_required: true,\n' +
+    '    request_payload: { agenda_id: agendaId, outcome, new_date: args?.new_date || null, new_time: args?.new_time || null },\n' +
+    '    result_payload: { persisted_local: true, persisted_remote: remoteSynced }\n' +
+    '  });\n' +
+    "  if (typeof render === 'function') render();\n" +
+    '  const next = gfcBuildDailyClose();\n' +
+    "  const agreedTotal = outcome === 'completed' ? gfcAgendaAgreedTotal(item) : 0;\n" +
+    '  return {\n' +
+    '    ok: true,\n' +
+    '    agenda_id: agendaId,\n' +
+    '    outcome,\n' +
+    '    persisted_local: true,\n' +
+    '    persisted_remote: remoteSynced,\n' +
+    "    persistence_status: remoteSynced ? 'synced' : 'pending_sync',\n" +
+    "    collection_prompt: outcome === 'completed' && agreedTotal > 0\n" +
+    "      ? { required: true, agenda_id: agendaId, agreed_amount: agreedTotal, question: '¿Se cobró todo o quedó algún saldo?' }\n" +
+    '      : null,\n' +
+    '    next: next.current,\n' +
+    '    remaining_count: next.pending_count,\n' +
+    '    instruction: remoteSynced\n' +
+    "      ? 'Confirma brevemente el resultado y, si next existe, pregunta solo por ese evento.'\n" +
+    "      : 'Di que quedó guardado localmente y pendiente de sincronizar; no afirmes que Supabase lo confirmó.'\n" +
+    '  };\n' +
+    '}\n' +
+    '\n'
+  
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\daily-close.test.js:72:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "async function gfcRecordDailyOutcome(args) {\n  const agendaId = String(args?.agenda_id || '').trim();\n  const outcome = String(args?.outcome || '').toLowerCase();\n  const allowed = new Set(['completed', 'reprogrammed', 'cancelled', 'not_done']);\n  if (!agendaId || !allowed.has(outcome)) return { ok: false, error: 'invalid_daily_outcome' };\n  const item = (state.agenda || []).find(item => String(item?.id || '') === agendaId);\n  if (!item) return { ok: false, error: 'agenda_id_not_found' };\n  const cycleBefore = gfcAgendaOperationalCycle(item);\n  const inputText = gfcDailyCloseInputText();\n  if (!gfcDailyCloseOutcomeSupported(outcome, inputText)) {\n    return { ok: false, error: 'explicit_confirmation_required', instruction: 'No cambies la agenda. Pide una respuesta clara sobre este evento.' };\n  }\n\n  const previousDate = String(item.fecha || '');\n  if (outcome === 'reprogrammed') {\n    const newDate = String(args?.new_date || '').slice(0, 10);\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(newDate) || newDate < gfcLimaClock().date) {\n      return { ok: false, error: 'valid_future_date_required', instruction: 'Pregunta la nueva fecha antes de modificar la agenda.' };\n    }\n    const motivoReprogramacion = String(args?.reason || 'Reprogramado durante el cierre diario').slice(0, 240);\n    const opened = gfcRequestYarbiAgendaConfirmation({\n      intent: 'update_agenda', action_type: 'reprogramar', agenda_id: agendaId,\n      client_name: item.cliente || '', phone: item.telefono || '', date: newDate,\n      time: String(args?.new_time || item.hora || '').slice(0, 5), new_status: 'reprogramado',\n      description: motivoReprogramacion\n    });\n    return { ok: true, agenda_id: agendaId, outcome, form_opened: true, saved: false, previous_date: previousDate, new_date: newDate, instruction: opened.reply + ' No afirmes que fue reprogramado hasta que el Maestro diga guardalo.' };\n  }\n  if (cycleBefore.actual.status !== 'unconfirmed') {\n    return { ok: false, error: 'outcome_already_confirmed', current_status: cycleBefore.actual.status, instruction: 'Si el Maestro desea corregir o reabrir este registro, usa prepare_confirmed_action para abrir el formulario de edición.' };\n  }\n  item.estado = outcome === 'completed' ? 'se_finalizo' : outcome === 'cancelled' ? 'se_desanimo' : 'seguimiento';\n  item.resultadoConfirmadoEn = new Date().toISOString();\n  item.resultadoConfirmadoPor = 'yarbi_daily_close';\n\n  save('fnz_agenda', state.agenda);\n  const sheetsUrl = localStorage.getItem('fnz_sheets_url') || '';\n  if (sheetsUrl && typeof _sendToSheets === 'function') {\n    _sendToSheets(sheetsUrl, { type: 'agenda_estado', agenda_estado: { id: item.id, estado: item.estado, estadoPago: item.estadoPago || '-', montoPagado: item.montoPagado || 0, montoPendienteCobro:item.montoPendienteCobro || 0, tipo:item.tipo, fechaReprogramado:item.fechaReprogramado || '' } });\n  }\n\n  const remoteSynced = await gfcSyncAgendaItemToSupabase(item.id, item, { silent: true });\n  if (localStorage.getItem('fnz_notion_token') && localStorage.getItem('fnz_notion_dbid_clientes') && typeof _pushToNotionClientes === 'function') {\n    void _pushToNotionClientes(item).catch(error => gfcChatDiag('daily-close-notion-pending', { agendaId, message: error?.message || String(error) }));\n  }\n  void gfcAgentAuditEvent({\n    module: 'agenda',\n    action_type: 'daily_close_' + outcome,\n    status: remoteSynced ? 'executed' : 'pending_sync',\n    target_type: 'agenda',\n    target_id: agendaId,\n    confirmation_required: true,\n    request_payload: { agenda_id: agendaId, outcome, new_date: args?.new_date || null, new_time: args?.new_time || null },\n    result_payload: { persisted_local: true, persisted_remote: remoteSynced }\n  });\n  if (typeof render === 'function') render();\n  const next = gfcBuildDailyClose();\n  const agreedTotal = outcome === 'completed' ? gfcAgendaAgreedTotal(item) : 0;\n  return {\n    ok: true,\n    agenda_id: agendaId,\n    outcome,\n    persisted_local: true,\n    persisted_remote: remoteSynced,\n    persistence_status: remoteSynced ? 'synced' : 'pending_sync',\n    collection_prompt: outcome === 'completed' && agreedTotal > 0\n      ? { required: true, agenda_id: agendaId, agreed_amount: agreedTotal, question: '¿Se cobró todo o quedó algún saldo?' }\n      : null,\n    next: next.current,\n    remaining_count: next.pending_count,\n    instruction: remoteSynced\n      ? 'Confirma brevemente el resultado y, si next existe, pregunta solo por ese evento.'\n      : 'Di que quedó guardado localmente y pendiente de sincronizar; no afirmes que Supabase lo confirmó.'\n  };\n}\n\n",
+    expected: /telefono/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at tests\fast-read-path.test.js:23:1
+✖ fast read: all structured tiers declare that raw history was not used (1.3018ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  6 !== 4
+  
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\fast-read-path.test.js:29:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 6,
+    expected: 4,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\fast-read-path.test.js:32:1
+✖ fast read: raw WhatsApp fallback runs only after structured memory misses (5.3962ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(block.indexOf('gfcFetchProcessedYarbiMemory') < block.indexOf('gfcFetchCloudWhatsAppMessages'))
+  
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\fast-read-path.test.js:36:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests\greeting-first.test.js:14:1
+✖ greeting: startup phrase is short and contains no date, time or old task (1.2049ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Hola, Omar\. Te escucho\./. Input:
+  
+  'function gfcYarbiInitialGreeting() {\n' +
+    "  return 'Hola, Omar. ¿En qué te puedo ayudar?';\n" +
+    '}\n' +
+    '\n'
+  
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\greeting-first.test.js:18:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "function gfcYarbiInitialGreeting() {\n  return 'Hola, Omar. ¿En qué te puedo ayudar?';\n}\n\n",
+    expected: /Hola, Omar\. Te escucho\./,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests\mentor-briefing.test.js:8:1
+✖ mentor: uses a deterministic read-only briefing before advice (3.6385ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /if \(name === 'get_mentor_briefing'\) return gfcBuildMentorBriefing\(\)/. Input:
+  
+  '<!DOCTYPE html>\n' +
+    '<html lang="es">\n' +
+    '<head>\n' +
+    '<meta charset="UTF-8">\n' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">\n' +
+    '<meta name="apple-mobile-web-app-capable" content="yes">\n' +
+    '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n' +
+    '<meta name="theme-color" content="#6C3483">\n' +
+    '<title>Mis Finanzas</title>\n' +
+    '<link rel="manifest" href="manifest.json">\n' +
+    '<script>\n' +
+    "  if ('serviceWorker' in navigator) {\n" +
+    "    window.addEventListener('load', () => {\n" +
+    "      navigator.serviceWorker.register('service-worker.js')\n" +
+    "        .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))\n" +
+    "        .catch(err => console.error('Error al registrar el Service Worker:', err));\n" +
+    '      });\n' +
+    '  }\n' +
+    '</script>\n' +
+    '<link rel="preconnect" href="https://fonts.googleapis.com">\n' +
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n' +
+    '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">\n' +
+    '<link rel="preconnect" href="https://cdnjs.cloudflare.com">\n' +
+    '<style>\n' +
+    ':root {\n' +
+    '  --gold:#546878;--gold2:#6A8494;--red:#D94040;--green:#546878;--blue:#2E73AB;\n' +
+    '  --bg:#F2F5F8;--card:#FFFFFF;--border:#D0DDE6;--text:#1A2C35;--muted:#6E8FA0;--dim:#A3BCC9;\n' +
+    '  --ing-color:#546878;--ing-bg:#EBF1F5;--ing-text:#2A4455;\n' +
+    '  --gas-orange:#F47C3C;--gas-orange-bg:#FFF2EA;--gas-blue:#546878;--gas-blue-bg:#EBF1F5;\n' +
+    '}\n' +
+    '\n' +
+    '/* ── 6 TEMAS — variables CSS completas ── */\n' +
+    '#app.tema-oceano {\n' +
+    '  --gold:#546878;--gold2:#6A8494;--red:#D94040;--green:#546878;--blue:#2E73AB;\n' +
+    '  --bg:#EDF3F6;--card:#FFFFFF;--border:#C5D8E4;--text:#0E2530;--muted:#5A8499;--dim:#8AAFBE;\n' +
+    '  --ing-color:#546878;--ing-bg:#E4EEF4;--ing-text:#1E3D4F;\n' +
+    '}\n' +
+    '#app.tema-ambar {\n' +
+    '  --gold:#854F0B;--gold2:#EF9F27;--red:#C62828;--green:#0F6E56;--blue:#185FA5;\n' +
+    '  --bg:#FFF8F0;--card:#FFFFFF;--border:#E8C88044;--text:#2C1A00;--muted:#BA7517;--dim:#EF9F27;\n' +
+    '  --ing-color:#854F0B;--ing-bg:#FAEEDA;--ing-text:#633806;\n' +
+    '}\n' +
+    '#app.tema-ambar .mv-card{border-left:3px solid #EF9F27;border-radius:0 14px 14px 0}\n' +
+    '#app.tema-ambar .mv-card.open{border-left-color:#854F0B}\n' +
+    '#app.tema-noche {\n' +
+    '  --gold:#9F5AE5;--gold2:#7C3AED;--red:#EF5350;--green:#1D9E75;--blue:#378ADD;\n' +
+    '  --bg:#0F0F1A;--card:#1A1A2E;--border:#534AB744;--text:#E8E6FF;--muted:#7F77DD;--dim:#534AB7;\n' +
+    '  --ing-color:#9FE1CB;--ing-bg:#1E2A3A;--ing-text:#CECBF6;\n' +
+    '}\n' +
+    '#app.tema-noche #header{background:#0F0F1A}\n' +
+    '#app.tema-noche .modal{background:#1A1A2E;border-color:#534AB744}\n' +
+    '#app.tema-noche .card{background:#1A1A2E;border-color:#534AB744}\n' +
+    '#app.tema-noche .mv-card{background:#1A1A2E;border-color:#534AB744}\n' +
+    '#app.tema-noche .field input,#app.tema-noche .field select,#app.tema-noche .field textarea{background:#262640;border-color:#534AB766;color:#E8E6FF}\n' +
+    '#app.tema-noche .modo-toggle{background:#262640}\n' +
+    '#app.tema-rosa {\n' +
+    '  --gold:#993556;--gold2:#D4537E;--red:#C62828;--green:#0F6E56;--blue:#185FA5;\n' +
+    '  --bg:#FDF0F5;--card:#FFFFFF;--border:#F4C0D144;--text:#2C0A18;--muted:#D4537E;--dim:#ED93B1;\n' +
+    '  --ing-color:#993556;--ing-bg:#FBEAF0;--ing-text:#72243E;\n' +
+    '}\n' +
+    '#app.tema-rosa .mv-card{border-radius:24px}\n' +
+    '#app.tema-rosa .mv-icon-box{border-radius:50%}\n' +
+    '#app.tema-rosa .card{border-radius:24px}\n' +
+    '#app.tema-slate {\n' +
+    '  --gold:#3B6D11;--gold2:var(--gold);--red:#A32D2D;--green:#0F6E56;--blue:#185FA5;\n' +
+    '  --bg:#F5F5F0;--card:#FFFFFF;--border:#D3D1C7;--text:#2C2C2A;--muted:#5F5E5A;--dim:#B4B2A9;\n' +
+    '  --ing-color:#3B6D11;--ing-bg:#EBF1F5;--ing-text:#2A4455;\n' +
+    '}\n' +
+    '#app.tema-slate .mv-card{border:none;border-bottom:2px solid #D3D1C7;border-radius:4px;background:transparent}\n' +
+    '#app.tema-slate .mv-card.open{border-bottom-color:var(--gold)}\n' +
+    '\n' +
+    '/* Graficos: estilo Notion compacto */\n' +
+    '.gfc-notion{\n' +
+    '  --gfc-ink:var(--text,#2F302D);\n' +
+    '  --gfc-muted:var(--muted,#74756F);\n' +
+    '  --gfc-line:var(--border,#E6E4DF);\n' +
+    '  --gfc-soft:var(--surface,#F7F7F5);\n' +
+    '  --gfc-soft-2:var(--surface-2,#EBEAE7);\n' +
+    '  --gfc-sage:var(--sage,#EEF6F1);\n' +
+    '  --gfc-sage-ink:var(--ing-color,#4F7F67);\n' +
+    '  --gfc-blue:var(--sky,#EEF4FA);\n' +
+    '  --gfc-blue-ink:var(--blue,#4F7EA8);\n' +
+    '  --gfc-warm:var(--peach,#F8EFE6);\n' +
+    '  --gfc-warm-ink:var(--gas-orange,#B07B52);\n' +
+    '  color:var(--gfc-ink);\n' +
+    '}\n' +
+    '.gfc-notion,\n' +
+    '.gfc-notion *{\n' +
+    '  font-family:Inter,Roboto,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;\n' +
+    '  letter-spacing:0 !important;\n' +
+    '  box-shadow:none !important;\n' +
+    '}\n' +
+    '.gfc-notion [style*="Playfair Display"]{font-family:Inter,Roboto,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important}\n' +
+    '.gfc-notion [style*="font-weight:950"]{font-weight:720 !important}\n' +
+    '.gfc-notion [style*="font-weight:900"]{font-weight:700 !important}\n' +
+    '.gfc-notion [style*="font-weight:850"]{font-weight:680 !important}\n' +
+    '.gfc-notion [style*="font-size:25px"]{font-size:22px !important;font-weight:760 !important;line-height:1.08 !important}\n' +
+    '.gfc-notion [style*="font-size:22px"]{font-size:17px !important;font-weight:700 !important}\n' +
+    '.gfc-notion [style*="font-size:19px"]{font-size:16px !important;font-weight:700 !important}\n' +
+    '.gfc-notion [style*="font-size:18px"]{font-size:15px !important;font-weight:700 !important}\n' +
+    '.gfc-notion [style*="font-size:17px"]{font-size:15px !important;font-weight:700 !important}\n' +
+    '.gfc-notion [style*="font-size:16px"]{font-size:14px !important}\n' +
+    '.gfc-notion [style*="font-size:13px"]{font-size:12px !important}\n' +
+    '.gfc-notion [style*="font-size:12px"]{font-size:11px !important}\n' +
+    '.gfc-notion [style*="font-size:11px"]{font-size:10.5px !important}\n' +
+    '.gfc-notion [style*="font-size:10px"]{font-size:10px !important}\n' +
+    '.gfc-notion [style*="background:#FFFFFF"],\n' +
+    '.gfc-notion [style*="background:#fff"]{background:var(--card,#FFFFFF) !important}\n' +
+    '.gfc-notion [style*="background:#F8FAFC"],\n' +
+    '.gfc-notion [style*="background:#F1F5F9"]{background:var(--gfc-soft) !important}\n' +
+    '.gfc-notion [style*="background:#EFF6FF"],\n' +
+    '.gfc-notion [style*="background:#DBEAFE"]{background:var(--gfc-blue) !important}\n' +
+    '.gfc-notion [style*="background:#ECFDF5"],\n' +
+    '.gfc-notion [style*="background:#F0FDF4"]{background:var(--gfc-sage) !important}\n' +
+    '.gfc-notion [style*="background:#FFF7ED"],\n' +
+    '.gfc-notion [style*="background:#FEF2F2"]{background:var(--gfc-warm) !important}\n' +
+    '.gfc-notion [style*="border:1px solid #E5E7EB"],\n' +
+    '.gfc-notion [style*="border:1px solid #E2E8F0"],\n' +
+    '.gfc-notion [style*="border:1px solid #EEF2F7"],\n' +
+    '.gfc-notion [style*="border:1px solid #BFDBFE"],\n' +
+    '.gfc-notion [style*="border:1px solid #BBF7D0"],\n' +
+    '.gfc-notion [style*="border:1px solid #FED7AA"]{border-color:var(--gfc-line) !important}\n' +
+    '.gfc-notion [style*="border-radius:8px"]{border-radius:10px !important}\n' +
+    '.gfc-notion [style*="border-radius:12px"]{border-radius:12px !important}\n' +
+    '.gfc-notion [style*="border-radius:999px"]{border-radius:999px !important}\n' +
+    '.gfc-notion [style*="padding:14px"]{padding:12px !important}\n' +
+    '.gfc-notion [style*="padding:12px"]{padding:11px !important}\n' +
+    '.gfc-notion [style*="padding:10px"]{padding:9px !important}\n' +
+    '.gfc-notion [style*="margin-bottom:13px"],\n' +
+    '.gfc-notion [style*="margin-bottom:12px"]{margin-bottom:10px !important}\n' +
+    '.gfc-notion [style*="gap:12px"]{gap:9px !important}\n' +
+    '.gfc-notion button{\n' +
+    '  border-color:var(--gfc-line) !important;\n' +
+    '  border-radius:10px !important;\n' +
+    '  background:var(--card,#FFFFFF) !important;\n' +
+    '  color:var(--gfc-ink) !important;\n' +
+    '}\n' +
+    '.gfc-notion button[style*="background:#111827"]{\n' +
+    '  background:var(--gfc-sage) !important;\n' +
+    '  border-color:#CFE5DA !important;\n' +
+    '}\n' +
+    '.gfc-notion button[style*="background:#111827"] *,\n' +
+    '.gfc-notion button[style*="background:#111827"] [style*="color:#FFFFFF"],\n' +
+    '.gfc-notion button[style*="background:#111827"] [style*="color:#E5E7EB"]{\n' +
+    '  color:var(--gfc-sage-ink) !important;\n' +
+    '}\n' +
+    '.gfc-notion [style*="background:#111827"]{background:var(--gfc-sage) !important}\n' +
+    '.gfc-notion [style*="color:#111827"]{color:var(--gfc-ink) !important}\n' +
+    '.gfc-notion [style*="color:#64748B"],\n' +
+    '.gfc-notion [style*="color:#94A3B8"],\n' +
+    '.gfc-notion [style*="color:#475569"],\n' +
+    '.gfc-notion [style*="color:#CBD5E1"]{color:var(--gfc-muted) !important}\n' +
+    '.gfc-notion [style*="color:#047857"],\n' +
+    '.gfc-notion [style*="color:#0F766E"],\n' +
+    '.gfc-notion [style*="color:#065F46"]{color:var(--gfc-sage-ink) !important}\n' +
+    '.gfc-notion [style*="color:#1D4ED8"]{color:var(--gfc-blue-ink) !important}\n' +
+    '.gfc-notion [style*="color:#B91C1C"],\n' +
+    '.gfc-notion [style*="color:#C62828"]{color:var(--red,#C75F5F) !important}\n' +
+    '.gfc-notion [style*="color:#9A3412"],\n' +
+    '.gfc-notion [style*="color:#B45309"]{color:var(--gfc-warm-ink) !important}\n' +
+    '.gfc-notion [style*="background:#2563EB"]{background:var(--gfc-blue-ink) !important}\n' +
+    '.gfc-notion [style*="background:#F97316"],\n' +
+    '.gfc-notion [style*="background:#D97706"]{background:var(--gfc-warm-ink) !important}\n' +
+    '.gfc-notion [style*="background:#0F766E"],\n' +
+    '.gfc-notion [style*="background:#059669"]{background:var(--gfc-sage-ink) !important}\n' +
+    '.gfc-notion [style*="height:9px"],\n' +
+    '.gfc-notion [style*="height:10px"]{height:7px !important}\n' +
+    '.gfc-notion [style*="height:7px"]{height:6px !important}\n' +
+    '.gfc-notion [style*="border-left:3px"]{border-left-width:2px !important}\n' +
+    '.gfc-notion [style*="width:88px;height:88px"]{width:74px !important;height:74px !important}\n' +
+    '.gfc-notion svg[width="88"]{width:74px !important;height:74px !important}\n' +
+    '.gfc-notion .app-icon{stroke-width:1.7 !important}\n' +
+    '\n' +
+    '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}\n' +
+    'html,body{height:100%;overflow:hidden;background:var(--bg);}\n' +
+    "body{font-family:'Inter','Roboto',sans-serif;color:var(--text)}\n" +
+    '::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:4px}\n' +
+    '#app{height:100vh;display:flex;flex-direction:column;width:100%;max-width:430px;margin:0 auto;overflow:hidden}\n' +
+    '#header{background:var(--bg);border-bottom:1px solid var(--border);padding:16px 20px 0;flex-shrink:0}\n' +
+    '.gfc-alert-select-box{width:24px;height:24px;border:1.5px solid #CBD5E1;border-radius:8px;background:#fff;display:none;align-items:center;justify-content:center;flex:0 0 24px;color:#fff;font-size:15px;font-weight:900;box-sizing:border-box}\n' +
+    '.gfc-alert-selection-mode .gfc-alert-select-box{display:flex}\n' +
+    '.g'... 2734226 more characters
+  
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\mentor-briefing.test.js:11:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n<meta name="theme-color" content="#6C3483">\n<title>Mis Finanzas</title>\n<link rel="manifest" href="manifest.json">\n<script>\n  if ('serviceWorker' in navigator) {\n    window.addEventListener('load', () => {\n      navigator.serviceWorker.register('service-worker.js')\n        .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))\n        .catch(err => console.error('Error al registrar el Service Worker:', err));\n      });\n  }\n</script>\n<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">\n<link rel="preconnect" href="https://cdnjs.cloudflare.com">\n<style>\n:root {\n  --gold:#546878;--gold2:#6A8494;--red:#D94040;--green:#546878;--blue:#2E73AB;\n  --bg:#F2F5F8;--card:#FFFFFF;--border:#D0DDE6;--text:#1A2C35;--muted:#6E8FA0;--dim:#A3BCC9;\n  --ing-color:#546878;--ing-bg:#EBF1F5;--ing-text:#2A4455;\n  --gas-orange:#F47C3C;--gas-orange-bg:#FFF2EA;--gas-blue:#546878;--gas-blue-bg:#EBF1F5;\n}\n\n/* ── 6 TEMAS — variables CSS completas ── */\n#app.tema-oceano {\n  --gold:#546878;--gold2:#6A8494;--red:#D94040;--green:#546878;--blue:#2E73AB;\n  --bg:#EDF3F6;--card:#FFFFFF;--border:#C5D8E4;--text:#0E2530;--muted:#5A8499;--dim:#8AAFBE;\n  --ing-color:#546878;--ing-bg:#E4EEF4;--ing-text:#1E3D4F;\n}\n#app.tema-ambar {\n  --gold:#854F0B;--gold2:#EF9F27;--red:#C62828;--green:#0F6E56;--blue:#185FA5;\n  --bg:#FFF8F0;--card:#FFFFFF;--border:#E8C88044;--text:#2C1A00;--muted:#BA7517;--dim:#EF9F27;\n  --ing-color:#854F0B;--ing-bg:#FAEEDA;--ing-text:#633806;\n}\n#app.tema-ambar .mv-card{border-left:3px solid #EF9F27;border-radius:0 14px 14px 0}\n#app.tema-ambar .mv-card.open{border-left-color:#854F0B}\n#app.tema-noche {\n  --gold:#9F5AE5;--gold2:#7C3AED;--red:#EF5350;--green:#1D9E75;--blue:#378ADD;\n  --bg:#0F0F1A;--card:#1A1A2E;--border:#534AB744;--text:#E8E6FF;--muted:#7F77DD;--dim:#534AB7;\n  --ing-color:#9FE1CB;--ing-bg:#1E2A3A;--ing-text:#CECBF6;\n}\n#app.tema-noche #header{background:#0F0F1A}\n#app.tema-noche .modal{background:#1A1A2E;border-color:#534AB744}\n#app.tema-noche .card{background:#1A1A2E;border-color:#534AB744}\n#app.tema-noche .mv-card{background:#1A1A2E;border-color:#534AB744}\n#app.tema-noche .field input,#app.tema-noche .field select,#app.tema-noche .field textarea{background:#262640;border-color:#534AB766;color:#E8E6FF}\n#app.tema-noche .modo-toggle{background:#262640}\n#app.tema-rosa {\n  --gold:#993556;--gold2:#D4537E;--red:#C62828;--green:#0F6E56;--blue:#185FA5;\n  --bg:#FDF0F5;--card:#FFFFFF;--border:#F4C0D144;--text:#2C0A18;--muted:#D4537E;--dim:#ED93B1;\n  --ing-color:#993556;--ing-bg:#FBEAF0;--ing-text:#72243E;\n}\n#app.tema-rosa .mv-card{border-radius:24px}\n#app.tema-rosa .mv-icon-box{border-radius:50%}\n#app.tema-rosa .card{border-radius:24px}\n#app.tema-slate {\n  --gold:#3B6D11;--gold2:var(--gold);--red:#A32D2D;--green:#0F6E56;--blue:#185FA5;\n  --bg:#F5F5F0;--card:#FFFFFF;--border:#D3D1C7;--text:#2C2C2A;--muted:#5F5E5A;--dim:#B4B2A9;\n  --ing-color:#3B6D11;--ing-bg:#EBF1F5;--ing-text:#2A4455;\n}\n#app.tema-slate .mv-card{border:none;border-bottom:2px solid #D3D1C7;border-radius:4px;background:transparent}\n#app.tema-slate .mv-card.open{border-bottom-color:var(--gold)}\n\n/* Graficos: estilo Notion compacto */\n.gfc-notion{\n  --gfc-ink:var(--text,#2F302D);\n  --gfc-muted:var(--muted,#74756F);\n  --gfc-line:var(--border,#E6E4DF);\n  --gfc-soft:var(--surface,#F7F7F5);\n  --gfc-soft-2:var(--surface-2,#EBEAE7);\n  --gfc-sage:var(--sage,#EEF6F1);\n  --gfc-sage-ink:var(--ing-color,#4F7F67);\n  --gfc-blue:var(--sky,#EEF4FA);\n  --gfc-blue-ink:var(--blue,#4F7EA8);\n  --gfc-warm:var(--peach,#F8EFE6);\n  --gfc-warm-ink:var(--gas-orange,#B07B52);\n  color:var(--gfc-ink);\n}\n.gfc-notion,\n.gfc-notion *{\n  font-family:Inter,Roboto,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;\n  letter-spacing:0 !important;\n  box-shadow:none !important;\n}\n.gfc-notion [style*="Playfair Display"]{font-family:Inter,Roboto,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important}\n.gfc-notion [style*="font-weight:950"]{font-weight:720 !important}\n.gfc-notion [style*="font-weight:900"]{font-weight:700 !important}\n.gfc-notion [style*="font-weight:850"]{font-weight:680 !important}\n.gfc-notion [style*="font-size:25px"]{font-size:22px !important;font-weight:760 !important;line-height:1.08 !important}\n.gfc-notion [style*="font-size:22px"]{font-size:17px !important;font-weight:700 !important}\n.gfc-notion [style*="font-size:19px"]{font-size:16px !important;font-weight:700 !important}\n.gfc-notion [style*="font-size:18px"]{font-size:15px !important;font-weight:700 !important}\n.gfc-notion [style*="font-size:17px"]{font-size:15px !important;font-weight:700 !important}\n.gfc-notion [style*="font-size:16px"]{font-size:14px !important}\n.gfc-notion [style*="font-size:13px"]{font-size:12px !important}\n.gfc-notion [style*="font-size:12px"]{font-size:11px !important}\n.gfc-notion [style*="font-size:11px"]{font-size:10.5px !important}\n.gfc-notion [style*="font-size:10px"]{font-size:10px !important}\n.gfc-notion [style*="background:#FFFFFF"],\n.gfc-notion [style*="background:#fff"]{background:var(--card,#FFFFFF) !important}\n.gfc-notion [style*="background:#F8FAFC"],\n.gfc-notion [style*="background:#F1F5F9"]{background:var(--gfc-soft) !important}\n.gfc-notion [style*="background:#EFF6FF"],\n.gfc-notion [style*="background:#DBEAFE"]{background:var(--gfc-blue) !important}\n.gfc-notion [style*="background:#ECFDF5"],\n.gfc-notion [style*="background:#F0FDF4"]{background:var(--gfc-sage) !important}\n.gfc-notion [style*="background:#FFF7ED"],\n.gfc-notion [style*="background:#FEF2F2"]{background:var(--gfc-warm) !important}\n.gfc-notion [style*="border:1px solid #E5E7EB"],\n.gfc-notion [style*="border:1px solid #E2E8F0"],\n.gfc-notion [style*="border:1px solid #EEF2F7"],\n.gfc-notion [style*="border:1px solid #BFDBFE"],\n.gfc-notion [style*="border:1px solid #BBF7D0"],\n.gfc-notion [style*="border:1px solid #FED7AA"]{border-color:var(--gfc-line) !important}\n.gfc-notion [style*="border-radius:8px"]{border-radius:10px !important}\n.gfc-notion [style*="border-radius:12px"]{border-radius:12px !important}\n.gfc-notion [style*="border-radius:999px"]{border-radius:999px !important}\n.gfc-notion [style*="padding:14px"]{padding:12px !important}\n.gfc-notion [style*="padding:12px"]{padding:11px !important}\n.gfc-notion [style*="padding:10px"]{padding:9px !important}\n.gfc-notion [style*="margin-bottom:13px"],\n.gfc-notion [style*="margin-bottom:12px"]{margin-bottom:10px !important}\n.gfc-notion [style*="gap:12px"]{gap:9px !important}\n.gfc-notion button{\n  border-color:var(--gfc-line) !important;\n  border-radius:10px !important;\n  background:var(--card,#FFFFFF) !important;\n  color:var(--gfc-ink) !important;\n}\n.gfc-notion button[style*="background:#111827"]{\n  background:var(--gfc-sage) !important;\n  border-color:#CFE5DA !important;\n}\n.gfc-notion button[style*="background:#111827"] *,\n.gfc-notion button[style*="background:#111827"] [style*="color:#FFFFFF"],\n.gfc-notion button[style*="background:#111827"] [style*="color:#E5E7EB"]{\n  color:var(--gfc-sage-ink) !important;\n}\n.gfc-notion [style*="background:#111827"]{background:var(--gfc-sage) !important}\n.gfc-notion [style*="color:#111827"]{color:var(--gfc-ink) !important}\n.gfc-notion [style*="color:#64748B"],\n.gfc-notion [style*="color:#94A3B8"],\n.gfc-notion [style*="color:#475569"],\n.gfc-notion [style*="color:#CBD5E1"]{color:var(--gfc-muted) !important}\n.gfc-notion [style*="color:#047857"],\n.gfc-notion [style*="color:#0F766E"],\n.gfc-notion [style*="color:#065F46"]{color:var(--gfc-sage-ink) !important}\n.gfc-notion [style*="color:#1D4ED8"]{color:var(--gfc-blue-ink) !important}\n.gfc-notion [style*="color:#B91C1C"],\n.gfc-notion [style*="color:#C62828"]{color:var(--red,#C75F5F) !important}\n.gfc-notion [style*="color:#9A3412"],\n.gfc-notion [style*="color:#B45309"]{color:var(--gfc-warm-ink) !important}\n.gfc-notion [style*="background:#2563EB"]{background:var(--gfc-blue-ink) !important}\n.gfc-notion [style*="background:#F97316"],\n.gfc-notion [style*="background:#D97706"]{background:var(--gfc-warm-ink) !important}\n.gfc-notion [style*="background:#0F766E"],\n.gfc-notion [style*="background:#059669"]{background:var(--gfc-sage-ink) !important}\n.gfc-notion [style*="height:9px"],\n.gfc-notion [style*="height:10px"]{height:7px !important}\n.gfc-notion [style*="height:7px"]{height:6px !important}\n.gfc-notion [style*="border-left:3px"]{border-left-width:2px !important}\n.gfc-notion [style*="width:88px;height:88px"]{width:74px !important;height:74px !important}\n.gfc-notion svg[width="88"]{width:74px !important;height:74px !important}\n.gfc-notion .app-icon{stroke-width:1.7 !important}\n\n*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}\nhtml,body{height:100%;overflow:hidden;background:var(--bg);}\nbody{font-family:'Inter','Roboto',sans-serif;color:var(--text)}\n::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:4px}\n#app{height:100vh;display:flex;flex-direction:column;width:100%;max-width:430px;margin:0 auto;overflow:hidden}\n#header{background:var(--bg);border-bottom:1px solid var(--border);padding:16px 20px 0;flex-shrink:0}\n.gfc-alert-select-box{width:24px;height:24px;border:1.5px solid #CBD5E1;border-radius:8px;background:#fff;display:none;align-items:center;justify-content:center;flex:0 0 24px;color:#fff;font-size:15px;font-weight:900;box-sizing:border-box}\n.gfc-alert-selection-mode .gfc-alert-select-box{display:flex}\n.g`... 2734226 more characters,
+    expected: /if \(name === 'get_mentor_briefing'\) return gfcBuildMentorBriefing\(\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests\proactive-alerts.test.js:28:1
+✖ proactive alerts: prioritizes balances and due unconfirmed work (2.4337ms)
+  ReferenceError: gfcYarbiConversationInboxRead is not defined
+      at Object.gfcBuildProactiveAlerts (evalmachine.<anonymous>:75:3)
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\proactive-alerts.test.js:35:26)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
+
+test at tests\proactive-alerts.test.js:42:1
+✖ proactive alerts: location without linked agenda is a signal, not a completed visit (1.0829ms)
+  ReferenceError: gfcYarbiConversationInboxRead is not defined
+      at Object.gfcBuildProactiveAlerts (evalmachine.<anonymous>:75:3)
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\proactive-alerts.test.js:46:26)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+
+test at tests\proactive-alerts.test.js:52:1
+✖ proactive alerts: an availability conflict is a high-priority reprogramming prompt, never an automatic change (0.8471ms)
+  ReferenceError: gfcYarbiConversationInboxRead is not defined
+      at Object.gfcBuildProactiveAlerts (evalmachine.<anonymous>:75:3)
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\proactive-alerts.test.js:56:26)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+
+test at tests\proactive-alerts.test.js:63:1
+✖ proactive alerts: proactive scope emits at most one unseen alert per session (0.9526ms)
+  ReferenceError: gfcYarbiConversationInboxRead is not defined
+      at Object.gfcBuildProactiveAlerts (evalmachine.<anonymous>:75:3)
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\proactive-alerts.test.js:70:25)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+
+test at tests\processing-status.test.js:29:1
+✖ processing status: manual update downloads the mirror and never starts AI analysis (1.7732ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /requested_by|action:\s*'process'|Gemini.*proces/i. Input:
+  
+  'async function gfcProcessYarbiInformation() {\n' +
+    "  const button = document.getElementById('gfc-ai-process-btn');\n" +
+    "  const token = localStorage.getItem('fnz_assistant_token') || '';\n" +
+    "  if (!token) return toast('Configura primero el token de Yarbi en Ajustes.', 'warning');\n" +
+    "  if (!navigator.onLine) return toast('Sin conexión. Yarbi seguirá usando la última copia local.', 'warning');\n" +
+    "  if (button) { button.disabled = true; button.textContent = '♻ Recuperando…'; }\n" +
+    '  try {\n' +
+    '    const before = await gfcRefreshYarbiProcessingStatus({ quiet: true });\n' +
+    '    let recovery = null;\n' +
+    "    if (before && before.status !== 'up_to_date') {\n" +
+    '      const recoveryResponse = await fetch(GFC_YARBI_PROCESSING_STATUS_ENDPOINT, {\n' +
+    "        method: 'POST',\n" +
+    "        headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },\n" +
+    "        body: JSON.stringify({ action: 'recover', limit: 25, requested_by: 'yarbi-manual-recovery' })\n" +
+    '      });\n' +
+    '      recovery = await recoveryResponse.json().catch(() => ({}));\n' +
+    "      if (!recoveryResponse.ok) throw new Error(recovery.detail || recovery.error || 'No se pudo recuperar el procesamiento pendiente');\n" +
+    "      gfcChatDiag('ai-processing-recovery', recovery.recovery || {});\n" +
+    '    }\n' +
+    "    if (button) button.textContent = '⬇ Actualizando…';\n" +
+    "    const data = await gfcSyncYarbiLocalMirror({ reason: 'manual-download', backfill: true });\n" +
+    '    const status = await gfcRefreshYarbiProcessingStatus({ quiet: true });\n' +
+    '    const received = (data?.messages || []).length + (data?.entities?.memories || []).length + (data?.entities?.analyses || []).length;\n' +
+    '    const recovered = Number(recovery?.recovery?.analysis_processed || 0) + Number(recovery?.recovery?.audio_recovered || 0);\n' +
+    "    toast(data?.has_more_history ? '⬇ Copia actualizada. Yarbi continúa descargando el histórico en segundo plano.' : (status?.status === 'up_to_date' ? '✅ Yarbi está al día. Copia local actualizada.' : (recovered > 0 ? '✅ Se recuperaron ' + recovered + ' elemento(s). Lo restante conserva diagnóstico.' : '✅ Copia local actualizada. Los casos pendientes conservan su diagnóstico.')), 'success');\n" +
+    "    gfcChatDiag('yarbi-manual-download', { received, recovered, hasMoreHistory: !!data?.has_more_history, remoteStatus: status?.status || 'unknown' });\n" +
+    '  } catch (error) {\n' +
+    "    gfcYarbiLocalStatusWrite({ status: 'error', reason: 'manual-download', last_error: error?.message || String(error) });\n" +
+    "    toast('No se pudo actualizar la copia local: ' + (error.message || 'revisa la conexión'), 'error');\n" +
+    '  } finally {\n' +
+    '    if (button) button.disabled = false;\n' +
+    '    gfcSetYarbiProcessingUi(window._gfcYarbiProcessingStatus || {});\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'function gfcScheduleYarbiOpenRefresh() {\n' +
+    '  if (window._gfcYarbiOpenRefreshTimer) clearTimeout(window._gfcYarbiOpenRefreshTimer);\n' +
+    '  const scheduledAt = Date.now();\n' +
+    '  const waitForLiveStartup = () => {\n' +
+    '    const liveSession = window._gfcLiveSession;\n' +
+    '    const elapsedMs = Date.now() - scheduledAt;\n' +
+    '    if (liveSession?.connecting && elapsedMs < 10000) {\n' +
+    '      window._gfcYarbiOpenRefreshTimer = window.setTimeout(waitForLiveStartup, 400);\n' +
+    '      return;\n' +
+    '    }\n' +
+    '    const settleDelay = liveSession?.active ? 1500 : 0;\n' +
+    '    window._gfcYarbiOpenRefreshTimer = window.setTimeout(() => {\n' +
+    '      window._gfcYarbiOpenRefreshTimer = null;\n' +
+    '      void Promise.allSettled([\n' +
+    '        gfcRefreshYarbiProcessingStatus({ quiet: true }),\n' +
+    "        gfcSyncYarbiLocalMirror({ reason: 'yarbi-open-incremental', backfill: false })\n" +
+    '      ]).then(() => gfcYarbiOfferHabitCandidate())\n' +
+    "        .catch(error => gfcChatDiag('yarbi-open-refresh-error', { message: error?.message || String(error) }));\n" +
+    '    }, settleDelay);\n' +
+    '  };\n' +
+    '  window._gfcYarbiOpenRefreshTimer = window.setTimeout(waitForLiveStartup, 300);\n' +
+    '}\n' +
+    '\n'
+  
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\processing-status.test.js:34:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "async function gfcProcessYarbiInformation() {\n  const button = document.getElementById('gfc-ai-process-btn');\n  const token = localStorage.getItem('fnz_assistant_token') || '';\n  if (!token) return toast('Configura primero el token de Yarbi en Ajustes.', 'warning');\n  if (!navigator.onLine) return toast('Sin conexión. Yarbi seguirá usando la última copia local.', 'warning');\n  if (button) { button.disabled = true; button.textContent = '♻ Recuperando…'; }\n  try {\n    const before = await gfcRefreshYarbiProcessingStatus({ quiet: true });\n    let recovery = null;\n    if (before && before.status !== 'up_to_date') {\n      const recoveryResponse = await fetch(GFC_YARBI_PROCESSING_STATUS_ENDPOINT, {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },\n        body: JSON.stringify({ action: 'recover', limit: 25, requested_by: 'yarbi-manual-recovery' })\n      });\n      recovery = await recoveryResponse.json().catch(() => ({}));\n      if (!recoveryResponse.ok) throw new Error(recovery.detail || recovery.error || 'No se pudo recuperar el procesamiento pendiente');\n      gfcChatDiag('ai-processing-recovery', recovery.recovery || {});\n    }\n    if (button) button.textContent = '⬇ Actualizando…';\n    const data = await gfcSyncYarbiLocalMirror({ reason: 'manual-download', backfill: true });\n    const status = await gfcRefreshYarbiProcessingStatus({ quiet: true });\n    const received = (data?.messages || []).length + (data?.entities?.memories || []).length + (data?.entities?.analyses || []).length;\n    const recovered = Number(recovery?.recovery?.analysis_processed || 0) + Number(recovery?.recovery?.audio_recovered || 0);\n    toast(data?.has_more_history ? '⬇ Copia actualizada. Yarbi continúa descargando el histórico en segundo plano.' : (status?.status === 'up_to_date' ? '✅ Yarbi está al día. Copia local actualizada.' : (recovered > 0 ? '✅ Se recuperaron ' + recovered + ' elemento(s). Lo restante conserva diagnóstico.' : '✅ Copia local actualizada. Los casos pendientes conservan su diagnóstico.')), 'success');\n    gfcChatDiag('yarbi-manual-download', { received, recovered, hasMoreHistory: !!data?.has_more_history, remoteStatus: status?.status || 'unknown' });\n  } catch (error) {\n    gfcYarbiLocalStatusWrite({ status: 'error', reason: 'manual-download', last_error: error?.message || String(error) });\n    toast('No se pudo actualizar la copia local: ' + (error.message || 'revisa la conexión'), 'error');\n  } finally {\n    if (button) button.disabled = false;\n    gfcSetYarbiProcessingUi(window._gfcYarbiProcessingStatus || {});\n  }\n}\n\nfunction gfcScheduleYarbiOpenRefresh() {\n  if (window._gfcYarbiOpenRefreshTimer) clearTimeout(window._gfcYarbiOpenRefreshTimer);\n  const scheduledAt = Date.now();\n  const waitForLiveStartup = () => {\n    const liveSession = window._gfcLiveSession;\n    const elapsedMs = Date.now() - scheduledAt;\n    if (liveSession?.connecting && elapsedMs < 10000) {\n      window._gfcYarbiOpenRefreshTimer = window.setTimeout(waitForLiveStartup, 400);\n      return;\n    }\n    const settleDelay = liveSession?.active ? 1500 : 0;\n    window._gfcYarbiOpenRefreshTimer = window.setTimeout(() => {\n      window._gfcYarbiOpenRefreshTimer = null;\n      void Promise.allSettled([\n        gfcRefreshYarbiProcessingStatus({ quiet: true }),\n        gfcSyncYarbiLocalMirror({ reason: 'yarbi-open-incremental', backfill: false })\n      ]).then(() => gfcYarbiOfferHabitCandidate())\n        .catch(error => gfcChatDiag('yarbi-open-refresh-error', { message: error?.message || String(error) }));\n    }, settleDelay);\n  };\n  window._gfcYarbiOpenRefreshTimer = window.setTimeout(waitForLiveStartup, 300);\n}\n\n",
+    expected: /requested_by|action:\s*'process'|Gemini.*proces/i,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at tests\processing-status.test.js:37:1
+✖ processing status: real background work remains visible as background (1.6796ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /chat\(s\) en segundo plano/. Input:
+  
+  'function gfcSetYarbiProcessingUi(data = {}) {\n' +
+    "  const label = document.getElementById('gfc-ai-process-status'), detail = document.getElementById('gfc-ai-process-detail'), button = document.getElementById('gfc-ai-process-btn');\n" +
+    '  if (!label || !button) return;\n' +
+    '  const local = gfcYarbiLocalStatusRead(), totals = data.totals || {}, recovery = data.recovery || {}, pending = Number(data.pending_work || 0);\n' +
+    "  const show = (text, color, detailText = '') => {\n" +
+    '    label.textContent = text;\n' +
+    '    label.style.color = color;\n' +
+    '    label.title = detailText || text;\n' +
+    '    if (detail) {\n' +
+    '      detail.textContent = detailText;\n' +
+    "      detail.style.display = detailText ? 'block' : 'none';\n" +
+    '      detail.style.color = color;\n' +
+    '    }\n' +
+    '  };\n' +
+    "  const localUpdating = local.status === 'syncing' || local.status === 'backfilling';\n" +
+    "  button.textContent = localUpdating ? '⬇ Actualizando…' : '⬇ Actualizar Yarbi';\n" +
+    '  button.disabled = localUpdating;\n' +
+    "  if (!navigator.onLine) { show(local.last_sync_at ? '📴 Sin conexión · copia local disponible' : '📴 Sin conexión · sin copia local', '#B45309'); return; }\n" +
+    "  if (local.status === 'syncing') { show('🔄 Actualizando memoria local…', '#0369A1', 'Sincronizando cambios nuevos; no vuelve a descargar todo el histórico.'); return; }\n" +
+    "  if (local.status === 'backfilling') { show('⬇ Descargando histórico · ' + Number(local.stored?.message || 0) + ' mensajes locales', '#0369A1', 'Carga inicial del histórico hacia la copia local.'); return; }\n" +
+    "  if (data.status === 'needs_attention' && data.blocker === 'gemini_quota') { show('⚠️ Gemini sin cuota: procesamiento en pausa', '#B45309', Number(totals.failed || 0) + ' análisis esperan; no se duplican mientras la cuota esté bloqueada.'); return; }\n" +
+    "  if (data.status === 'needs_attention' && data.blocker === 'audio_summary_failure' && !Number(totals.failed || 0)) { show('⚠️ ' + Number(totals.audio_failed || 0) + ' nota(s) de voz requieren revisión', '#B45309'); return; }\n" +
+    '  if (window._gfcYarbiAutoRecoveryRunning) {\n' +
+    '    const ready = Number(recovery.retryable_ready ?? totals.failed_ready ?? totals.failed ?? 0);\n' +
+    "    show('🔄 Recuperando lote histórico…', '#0369A1', 'Procesando como máximo ' + Math.min(25, ready) + ' análisis listos. Cada registro se reclama una sola vez en Supabase.');\n" +
+    '    return;\n' +
+    '  }\n' +
+    "  if (data.status === 'processing') {\n" +
+    "    show('🔄 Procesando ahora: ' + Number(totals.processing || 0) + ' · pendientes: ' + pending, '#0369A1', 'Es un proceso incremental. Los bloqueos de Supabase impiden que dos procesos tomen el mismo análisis.');\n" +
+    '    return;\n' +
+    '  }\n' +
+    "  if (data.status === 'needs_attention') {\n" +
+    '    const issues = [], details = [];\n' +
+    '    const failed = Number(totals.failed || 0), identityPending = Number(recovery.identity_pending ?? totals.identity_pending ?? 0), ready = Number(recovery.retryable_ready ?? totals.failed_ready ?? 0), waiting = Number(recovery.retryable_waiting ?? totals.failed_waiting ?? 0), exhausted = Number(recovery.exhausted ?? totals.failed_exhausted ?? 0), unclassified = Number(recovery.unclassified ?? totals.failed_unclassified ?? Math.max(0, failed - ready - waiting - exhausted)), audioPending = Number(totals.audio_pending || 0), audioFailed = Number(totals.audio_failed || 0);\n' +
+    "    if (ready > 0) issues.push(ready + ' listo(s) para reintento');\n" +
+    "    if (waiting > 0) issues.push(waiting + ' esperando su hora');\n" +
+    "    if (exhausted > 0) issues.push(exhausted + ' cerrado(s) tras 3 intentos');\n" +
+    "    if (unclassified > 0) issues.push(unclassified + ' con error por clasificar');\n" +
+    "    if (identityPending > 0) issues.push(identityPending + ' con identidad por revisar');\n" +
+    "    if (audioFailed > 0) issues.push(audioFailed + ' nota(s) de voz con error');\n" +
+    "    if (audioPending > 0) issues.push(audioPending + ' nota(s) de voz pendientes');\n" +
+    "    if (recovery.next_retry_at) details.push('Próximo reintento: ' + new Date(recovery.next_retry_at).toLocaleString('es-PE'));\n" +
+    "    details.push('Lote automático máximo: ' + Number(recovery.automatic_batch_limit || 25) + '. No se reprocesa todo el histórico.');\n" +
+    '    const sample = Array.isArray(data.failure_samples) ? data.failure_samples[0] : null;\n' +
+    "    if (sample?.error) details.push('Último motivo: ' + String(sample.error).slice(0, 140));\n" +
+    "    show('⚠️ Histórico: ' + (issues.length ? issues.join(' · ') : failed + ' con error'), '#B45309', details.join(' ') + (identityPending > 0 ? ' Esos mensajes se conservan y no se asocian automáticamente a un cliente.' : ''));\n" +
+    '    return;\n' +
+    '  }\n' +
+    "  if (data.status === 'outdated' || pending > 0) { show(Number(totals.audio_pending || 0) > 0 ? '🎤 ' + Number(totals.audio_pending || 0) + ' nota(s) de voz pendientes' : '⚠️ ' + pending + ' chat(s) pendientes', '#B45309', 'Yarbi procesa solamente los elementos nuevos o pendientes.'); return; }\n" +
+    "  if (data.status === 'up_to_date' && local.status === 'synced') {\n" +
+    '    const unavailable = Number(totals.audio_unavailable || 0);\n' +
+    "    show(unavailable > 0 ? '✅ Yarbi al día · ' + unavailable + ' audio(s) antiguo(s) no recuperables' : '✅ Yarbi al día · chats y memoria local', '#16734B', 'No hay mensajes nuevos ni análisis pendientes.');\n" +
+    '    return;\n' +
+    '  }\n' +
+    "  if (local.status === 'error') { show('⚠️ Copia local desactualizada', '#B45309'); return; }\n" +
+    "  show('🔄 Verificando chats y memoria…', '#64748B');\n" +
+    '}\n' +
+    "const GFC_YARBI_AUTO_RECOVERY_KEY = 'gfc_yarbi_auto_recovery_v1';\n" +
+    'function gfcMaybeRecoverYarbiFailures(data = {}) {\n' +
+    '  const ready = Number(data?.recovery?.retryable_ready ?? data?.totals?.failed_ready ?? 0);\n' +
+    "  if (!ready || Number(data?.totals?.processing || 0) > 0 || data.blocker === 'gemini_quota' || !navigator.onLine || window._gfcYarbiAutoRecoveryRunning) return;\n" +
+    '  const previous = Number(localStorage.getItem(GFC_YARBI_AUTO_RECOVERY_KEY) || 0);\n' +
+    '  if (Date.now() - previous < 6 * 60 * 60 * 1000) return;\n' +
+    "  const token = localStorage.getItem('fnz_assistant_token') || '';\n" +
+    '  if (!token) return;\n' +
+    '  window._gfcYarbiAutoRecoveryRunning = true;\n' +
+    '  gfcSetYarbiProcessingUi(data);\n' +
+    '  localStorage.setItem(GFC_YARBI_AUTO_RECOVERY_KEY, String(Date.now()));\n' +
+    '  fetch(GFC_YARBI_PROCESSING_STATUS_ENDPOINT, {\n' +
+    "    method:'POST',\n" +
+    "    headers:{ 'Content-Type':'application/json', 'X-Assistant-Token':token },\n" +
+    "    body:JSON.stringify({ action:'recover', limit:25, requested_by:'yarbi-background-recovery' })\n" +
+    '  }).then(async response => {\n' +
+    '    const result = await response.json().catch(() => ({}));\n' +
+    "    if (!response.ok) throw new Error(result.detail || result.error || 'No se pudo recuperar el histórico');\n" +
+    "    gfcChatDiag('ai-processing-auto-recovery', result.recovery || {});\n" +
+    '    if (result.processing_status) gfcSetYarbiProcessingUi(result.processing_status);\n' +
+    '    setTimeout(() => {\n' +
+    '      gfcRefreshYarbiProcessingStatus({ quiet:true });\n' +
+    "      if (typeof gfcSyncYarbiLocalMirror === 'function') gfcSyncYarbiLocalMirror({ reason:'automatic-recovery' }).catch(() => {});\n" +
+    '    }, 1800);\n' +
+    '  }).catch(error => {\n' +
+    '    localStorage.setItem(GFC_YARBI_AUTO_RECOVERY_KEY, String(Date.now() - (5.5 * 60 * 60 * 1000)));\n' +
+    "    gfcChatDiag('ai-processing-auto-recovery-error', { message:error?.message || String(error) });\n" +
+    '  }).finally(() => { window._gfcYarbiAutoRecoveryRunning = false; });\n' +
+    '}\n'
+  
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\processing-status.test.js:41:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "function gfcSetYarbiProcessingUi(data = {}) {\n  const label = document.getElementById('gfc-ai-process-status'), detail = document.getElementById('gfc-ai-process-detail'), button = document.getElementById('gfc-ai-process-btn');\n  if (!label || !button) return;\n  const local = gfcYarbiLocalStatusRead(), totals = data.totals || {}, recovery = data.recovery || {}, pending = Number(data.pending_work || 0);\n  const show = (text, color, detailText = '') => {\n    label.textContent = text;\n    label.style.color = color;\n    label.title = detailText || text;\n    if (detail) {\n      detail.textContent = detailText;\n      detail.style.display = detailText ? 'block' : 'none';\n      detail.style.color = color;\n    }\n  };\n  const localUpdating = local.status === 'syncing' || local.status === 'backfilling';\n  button.textContent = localUpdating ? '⬇ Actualizando…' : '⬇ Actualizar Yarbi';\n  button.disabled = localUpdating;\n  if (!navigator.onLine) { show(local.last_sync_at ? '📴 Sin conexión · copia local disponible' : '📴 Sin conexión · sin copia local', '#B45309'); return; }\n  if (local.status === 'syncing') { show('🔄 Actualizando memoria local…', '#0369A1', 'Sincronizando cambios nuevos; no vuelve a descargar todo el histórico.'); return; }\n  if (local.status === 'backfilling') { show('⬇ Descargando histórico · ' + Number(local.stored?.message || 0) + ' mensajes locales', '#0369A1', 'Carga inicial del histórico hacia la copia local.'); return; }\n  if (data.status === 'needs_attention' && data.blocker === 'gemini_quota') { show('⚠️ Gemini sin cuota: procesamiento en pausa', '#B45309', Number(totals.failed || 0) + ' análisis esperan; no se duplican mientras la cuota esté bloqueada.'); return; }\n  if (data.status === 'needs_attention' && data.blocker === 'audio_summary_failure' && !Number(totals.failed || 0)) { show('⚠️ ' + Number(totals.audio_failed || 0) + ' nota(s) de voz requieren revisión', '#B45309'); return; }\n  if (window._gfcYarbiAutoRecoveryRunning) {\n    const ready = Number(recovery.retryable_ready ?? totals.failed_ready ?? totals.failed ?? 0);\n    show('🔄 Recuperando lote histórico…', '#0369A1', 'Procesando como máximo ' + Math.min(25, ready) + ' análisis listos. Cada registro se reclama una sola vez en Supabase.');\n    return;\n  }\n  if (data.status === 'processing') {\n    show('🔄 Procesando ahora: ' + Number(totals.processing || 0) + ' · pendientes: ' + pending, '#0369A1', 'Es un proceso incremental. Los bloqueos de Supabase impiden que dos procesos tomen el mismo análisis.');\n    return;\n  }\n  if (data.status === 'needs_attention') {\n    const issues = [], details = [];\n    const failed = Number(totals.failed || 0), identityPending = Number(recovery.identity_pending ?? totals.identity_pending ?? 0), ready = Number(recovery.retryable_ready ?? totals.failed_ready ?? 0), waiting = Number(recovery.retryable_waiting ?? totals.failed_waiting ?? 0), exhausted = Number(recovery.exhausted ?? totals.failed_exhausted ?? 0), unclassified = Number(recovery.unclassified ?? totals.failed_unclassified ?? Math.max(0, failed - ready - waiting - exhausted)), audioPending = Number(totals.audio_pending || 0), audioFailed = Number(totals.audio_failed || 0);\n    if (ready > 0) issues.push(ready + ' listo(s) para reintento');\n    if (waiting > 0) issues.push(waiting + ' esperando su hora');\n    if (exhausted > 0) issues.push(exhausted + ' cerrado(s) tras 3 intentos');\n    if (unclassified > 0) issues.push(unclassified + ' con error por clasificar');\n    if (identityPending > 0) issues.push(identityPending + ' con identidad por revisar');\n    if (audioFailed > 0) issues.push(audioFailed + ' nota(s) de voz con error');\n    if (audioPending > 0) issues.push(audioPending + ' nota(s) de voz pendientes');\n    if (recovery.next_retry_at) details.push('Próximo reintento: ' + new Date(recovery.next_retry_at).toLocaleString('es-PE'));\n    details.push('Lote automático máximo: ' + Number(recovery.automatic_batch_limit || 25) + '. No se reprocesa todo el histórico.');\n    const sample = Array.isArray(data.failure_samples) ? data.failure_samples[0] : null;\n    if (sample?.error) details.push('Último motivo: ' + String(sample.error).slice(0, 140));\n    show('⚠️ Histórico: ' + (issues.length ? issues.join(' · ') : failed + ' con error'), '#B45309', details.join(' ') + (identityPending > 0 ? ' Esos mensajes se conservan y no se asocian automáticamente a un cliente.' : ''));\n    return;\n  }\n  if (data.status === 'outdated' || pending > 0) { show(Number(totals.audio_pending || 0) > 0 ? '🎤 ' + Number(totals.audio_pending || 0) + ' nota(s) de voz pendientes' : '⚠️ ' + pending + ' chat(s) pendientes', '#B45309', 'Yarbi procesa solamente los elementos nuevos o pendientes.'); return; }\n  if (data.status === 'up_to_date' && local.status === 'synced') {\n    const unavailable = Number(totals.audio_unavailable || 0);\n    show(unavailable > 0 ? '✅ Yarbi al día · ' + unavailable + ' audio(s) antiguo(s) no recuperables' : '✅ Yarbi al día · chats y memoria local', '#16734B', 'No hay mensajes nuevos ni análisis pendientes.');\n    return;\n  }\n  if (local.status === 'error') { show('⚠️ Copia local desactualizada', '#B45309'); return; }\n  show('🔄 Verificando chats y memoria…', '#64748B');\n}\nconst GFC_YARBI_AUTO_RECOVERY_KEY = 'gfc_yarbi_auto_recovery_v1';\nfunction gfcMaybeRecoverYarbiFailures(data = {}) {\n  const ready = Number(data?.recovery?.retryable_ready ?? data?.totals?.failed_ready ?? 0);\n  if (!ready || Number(data?.totals?.processing || 0) > 0 || data.blocker === 'gemini_quota' || !navigator.onLine || window._gfcYarbiAutoRecoveryRunning) return;\n  const previous = Number(localStorage.getItem(GFC_YARBI_AUTO_RECOVERY_KEY) || 0);\n  if (Date.now() - previous < 6 * 60 * 60 * 1000) return;\n  const token = localStorage.getItem('fnz_assistant_token') || '';\n  if (!token) return;\n  window._gfcYarbiAutoRecoveryRunning = true;\n  gfcSetYarbiProcessingUi(data);\n  localStorage.setItem(GFC_YARBI_AUTO_RECOVERY_KEY, String(Date.now()));\n  fetch(GFC_YARBI_PROCESSING_STATUS_ENDPOINT, {\n    method:'POST',\n    headers:{ 'Content-Type':'application/json', 'X-Assistant-Token':token },\n    body:JSON.stringify({ action:'recover', limit:25, requested_by:'yarbi-background-recovery' })\n  }).then(async response => {\n    const result = await response.json().catch(() => ({}));\n    if (!response.ok) throw new Error(result.detail || result.error || 'No se pudo recuperar el histórico');\n    gfcChatDiag('ai-processing-auto-recovery', result.recovery || {});\n    if (result.processing_status) gfcSetYarbiProcessingUi(result.processing_status);\n    setTimeout(() => {\n      gfcRefreshYarbiProcessingStatus({ quiet:true });\n      if (typeof gfcSyncYarbiLocalMirror === 'function') gfcSyncYarbiLocalMirror({ reason:'automatic-recovery' }).catch(() => {});\n    }, 1800);\n  }).catch(error => {\n    localStorage.setItem(GFC_YARBI_AUTO_RECOVERY_KEY, String(Date.now() - (5.5 * 60 * 60 * 1000)));\n    gfcChatDiag('ai-processing-auto-recovery-error', { message:error?.message || String(error) });\n  }).finally(() => { window._gfcYarbiAutoRecoveryRunning = false; });\n}\n",
+    expected: /chat\(s\) en segundo plano/,
+    operator: 'match',
+    diff: 'simple'
+  }

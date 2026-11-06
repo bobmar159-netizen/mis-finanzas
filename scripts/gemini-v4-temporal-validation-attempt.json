@@ -1,0 +1,78 @@
+{
+  "phase": "gemini_v4_temporal_validation",
+  "state": "preview_dispatched",
+  "preview": "https://misfinanzas-backend-s87nsccze-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "fixture_count": 3,
+  "max_calls": 3,
+  "automatic_retries": 0,
+  "execute_false": true,
+  "local_preflight_total": 105,
+  "local_preflight": [
+    {
+      "file": "test-yarbi-compact-understanding-local.cjs",
+      "ok": true,
+      "passed": 12,
+      "total": 12
+    },
+    {
+      "file": "test-yarbi-polarity-proposal-local.cjs",
+      "ok": true,
+      "passed": 18,
+      "total": 18
+    },
+    {
+      "file": "test-yarbi-v4-v1-integration-local.cjs",
+      "ok": true,
+      "passed": 15,
+      "total": 15
+    },
+    {
+      "file": "test-yarbi-v4-adapter-hardening-local.cjs",
+      "ok": true,
+      "passed": 14,
+      "total": 14
+    },
+    {
+      "file": "test-gemini-v4-semantic-validation-local.cjs",
+      "ok": true,
+      "passed": 5,
+      "total": 5
+    },
+    {
+      "file": "test-yarbi-v4-forensic-regression-local.cjs",
+      "ok": true,
+      "passed": 6,
+      "total": 6
+    },
+    {
+      "file": "test-yarbi-v4-post-corrections-local.cjs",
+      "ok": true,
+      "passed": 17,
+      "total": 17
+    },
+    {
+      "file": "test-gemini-v4-post-corrections-ledger-preflight-local.cjs",
+      "ok": true,
+      "passed": 3,
+      "total": 3
+    },
+    {
+      "file": "test-yarbi-v4-temporal-forensics-local.cjs",
+      "ok": true,
+      "passed": 7,
+      "total": 7
+    },
+    {
+      "file": "test-yarbi-v4-temporal-instrumentation-local.cjs",
+      "ok": true,
+      "passed": 8,
+      "total": 8
+    }
+  ],
+  "auth_only_passed": true,
+  "credentials_persisted": false,
+  "prompts_persisted": false,
+  "provider_responses_persisted": false,
+  "dispatched_at": "2026-11-05T09:40:31.895Z"
+}

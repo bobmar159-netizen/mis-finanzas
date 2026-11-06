@@ -1,0 +1,42 @@
+{
+  "phase": "gemini_availability_probe",
+  "preview": "https://misfinanzas-backend-9s6vmn1rk-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "model": "gemini-3.5-flash-lite",
+  "result": "FAIL",
+  "probe": {
+    "case_id": "F3G-SERVICE",
+    "round": 1,
+    "semantic_pass": false,
+    "schema_pass": false,
+    "typed_mentions_pass": false,
+    "hallucination_detected": false,
+    "hallucination_reasons": [],
+    "execute_false": true,
+    "semantic_failures": [
+      "schema",
+      "intent",
+      "service",
+      "provenance",
+      "typed_mentions",
+      "provider:understanding_unavailable"
+    ],
+    "gemini_ms": null,
+    "server_total_ms": null,
+    "status": 503,
+    "route": null,
+    "round_trip_ms": 8181,
+    "provider_error": "understanding_unavailable",
+    "understanding_error": "owner_understanding_provider_rejected_400",
+    "timeout": false
+  },
+  "generated_at": "2026-11-02T15:05:51.574Z",
+  "notes": {
+    "credentials_persisted": false,
+    "utterances_persisted": false,
+    "proposed_names_persisted": false,
+    "commercial_actions_executed": false,
+    "production_used": false,
+    "execute_false": true
+  }
+}

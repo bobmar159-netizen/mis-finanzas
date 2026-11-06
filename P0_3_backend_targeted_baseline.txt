@@ -1,0 +1,244 @@
+✔ F3A handler: valid phone resolves identity without Gemini, memory, agenda or external egress (61.0354ms)
+✔ F3A handler: invalid phone remains identity_pending without attempting CRM resolution or egress (5.7338ms)
+✔ F3B handler: structured evidence updates deterministic commercial context without external egress (68.6958ms)
+✔ F3C handler: accepted structured visit reaches 3B, never Gemini nor external egress (76.7958ms)
+[WEBHOOK AUTH REJECTED] ycloud_signature_missing
+[WEBHOOK META RECEIVED] {
+  "id": "F3D-event-interactive",
+  "type": "whatsapp.inbound_message.received",
+  "createTime": "2026-10-30T15:00:00.000Z",
+  "whatsappInboundMessage": {
+    "id": "F3D-message-interactive",
+    "from": "+51955300401",
+    "type": "interactive",
+    "interactive": {
+      "type": "button_reply",
+      "button_reply": {
+        "id": "yarbi.commercial.v1.service.reparacion"
+      }
+    }
+  }
+}
+[WEBHOOK IDENTITY] {"source":"phone_fallback","phone":"955300401","profileName":null,"profileUsername":null,"fromUserId":null,"aliases":[],"contactWaId":"+51955300401"}
+[PROCESANDO] Cliente:  (955300401) | Maps: Ninguno
+[YARBI TRACE WEBHOOK] trace_hmac_key_missing
+[WEBHOOK META RECEIVED] {
+  "id": "F3D-event-interactive",
+  "type": "whatsapp.inbound_message.received",
+  "createTime": "2026-10-30T15:00:00.000Z",
+  "whatsappInboundMessage": {
+    "id": "F3D-message-interactive",
+    "from": "+51955300401",
+    "type": "interactive",
+    "interactive": {
+      "type": "button_reply",
+      "button_reply": {
+        "id": "yarbi.commercial.v1.service.reparacion"
+      }
+    }
+  }
+}
+[WEBHOOK IDENTITY] {"source":"phone_fallback","phone":"955300401","profileName":null,"profileUsername":null,"fromUserId":null,"aliases":[],"contactWaId":"+51955300401"}
+[WEBHOOK] Mensaje duplicado ignorado: F3D-message-interactive
+✔ F3D handler rejects unsigned JSON before any network or commercial effect (22.4195ms)
+[WEBHOOK META RECEIVED] {
+  "id": "F3D-event-interactive",
+  "type": "whatsapp.inbound_message.received",
+  "createTime": "2026-10-30T15:00:00.000Z",
+  "whatsappInboundMessage": {
+    "id": "F3D-message-different-representation",
+    "from": "+51955300401",
+    "type": "interactive",
+    "interactive": {
+      "type": "button_reply",
+      "button_reply": {
+        "id": "yarbi.commercial.v1.service.reparacion"
+      }
+    }
+  }
+}
+[WEBHOOK IDENTITY] {"source":"phone_fallback","phone":"955300401","profileName":null,"profileUsername":null,"fromUserId":null,"aliases":[],"contactWaId":"+51955300401"}
+[WEBHOOK] Evento YCloud duplicado ignorado: F3D-event-interactive
+[WEBHOOK META RECEIVED] {
+  "id": "F3D-event-free-text",
+  "type": "whatsapp.inbound_message.received",
+  "createTime": "2026-10-30T16:00:00.000Z",
+  "whatsappInboundMessage": {
+    "id": "F3D-message-free-text",
+    "from": "+51955300402",
+    "type": "text",
+    "text": {
+      "body": "quiero instalación y visita"
+    }
+  }
+}
+[WEBHOOK IDENTITY] {"source":"phone_fallback","phone":"955300402","profileName":null,"profileUsername":null,"fromUserId":null,"aliases":[],"contactWaId":"+51955300402"}
+[PROCESANDO] Cliente:  (955300402) | Maps: Ninguno
+✔ F3D handler preserves raw bytes, accepts signed interactive YCloud once, and keeps signed free text unclassified (48.9896ms)
+✔ F3E handler persists only structured memory facts without Gemini, agenda, alerts or external egress (72.8483ms)
+✔ F3J scheduler endpoint accepts only the isolated preview configuration and a bounded interval (2.2159ms)
+✔ F3J inbox payload is compact and omits phone, name and customer text (1.7782ms)
+✔ F3J preview scheduler firewall permits only its isolated GET route and blocks commercial routes (1.8686ms)
+✔ F3K preview configuration is isolated and fails closed around external integrations (1.5136ms)
+✔ F3K preview firewall permits only authenticated owner decisions (1.9ms)
+✔ F3K real endpoint calls only the isolated atomic RPC and exposes no service key (38.144ms)
+FAST_LOCAL_MOCK_METRICS={"samples":20,"p50_ms":1.149,"p95_ms":2.075,"max_ms":2.341}
+✔ A/B: sesión autenticada obtiene solamente candidatos de su scope canónico y cierra traza (70.0729ms)
+✔ C/D/E: teléfono exacto conserva el scope, sesión inválida falla y scope vacío no filtra datos ajenos (8.0793ms)
+✔ F/G: el cliente no puede aportar owner_id/scope ni activar reutilización de candidatos (1.1395ms)
+✔ H/I: la ruta está limitada a Preview, POST y a un bearer; otras rutas no llegan al handler (0.3745ms)
+✔ J: presupuesto local de lectura queda medido sin egress ni llamadas de IA (27.8109ms)
+✔ Fase 1A: el generador distingue artefactos, backend y no despliega (1.9171ms)
+✔ Fase 1C: 20 escrituras concurrentes no pierden eventos ni hacen lectura previa (34.4577ms)
+✔ Fase 1C: 100 eventos permanecen completos, sin recorte silencioso (12.0878ms)
+✔ Fase 1C: un reintento idéntico es idempotente y un conflicto no se confirma (1.4028ms)
+✔ Fase 1C: 20 reintentos simultáneos del mismo evento conservan una sola evidencia (3.9824ms)
+✔ Fase 1C: error de Supabase no se reporta como escritura confirmada (0.4015ms)
+✔ Fase 1C: sin clave HMAC no se genera una identidad supuestamente protegida (0.3345ms)
+✔ Fase 1C: una cabecera externa no puede apropiarse de una operación interna (0.779ms)
+✔ Fase 1C: fallo parcial permanece visible después de una etapa exitosa (0.5905ms)
+✔ Fase 1C: reconstruye WhatsApp, procesamiento y consulta como operaciones independientes relacionadas (0.7904ms)
+✔ Fase 1C: la fila registrada no expone conversación, teléfono, clave ni texto de error (0.3705ms)
+✔ el ledger conserva únicamente el diagnóstico Gemini allowlisted (0.9003ms)
+✔ el ledger rechaza categorías, modelos y hashes no permitidos (0.1056ms)
+✔ Fase 1C: las rutas usan una escritura por evento, no agregan Gemini ni contratos públicos (1.3989ms)
+✔ Fase 1D: producción permanece inalterada cuando el modo auditoría está apagado (1.6674ms)
+✔ Fase 1D: cualquier preview sin modo auditoría explícito falla cerrado (0.3003ms)
+✔ Fase 1D: el modo auditoría falla cerrado si faltan variables obligatorias (0.3891ms)
+✔ Fase 1D: una URL o referencia de Supabase producción no es válida en preview (0.347ms)
+✔ Fase 1D: una clave de Supabase claramente inválida falla antes de cualquier ruta (0.2213ms)
+✔ Fase 1D: credenciales de integraciones externas invalidan el modo auditoría (0.4242ms)
+✔ Fase 1D: webhook y mutaciones empresariales se bloquean antes del handler (0.7627ms)
+✔ Fase 1D: endpoint auditoría exige POST y autenticación exacta (0.3988ms)
+✔ Fase 1D: acceso legítimo permite únicamente la auditoría sintética (0.264ms)
+✔ Fase 1D: prueba sintética ejecuta 20 eventos, deduplica y no incluye PII (19.5156ms)
+✔ Fase 1D: el proxy cubre todas las rutas /api antes de las Functions (1.3814ms)
+✔ Fase 2D.1: rutas no permitidas no cargan el handler (2.6022ms)
+✔ Fase 2D.1: credenciales ausentes o inválidas fallan antes del handler (0.6057ms)
+✔ Fase 2D.1: producción y fallback histórico se rechazan (0.4314ms)
+✔ Fase 2D.1: integraciones externas y extracción legacy se rechazan (0.2914ms)
+✔ Fase 2D.1: solo webhook y procesador sintéticos con autenticación completa pasan (0.5956ms)
+✔ Fase 2D.1: audit-only mantiene su contrato y el proxy usa el selector común (0.9708ms)
+[AI QUEUE CONTINUATION] 202 {"status":"synthetic_accepted"}
+✔ F2D2 resolver never fetches Google Maps or short links in synthetic preview (6.5704ms)
+✖ F2D2 real webhook handles Maps, short Maps and no location without external egress (2.9135ms)
+✖ F2D2 real webhook records dependency failure locally and schedules no processor (2.2681ms)
+✖ F2D6 commits canonical storage before client mutation and deduplicates a re-delivery (1.3073ms)
+✖ F2D6 preserves canonical evidence when post-canonical client association fails (1.2396ms)
+✖ F2D6 rejects missing or forbidden runtime destinations before handler side effects (1.1465ms)
+✔ F2D6 processor rejects a missing explicit processor URL before reading the queue (16.3404ms)
+✔ F2D6 assistant chat rejects missing Supabase configuration before history or model calls (1.812ms)
+✔ F2D2 real processor keeps URL-only synthetic message identity_pending without egress (7.3132ms)
+✔ phase2a: canonical message remains processable without a legacy record (1.2578ms)
+✔ phase2a: canonical partition quarantines repeated jobs without executing the message twice (0.231ms)
+✔ phase2a: invalid identity stays pending review and is never invented (1.0488ms)
+✔ phase2a: retries stop at three claimed attempts (1.8057ms)
+✔ phase2a: Gemini failures are classified without increasing model calls (0.33ms)
+✔ security: shipped frontends contain no recognizable secret value (12.0976ms)
+✔ security: privileged integrations obtain credentials from server environment (1.7388ms)
+[WHATSAPP SEND] ycloud_send_unverified 200
+[WHATSAPP SEND] ycloud_sender_ambiguous 503
+✔ WhatsApp sender uses YCloud, discovers its single business number and preserves exact text (22.9646ms)
+✔ WhatsApp sender never claims success when YCloud omits the provider message id (1.126ms)
+✔ WhatsApp sender never sends without explicit confirmation (0.4604ms)
+✔ WhatsApp sender refuses to guess when YCloud has multiple business numbers (1.1385ms)
+ℹ tests 69
+ℹ suites 0
+ℹ pass 64
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 232.6536
+
+✖ failing tests:
+
+test at tests\phase2d2-egress-isolation.test.js:150:1
+✖ F2D2 real webhook handles Maps, short Maps and no location without external egress (2.9135ms)
+  C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\api\webhook.js.f2d2.cjs:30
+  export const config = { api: { bodyParser: false } };
+  ^^^^^^
+  
+  SyntaxError: Unexpected token 'export'
+      at new Script (node:vm:117:7)
+      at createScript (node:vm:269:10)
+      at Object.runInThisContext (node:vm:317:10)
+      at loadHandler (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:38:22)
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:154:23)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+
+test at tests\phase2d2-egress-isolation.test.js:165:1
+✖ F2D2 real webhook records dependency failure locally and schedules no processor (2.2681ms)
+  C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\api\webhook.js.f2d2.cjs:30
+  export const config = { api: { bodyParser: false } };
+  ^^^^^^
+  
+  SyntaxError: Unexpected token 'export'
+      at new Script (node:vm:117:7)
+      at createScript (node:vm:269:10)
+      at Object.runInThisContext (node:vm:317:10)
+      at loadHandler (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:38:22)
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:168:21)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+
+test at tests\phase2d2-egress-isolation.test.js:177:1
+✖ F2D6 commits canonical storage before client mutation and deduplicates a re-delivery (1.3073ms)
+  C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\api\webhook.js.f2d2.cjs:30
+  export const config = { api: { bodyParser: false } };
+  ^^^^^^
+  
+  SyntaxError: Unexpected token 'export'
+      at new Script (node:vm:117:7)
+      at createScript (node:vm:269:10)
+      at Object.runInThisContext (node:vm:317:10)
+      at loadHandler (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:38:22)
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:180:21)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+
+test at tests\phase2d2-egress-isolation.test.js:199:1
+✖ F2D6 preserves canonical evidence when post-canonical client association fails (1.2396ms)
+  C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\api\webhook.js.f2d2.cjs:30
+  export const config = { api: { bodyParser: false } };
+  ^^^^^^
+  
+  SyntaxError: Unexpected token 'export'
+      at new Script (node:vm:117:7)
+      at createScript (node:vm:269:10)
+      at Object.runInThisContext (node:vm:317:10)
+      at loadHandler (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:38:22)
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:202:21)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+
+test at tests\phase2d2-egress-isolation.test.js:213:1
+✖ F2D6 rejects missing or forbidden runtime destinations before handler side effects (1.1465ms)
+  C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\api\webhook.js.f2d2.cjs:30
+  export const config = { api: { bodyParser: false } };
+  ^^^^^^
+  
+  SyntaxError: Unexpected token 'export'
+      at new Script (node:vm:117:7)
+      at createScript (node:vm:269:10)
+      at Object.runInThisContext (node:vm:317:10)
+      at loadHandler (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:38:22)
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:221:23)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)

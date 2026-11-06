@@ -1,0 +1,2 @@
+# YARBI P0.6.3 — SHA-256 del informe de build local
+9bf24e295840ae8e880882e72d99f1b590d9b0377a963f7d7a747d464fccf9b8  YARBI_P0_6_3_BUILD_FINAL.md

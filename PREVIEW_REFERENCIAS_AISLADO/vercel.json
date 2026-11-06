@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "routes": [
+    { "src": "/api/assistant/reference-candidates", "dest": "/api/assistant/reference-candidates.js" },
+    { "src": "/api/diagnostics/gemini-schema-isolation", "dest": "/api/diagnostics/gemini-schema-isolation.js" },
+    { "src": "/api/diagnostics/gemini-schema-minimal", "dest": "/api/diagnostics/gemini-schema-minimal.js" },
+    { "src": "/api/diagnostics/gemini-v4-first-probe", "dest": "/api/diagnostics/gemini-v4-first-probe.js" },
+    { "src": "/api/diagnostics/gemini-v4-semantic-validation", "dest": "/api/diagnostics/gemini-v4-semantic-validation.js" },
+    { "src": "/api/diagnostics/gemini-v4-post-corrections-validation", "dest": "/api/diagnostics/gemini-v4-post-corrections-validation.js" },
+    { "src": "/api/diagnostics/gemini-v4-temporal-validation", "dest": "/api/diagnostics/gemini-v4-temporal-validation.js" },
+    { "src": "/api/diagnostics/auth-continuity", "dest": "/api/diagnostics/auth-continuity.js" }
+  ]
+}

@@ -1,0 +1,11 @@
+# YARBI P0.6.1 — SHA-256 de evidencia local
+# Formato: SHA256  ruta relativa. Este manifiesto no se incluye a sí mismo.
+e9a561cad1f5d526fedb0b2ba3722698f5223e9a30ddfbe27ea6b933ec4be171  vercel.json
+696de6da9eafd9749ccacaefd58d75b3fcfc38bd559cedb6260323c39ed12bb8  api/assistant-router.js
+39e909159095804bcd2bbb9c7f3392d67d688bde54c730c631307fcb483d9c6f  api/utility-router.js
+2cb7b927d693b6c6c956798846dd12cb8b6f487b8952dcd3977e9dc8b4fb5f19  api_handlers/assistant/collections.js
+f8616eb915a064550ad23a88b014eb8ee2c3fdce4eaf4de69c2436ba021a6943  tests/p061-rewrite-matrix.test.js
+9020da4832875e955511992c774332262b6991d800fe1088739a56aa604b8f67  tests/p061-router-functional.test.js
+7e413395e885eda1b9dbc1eb0893234ec891f8a0be42c47ace48a9c82f3cadbd  tests/p061-collections-export.test.js
+de045b953f34912729a4916ecf7e43721a1cccb9a017ef635576a093ebd46693  YARBI_P0_6_1_VALIDACION_FINAL.md
+6e79a7d4994c93af847abeb59a79187df05c520ee4032e6e1f3dc04550f69ae7  YARBI_P0_6_1_STORAGE_RECOVERY.md

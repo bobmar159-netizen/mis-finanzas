@@ -1,0 +1,252 @@
+{
+  "phase": "gemini_v4_post_corrections_preparation",
+  "result": "PREPARED_NO_EXECUTION",
+  "exact_request_count_prepared": 16,
+  "automatic_retries": 0,
+  "execute_false": true,
+  "future_endpoint": "/api/diagnostics/gemini-v4-post-corrections-validation",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "owner_scope": "synthetic_owner_required",
+  "no_commercial_handlers": true,
+  "no_candidate_queries": true,
+  "reference_time": "2026-11-04T12:00:00-05:00",
+  "time_zone": "America/Lima",
+  "fixtures": [
+    {
+      "fixture_id": "F3PC-01",
+      "family": "correction",
+      "has_structured_antecedent": true,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 1,
+        "negated_count": 1,
+        "correction": "replace_previous",
+        "continuation": "none",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-02",
+      "family": "correction",
+      "has_structured_antecedent": true,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 2,
+        "negated_count": 1,
+        "correction": "replace_previous",
+        "continuation": "none",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-03",
+      "family": "correction",
+      "has_structured_antecedent": true,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 2,
+        "negated_count": 1,
+        "correction": "replace_previous",
+        "continuation": "none",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-04",
+      "family": "correction",
+      "has_structured_antecedent": true,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 2,
+        "negated_count": 1,
+        "correction": "replace_previous",
+        "continuation": "none",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-05",
+      "family": "temporal",
+      "has_structured_antecedent": false,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 2,
+        "negated_count": 0,
+        "correction": "none",
+        "continuation": "none",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-06",
+      "family": "temporal",
+      "has_structured_antecedent": false,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 2,
+        "negated_count": 0,
+        "correction": "none",
+        "continuation": "none",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-07",
+      "family": "temporal",
+      "has_structured_antecedent": false,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 0,
+        "negated_count": 0,
+        "correction": "none",
+        "continuation": "none",
+        "clarification": true
+      }
+    },
+    {
+      "fixture_id": "F3PC-08",
+      "family": "continuity",
+      "has_structured_antecedent": true,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 1,
+        "negated_count": 0,
+        "correction": "none",
+        "continuation": "active_entity",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-09",
+      "family": "continuity",
+      "has_structured_antecedent": true,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 1,
+        "negated_count": 0,
+        "correction": "none",
+        "continuation": "active_entity",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-10",
+      "family": "continuity",
+      "has_structured_antecedent": true,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 2,
+        "negated_count": 0,
+        "correction": "none",
+        "continuation": "active_entity",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-11",
+      "family": "independent_negation",
+      "has_structured_antecedent": true,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 2,
+        "negated_count": 1,
+        "correction": "replace_previous",
+        "continuation": "none",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-12",
+      "family": "independent_negation",
+      "has_structured_antecedent": true,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 2,
+        "negated_count": 1,
+        "correction": "replace_previous",
+        "continuation": "none",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-13",
+      "family": "identification_service",
+      "has_structured_antecedent": false,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 2,
+        "negated_count": 0,
+        "correction": "none",
+        "continuation": "none",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-14",
+      "family": "identification_service",
+      "has_structured_antecedent": false,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 2,
+        "negated_count": 0,
+        "correction": "none",
+        "continuation": "none",
+        "clarification": false
+      }
+    },
+    {
+      "fixture_id": "F3PC-15",
+      "family": "ambiguity",
+      "has_structured_antecedent": false,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 0,
+        "negated_count": 0,
+        "correction": "none",
+        "continuation": "none",
+        "clarification": true
+      }
+    },
+    {
+      "fixture_id": "F3PC-16",
+      "family": "ambiguity",
+      "has_structured_antecedent": false,
+      "has_reference_time": true,
+      "has_time_zone": true,
+      "expected": {
+        "positive_count": 0,
+        "negated_count": 0,
+        "correction": "none",
+        "continuation": "none",
+        "clarification": true
+      }
+    }
+  ],
+  "execution_requirements": [
+    "explicit_user_authorization",
+    "isolated_preview_deployment_with_a_dedicated_route",
+    "authenticated_synthetic_owner",
+    "one_request_per_fixture",
+    "zero_automatic_retries",
+    "execute_false",
+    "no_commercial_handlers"
+  ],
+  "secrets_persisted": false,
+  "prompts_persisted": false,
+  "provider_responses_persisted": false
+}

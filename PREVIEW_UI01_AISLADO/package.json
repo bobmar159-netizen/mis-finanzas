@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "name": "yarbi-ui01-isolated-preview",
+  "version": "1.0.0",
+  "description": "Paquete aislado para validar UI-01 de Yarbi en Preview."
+}

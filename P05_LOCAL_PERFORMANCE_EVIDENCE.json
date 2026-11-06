@@ -1,0 +1,43 @@
+{
+  "schema": "yarbi.p05.local-performance.v1",
+  "generated_at": "2026-11-05T18:05:01.879Z",
+  "environment": "local_no_network",
+  "metrics": [
+    {
+      "name": "owner_identity_classification",
+      "samples": 200,
+      "median_ms": 0.0179,
+      "p95_ms": 0.0386,
+      "min_ms": 0.0161,
+      "max_ms": 0.9078
+    },
+    {
+      "name": "context_recovery",
+      "samples": 200,
+      "median_ms": 0.0062,
+      "p95_ms": 0.019,
+      "min_ms": 0.005,
+      "max_ms": 0.4145
+    },
+    {
+      "name": "local_candidate_search",
+      "samples": 200,
+      "median_ms": 0.0274,
+      "p95_ms": 0.0616,
+      "min_ms": 0.0193,
+      "max_ms": 1.7414
+    },
+    {
+      "name": "owner_turn_processing",
+      "samples": 100,
+      "median_ms": 0.217,
+      "p95_ms": 0.4197,
+      "min_ms": 0.1971,
+      "max_ms": 3.4082
+    }
+  ],
+  "limitations": [
+    "No incluye red, Supabase, Gemini, cold-start, Vercel ni almacenamiento remoto.",
+    "No representa latencia de producción."
+  ]
+}

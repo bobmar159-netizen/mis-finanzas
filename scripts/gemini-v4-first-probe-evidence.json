@@ -1,0 +1,58 @@
+{
+  "phase": "gemini_v4_first_probe",
+  "state": "preview_request_dispatched",
+  "deployment_id": "dpl_HicTemA7jmtFUvNxM8iwLLMjwLWq",
+  "preview": "https://misfinanzas-backend-j1u30ej9t-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "fixture_id": "F3V4-CORRECTION",
+  "model": "gemini-3.5-flash-lite",
+  "automatic_retries": 0,
+  "execute_false": true,
+  "dispatched_at": "2026-11-04T03:51:37.658Z",
+  "credentials_persisted": false,
+  "result": "REQUEST_COMPLETED",
+  "request_count": 1,
+  "public_http_status": 200,
+  "public_http_status_observed": true,
+  "public_ok": true,
+  "public_error": null,
+  "route": "GEMINI_V4_FIRST_PROBE",
+  "operation_id": "op1-gemini_v4_probe-b70b4ec603f454961ed0e80df2d9591b",
+  "commercial_actions_executed": false,
+  "schema_sha256": "c72ccc5895d02dbbb56fa482cca4397f3d119b73f64a707fb45fea7cfcee87c6",
+  "schema_bytes": 2068,
+  "provider_http_status": 200,
+  "provider_diagnostic": null,
+  "gemini_ms": 1533,
+  "server_total_ms": 2998,
+  "pipeline": {
+    "status": "passed",
+    "stage": "completed",
+    "code": null,
+    "timings_ms": {
+      "strict_normalize_ms": 0,
+      "v4_hardener_ms": 2,
+      "v4_v1_adapter_ms": 1,
+      "v1_normalize_ms": 0,
+      "v3_hardener_ms": 2
+    },
+    "assertions": {
+      "discarded_name_never_positive": true,
+      "replacement_name_positive": true,
+      "correction_replace_previous": true,
+      "may_auto_select_false": true,
+      "no_sql_exclusions": true,
+      "verified_provenance": true
+    }
+  },
+  "trace_closed": true,
+  "allowed_egress": [
+    "isolated_supabase_auth_and_ledger",
+    "gemini_generate_content"
+  ],
+  "round_trip_ms": 9174,
+  "provider_body_persisted": false,
+  "utterance_persisted": false,
+  "production_used": false,
+  "generated_at": "2026-11-04T03:51:46.836Z"
+}

@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "proxy": {
+    "entrypoint": "proxy.js",
+    "matcher": ["/api/:path*"]
+  },
+  "routes": [
+    { "src": "/auth/callback", "dest": "/api/assistant-router.js?__p06_route=preferences&action=auth-callback" },
+    { "src": "/api/webhook", "dest": "/api/webhook.js" },
+    { "src": "/api/whatsapp/messages", "dest": "/api/webhook.js" },
+    { "src": "/api/supabase-secure", "dest": "/api/supabase-secure.js" },
+    { "src": "/api/notion-proxy", "dest": "/api/notion-proxy.js" },
+    { "src": "/api/actions/approve", "dest": "/api/actions/approve.js" },
+    { "src": "/api/ai/process", "dest": "/api/ai/process.js" },
+    { "src": "/api/assistant/send-whatsapp", "dest": "/api/assistant/send-whatsapp.js" },
+    { "src": "/api/assistant/chat", "dest": "/api/assistant-router.js?__p06_route=chat" },
+    { "src": "/api/assistant/collections", "dest": "/api/assistant-router.js?__p06_route=collections" },
+    { "src": "/api/assistant/command", "dest": "/api/assistant-router.js?__p06_route=command" },
+    { "src": "/api/assistant/crm-search", "dest": "/api/assistant-router.js?__p06_route=crm-search" },
+    { "src": "/api/assistant/live-token", "dest": "/api/assistant-router.js?__p06_route=live-token" },
+    { "src": "/api/assistant/owner-action", "dest": "/api/assistant-router.js?__p06_route=owner-action" },
+    { "src": "/api/assistant/owner-inbox", "dest": "/api/assistant-router.js?__p06_route=owner-inbox" },
+    { "src": "/api/assistant/preferences", "dest": "/api/assistant-router.js?__p06_route=preferences" },
+    { "src": "/api/assistant/proactive-loop", "dest": "/api/assistant-router.js?__p06_route=proactive-loop" },
+    { "src": "/api/assistant/reference-candidates", "dest": "/api/assistant-router.js?__p06_route=reference-candidates" },
+    { "src": "/api/assistant/scheduled-followups", "dest": "/api/assistant-router.js?__p06_route=scheduled-followups" },
+    { "src": "/api/audit/trace", "dest": "/api/utility-router.js?__p06_route=trace" },
+    { "src": "/api/location/resolve", "dest": "/api/utility-router.js?__p06_route=resolve" },
+    { "src": "/privacy", "dest": "/privacy.html" }
+  ]
+}

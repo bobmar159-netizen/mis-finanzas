@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "name": "yarbi-owner-references-isolated-preview",
+  "version": "1.0.0",
+  "description": "Preview aislado, de solo lectura, para referencias autenticadas de Yarbi."
+}

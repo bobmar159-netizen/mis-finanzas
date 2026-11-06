@@ -1,0 +1,239 @@
+{
+  "phase": "gemini_typed_mentions_real",
+  "result": "PASS_WITH_OBSERVATIONS",
+  "conclusion": "GEMINI_COMPRENSION_ENDURECIDA_CON_OBSERVACIONES",
+  "preview": "https://misfinanzas-backend-9fqjlejbq-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "model": "gemini-3.5-flash-lite",
+  "contract": "yarbi.owner-understanding.v3",
+  "service_5x": {
+    "pass": false,
+    "quality": {
+      "semantic_correct": 0,
+      "total": 5,
+      "schema_correct": 0,
+      "typed_mentions_correct": 0,
+      "hallucination_count": 0,
+      "provider_error_count": 5,
+      "timeout_count": 0,
+      "execute_false": true,
+      "failed_cases": [
+        "F3G-SERVICE"
+      ],
+      "gemini_ms": {
+        "n": 0,
+        "min_ms": null,
+        "p50_ms": null,
+        "p95_ms": null,
+        "max_ms": null
+      },
+      "server_total_ms": {
+        "n": 0,
+        "min_ms": null,
+        "p50_ms": null,
+        "p95_ms": null,
+        "max_ms": null
+      }
+    },
+    "results": [
+      {
+        "case_id": "F3G-SERVICE",
+        "round": 1,
+        "semantic_pass": false,
+        "schema_pass": false,
+        "typed_mentions_pass": false,
+        "hallucination_detected": false,
+        "hallucination_reasons": [],
+        "execute_false": true,
+        "semantic_failures": [
+          "schema",
+          "intent",
+          "service",
+          "provenance",
+          "typed_mentions",
+          "provider:understanding_unavailable"
+        ],
+        "gemini_ms": null,
+        "server_total_ms": null,
+        "status": 503,
+        "route": null,
+        "round_trip_ms": 8615,
+        "provider_error": "understanding_unavailable",
+        "timeout": false
+      },
+      {
+        "case_id": "F3G-SERVICE",
+        "round": 2,
+        "semantic_pass": false,
+        "schema_pass": false,
+        "typed_mentions_pass": false,
+        "hallucination_detected": false,
+        "hallucination_reasons": [],
+        "execute_false": true,
+        "semantic_failures": [
+          "schema",
+          "intent",
+          "service",
+          "provenance",
+          "typed_mentions",
+          "provider:understanding_unavailable"
+        ],
+        "gemini_ms": null,
+        "server_total_ms": null,
+        "status": 503,
+        "route": null,
+        "round_trip_ms": 7048,
+        "provider_error": "understanding_unavailable",
+        "timeout": false
+      },
+      {
+        "case_id": "F3G-SERVICE",
+        "round": 3,
+        "semantic_pass": false,
+        "schema_pass": false,
+        "typed_mentions_pass": false,
+        "hallucination_detected": false,
+        "hallucination_reasons": [],
+        "execute_false": true,
+        "semantic_failures": [
+          "schema",
+          "intent",
+          "service",
+          "provenance",
+          "typed_mentions",
+          "provider:understanding_unavailable"
+        ],
+        "gemini_ms": null,
+        "server_total_ms": null,
+        "status": 503,
+        "route": null,
+        "round_trip_ms": 7703,
+        "provider_error": "understanding_unavailable",
+        "timeout": false
+      },
+      {
+        "case_id": "F3G-SERVICE",
+        "round": 4,
+        "semantic_pass": false,
+        "schema_pass": false,
+        "typed_mentions_pass": false,
+        "hallucination_detected": false,
+        "hallucination_reasons": [],
+        "execute_false": true,
+        "semantic_failures": [
+          "schema",
+          "intent",
+          "service",
+          "provenance",
+          "typed_mentions",
+          "provider:understanding_unavailable"
+        ],
+        "gemini_ms": null,
+        "server_total_ms": null,
+        "status": 503,
+        "route": null,
+        "round_trip_ms": 7874,
+        "provider_error": "understanding_unavailable",
+        "timeout": false
+      },
+      {
+        "case_id": "F3G-SERVICE",
+        "round": 5,
+        "semantic_pass": false,
+        "schema_pass": false,
+        "typed_mentions_pass": false,
+        "hallucination_detected": false,
+        "hallucination_reasons": [],
+        "execute_false": true,
+        "semantic_failures": [
+          "schema",
+          "intent",
+          "service",
+          "provenance",
+          "typed_mentions",
+          "provider:understanding_unavailable"
+        ],
+        "gemini_ms": null,
+        "server_total_ms": null,
+        "status": 503,
+        "route": null,
+        "round_trip_ms": 7245,
+        "provider_error": "understanding_unavailable",
+        "timeout": false
+      }
+    ]
+  },
+  "six_families_3x": {
+    "executed": false,
+    "pass": false,
+    "quality": {
+      "semantic_correct": 0,
+      "total": 0,
+      "schema_correct": 0,
+      "typed_mentions_correct": 0,
+      "hallucination_count": 0,
+      "provider_error_count": 0,
+      "timeout_count": 0,
+      "execute_false": true,
+      "failed_cases": [],
+      "gemini_ms": {
+        "n": 0,
+        "min_ms": null,
+        "p50_ms": null,
+        "p95_ms": null,
+        "max_ms": null
+      },
+      "server_total_ms": {
+        "n": 0,
+        "min_ms": null,
+        "p50_ms": null,
+        "p95_ms": null,
+        "max_ms": null
+      }
+    },
+    "results": []
+  },
+  "fresh_14": {
+    "executed": false,
+    "pass": false,
+    "quality": {
+      "semantic_correct": 0,
+      "total": 0,
+      "schema_correct": 0,
+      "typed_mentions_correct": 0,
+      "hallucination_count": 0,
+      "provider_error_count": 0,
+      "timeout_count": 0,
+      "execute_false": true,
+      "failed_cases": [],
+      "gemini_ms": {
+        "n": 0,
+        "min_ms": null,
+        "p50_ms": null,
+        "p95_ms": null,
+        "max_ms": null
+      },
+      "server_total_ms": {
+        "n": 0,
+        "min_ms": null,
+        "p50_ms": null,
+        "p95_ms": null,
+        "max_ms": null
+      }
+    },
+    "results": []
+  },
+  "v2_local_structural": {
+    "executed": false,
+    "pass": null
+  },
+  "generated_at": "2026-11-02T14:38:03.969Z",
+  "notes": {
+    "credentials_persisted": false,
+    "utterances_persisted": false,
+    "proposed_names_persisted": false,
+    "commercial_actions_executed": false,
+    "production_used": false,
+    "execute_false": true
+  }
+}

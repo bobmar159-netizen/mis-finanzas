@@ -1,0 +1,16 @@
+{
+  "phase": "v4_route_auth_continuity",
+  "state": "dispatched",
+  "preview": "https://misfinanzas-backend-dfxg4yyf8-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "request_limit": 4,
+  "automatic_retries": 0,
+  "one_access_token": true,
+  "token_renewal_during_batch": false,
+  "route_mode": "v4_auth_only",
+  "gemini_calls": 0,
+  "fixtures_consumed": 0,
+  "traces_created": 0,
+  "credentials_persisted": false,
+  "dispatched_at": "2026-11-05T06:53:24.283Z"
+}

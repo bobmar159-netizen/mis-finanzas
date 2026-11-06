@@ -1,0 +1,335 @@
+{
+  "phase": "gemini_v4_post_corrections_validation",
+  "state": "preview_batch_dispatched",
+  "preview": "https://misfinanzas-backend-1rs6wnap6-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "fixture_count": 16,
+  "max_calls": 16,
+  "automatic_retries": 0,
+  "execute_false": true,
+  "local_preflight": [
+    {
+      "file": "test-yarbi-compact-understanding-local.cjs",
+      "ok": true,
+      "passed": 12,
+      "total": 12
+    },
+    {
+      "file": "test-yarbi-polarity-proposal-local.cjs",
+      "ok": true,
+      "passed": 18,
+      "total": 18
+    },
+    {
+      "file": "test-yarbi-v4-v1-integration-local.cjs",
+      "ok": true,
+      "passed": 15,
+      "total": 15
+    },
+    {
+      "file": "test-yarbi-v4-adapter-hardening-local.cjs",
+      "ok": true,
+      "passed": 14,
+      "total": 14
+    },
+    {
+      "file": "test-gemini-v4-semantic-validation-local.cjs",
+      "ok": true,
+      "passed": 5,
+      "total": 5
+    },
+    {
+      "file": "test-yarbi-v4-forensic-regression-local.cjs",
+      "ok": true,
+      "passed": 6,
+      "total": 6
+    },
+    {
+      "file": "test-yarbi-v4-post-corrections-local.cjs",
+      "ok": true,
+      "passed": 17,
+      "total": 17
+    }
+  ],
+  "local_preflight_total": 87,
+  "dispatched_at": "2026-11-04T06:35:16.132Z",
+  "credentials_persisted": false,
+  "prompts_persisted": false,
+  "provider_responses_persisted": false,
+  "result": "GEMINI_V4_POST_CORRECTIONS_VALIDATION_BLOCKED",
+  "completed_calls": 3,
+  "results": [
+    {
+      "fixture_id": "F3PC-01",
+      "fixture_family": "correction",
+      "request_http_status": 200,
+      "provider_http_status": 200,
+      "model": "gemini-3.5-flash-lite",
+      "schema_sha256": "c72ccc5895d02dbbb56fa482cca4397f3d119b73f64a707fb45fea7cfcee87c6",
+      "schema_bytes": 2068,
+      "execute_false": true,
+      "commercial_actions_executed": false,
+      "resolver_invoked": false,
+      "automatic_retries": 0,
+      "request_count": 1,
+      "gemini_ms": 5419,
+      "server_total_ms": 7802,
+      "trace_closed": true,
+      "pipeline": {
+        "status": "passed",
+        "stage": "completed",
+        "code": null,
+        "semantic_pass": true,
+        "critical_security_failure": false,
+        "safe_outcome": "adapted_v3",
+        "assertions": {
+          "must_positive": true,
+          "must_negated": true,
+          "no_forbidden_positive": true,
+          "correction_expected": true,
+          "clarification_expected": true,
+          "negated_never_positive_constraint": true,
+          "may_auto_select_false": true,
+          "unresolved_contradiction_blocked": true,
+          "pipeline_expected": true,
+          "resolver_not_invoked": true,
+          "commercial_actions_not_executed": true
+        },
+        "timings_ms": {
+          "strict_normalize_ms": 0,
+          "v4_hardener_ms": 4,
+          "v4_v1_adapter_ms": 1,
+          "v1_normalize_ms": 1,
+          "v3_hardener_ms": 4
+        }
+      },
+      "error": null,
+      "allowed_egress": [
+        "isolated_supabase_auth_and_ledger",
+        "gemini_generate_content"
+      ],
+      "round_trip_ms": 13859
+    },
+    {
+      "fixture_id": "F3PC-02",
+      "fixture_family": "correction",
+      "request_http_status": 200,
+      "provider_http_status": 200,
+      "model": "gemini-3.5-flash-lite",
+      "schema_sha256": "c72ccc5895d02dbbb56fa482cca4397f3d119b73f64a707fb45fea7cfcee87c6",
+      "schema_bytes": 2068,
+      "execute_false": true,
+      "commercial_actions_executed": false,
+      "resolver_invoked": false,
+      "automatic_retries": 0,
+      "request_count": 1,
+      "gemini_ms": 5236,
+      "server_total_ms": 6966,
+      "trace_closed": true,
+      "pipeline": {
+        "status": "passed",
+        "stage": "completed",
+        "code": null,
+        "semantic_pass": true,
+        "critical_security_failure": false,
+        "safe_outcome": "adapted_v3",
+        "assertions": {
+          "must_positive": true,
+          "must_negated": true,
+          "no_forbidden_positive": true,
+          "correction_expected": true,
+          "clarification_expected": true,
+          "negated_never_positive_constraint": true,
+          "may_auto_select_false": true,
+          "unresolved_contradiction_blocked": true,
+          "pipeline_expected": true,
+          "resolver_not_invoked": true,
+          "commercial_actions_not_executed": true
+        },
+        "timings_ms": {
+          "strict_normalize_ms": 0,
+          "v4_hardener_ms": 1,
+          "v4_v1_adapter_ms": 0,
+          "v1_normalize_ms": 0,
+          "v3_hardener_ms": 2
+        }
+      },
+      "error": null,
+      "allowed_egress": [
+        "isolated_supabase_auth_and_ledger",
+        "gemini_generate_content"
+      ],
+      "round_trip_ms": 12703
+    },
+    {
+      "fixture_id": "F3PC-03",
+      "fixture_family": "correction",
+      "request_http_status": 200,
+      "provider_http_status": 200,
+      "model": "gemini-3.5-flash-lite",
+      "schema_sha256": "c72ccc5895d02dbbb56fa482cca4397f3d119b73f64a707fb45fea7cfcee87c6",
+      "schema_bytes": 2068,
+      "execute_false": true,
+      "commercial_actions_executed": false,
+      "resolver_invoked": false,
+      "automatic_retries": 0,
+      "request_count": 1,
+      "gemini_ms": 5969,
+      "server_total_ms": 7664,
+      "trace_closed": true,
+      "pipeline": {
+        "status": "passed",
+        "stage": "completed",
+        "code": null,
+        "semantic_pass": true,
+        "critical_security_failure": false,
+        "safe_outcome": "adapted_v3",
+        "assertions": {
+          "must_positive": true,
+          "must_negated": true,
+          "no_forbidden_positive": true,
+          "correction_expected": true,
+          "clarification_expected": true,
+          "negated_never_positive_constraint": true,
+          "may_auto_select_false": true,
+          "unresolved_contradiction_blocked": true,
+          "pipeline_expected": true,
+          "resolver_not_invoked": true,
+          "commercial_actions_not_executed": true
+        },
+        "timings_ms": {
+          "strict_normalize_ms": 0,
+          "v4_hardener_ms": 1,
+          "v4_v1_adapter_ms": 0,
+          "v1_normalize_ms": 0,
+          "v3_hardener_ms": 1
+        }
+      },
+      "error": null,
+      "allowed_egress": [
+        "isolated_supabase_auth_and_ledger",
+        "gemini_generate_content"
+      ],
+      "round_trip_ms": 12904
+    },
+    {
+      "fixture_id": null,
+      "fixture_family": null,
+      "request_http_status": 401,
+      "provider_http_status": null,
+      "model": null,
+      "schema_sha256": null,
+      "schema_bytes": null,
+      "execute_false": true,
+      "commercial_actions_executed": false,
+      "resolver_invoked": false,
+      "automatic_retries": null,
+      "request_count": null,
+      "gemini_ms": null,
+      "server_total_ms": null,
+      "trace_closed": false,
+      "pipeline": {
+        "status": null,
+        "stage": null,
+        "code": null,
+        "semantic_pass": false,
+        "critical_security_failure": false,
+        "safe_outcome": null,
+        "assertions": null,
+        "timings_ms": {}
+      },
+      "error": "owner_reference_unauthorized",
+      "allowed_egress": [],
+      "round_trip_ms": 10111,
+      "stop_reason": "provider_or_safety_stop"
+    }
+  ],
+  "by_family": {
+    "correction": {
+      "completed": 3,
+      "semantic_pass": 3
+    },
+    "temporal": {
+      "completed": 0,
+      "semantic_pass": 0
+    },
+    "continuity": {
+      "completed": 0,
+      "semantic_pass": 0
+    },
+    "independent_negation": {
+      "completed": 0,
+      "semantic_pass": 0
+    },
+    "identification_service": {
+      "completed": 0,
+      "semantic_pass": 0
+    },
+    "ambiguity": {
+      "completed": 0,
+      "semantic_pass": 0
+    }
+  },
+  "metrics_ms": {
+    "gemini": {
+      "min": 5236,
+      "median": 5419,
+      "max": 5969,
+      "p95": 5969
+    },
+    "handler": {
+      "min": 6966,
+      "median": 7664,
+      "max": 7802,
+      "p95": 7802
+    },
+    "runner": {
+      "min": 12703,
+      "median": 12904,
+      "max": 13859,
+      "p95": 13859
+    },
+    "pipeline": {
+      "strict_normalize": {
+        "min": 0,
+        "median": 0,
+        "max": 0,
+        "p95": 0
+      },
+      "v4_hardener": {
+        "min": 1,
+        "median": 1,
+        "max": 4,
+        "p95": 4
+      },
+      "v4_v1_adapter": {
+        "min": 0,
+        "median": 0,
+        "max": 1,
+        "p95": 1
+      },
+      "v1_normalize": {
+        "min": 0,
+        "median": 0,
+        "max": 1,
+        "p95": 1
+      },
+      "v3_hardener": {
+        "min": 1,
+        "median": 2,
+        "max": 4,
+        "p95": 4
+      }
+    }
+  },
+  "semantic": {
+    "total": "3/3",
+    "unambiguous": "3/13",
+    "correct_abstentions": "0/3",
+    "threshold_90_percent_met": false
+  },
+  "critical_security_failure": true,
+  "production_used": false,
+  "commercial_actions_executed": false,
+  "generated_at": "2026-11-04T08:07:45.964Z"
+}

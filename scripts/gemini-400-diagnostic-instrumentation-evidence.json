@@ -1,0 +1,94 @@
+{
+  "schema": "yarbi.gemini-400-diagnostic-instrumentation.v1",
+  "generated_at": "2026-11-02T18:34:12.157Z",
+  "execution": "local_mocks_only",
+  "real_network_calls": 0,
+  "mocked_fetch_calls": 7,
+  "model": "gemini-3.5-flash-lite",
+  "response_schema_sha256": "6c37a3d36bf8f43ab17f7a23ba9af79d78bd7e00805f8b278416104b97516e32",
+  "response_schema_statistics": {
+    "serialized_bytes": 5513,
+    "node_count": 139,
+    "object_count": 82,
+    "array_count": 57,
+    "property_count": 76,
+    "required_entry_count": 76,
+    "enum_count": 15,
+    "enum_value_count": 68,
+    "max_items_total": 38,
+    "max_depth": 5,
+    "nullable_type_array_count": 27,
+    "unsupported_keywords": []
+  },
+  "cases": [
+    {
+      "id": "schema_complexity",
+      "expected": "SCHEMA_UNSUPPORTED",
+      "actual": "SCHEMA_UNSUPPORTED",
+      "pass": true,
+      "raw_provider_content_absent": true
+    },
+    {
+      "id": "schema_invalid",
+      "expected": "SCHEMA_INVALID",
+      "actual": "SCHEMA_INVALID",
+      "pass": true,
+      "raw_provider_content_absent": true
+    },
+    {
+      "id": "unsupported_parameter",
+      "expected": "REQUEST_FIELD_UNSUPPORTED",
+      "actual": "REQUEST_FIELD_UNSUPPORTED",
+      "pass": true,
+      "raw_provider_content_absent": true
+    },
+    {
+      "id": "model_incompatible",
+      "expected": "MODEL_CONFIGURATION_INVALID",
+      "actual": "MODEL_CONFIGURATION_INVALID",
+      "pass": true,
+      "raw_provider_content_absent": true
+    },
+    {
+      "id": "generic",
+      "expected": "PROVIDER_INVALID_ARGUMENT_UNKNOWN",
+      "actual": "PROVIDER_INVALID_ARGUMENT_UNKNOWN",
+      "pass": true,
+      "raw_provider_content_absent": true
+    },
+    {
+      "id": "no_details",
+      "expected": "PROVIDER_INVALID_ARGUMENT_UNKNOWN",
+      "actual": "PROVIDER_INVALID_ARGUMENT_UNKNOWN",
+      "pass": true,
+      "raw_provider_content_absent": true
+    },
+    {
+      "id": "structured_field_violation",
+      "expected": "SCHEMA_UNSUPPORTED",
+      "actual": "SCHEMA_UNSUPPORTED",
+      "pass": true,
+      "raw_provider_content_absent": true
+    }
+  ],
+  "privacy": {
+    "all_raw_provider_content_absent": true,
+    "trace_raw_provider_content_absent": true,
+    "trace_fields": [
+      "category",
+      "http_status",
+      "model",
+      "provider",
+      "provider_status",
+      "schema_sha256",
+      "signals"
+    ]
+  },
+  "contract": {
+    "semantic_prompt_changed": false,
+    "response_json_schema_changed": false,
+    "model_changed": false,
+    "generation_config_changed": false
+  },
+  "conclusion": "LOCAL_DIAGNOSTIC_INSTRUMENTATION_PASS"
+}

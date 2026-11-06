@@ -1,0 +1,17 @@
+{
+  "phase": "gemini_polarity_contradiction_proposal_local",
+  "result": "PASS",
+  "test_total": 18,
+  "test_passed": 18,
+  "network_calls": 0,
+  "commercial_actions": 0,
+  "active_endpoint_modified": false,
+  "schema_metrics": {
+    "active_v1_bytes": 5513,
+    "compact_v4_bytes": 2068,
+    "reduction_percent": 62.49,
+    "active_v1_sha256": "6c37a3d36bf8f43ab17f7a23ba9af79d78bd7e00805f8b278416104b97516e32",
+    "compact_v4_sha256": "c72ccc5895d02dbbb56fa482cca4397f3d119b73f64a707fb45fea7cfcee87c6"
+  },
+  "decision": "LOCAL_PROPOSAL_VALIDATED_NOT_CONNECTED"
+}

@@ -1,0 +1,310 @@
+{
+  "phase": "owner_references_preview_trace_read",
+  "result": "PASS",
+  "project_ref": "uevilhbstnmmdlgyshlv",
+  "operation_count": 29,
+  "expected_operation_count": 29,
+  "window": {
+    "from": "2026-11-01T19:05:07.661Z",
+    "to": "2026-11-01T19:26:07.661Z"
+  },
+  "summaries": [
+    {
+      "operation_id": "owner_reference_1",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_2",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": false,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_3",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_4",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_5",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_6",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_7",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_8",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_9",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_10",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": false,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_11",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_12",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_13",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_14",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_15",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": false,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_16",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": false,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_17",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_18",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_19",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_20",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_21",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_22",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_23",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_24",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_25",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_26",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": false,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_27",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": false,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_28",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": true,
+      "forbidden_payload_keys_absent": true
+    },
+    {
+      "operation_id": "owner_reference_29",
+      "event_count": 3,
+      "started": true,
+      "terminal": true,
+      "operation_closed_count": 1,
+      "closed_once": true,
+      "refs_present": false,
+      "forbidden_payload_keys_absent": true
+    }
+  ],
+  "notes": {
+    "read_only": true,
+    "rows_exported": false,
+    "secrets_persisted": false,
+    "refs_values_persisted": false,
+    "operation_ids_persisted": false
+  }
+}

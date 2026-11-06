@@ -1,0 +1,156 @@
+{
+  "schema": "yarbi.release-manifest.v1",
+  "generated_at": "2026-11-05T00:00:00-05:00",
+  "scope": "local_read_only_baseline",
+  "status": "FROZEN_IDENTIFICATION_ONLY",
+  "integrity": {
+    "hash_algorithm": "SHA-256",
+    "collection_digest_rule": "UTF-8 sorted relative_path + TAB + lowercase file SHA-256, joined by LF",
+    "excluded_from_android_source_tree": ["node_modules", "build", ".gradle", "backups"],
+    "no_secrets_or_environment_values_included": true
+  },
+  "apk": {
+    "path": "Yarbi_APPDEBUG_3.4.25_WhatsApp_Directo_Estados_20261026.apk",
+    "sha256": "26e9b39b74e239f5b0b0e8c64e892ccb0cfebec3df447d8f59664d64007fd278",
+    "bytes": 28592953,
+    "application_id": "com.misfinanzas.app.yarbitest",
+    "version_code": 116,
+    "version_name": "3.4.25-whatsapp-directo-estados",
+    "validation": "APK archive and Gradle metadata inspected locally"
+  },
+  "android_source": {
+    "path": "YARBI_LATEST_CRM_PHASE2_BUILD_2026-09-15",
+    "source_tree_sha256": "84c317bc3e4a1f216230c434fba84715a9e96304ddb9d31f324fe8ce98859b40",
+    "source_file_count": 711,
+    "capacitor_web_dir": "www",
+    "files": {
+      "index.html": {"sha256":"60ee1cfe7f93ab3d5451b32426dc9afe8f26ab4bdb2da3c5166054d453101c64","bytes":2882547,"matches_apk_asset":true},
+      "www/index.html": {"sha256":"60ee1cfe7f93ab3d5451b32426dc9afe8f26ab4bdb2da3c5166054d453101c64","bytes":2882547,"matches_apk_asset":true},
+      "www/service-worker.js": {"sha256":"8d1fe88d6fd876d7e75f6010651099077058f75310337dc4e6b3bc41ec9a50b9","bytes":1562,"matches_apk_asset":true},
+      "www/yarbi-assistant.js": {"sha256":"caf1a9028085a0d3f0b2048145b2af2ba4e8ab8352c10af5b691b6344dea1e3e","matches_apk_asset":true},
+      "www/yarbi-memory-center.js": {"sha256":"354782d290df7570f49dca0377022fc4fe7c74ab266ad8b277953046a40c443a","matches_apk_asset":true},
+      "www/manifest.json": {"sha256":"524bb19c5f1e61ea79cda9c59fc36472fca826875a32db1da1982780173e7a82","matches_apk_asset":true},
+      "android/app/build.gradle": {"sha256":"85fec083887e19b26acaee2e550c1390981f3b4f61dcfc62572651a79b901d75","version_source":true},
+      "android/app/src/main/assets/capacitor.config.json": {"sha256":"08d27446db95deb5d1fb096593eb70f1e652fbd5a9b6331d873324afd712dfd2","declares_web_dir":"www"},
+      "android/app/src/main/AndroidManifest.xml": {"sha256":"a58349ae83af1b7c6cd6e2ef7445ef2514153ca96bf1f76b2b763ebf800ac40b"}
+    },
+    "official_for_current_apk": "www/ because Capacitor packaged configuration declares webDir=www and its assets match the APK"
+  },
+  "backend_candidate": {
+    "path": "YARBI_BACKEND_MERGED_20260930",
+    "vercel_project_link": "misfinanzas-backend",
+    "vercel_build_command": null,
+    "vercel_output_directory": null,
+    "production_code_equivalence": "NOT_PROVEN",
+    "release_files": {
+      "index.html": {"sha256":"19d2ead74b76a2624d1fe9268e0b59ba5eb62af51bbe124d4ecf3d57921fc0c2","bytes":2771995,"status":"diverges_from_apk"},
+      "www/index.html": {"sha256":"dbc4a1a1ee5c8b32d8f197052f46f8632caeeacd12e9ec96028c44aaddb586a1","bytes":2771708,"status":"diverges_from_apk_and_root"},
+      "www/service-worker.js": {"sha256":"08c2d254129f824f0d5424f3137dc1d106799721557ce9158f479de99d8c9667","bytes":1562,"status":"diverges_from_apk"},
+      "www/yarbi-assistant.js": {"sha256":"caf1a9028085a0d3f0b2048145b2af2ba4e8ab8352c10af5b691b6344dea1e3e","matches_apk_asset":true},
+      "www/yarbi-memory-center.js": {"sha256":"354782d290df7570f49dca0377022fc4fe7c74ab266ad8b277953046a40c443a","matches_apk_asset":true},
+      "package.json": "71cf185c23e2199d67f82e2ff74dd975105cba46c16ef680631d4151a589698c",
+      "package-lock.json": "3c34fbb6b9c18dbaf11b504fac55f2a01f9d101f1f29efff3bdb0c6b3f0e53eb",
+      "vercel.json": "8a9cbc86604e6abbcb9b9d6660d6dd3c9d2356a80906edb87de3e98c0fad9b26"
+    }
+  },
+  "official_sources": {
+    "current_android_apk": {"source":"YARBI_LATEST_CRM_PHASE2_BUILD_2026-09-15/www","status":"JUSTIFIED"},
+    "future_vercel_static_candidate": {"source":"YARBI_BACKEND_MERGED_20260930/index.html","status":"CANDIDATE_NOT_DEPLOYMENT_VERIFIED","reason":"linked Vercel root has no configured build command or output directory"},
+    "future_android_candidate": {"source":"YARBI_BACKEND_MERGED_20260930/www","status":"CANDIDATE_ONLY","reason":"matches Capacitor convention but diverges from root and APK"},
+    "universal_frontend_source": {"source":null,"status":"BLOCKED_ARCHITECTURAL_DECISION_REQUIRED","reason":"no local build contract proves one existing divergent file is safe for both Android and Vercel"}
+  },
+  "functions": {
+    "count": 18,
+    "collection_sha256":"62cc6e29a4afc37ac5bb54d6b81237ae1b053f947163f31791e4a35546ce4ef1",
+    "members": {
+      "api/actions/approve.js":"10e653adb6584b4c8eaa44fd82ff2072b50623aeaadcbe66beab5c97a2b26a3b",
+      "api/ai/process.js":"34773656249d594acb06b5ca3767eb70a81deefd18714ffe43bf8db0eea28c00",
+      "api/assistant/chat.js":"cc3b1d4a14a1bbde26b0172ab44271b63bfa52558fe9bbd5caa2a76922a78103",
+      "api/assistant/collections.js":"d2863c78f66068f0ce5633ec38a1970e59511d721e018ffee6a6ae30d27298bb",
+      "api/assistant/command.js":"c6e73d7f4da8dbafa7a0d7d1dd4c4a0e305febec69fd2042bb4e99e9f72e8c58",
+      "api/assistant/live-token.js":"d152de672508a44d7b3e391be8002d1a99c84e6a5e154ab8e0795753e798d9ef",
+      "api/assistant/owner-action.js":"d128fa00c47a813845b4d7ba599b039b701213ca6ff107f606eee20481280036",
+      "api/assistant/owner-inbox.js":"a9f29d83f60558a4318b64466faea294e49158c6ea7ab290b994c92727509656",
+      "api/assistant/preferences.js":"7e401fee0072da95c2e9f1593c60de325814e1640b3200bcb2d1b9a33b91e9d5",
+      "api/assistant/proactive-loop.js":"50bf9fc7a215f16bdd6f005bb3b73f8723578d46771e1c7de61af2931ea627dc",
+      "api/assistant/reference-candidates.js":"002dbbcb4cf0362e91602aedc6c6b5ddaccb701c31e2df5888c6672f8dd7130a",
+      "api/assistant/scheduled-followups.js":"6fefe09ddaca010bafc1c93c132704a47908e3b231fdfe1b2d30d9972b3d409a",
+      "api/assistant/send-whatsapp.js":"6ce48a7bf54dc2cb7cbba8753d54f3696363b9eb2ed614687cdd1288be00a343",
+      "api/audit/trace.js":"fa1fc2ca2d81cda5184a36cab2c64e682ed82bea9fdf3a4a9feb0b6f288b0aee",
+      "api/location/resolve.js":"80dc5e2f5326fb55777424ab950553cb45f1a48741a4d3b1f721dcb042d02553",
+      "api/notion-proxy.js":"b7d20531832c2e3928aa7f2aca71e2364216866bc7efb53403b8963fb48f5c6a",
+      "api/supabase-secure.js":"981a6aa4e68e412875f3aaf95e813b246b20eccc8a9d397836db327e6922cd3b",
+      "api/webhook.js":"619ca54c78859e44f16e6ae1a73d34a025f9e60f831cf577b8813471aee0c3b6"
+    }
+  },
+  "migrations": {
+    "count": 24,
+    "collection_sha256":"073d2c84843a3ca97f0ce05e4139ed3a78eaf99a9ac4618b09d76f5d711cf0f3",
+    "members": {
+      "20261026_yarbi_scheduled_messages.sql":"c7cc86b13087395d5cdae2c856b843906e7d8948a6ae206980b6c8e02f745997",
+      "20261030_f3a_identity_crm_minimo_fix_contact_id_ambiguity.sql":"6d8b9f4d33a9e4fb17daa6760b407ae32340f175cf4de277ec71a9c17cfe201c",
+      "20261030_f3a_identity_crm_minimo.sql":"6bb468f2b15b3a84786a9fe1ff1101e4be80cad00e9b5a5cb8e54ecb3be40cca",
+      "20261030_f3b_commercial_context_event_timestamps.sql":"0d790e08cb212274c4501441a01cfaca30bb8be5c10e5502619e83e1f9f39ddb",
+      "20261030_f3b_commercial_context_minimo.sql":"46b619998e6dbef773c7a5af3c872141a3250daf2e757c218156a45fe0b3ecc7",
+      "20261030_f3b_commercial_context_prevent_stale_replay.sql":"1245672da61e792673ba5c2a742ae88f04e9223af0528f108cee3c83a42a2476",
+      "20261030_f3e_operational_memory_rpc_fix.sql":"4392f6c8fbd7d33b16dd77d0645825ce0cc9855a26e768a1ba22ceef8a8aa194",
+      "20261030_f3e_operational_memory.sql":"da201c2cd37f74c60c833a2d9c561c4eea65c98223e209738b3fdaecd2da146b",
+      "20261030_f3j_proactive_loop.sql":"70e2c263ece4e4d6a5f2e1d687b646fbbdf4824f88c8de92f0f0b1537fdb58cf",
+      "20261030_f3k_owner_authorization_rpc_fix_v2.sql":"ef914bcce3da3b5a14226b6a69e66f18c1b61c8bb7dc1bf265a326846750ddec",
+      "20261030_f3k_owner_authorization_rpc_fix_v3.sql":"2f2618900eef2f5c46c77c5f1a81a88c3e41ee3bc827acb005aa428aa17e5b94",
+      "20261030_f3k_owner_authorization_rpc_fix.sql":"174d3dd2d2a4454141329bf0db121079aa8f5dabea20dd9be9a25ff516bb75b6",
+      "20261030_f3k_owner_authorization.sql":"a6215f318646154880011ba9da128ce508f1219bb072e16f9a527a66f24e30f0",
+      "20261101_owner_contact_scope_isolated.sql":"665a80374b2fac2b44311bceee1aac1554948b3d9e7376f061f77705c90ed110",
+      "F3_OWNER_SCOPE_FUNCTIONAL_ASSERTIONS.sql":"9985deb781db616b9776b61d2ac21f880e39173226664e4bfc28fe133e7251fa",
+      "F3_OWNER_SCOPE_SERVICE_ROLE_ASSERTION.sql":"f7aa40041b39066973d068eb18085669b4269aa65ed8a15740fd6669759b844e",
+      "F3_OWNER_SCOPE_SYNTHETIC_FIXTURES.sql":"96ed483d67479cd8d7928efcaaaad9bf5a679e77cfec53792d4b22fce73aaa33",
+      "F3_OWNER_SCOPE_VERIFY_SYNTHETIC.sql":"2a331dca026f3e94d1f25256b9dfe6d0e430e6785990207bef1892823c3ea202",
+      "F3REF_E2E_REASSIGN_SYNTHETIC_SCOPES.sql":"aa4c8bcfc403e384234f9cf0457b9246c1c86e1d23d5134ddb8ee2fa76d0d5c2",
+      "PROPOSED_20261101_yarbi_owner_contact_scope.sql":"150e69e7ef9ea23bc04cdc5933b5cee483058119b3d56f885fcb46fe14f07b55",
+      "YARBI_AGENT_ACTION_LEDGER_20261025.sql":"23d5e36fc4e64389018d773b3a24b903c2474409670c08812a1d03bb50b550ba",
+      "YARBI_AGENT_ACTION_LEDGER_HARDENING_20261025.sql":"4008e47f896fed17571fcf5d918bf8b53ec5d9c1c94fe07cbe33ca603f42e201",
+      "YARBI_CHAT_HISTORY_MIGRATION_20261008.sql":"9655615c7c0d0262cf04f5d60f060d0f52a89da35392d77ad0fd4619f1e55168",
+      "YARBI_TRAINING_EXAMPLES_MIGRATION_20261019.sql":"c18ad3ab781d286f06d2117bfe5d165480d0c42137319d7b68eb174692780615"
+    },
+    "application_state": "NOT_PROVEN_LOCAL_ONLY"
+  },
+  "intelligence_modules": {
+    "count": 32,
+    "collection_sha256":"4358a7caa417f2704a46daca2a2b7e7855e5772f4259aa25137ae33a2fae3ea0",
+    "principal_members": {
+      "lib/yarbi-trace.js":"983ccb2e2b8777da2953764ca0352f8ad78a0a27d33668b3a75f1605918f6453",
+      "lib/yarbi-processing-recovery.js":"7ba55be1eae1cfdfd27b0201da587cb92cd7746afc4ac6110e9ff23bc25c72a6",
+      "lib/yarbi-contact-resolution.js":"d08efbed9e7ff56199e94b747e555b497ca56daec3b8c7fd9325761588781a53",
+      "lib/yarbi-contact-identity.js":"9daaf0b98019556eab21b06a6f3b495f5aca13766906985bd7cefb3230f25266",
+      "lib/yarbi-commercial-context.js":"ee5e81ec960035920f3126bb2043c2618f84a9c026e85e076f9a4a52bf9e932b",
+      "lib/yarbi-commercial-evidence.js":"9d90d0a7c5713c65d5d1259d067f06677a6816ea84a9ac05256cbd3f2dee538f",
+      "lib/yarbi-operational-memory.js":"9b6f294b04564f99265833b3c70ff2358c2655b7dc503fec89d51087dd85ad44",
+      "lib/yarbi-owner-scope.js":"1266d8d9d6bfcdf6db431aefdc586e353ed3460e20fa1809e6652e0df7ee0cd2",
+      "lib/yarbi-owner-reference-candidates.js":"739821689d5351ae857a8c14db93659fef1f00a629772b89c35908a3a7dc5578",
+      "lib/yarbi-candidate-resolver.js":"a1bac44ef32be217dda6597cb8f387f90a77ecde7c4bdcdbc536e73284e343f2",
+      "lib/yarbi-owner-understanding.js":"c7501ee01440915472a66f606e0882418e5c2f5001932e936d923670d0a7988e",
+      "lib/yarbi-gemini-owner-understanding.js":"2393c719e1881559b16c1bfa8129a3c23db2e15b9b66c37ac6089d1d6c9a668b",
+      "lib/yarbi-semantic-hardening.js":"177ab4fbce045b211dccd5e40c0101652089c72ef2badc9f8f4ed0efcdc8e36d",
+      "lib/yarbi-next-best-action.js":"df9b743b52ec9b71054644c11d8a1a6f15807c8ade2078d9e35b720cc9863e60",
+      "lib/yarbi-owner-proactive-orchestrator.js":"fabad2f1cd3203e15f44682c564ebe6194a513f3c93e1e37cc9d64a10808bae2",
+      "lib/yarbi-proactive-loop.js":"c6fabe4d5681ff729455b41fd9e41524aace1bd3d389bcb940498fd5c6e527a9",
+      "lib/yarbi-unified-contact-context.js":"7346c9902660a301743115f140868c414ff12c70897cf12b90b491ab3b1f8d96"
+    }
+  },
+  "production_url_inventory": {
+    "literal_reference_count_in_backend_www": 44,
+    "host": "misfinanzas-backend.vercel.app",
+    "usage_groups": [
+      {"lines":"9424,15145-15224,15507-15508,16145,17036,17379,20309,22817,30962","purpose":"WhatsApp mirror, alerts, habits and processing reads"},
+      {"lines":"10695-11058,18066,19015-19103","purpose":"chat, Live token, send WhatsApp and command"},
+      {"lines":"10800,11956-12298,14451-14475,19773-19788","purpose":"account/auth/preferences/learning"},
+      {"lines":"14190,20451,20787-20844,22477-22511,28017,31467-31863","purpose":"collections, process, location, secure import/delete and agenda approval"}
+    ],
+    "safe_future_alternatives": [
+      "same-origin relative API paths for a frontend served with its backend",
+      "validated build-time public origin for an intentionally separate frontend",
+      "server-only environment variables validated fail-closed per Preview/Production"
+    ],
+    "status":"INVENTORIED_NOT_MODIFIED"
+  }
+}

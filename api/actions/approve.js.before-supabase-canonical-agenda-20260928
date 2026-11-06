@@ -1,0 +1,217 @@
+/**
+ * API ROUTE / SERVICIO DE APROBACIÓN DE BORRADORES (Human-in-the-Loop)
+ * /api/actions/approve
+ * Aprueba el borrador, actualiza el perfil del cliente y sincroniza en paralelo con Calendar, Sheets y Notion.
+ */
+
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://haifktjvyhbsazmiyqps.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || '';
+const ASSISTANT_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
+
+// Credenciales / Variables de Entorno para Integraciones
+const NOTION_TOKEN = process.env.NOTION_TOKEN || process.env.FNZ_NOTION_TOKEN || '';
+const NOTION_DB_AGENDA = process.env.NOTION_DB_AGENDA || process.env.FNZ_NOTION_DB_AGENDA || '';
+const GOOGLE_SHEETS_URL = process.env.GOOGLE_SHEETS_URL || process.env.FNZ_SHEETS_URL || '';
+const GOOGLE_CALENDAR_CLIENT_EMAIL = process.env.GOOGLE_CALENDAR_CLIENT_EMAIL || '';
+const GOOGLE_CALENDAR_PRIVATE_KEY = process.env.GOOGLE_CALENDAR_PRIVATE_KEY || '';
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método no permitido' });
+  }
+
+  const header = req.headers?.['x-assistant-token'] || req.headers?.authorization || '';
+  const token = String(header).replace(/^Bearer\s+/i, '').trim();
+  if (!ASSISTANT_TOKEN || token !== ASSISTANT_TOKEN) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+
+  try {
+    const { draft_id, payload } = req.body;
+
+    if (!payload || !payload.client_name) {
+      return res.status(400).json({ error: 'Faltan datos obligatorios del borrador (client_name)' });
+    }
+
+    console.log(`[APROBANDO BORRADOR ${draft_id}] Cliente: ${payload.client_name} | Tipo: ${payload.type || 'visita'}`);
+
+    const syncResults = {
+      supabase_draft: false,
+      supabase_client: false,
+      google_calendar: false,
+      google_sheets: false,
+      notion: false,
+      errors: []
+    };
+
+    // 1. Cambiar estado de draft_actions a 'approved'
+    if (draft_id) {
+      try {
+        const draftRes = await fetch(`${SUPABASE_URL}/rest/v1/draft_actions?id=eq.${draft_id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status: 'approved',
+            payload: payload
+          })
+        });
+        if (draftRes.ok) syncResults.supabase_draft = true;
+      } catch(dErr) {
+        syncResults.errors.push('Supabase draft status error: ' + dErr.message);
+      }
+    }
+
+    // 2. Actualizar perfil del cliente en `clients`
+    if (payload.phone) {
+      try {
+        const clientRes = await fetch(`${SUPABASE_URL}/rest/v1/clients?phone_number=eq.${payload.phone}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: payload.client_name,
+            address_summary: payload.location || ''
+          })
+        });
+        if (clientRes.ok) syncResults.supabase_client = true;
+      } catch(cErr) {
+        syncResults.errors.push('Supabase client update error: ' + cErr.message);
+      }
+    }
+
+    // 3. Sincronización en Paralelo con Servicios Externos (Calendar, Sheets, Notion)
+    const syncPromises = [];
+
+    // A) Sincronización con Notion API
+    if (NOTION_TOKEN && NOTION_DB_AGENDA) {
+      syncPromises.push((async () => {
+        try {
+          const nRes = await fetch('https://api.notion.com/v1/pages', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${NOTION_TOKEN}`,
+              'Notion-Version': '2022-06-28',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              parent: { database_id: NOTION_DB_AGENDA },
+              properties: {
+                'Cliente': { title: [{ text: { content: payload.client_name } }] },
+                'Tipo': { select: { name: (payload.type || 'visita').toUpperCase() } },
+                'Fecha': payload.date ? { date: { start: payload.date } } : undefined,
+                'Servicio': { rich_text: [{ text: { content: payload.service || '' } }] },
+                'Ubicacion': { rich_text: [{ text: { content: payload.location || '' } }] },
+                'Maps': payload.maps_url ? { url: payload.maps_url } : undefined,
+                'Precio': payload.price ? { number: parseFloat(payload.price) } : undefined
+              }
+            })
+          });
+          if (nRes.ok) {
+            syncResults.notion = true;
+          } else {
+            const nErr = await nRes.text();
+            syncResults.errors.push('Notion HTTP ' + nRes.status + ': ' + nErr);
+          }
+        } catch(nErr) {
+          syncResults.errors.push('Notion Exception: ' + nErr.message);
+        }
+      })());
+    }
+
+    // B) Sincronización con Google Sheets Apps Script API
+    if (GOOGLE_SHEETS_URL) {
+      syncPromises.push((async () => {
+        try {
+          const sRes = await fetch(GOOGLE_SHEETS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'add_agenda',
+              data: {
+                tipo: payload.type || 'visita',
+                cliente: payload.client_name,
+                telefono: payload.phone || '',
+                fecha: payload.date || '',
+                hora: payload.time || '',
+                servicio: payload.service || '',
+                ubicacion: payload.location || '',
+                maps: payload.maps_url || '',
+                precio: payload.price || 0,
+                estado: 'confirmado'
+              }
+            })
+          });
+          if (sRes.ok) {
+            syncResults.google_sheets = true;
+          } else {
+            syncResults.errors.push('Google Sheets HTTP ' + sRes.status);
+          }
+        } catch(sErr) {
+          syncResults.errors.push('Google Sheets Exception: ' + sErr.message);
+        }
+      })());
+    }
+
+    // C) Sincronización con Google Calendar API (Servidor HTTP / Apps Script fallback)
+    if (payload.date) {
+      if (!GOOGLE_SHEETS_URL) {
+        syncResults.errors.push('Google Sheets/Calendar URL no configurada');
+      }
+      syncPromises.push((async () => {
+        try {
+          // Intentar crear evento vía Apps Script / Google Calendar Integration
+          if (GOOGLE_SHEETS_URL) {
+            const calRes = await fetch(GOOGLE_SHEETS_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'create_calendar_event',
+                event: {
+                  title: `📍 ${payload.type ? payload.type.toUpperCase() : 'VISITA'}: ${payload.client_name}`,
+                  description: `Cliente: ${payload.client_name}\nCel: ${payload.phone || 'Sin cel'}\nServicio: ${payload.service || ''}\nUbicación: ${payload.location || ''}\nMaps: ${payload.maps_url || ''}`,
+                  date: payload.date,
+                  time: payload.time || '09:00',
+                  location: payload.maps_url || payload.location || 'Lima, Perú'
+                }
+              })
+            });
+            if (calRes.ok) syncResults.google_calendar = true;
+          }
+        } catch(cErr) {
+          syncResults.errors.push('Google Calendar Exception: ' + cErr.message);
+        }
+      })());
+    }
+
+    // Esperar a que todas las sincronizaciones paralelas terminen
+    await Promise.allSettled(syncPromises);
+
+    console.log('[APROBACIÓN COMPLETADA]:', JSON.stringify(syncResults, null, 2));
+
+    return res.status(200).json({
+      status: syncResults.errors.length ? 'partial' : 'success',
+      message: syncResults.errors.length ? 'The action was saved, but one or more external synchronizations failed.' : 'Action approved and synchronized successfully.',
+      syncResults
+    });
+
+  } catch (err) {
+    console.error('[APPROVE ACTION ERROR]', err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+

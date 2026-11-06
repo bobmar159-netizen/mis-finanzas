@@ -1,0 +1,13 @@
+{
+  "phase": "gemini_v4_first_probe",
+  "state": "preview_request_dispatched",
+  "deployment_id": "dpl_HicTemA7jmtFUvNxM8iwLLMjwLWq",
+  "preview": "https://misfinanzas-backend-j1u30ej9t-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "fixture_id": "F3V4-CORRECTION",
+  "model": "gemini-3.5-flash-lite",
+  "automatic_retries": 0,
+  "execute_false": true,
+  "dispatched_at": "2026-11-04T03:51:37.658Z",
+  "credentials_persisted": false
+}

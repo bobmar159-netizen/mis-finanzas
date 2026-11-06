@@ -1,0 +1,3 @@
+a1f113993f1b029aab242cab82b67b0100ab961dc74dded6e44aec4f34ae9546 *lib/yarbi-owner-reference-candidates.js
+668bef801b8d6f8b35bfcb2a0cdfe7f51a19b284fe8626b56901b18c7838d14a *tests/yarbi-owner-reference-candidates.test.js
+ddd95c72b67623da37f367ec51c74bd248c8c449002398d34496a5c96235a6da *YARBI_ADAPTADOR_CANDIDATOS_REALES.md

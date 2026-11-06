@@ -1,0 +1,81 @@
+{
+  "phase": "f3g_service_diagnostic",
+  "preview": "https://misfinanzas-backend-e0zstcbjq-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "model": "gemini-3.5-flash-lite",
+  "calls": 3,
+  "case_id": "F3G-SERVICE",
+  "results": [
+    {
+      "attempt": 1,
+      "status": 200,
+      "execute_false": true,
+      "schema": "yarbi.owner-understanding.v2",
+      "gemini_ms": 6816,
+      "server_total_ms": 9876,
+      "provider_error": null,
+      "name_diagnostic": {
+        "normalized_length_bucket": "0",
+        "token_count": 0,
+        "contains_exact_service_alias": false,
+        "equals_exact_service_alias": false,
+        "wraps_service_alias": false,
+        "evidence_source": "unknown",
+        "evidence_type_detected": "absent",
+        "overlap_with_service_evidence": false,
+        "came_from_conversation_state": false,
+        "category": "other"
+      }
+    },
+    {
+      "attempt": 2,
+      "status": 200,
+      "execute_false": true,
+      "schema": "yarbi.owner-understanding.v2",
+      "gemini_ms": 4372,
+      "server_total_ms": 6845,
+      "provider_error": null,
+      "name_diagnostic": {
+        "normalized_length_bucket": "0",
+        "token_count": 0,
+        "contains_exact_service_alias": false,
+        "equals_exact_service_alias": false,
+        "wraps_service_alias": false,
+        "evidence_source": "unknown",
+        "evidence_type_detected": "absent",
+        "overlap_with_service_evidence": false,
+        "came_from_conversation_state": false,
+        "category": "other"
+      }
+    },
+    {
+      "attempt": 3,
+      "status": 200,
+      "execute_false": true,
+      "schema": "yarbi.owner-understanding.v2",
+      "gemini_ms": 3470,
+      "server_total_ms": 5866,
+      "provider_error": null,
+      "name_diagnostic": {
+        "normalized_length_bucket": "21_50",
+        "token_count": 4,
+        "contains_exact_service_alias": true,
+        "equals_exact_service_alias": false,
+        "wraps_service_alias": true,
+        "evidence_source": "utterance",
+        "evidence_type_detected": "service_reference",
+        "overlap_with_service_evidence": true,
+        "came_from_conversation_state": false,
+        "category": "service_alias_wrapped_in_phrase"
+      }
+    }
+  ],
+  "generated_at": "2026-11-02T14:07:06.837Z",
+  "notes": {
+    "credentials_persisted": false,
+    "utterance_persisted": false,
+    "proposed_name_persisted": false,
+    "production_used": false,
+    "commercial_actions_executed": false
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "phase": "F3J.1",
+  "project_ref": "uevilhbstnmmdlgyshlv",
+  "migration": {
+    "file": "20261030_f3j_proactive_loop.sql",
+    "sha256": "70E2C263ECE4E4D6A5F2E1D687B646FBBDF4824F88C8DE92F0F0B1537FDB58CF",
+    "already_applied": true
+  },
+  "preflight": {
+    "base_objects": [
+      "crm_contacts",
+      "yarbi_contact_operational_memory"
+    ],
+    "loop_objects_before": [
+      "yarbi_owner_inbox",
+      "yarbi_owner_notification_state",
+      "yarbi_proactive_runs"
+    ],
+    "migration_state": "already_applied",
+    "candidate_safety": {
+      "general_candidates_excluded": 6,
+      "eligible_f3j_remote_before": 0
+    }
+  },
+  "fixture": {
+    "fixture": "F3J-REMOTE-mvvhg4wl-92ce5a7d",
+    "contact_id": 11
+  },
+  "handler": {
+    "http_status": 200,
+    "payload": {
+      "ok": true,
+      "status": "completed",
+      "reason": "actionable_business_items",
+      "has_run_key": true,
+      "run_key": "yarbi-proactive:primary:1992661",
+      "has_next_review": true
+    }
+  },
+  "fixture_result": {
+    "run": {
+      "status": "completed",
+      "decision": "notify",
+      "evaluated_contacts": 1,
+      "actionable_count": 1,
+      "has_fingerprint": true
+    },
+    "inbox_count": 1,
+    "inbox": [
+      {
+        "status": "delivered",
+        "urgency": "high",
+        "mode": "interrupt",
+        "has_fingerprint": true
+      }
+    ]
+  },
+  "egress": {
+    "management": [
+      {
+        "host": "api.supabase.com",
+        "path": "/v1/projects/uevilhbstnmmdlgyshlv",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "api.supabase.com",
+        "path": "/v1/projects/uevilhbstnmmdlgyshlv/database/query/read-only",
+        "method": "POST",
+        "allowed": true
+      }
+    ],
+    "handler": [
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/list_yarbi_proactive_candidates",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_contact_operational_memory",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/crm_contacts",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_contact_operational_memory",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/claim_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_notification_state",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/list_yarbi_proactive_candidates",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_contact_operational_memory",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/crm_contacts",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/contact_identifiers",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_contact_operational_memory",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/record_yarbi_proactive_evaluation",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/deliver_yarbi_owner_brief",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/complete_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_proactive_runs",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_inbox",
+        "method": "GET",
+        "allowed": true
+      }
+    ]
+  },
+  "result": "FASE3J_LOOP_PROACTIVO_SCHEDULER_DUENO_VALIDADO_EN_AISLADO",
+  "error": null,
+  "started_at": "2026-10-30T21:26:56.840Z",
+  "project": {
+    "ref": "uevilhbstnmmdlgyshlv"
+  },
+  "completed_at": "2026-10-30T21:27:02.415Z"
+}

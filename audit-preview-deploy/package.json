@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "name": "yarbi-audit-preview-only",
+  "version": "1.0.0",
+  "description": "Paquete aislado para validar el ledger de auditoría de Yarbi en Vercel Preview.",
+  "dependencies": {
+    "@vercel/functions": "3.9.8"
+  }
+}

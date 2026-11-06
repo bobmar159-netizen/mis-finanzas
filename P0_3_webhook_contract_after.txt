@@ -1,0 +1,144 @@
+[WEBHOOK META RECEIVED] {
+  "type": "whatsapp.inbound_message.received",
+  "whatsappInboundMessage": {
+    "id": "F2D2-WEBHOOK-maps",
+    "from": "51999990001",
+    "type": "text",
+    "text": {
+      "body": "F2D2 https://www.google.com/maps/@-12.0464,-77.0428,16z"
+    },
+    "sendTime": "2026-11-05T16:14:16.667Z",
+    "customerProfile": {
+      "name": "F2D2 Cliente"
+    }
+  }
+}
+[WEBHOOK IDENTITY] {"source":"cloud_profile","phone":"999990001","profileName":"F2D2 Cliente","profileUsername":null,"fromUserId":null,"aliases":["F2D2 Cliente"],"contactWaId":"51999990001"}
+[PROCESANDO] Cliente: F2D2 Cliente (999990001) | Maps: Ninguno
+[YARBI BACKGROUND PROCESSOR] 202 {"status":"synthetic_accepted","processed":0}
+[WEBHOOK META RECEIVED] {
+  "type": "whatsapp.inbound_message.received",
+  "whatsappInboundMessage": {
+    "id": "F2D2-WEBHOOK-short",
+    "from": "51999990001",
+    "type": "text",
+    "text": {
+      "body": "F2D2 https://maps.app.goo.gl/F2D2notfollowed"
+    },
+    "sendTime": "2026-11-05T16:14:16.674Z",
+    "customerProfile": {
+      "name": "F2D2 Cliente"
+    }
+  }
+}
+[WEBHOOK IDENTITY] {"source":"cloud_profile","phone":"999990001","profileName":"F2D2 Cliente","profileUsername":null,"fromUserId":null,"aliases":["F2D2 Cliente"],"contactWaId":"51999990001"}
+[PROCESANDO] Cliente: F2D2 Cliente (999990001) | Maps: Ninguno
+[YARBI BACKGROUND PROCESSOR] 202 {"status":"synthetic_accepted","processed":0}
+[WEBHOOK META RECEIVED] {
+  "type": "whatsapp.inbound_message.received",
+  "whatsappInboundMessage": {
+    "id": "F2D2-WEBHOOK-none",
+    "from": "51999990001",
+    "type": "text",
+    "text": {
+      "body": "F2D2 sin ubicación"
+    },
+    "sendTime": "2026-11-05T16:14:16.676Z",
+    "customerProfile": {
+      "name": "F2D2 Cliente"
+    }
+  }
+}
+[WEBHOOK IDENTITY] {"source":"cloud_profile","phone":"999990001","profileName":"F2D2 Cliente","profileUsername":null,"fromUserId":null,"aliases":["F2D2 Cliente"],"contactWaId":"51999990001"}
+[PROCESANDO] Cliente: F2D2 Cliente (999990001) | Maps: Ninguno
+[YARBI BACKGROUND PROCESSOR] 202 {"status":"synthetic_accepted","processed":0}
+[WEBHOOK META RECEIVED] {
+  "type": "whatsapp.inbound_message.received",
+  "whatsappInboundMessage": {
+    "id": "F2D2-WEBHOOK-FAIL",
+    "from": "51999990001",
+    "type": "text",
+    "text": {
+      "body": "https://maps.app.goo.gl/F2D2notfollowed"
+    },
+    "sendTime": "2026-11-05T16:14:16.678Z",
+    "customerProfile": {
+      "name": "F2D2 Cliente"
+    }
+  }
+}
+[WEBHOOK IDENTITY] {"source":"cloud_profile","phone":"999990001","profileName":"F2D2 Cliente","profileUsername":null,"fromUserId":null,"aliases":["F2D2 Cliente"],"contactWaId":"51999990001"}
+[PROCESANDO] Cliente: F2D2 Cliente (999990001) | Maps: Ninguno
+[SUPABASE WA MSG SAVE WARN] No se confirmó persistencia canónica 503
+[WEBHOOK META RECEIVED] {
+  "type": "whatsapp.inbound_message.received",
+  "whatsappInboundMessage": {
+    "id": "F2D6-ORDER-001",
+    "from": "51999990001",
+    "type": "text",
+    "text": {
+      "body": "F2D6 registrar después del compromiso canónico"
+    },
+    "sendTime": "2026-11-05T16:14:16.680Z",
+    "customerProfile": {
+      "name": "F2D2 Cliente"
+    }
+  }
+}
+[WEBHOOK IDENTITY] {"source":"cloud_profile","phone":"999990001","profileName":"F2D2 Cliente","profileUsername":null,"fromUserId":null,"aliases":["F2D2 Cliente"],"contactWaId":"51999990001"}
+[PROCESANDO] Cliente: F2D2 Cliente (999990001) | Maps: Ninguno
+[YARBI BACKGROUND PROCESSOR] 202 {"status":"synthetic_accepted","processed":0}
+[WEBHOOK META RECEIVED] {
+  "type": "whatsapp.inbound_message.received",
+  "whatsappInboundMessage": {
+    "id": "F2D6-ORDER-001",
+    "from": "51999990001",
+    "type": "text",
+    "text": {
+      "body": "F2D6 registrar después del compromiso canónico"
+    },
+    "sendTime": "2026-11-05T16:14:16.680Z",
+    "customerProfile": {
+      "name": "F2D2 Cliente"
+    }
+  }
+}
+[WEBHOOK IDENTITY] {"source":"cloud_profile","phone":"999990001","profileName":"F2D2 Cliente","profileUsername":null,"fromUserId":null,"aliases":["F2D2 Cliente"],"contactWaId":"51999990001"}
+[WEBHOOK] Mensaje duplicado ignorado: F2D6-ORDER-001
+[WEBHOOK META RECEIVED] {
+  "type": "whatsapp.inbound_message.received",
+  "whatsappInboundMessage": {
+    "id": "F2D6-CLIENT-FAIL-001",
+    "from": "51999990001",
+    "type": "text",
+    "text": {
+      "body": "F2D6 sin asociación inventada"
+    },
+    "sendTime": "2026-11-05T16:14:16.682Z",
+    "customerProfile": {
+      "name": "F2D2 Cliente"
+    }
+  }
+}
+[WEBHOOK IDENTITY] {"source":"cloud_profile","phone":"999990001","profileName":"F2D2 Cliente","profileUsername":null,"fromUserId":null,"aliases":["F2D2 Cliente"],"contactWaId":"51999990001"}
+[PROCESANDO] Cliente: F2D2 Cliente (999990001) | Maps: Ninguno
+[SUPABASE CLIENT POST-CANONICAL ERROR] client_create_failed
+[YARBI BACKGROUND PROCESSOR] 202 {"status":"synthetic_accepted","processed":0}
+[AI QUEUE CONTINUATION] 202 {"status":"synthetic_accepted"}
+✔ F2D2 resolver never fetches Google Maps or short links in synthetic preview (2.7774ms)
+✔ F2D2 real webhook handles Maps, short Maps and no location without external egress (18.0033ms)
+✔ F2D2 real webhook records dependency failure locally and schedules no processor (1.9562ms)
+✔ F2D6 commits canonical storage before client mutation and deduplicates a re-delivery (2.3581ms)
+✔ F2D6 preserves canonical evidence when post-canonical client association fails (2.0402ms)
+✔ F2D6 rejects missing or forbidden runtime destinations before handler side effects (2.4493ms)
+✔ F2D6 processor rejects a missing explicit processor URL before reading the queue (7.7713ms)
+✔ F2D6 assistant chat rejects missing Supabase configuration before history or model calls (1.4146ms)
+✔ F2D2 real processor keeps URL-only synthetic message identity_pending without egress (3.1794ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 104.5555

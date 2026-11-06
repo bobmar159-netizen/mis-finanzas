@@ -1,0 +1,531 @@
+{
+  "phase": "F2E2C-FINAL",
+  "project_ref": "uevilhbstnmmdlgyshlv",
+  "started_at": "2026-10-30T16:24:46.413Z",
+  "handler_source": "api/ai/process.js",
+  "fixture": "F2E2C-FINAL-mvv6ni27-c8011a7171",
+  "preexisting_synthetic_queue": [
+    {
+      "message_id": "F2B-canonical",
+      "status": "processing",
+      "attempt_count": 2,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-identity",
+      "status": "identity_pending",
+      "attempt_count": 1,
+      "locked": false,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-attempt-two",
+      "status": "skipped",
+      "attempt_count": 3,
+      "locked": false,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-attempt-three",
+      "status": "failed",
+      "attempt_count": 3,
+      "locked": false,
+      "retry_scheduled": true
+    },
+    {
+      "message_id": "F2B-historic-37",
+      "status": "failed",
+      "attempt_count": 37,
+      "locked": false,
+      "retry_scheduled": true
+    },
+    {
+      "message_id": "F2B-lock",
+      "status": "processing",
+      "attempt_count": 2,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-01",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-02",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-03",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-04",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-05",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-06",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-07",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-08",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-09",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-10",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-11",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-12",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-13",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-14",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-15",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-16",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-17",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-18",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-19",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-worker-20",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-canonical",
+      "status": "completed",
+      "attempt_count": 1,
+      "locked": false,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-identity",
+      "status": "identity_pending",
+      "attempt_count": 1,
+      "locked": false,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-two",
+      "status": "skipped",
+      "attempt_count": 3,
+      "locked": false,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-three",
+      "status": "failed",
+      "attempt_count": 3,
+      "locked": false,
+      "retry_scheduled": true
+    },
+    {
+      "message_id": "F2B-R2-historic37",
+      "status": "failed",
+      "attempt_count": 37,
+      "locked": false,
+      "retry_scheduled": true
+    },
+    {
+      "message_id": "F2B-R2-lock",
+      "status": "completed",
+      "attempt_count": 2,
+      "locked": false,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-01",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-02",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-03",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-04",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-05",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-06",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-07",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-08",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-09",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-10",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-11",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-12",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-13",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-14",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-15",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-16",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-17",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-18",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-19",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-worker-20",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    },
+    {
+      "message_id": "F2B-R2-error-quota",
+      "status": "failed",
+      "attempt_count": 1,
+      "locked": false,
+      "retry_scheduled": true
+    },
+    {
+      "message_id": "F2B-R2-error-timeout",
+      "status": "failed",
+      "attempt_count": 1,
+      "locked": false,
+      "retry_scheduled": true
+    },
+    {
+      "message_id": "F2B-R2-error-5xx",
+      "status": "failed",
+      "attempt_count": 1,
+      "locked": false,
+      "retry_scheduled": true
+    },
+    {
+      "message_id": "F2B-R2-error-json",
+      "status": "failed",
+      "attempt_count": 1,
+      "locked": false,
+      "retry_scheduled": true
+    },
+    {
+      "message_id": "F2E2C-MSG-STABLE-001",
+      "status": "processing",
+      "attempt_count": 1,
+      "locked": true,
+      "retry_scheduled": false
+    }
+  ],
+  "claimed_message_ids": [
+    "F2E2C-FINAL-mvv6ni27-c8011a7171"
+  ],
+  "handler_response": {
+    "status": 200,
+    "payload": {
+      "status": "completed",
+      "run_id": 1,
+      "messages_scanned": 1,
+      "messages_processed": 0,
+      "contacts_affected": 0,
+      "agenda_events_created": 0,
+      "intelligent_alerts_created": 0,
+      "error_code": null,
+      "errors_count": 0
+    }
+  },
+  "fixture_after": {
+    "message": [
+      {
+        "id": "F2E2C-FINAL-mvv6ni27-c8011a7171",
+        "phone_is_null": true,
+        "contact_id": null
+      }
+    ],
+    "analysis": [
+      {
+        "id": 67,
+        "message_id": "F2E2C-FINAL-mvv6ni27-c8011a7171",
+        "status": "identity_pending",
+        "attempt_count": 1,
+        "requires_review": true,
+        "contact_id": null,
+        "processing_run_id": 1,
+        "has_error_code": true,
+        "lock_cleared": true,
+        "completed_at_present": false
+      }
+    ]
+  },
+  "trace_events_observed": [
+    {
+      "operation_id": "op1-processing-4c9bd99b70b3280928054e84de7df338",
+      "stage": "memory_updated",
+      "outcome": "completed"
+    },
+    {
+      "operation_id": "op1-processing-4c9bd99b70b3280928054e84de7df338",
+      "stage": "operation_closed",
+      "outcome": "completed"
+    }
+  ],
+  "egress": [
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/ai_message_analysis",
+      "method": "GET",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/whatsapp_messages",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/rpc/claim_yarbi_message_analysis",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/whatsapp_messages",
+      "method": "GET",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/ai_processing_runs",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/ai_message_analysis",
+      "method": "PATCH",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/ai_processing_runs",
+      "method": "PATCH",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/yarbi_agent_actions",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/yarbi_agent_actions",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/whatsapp_messages",
+      "method": "GET",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/ai_message_analysis",
+      "method": "GET",
+      "allowed": true
+    }
+  ],
+  "result": "BASE_CANONICA_Y_PROCESAMIENTO_MINIMO_VALIDADO_EN_AISLADO",
+  "error": null,
+  "completed_at": "2026-10-30T16:24:50.359Z"
+}

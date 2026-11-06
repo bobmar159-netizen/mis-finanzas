@@ -1,0 +1,42 @@
+{
+  "phase": "gemini_http400_single_probe",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "operation_id": "op1-owner_reference-8716991a3b63e450229cb497fd71225f",
+  "event_count": 3,
+  "events": [
+    {
+      "stage": "reference_lookup_started",
+      "outcome": "started",
+      "created_at": "2026-11-03T04:43:47.962208Z"
+    },
+    {
+      "stage": "understanding_unavailable",
+      "outcome": "completed",
+      "created_at": "2026-11-03T04:43:48.982575Z",
+      "provider_diagnostic": {
+        "provider": "gemini",
+        "http_status": 400,
+        "provider_status": "INVALID_ARGUMENT",
+        "category": "PROVIDER_INVALID_ARGUMENT_UNKNOWN",
+        "signals": {
+          "invalid_argument": true,
+          "mentions_schema": false,
+          "mentions_complexity": false,
+          "mentions_model": false,
+          "mentions_generation_config": false,
+          "mentions_unknown_field": false
+        },
+        "schema_sha256": "6c37a3d36bf8f43ab17f7a23ba9af79d78bd7e00805f8b278416104b97516e32",
+        "model": "gemini-3.5-flash-lite"
+      }
+    },
+    {
+      "stage": "operation_closed",
+      "outcome": "completed",
+      "created_at": "2026-11-03T04:43:49.468176Z"
+    }
+  ],
+  "contains_secrets": false,
+  "contains_customer_content": false,
+  "retrieval_scope": "single operation identified from the exact dispatch window"
+}

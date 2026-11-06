@@ -1,0 +1,31 @@
+{
+  "phase": "yarbi_v4_post_corrections_local",
+  "mode": "synthetic_local_only",
+  "fixture_count": 16,
+  "reference_time": "2026-11-04T12:00:00-05:00",
+  "time_zone": "America/Lima",
+  "records": [
+    { "fixture_id": "F3PC-01", "family": "correction", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-02", "family": "correction", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-03", "family": "correction", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-04", "family": "correction", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-05", "family": "temporal", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-06", "family": "temporal", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-07", "family": "temporal", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "safe_abstention", "v4_v1_adapter": "expected_rejection", "v1_normalize": "not_applicable", "v3_hardener": "not_applicable", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-08", "family": "continuity", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-09", "family": "continuity", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-10", "family": "continuity", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-11", "family": "independent_negation", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-12", "family": "independent_negation", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-13", "family": "identification_service", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-14", "family": "identification_service", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "pass", "v4_v1_adapter": "pass", "v1_normalize": "pass", "v3_hardener": "pass", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-15", "family": "ambiguity", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "safe_abstention", "v4_v1_adapter": "expected_rejection", "v1_normalize": "not_applicable", "v3_hardener": "not_applicable", "semantic_result": "pass" },
+    { "fixture_id": "F3PC-16", "family": "ambiguity", "interpretation_received": "synthetic", "strict_normalize": "pass", "v4_hardener": "safe_abstention", "v4_v1_adapter": "expected_rejection", "v1_normalize": "not_applicable", "v3_hardener": "not_applicable", "semantic_result": "pass" }
+  ],
+  "rejections": [],
+  "network_calls": 0,
+  "commercial_actions": 0,
+  "personal_data_persisted": false,
+  "prompts_persisted": false,
+  "provider_responses_persisted": false
+}

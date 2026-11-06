@@ -1,0 +1,28 @@
+{
+  "phase": "UI01-FINAL-FIXTURES",
+  "project_ref": "uevilhbstnmmdlgyshlv",
+  "owner_key": "primary",
+  "created_at": "2026-11-01T02:37:18.153Z",
+  "fixtures": {
+    "auth": {
+      "label": "UI01-FINAL-AUTH-1793500635769-06f7fa",
+      "inbox_id": 19,
+      "action": "ask_for_location",
+      "status": "pending",
+      "raw_reason": "action_allowed_now:ask_for_location"
+    },
+    "dismiss": {
+      "label": "UI01-FINAL-DISMISS-1793500635769-06f7fa",
+      "inbox_id": 20,
+      "action": "ask_for_service",
+      "status": "pending",
+      "raw_reason": "action_allowed_now:ask_for_service"
+    }
+  },
+  "allowed_hosts": [
+    "uevilhbstnmmdlgyshlv.supabase.co"
+  ],
+  "external_egress": false,
+  "secrets_stored": false,
+  "pii_stored": false
+}

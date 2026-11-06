@@ -1,0 +1,101 @@
+{
+  "phase": "gemini_owner_understanding_real",
+  "diagnostic_only": true,
+  "result": "PASS",
+  "preview": "https://misfinanzas-backend-2bbakfrs4-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "model": "gemini-3.5-flash-lite",
+  "calls": {
+    "gemini": 1,
+    "fast_local": 0
+  },
+  "semantic": {
+    "total": 1,
+    "correct": 1,
+    "incorrect": 0,
+    "percentage": 100
+  },
+  "provider_errors": 0,
+  "timeouts": 0,
+  "latency": {
+    "gemini_ms": {
+      "n": 1,
+      "p50_ms": 3221,
+      "p95_ms": 3221,
+      "max_ms": 3221
+    },
+    "owner_scope_ms": {
+      "n": 1,
+      "p50_ms": 436,
+      "p95_ms": 436,
+      "max_ms": 436
+    },
+    "candidate_ms": {
+      "n": 1,
+      "p50_ms": 825,
+      "p95_ms": 825,
+      "max_ms": 825
+    },
+    "resolver_ms": {
+      "n": 1,
+      "p50_ms": 1,
+      "p95_ms": 1,
+      "max_ms": 1
+    },
+    "trace_ms": {
+      "n": 1,
+      "p50_ms": 1502,
+      "p95_ms": 1502,
+      "max_ms": 1502
+    },
+    "server_total_ms": {
+      "n": 1,
+      "p50_ms": 6180,
+      "p95_ms": 6180,
+      "max_ms": 6180
+    },
+    "round_trip_ms": {
+      "n": 1,
+      "p50_ms": 11655,
+      "p95_ms": 11655,
+      "max_ms": 11655
+    }
+  },
+  "fast_local": null,
+  "adversarial": null,
+  "long_input": null,
+  "results": [
+    {
+      "id": "F3G-CORRECTION",
+      "repeat": 1,
+      "status": 200,
+      "route": "NEEDS_LANGUAGE_MODEL",
+      "gemini_called": true,
+      "execute": false,
+      "schema": "yarbi.owner-understanding.v1",
+      "conversational_act": "correction",
+      "cancel_scope": "none",
+      "ambiguity": false,
+      "semantic_pass": true,
+      "semantic_failures": [],
+      "metrics": {
+        "gemini_ms": 3221,
+        "owner_scope_ms": 436,
+        "candidate_ms": 825,
+        "resolver_ms": 1,
+        "trace_ms": 1502,
+        "total_ms": 6180
+      },
+      "round_trip_ms": 11655,
+      "error": null,
+      "understanding_error": null
+    }
+  ],
+  "generated_at": "2026-11-02T02:09:46.768Z",
+  "notes": {
+    "credentials_persisted": false,
+    "utterances_persisted": false,
+    "crm_or_phone_persisted": false,
+    "production_used": false
+  }
+}

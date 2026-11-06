@@ -1,0 +1,406 @@
+/**
+ * API ROUTE / WEBHOOK DE WHATSAPP BUSINESS & PROCESADOR DE IA YARBI
+ * Meta Cloud API Webhook + Supabase CRM + Gemini LLM Extraction
+ */
+
+const { processLocationInput, extractCoordinatesFromMapsUrl } = require('../lib/location-resolver');
+
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN || '';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://haifktjvyhbsazmiyqps.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || '';
+const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
+const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN || '';
+const GEMINI_ANALYSIS_MODEL = process.env.GEMINI_ANALYSIS_MODEL || 'gemini-3.1-flash-lite';
+const GEMINI_AUDIO_MODEL = process.env.GEMINI_AUDIO_MODEL || GEMINI_ANALYSIS_MODEL;
+
+
+async function loadRecentClientHistory(phone) {
+  if (!SUPABASE_KEY || !phone) return [];
+  const encoded = encodeURIComponent(phone);
+  const urls = [
+    `${SUPABASE_URL}/rest/v1/messages?select=sender,content,created_at&phone_number=eq.${encoded}&order=created_at.desc&limit=80`,
+    `${SUPABASE_URL}/rest/v1/whatsapp_messages?select=title,text,timestamp&phone=eq.${encoded}&order=timestamp.desc&limit=80`
+  ];
+  for (const url of urls) {
+    try {
+      const result = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+      if (!result.ok) continue;
+      const rows = await result.json();
+      return Array.isArray(rows) ? rows.reverse() : [];
+    } catch (_) {}
+  }
+  return [];
+}
+export default async function handler(req, res) {
+  // Configurar cabeceras CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // 1. Verificación de Webhook por Meta (GET /api/webhook)
+  if (req.method === 'GET' && req.query['hub.mode'] === 'subscribe') {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+      console.log('[WEBHOOK] Verificado exitosamente por Meta!');
+      return res.status(200).send(challenge);
+    } else {
+      console.warn('[WEBHOOK] Falló la verificación de token:', token);
+      return res.status(403).json({ error: 'Token de verificación no válido' });
+    }
+  }
+
+  // 2. Consulta de borradores de acciones y mensajes para el Frontend (GET /api/webhook?action=get_drafts)
+  if (req.method === 'GET' && req.query['action'] === 'get_drafts') {
+    try {
+      const supaRes = await fetch(`${SUPABASE_URL}/rest/v1/draft_actions?select=*,clients(*)&status=eq.pending_review&order=created_at.desc`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (supaRes.ok) {
+        const drafts = await supaRes.json();
+        return res.status(200).json({ status: 'ok', drafts });
+      }
+    } catch(e) {
+      console.error('[SUPABASE GET DRAFTS ERROR]', e);
+    }
+    return res.status(200).json({ status: 'ok', drafts: [] });
+  }
+
+  // 3. Consulta de mensajes tradicionales (GET /api/webhook?action=get)
+  if (req.method === 'GET' && req.query['action'] === 'get') {
+    try {
+      const supaRes = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_messages?select=*&order=timestamp.desc&limit=50`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (supaRes.ok) {
+        const rawMessages = await supaRes.json();
+        const messages = rawMessages.map(m => ({
+          id: m.id,
+          appName: m.app_name || 'WhatsApp Business API (Cloud)',
+          title: m.title,
+          phone: m.phone,
+          text: m.text,
+          mapsUrl: m.maps_url || '',
+          timestamp: parseInt(m.timestamp) || Date.now()
+        }));
+        return res.status(200).json({ status: 'ok', source: 'supabase', messages });
+      }
+    } catch(e) {
+      console.error('[SUPABASE GET MESSAGES ERROR]', e);
+    }
+    return res.status(200).json({ status: 'ok', source: 'empty', messages: [] });
+  }
+
+  // 4. Recepción de mensajes en tiempo real (POST /api/webhook)
+  if (req.method === 'POST') {
+    try {
+      const body = req.body;
+      console.log('[WEBHOOK META RECEIVED]', JSON.stringify(body, null, 2));
+
+      if (body && body.entry && body.entry[0] && body.entry[0].changes && body.entry[0].changes[0]) {
+        const value = body.entry[0].changes[0].value;
+        if (value.messages && value.messages[0]) {
+          const msg = value.messages[0];
+          const contact = (value.contacts && value.contacts[0]) ? value.contacts[0] : {};
+          const profileName = (contact.profile && contact.profile.name) ? contact.profile.name : 'Cliente WhatsApp';
+
+          let senderPhone = msg.from ? msg.from.replace(/\D/g, '') : '';
+          if (senderPhone.startsWith('51') && senderPhone.length === 11) {
+            senderPhone = senderPhone.slice(2);
+          }
+
+          let messageText = '';
+          let mediaType = msg.type || 'text';
+          let locationObj = null;
+
+          // A) Procesamiento de Mensajes de Voz / Audio
+          if (msg.type === 'audio' && msg.audio) {
+            console.log('[WEBHOOK AUDIO] Descargando audio de Meta Media ID:', msg.audio.id);
+            try {
+              if (META_ACCESS_TOKEN && GEMINI_KEY) {
+                // Obtener URL de descarga desde Meta Graph API
+                const mediaRes = await fetch(`https://graph.facebook.com/v18.0/${msg.audio.id}`, {
+                  headers: { 'Authorization': `Bearer ${META_ACCESS_TOKEN}` }
+                });
+                if (mediaRes.ok) {
+                  const mediaData = await mediaRes.json();
+                  if (mediaData.url) {
+                    const audioBinRes = await fetch(mediaData.url, {
+                      headers: { 'Authorization': `Bearer ${META_ACCESS_TOKEN}` }
+                    });
+                    if (audioBinRes.ok) {
+                      const arrayBuffer = await audioBinRes.arrayBuffer();
+                      const base64Audio = Buffer.from(arrayBuffer).toString('base64');
+
+                      // Transcribir audio con Gemini 1.5 Multimodal
+                      const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_AUDIO_MODEL}:generateContent?key=${GEMINI_KEY}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          contents: [{
+                            parts: [
+                              { text: 'Transcribe exactamente el siguiente audio dictado por un cliente:' },
+                              { inline_data: { mime_type: msg.audio.mime_type || 'audio/ogg', data: base64Audio } }
+                            ]
+                          }]
+                        })
+                      });
+                      if (geminiRes.ok) {
+                        const gData = await geminiRes.json();
+                        messageText = gData.candidates?.[0]?.content?.parts?.[0]?.text || '[Audio recibido sin transcripción]';
+                        console.log('[AUDIO TRANSCRIBIDO]:', messageText);
+                      }
+                    }
+                  }
+                }
+              }
+            } catch(aErr) {
+              console.error('[AUDIO TRANSCRIPTION ERROR]', aErr);
+            }
+            if (!messageText) messageText = '[Mensaje de voz de WhatsApp]';
+          } else if (msg.type === 'location' && msg.location) {
+            // B) Ubicación Nativa de WhatsApp
+            mediaType = 'location';
+            locationObj = {
+              latitude: msg.location.latitude,
+              longitude: msg.location.longitude,
+              name: msg.location.name,
+              address: msg.location.address
+            };
+            messageText = `📍 Ubicación compartida por WhatsApp: ${msg.location.name || ''} ${msg.location.address || ''}`;
+          } else if (msg.type === 'text' && msg.text) {
+            messageText = msg.text.body;
+          } else {
+            messageText = `Mensaje de WhatsApp (${msg.type || 'multimedia'})`;
+          }
+
+          // C) Resolver Ubicación (Google Maps URL o Coordenadas)
+          const locResult = await processLocationInput(locationObj || messageText);
+          const finalMapsUrl = locResult ? locResult.resolvedUrl : '';
+
+          console.log(`[PROCESANDO] Cliente: ${profileName} (${senderPhone}) | Maps: ${finalMapsUrl || 'Ninguno'}`);
+
+          // D) Buscar o Crear Cliente en Supabase (`clients`)
+          let clientId = null;
+          let notesContext = '';
+          try {
+            const clientRes = await fetch(`${SUPABASE_URL}/rest/v1/clients?phone_number=eq.${senderPhone}&select=*`, {
+              headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            });
+            if (clientRes.ok) {
+              const clients = await clientRes.json();
+              if (clients && clients.length > 0) {
+                clientId = clients[0].id;
+                notesContext = clients[0].notes_context || '';
+              } else {
+                // Crear nuevo cliente
+                const newClientRes = await fetch(`${SUPABASE_URL}/rest/v1/clients`, {
+                  method: 'POST',
+                  headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                  },
+                  body: JSON.stringify([{
+                    phone_number: senderPhone,
+                    name: profileName,
+                    address_summary: locResult ? locResult.formattedAddress : ''
+                  }])
+                });
+                if (newClientRes.ok) {
+                  const created = await newClientRes.json();
+                  if (created && created[0]) clientId = created[0].id;
+                }
+              }
+            }
+          } catch(cErr) {
+            console.error('[SUPABASE CLIENT ERROR]', cErr);
+          }
+
+          // E) Guardar Mensaje Crudo en `messages` y `whatsapp_messages`
+          const msgPayload = {
+            id: msg.id || ('meta_' + Date.now()),
+            client_id: clientId,
+            phone_number: senderPhone,
+            sender: 'client',
+            content: messageText,
+            media_type: mediaType,
+            maps_url: finalMapsUrl || null,
+            raw_payload: msg
+          };
+
+          await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify([msgPayload])
+          }).catch(e => console.warn('[SUPABASE MSG SAVE WARN]', e));
+
+          // Guardar en tabla tradicional
+          await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_messages`, {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify([{
+              id: msg.id || ('meta_' + Date.now()),
+              phone: senderPhone,
+              title: profileName,
+              text: messageText,
+              maps_url: finalMapsUrl || null,
+              app_name: 'WhatsApp Business API (Cloud)',
+              timestamp: msg.timestamp ? (parseInt(msg.timestamp) * 1000) : Date.now()
+            }])
+          }).catch(e => console.warn('[SUPABASE WA MSG SAVE WARN]', e));
+
+          // F) Extracción estructurada de bajo costo con Gemini Flash-Lite
+          if (GEMINI_KEY) {
+            try {
+              const currentDateStr = new Date().toISOString().split('T')[0];
+              const priorHistory = await loadRecentClientHistory(senderPhone);
+              const priorHistoryText = priorHistory.map(m => '[' + (m.sender || m.title || 'Contacto') + '] ' + (m.content || m.text || '')).join('\n').slice(-24000);
+              const promptInstruction = `Eres un asistente operativo y CRM experto en gas natural e instalaciones técnicas en Lima, Perú.
+Analiza la siguiente conversación de WhatsApp del cliente y extrae la información en JSON estricto.
+
+FECHA ACTUAL: ${currentDateStr}
+
+HISTORIAL TÉCNICO Y NOTAS ACUMULADAS DEL CLIENTE:
+${notesContext || 'Sin historial previo registrado.'}
+
+CONVERSACIÓN PREVIA DEL MISMO CLIENTE (usar para resolver referencias como "mañana", "lo de antes" o "confirmado"):
+${priorHistoryText}
+
+MENSAJE RECIBIDO DE WHATSAPP:
+Cliente: "${profileName}" (Tel: ${senderPhone})
+Mensaje: "${messageText}"
+Ubicación Detectada: "${finalMapsUrl}"
+
+REGLAS DE EXTRACCIÓN:
+1. "has_actionable_request": true si el cliente solicita o confirma una visita, cotización, trabajo de construcción o seguimiento.
+2. "type": "visita" | "construccion" | "seguimiento" | "ninguno"
+3. "client_name": Nombre completo detectado del cliente.
+4. "service": Descripción detallada del trabajo o falla técnica.
+5. "date": Fecha acordada en formato YYYY-MM-DD (Calcula con respecto a la fecha actual si dice "mañana", "este viernes", etc.).
+6. "time": Hora acordada en formato HH:mm (formato 24 Horas).
+7. "location": Dirección o distrito mencionado.
+8. "coordinates": { "lat": numero, "lng": numero } si hay mapa, o null.
+9. "maps_url": Enlace exacto a Google Maps.
+10. "price": Monto en soles si fue mencionado (ej. 150.00), o null.
+11. "summary_update": Breve resumen de 1 oración para actualizar la memoria acumulada del cliente.
+
+DEBES RESPONDER ÚNICAMENTE CON UN OBJETO JSON VÁLIDO CON ESTE ESQUEMA:
+{
+  "has_actionable_request": boolean,
+  "type": "visita" | "construccion" | "seguimiento" | "ninguno",
+  "client_name": string,
+  "service": string,
+  "date": string | null,
+  "time": string | null,
+  "location": string,
+  "coordinates": { "lat": number, "lng": number } | null,
+  "maps_url": string,
+  "price": number | null,
+  "summary_update": string
+}`;
+
+              const llmRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_ANALYSIS_MODEL}:generateContent?key=${GEMINI_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: promptInstruction }] }],
+                  generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
+                })
+              });
+
+              if (llmRes.ok) {
+                const llmData = await llmRes.json();
+                const jsonText = llmData.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (jsonText) {
+                  const extractedData = JSON.parse(jsonText);
+                  console.log('[LLM EXTRACTED DATA]:', JSON.stringify(extractedData, null, 2));
+
+                  // G) Si hay solicitud accionable, crear borrador en `draft_actions`
+                  if (extractedData.has_actionable_request && extractedData.type !== 'ninguno') {
+                    const coords = extractedData.coordinates || (locResult ? { lat: locResult.lat, lng: locResult.lng } : null);
+                    const mapsLink = extractedData.maps_url || finalMapsUrl || (coords && coords.lat ? `https://www.google.com/maps?q=${coords.lat},${coords.lng}` : '');
+
+                    const draftItem = {
+                      client_id: clientId,
+                      type: extractedData.type,
+                      status: 'pending_review',
+                      payload: {
+                        client_name: extractedData.client_name || profileName,
+                        phone: senderPhone,
+                        service: extractedData.service || 'Servicio técnico de gas natural',
+                        date: extractedData.date || null,
+                        time: extractedData.time || null,
+                        location: extractedData.location || (locResult ? locResult.formattedAddress : 'Lima'),
+                        coordinates: coords,
+                        maps_url: mapsLink,
+                        price: extractedData.price || null,
+                        summary_update: extractedData.summary_update || ''
+                      }
+                    };
+
+                    await fetch(`${SUPABASE_URL}/rest/v1/draft_actions`, {
+                      method: 'POST',
+                      headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify([draftItem])
+                    });
+                    console.log('[DRAFT ACTION CREADO DE MANERA EXITOSA]:', draftItem.type);
+                  }
+
+                  // H) Actualizar Memoria Acumulada del Cliente (`clients.notes_context`)
+                  if (clientId && extractedData.summary_update) {
+                    const updatedNotes = (notesContext ? notesContext + '\n• ' : '• ') + `${new Date().toLocaleDateString('es-PE')}: ${extractedData.summary_update}`;
+                    await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${clientId}`, {
+                      method: 'PATCH',
+                      headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({
+                        notes_context: updatedNotes,
+                        name: extractedData.client_name || profileName
+                      })
+                    }).catch(e => console.warn('[CLIENT NOTES UPDATE WARN]', e));
+                  }
+                }
+              }
+            } catch(llmErr) {
+              console.error('[LLM EXTRACTION ERROR]', llmErr);
+            }
+          }
+        }
+      }
+
+      return res.status(200).json({ status: 'success', message: 'Evento de WhatsApp procesado exitosamente' });
+    } catch (err) {
+      console.error('[WEBHOOK POST ERROR]', err);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  return res.status(405).json({ error: 'Método no permitido' });
+}
+
+

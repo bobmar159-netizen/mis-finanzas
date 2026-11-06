@@ -1,0 +1,27 @@
+{
+  "phase": "gemini_compact_contract_local",
+  "result": "PASS_WITH_LIMITATION",
+  "executed": "node scripts/test-yarbi-compact-understanding-local.cjs",
+  "total": 12,
+  "passed": 12,
+  "network_calls": 0,
+  "compact_schema": {
+    "bytes": 1995,
+    "properties": 21,
+    "objects": 4,
+    "arrays": 2,
+    "enum_values": 51,
+    "max_depth": 4,
+    "sha256": "1a371ae9deebc1c0c71d0dc81d372862c1a93f0828f41e14807bf7a43633b589"
+  },
+  "active_schema": {
+    "bytes": 5513,
+    "properties": 76,
+    "objects": 15,
+    "arrays": 5,
+    "enum_values": 68,
+    "max_depth": 3,
+    "sha256": "6c37a3d36bf8f43ab17f7a23ba9af79d78bd7e00805f8b278416104b97516e32"
+  },
+  "limitation": "negated_or_contradicted_mentions_are_rejected_until_v1_v3_can_preserve_polarity"
+}

@@ -1,0 +1,31 @@
+{
+  "name": "mis-finanzas-app",
+  "version": "1.0.0",
+  "description": "App de finanzas personales y negocio empaquetada con Capacitor.",
+  "main": "index.html",
+  "scripts": {
+    "cap:init": "npx cap init",
+    "cap:add-android": "npx cap add android",
+    "cap:sync": "npx cap sync",
+    "cap:open-android": "npx cap open android",
+    "test": "node --test tests/*.test.js",
+    "test:unit": "node --test tests/daily-close.test.js tests/fast-read-path.test.js tests/greeting-first.test.js tests/habit-learning.test.js tests/latency-stages.test.js tests/mentor-briefing.test.js tests/operational-cycle.test.js tests/proactive-alerts.test.js tests/processing-status.test.js tests/visual-status-chips.test.js",
+    "test:integration": "node --test tests/audio-notes-regression.test.js tests/barge-in-regression.test.js tests/collections-balance.test.js tests/cross-source-consistency.test.js tests/operational-status.test.js tests/readback-integrity.test.js tests/structured-observations.test.js tests/supabase-contract.test.js tests/two-brains-architecture.test.js tests/yarbi-regression.test.js",
+    "test:e2e": "node --test tests/e2e-controlled.test.js tests/mandatory-simulations.test.js",
+    "test:simulations": "node --test tests/mandatory-simulations.test.js",
+    "test:syntax": "node tests/validate-inline-scripts.js index.html",
+    "build:frontend:web": "node scripts/build-unified-frontend.cjs --target=web --replace-generated --publish-root",
+    "build:frontend:android": "node scripts/build-unified-frontend.cjs --target=android --replace-generated",
+    "test:frontend:unified": "node --test tests/frontend-unified-build.test.js"
+  },
+  "dependencies": {
+    "@capacitor-community/speech-recognition": "^5.1.0",
+    "@capacitor/android": "^5.0.0",
+    "@capacitor/cli": "^5.0.0",
+    "@capacitor/core": "^5.0.0",
+    "@vercel/functions": "3.9.8"
+  },
+  "devDependencies": {
+    "supabase": "^2.122.0"
+  }
+}

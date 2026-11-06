@@ -1,0 +1,585 @@
+/**
+ * API ROUTE / WEBHOOK DE WHATSAPP BUSINESS & PROCESADOR DE IA YARBI
+ * Meta Cloud API Webhook + Supabase CRM + Gemini LLM Extraction
+ */
+
+const { processLocationInput, extractCoordinatesFromMapsUrl } = require('../lib/location-resolver');
+const whatsappMessagesHandler = require('../lib/whatsapp-messages');
+
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN || '';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://haifktjvyhbsazmiyqps.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || '';
+const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
+const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN || '';
+const ASSISTANT_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
+const GEMINI_ANALYSIS_MODEL = process.env.GEMINI_ANALYSIS_MODEL || 'gemini-3.1-flash-lite';
+const GEMINI_AUDIO_MODEL = process.env.GEMINI_AUDIO_MODEL || GEMINI_ANALYSIS_MODEL;
+
+function cleanPhone(value) {
+  let phone = String(value || '').replace(/\D/g, '');
+  if (phone.startsWith('51') && phone.length === 11) phone = phone.slice(2);
+  return phone;
+}
+
+function isPlaceholderName(value) {
+  return !value || /^(cliente whatsapp|cliente|sin nombre|unknown)$/i.test(String(value).trim());
+}
+
+function hasAssistantAccess(req) {
+  const headers = req && req.headers ? req.headers : {};
+  const token = headers['x-assistant-token'] || (headers.authorization || '').replace(/^Bearer\s+/i, '');
+  return Boolean(ASSISTANT_TOKEN && token === ASSISTANT_TOKEN);
+}
+
+
+async function loadRecentClientHistory(phone) {
+  if (!SUPABASE_KEY || !phone) return [];
+  const encoded = encodeURIComponent(phone);
+  const urls = [
+    SUPABASE_URL + '/rest/v1/messages?select=id,sender,content,created_at&phone_number=eq.' + encoded + '&order=created_at.desc&limit=80',
+    SUPABASE_URL + '/rest/v1/whatsapp_messages?deleted_at=is.null&select=id,title,text,timestamp&phone=eq.' + encoded + '&order=timestamp.desc&limit=80'
+  ];
+  const rows = [];
+  for (const url of urls) {
+    try {
+      const result = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } });
+      if (result.ok) {
+        const data = await result.json();
+        if (Array.isArray(data)) rows.push(...data);
+      }
+    } catch (_) {}
+  }
+  const unique = new Map();
+  rows.forEach((row) => {
+    const value = row.content || row.text || '';
+    const at = row.created_at || row.timestamp || '';
+    const key = row.id || (String(at) + '|' + String(value));
+    if (!unique.has(key)) unique.set(key, { ...row, _historyText: value, _historyAt: at });
+  });
+  return Array.from(unique.values()).sort((a, b) => String(a._historyAt).localeCompare(String(b._historyAt))).slice(-80);
+}
+export default async function handler(req, res) {
+  // Configurar cabeceras CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // La memoria CRM comparte esta función para respetar el límite Hobby de Vercel.
+  const requestPath = String(req.url || '').split('?')[0];
+  if (requestPath === '/api/whatsapp/messages' || requestPath.endsWith('/api/whatsapp/messages') || ['memory', 'memory-overview'].includes(String(req.query?.action || ''))) {
+    return whatsappMessagesHandler(req, res);
+  }
+
+  // 1. Verificación de Webhook por Meta (GET /api/webhook)
+  if (req.method === 'GET' && req.query['hub.mode'] === 'subscribe') {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+      console.log('[WEBHOOK] Verificado exitosamente por Meta!');
+      return res.status(200).send(challenge);
+    } else {
+      console.warn('[WEBHOOK] Falló la verificación de token:', token);
+      return res.status(403).json({ error: 'Token de verificación no válido' });
+    }
+  }
+
+  // 2. Consulta de borradores de acciones y mensajes para el Frontend (GET /api/webhook?action=get_drafts)
+  if (req.method === 'GET' && req.query['action'] === 'get_drafts') {
+    if (!hasAssistantAccess(req)) return res.status(401).json({ error: 'No autorizado' });
+    try {
+      const supaRes = await fetch(`${SUPABASE_URL}/rest/v1/draft_actions?select=*,clients(*)&status=eq.pending_review&order=created_at.desc`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (supaRes.ok) {
+        const drafts = await supaRes.json();
+        return res.status(200).json({ status: 'ok', drafts });
+      }
+    } catch(e) {
+      console.error('[SUPABASE GET DRAFTS ERROR]', e);
+    }
+    return res.status(200).json({ status: 'ok', drafts: [] });
+  }
+
+  // Diagnóstico seguro: confirma si WhatsApp Cloud guardó una ubicación para este cliente.
+  if (req.method === 'GET' && req.query['action'] === 'location_debug') {
+    if (!hasAssistantAccess(req)) return res.status(401).json({ error: 'No autorizado' });
+    const phone = cleanPhone(req.query.phone);
+    if (!phone) return res.status(400).json({ error: 'La alerta no contiene teléfono para consultar Cloud', locationStatus: 'missing_phone' });
+    try {
+      const encoded = encodeURIComponent(phone);
+      const headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+      const [traditionalRes, structuredRes] = await Promise.all([
+        fetch(SUPABASE_URL + '/rest/v1/whatsapp_messages?deleted_at=is.null&phone=eq.' + encoded + '&select=id,timestamp,maps_url,app_name&order=timestamp.desc&limit=10', { headers }),
+        fetch(SUPABASE_URL + '/rest/v1/messages?phone_number=eq.' + encoded + '&select=id,created_at,maps_url,media_type&order=created_at.desc&limit=10', { headers })
+      ]);
+      const traditional = traditionalRes.ok ? await traditionalRes.json() : [];
+      const structured = structuredRes.ok ? await structuredRes.json() : [];
+      const exactTraditional = traditional.filter(row => row.maps_url).length;
+      const exactStructured = structured.filter(row => row.maps_url).length;
+      return res.status(200).json({
+        status: 'ok',
+        phone,
+        locationStatus: exactTraditional || exactStructured ? 'exact_location_saved' : ((traditional.length || structured.length) ? 'messages_saved_without_exact_location' : 'no_cloud_message_for_phone'),
+        whatsappMessages: { count: traditional.length, exactLocationCount: exactTraditional, latest: traditional.slice(0, 3).map(row => ({ timestamp: row.timestamp, hasMapsUrl: Boolean(row.maps_url), source: row.app_name || '' })) },
+        structuredMessages: { count: structured.length, exactLocationCount: exactStructured, latest: structured.slice(0, 3).map(row => ({ createdAt: row.created_at, hasMapsUrl: Boolean(row.maps_url), mediaType: row.media_type || '' })) }
+      });
+    } catch (error) {
+      console.error('[LOCATION DEBUG ERROR]', error);
+      return res.status(500).json({ error: 'No se pudo consultar la traza Cloud', detail: error.message, locationStatus: 'diagnostic_error' });
+    }
+  }
+  // 3. Consulta de mensajes tradicionales (GET /api/webhook?action=get)
+  if (req.method === 'GET' && req.query['action'] === 'get') {
+    if (!hasAssistantAccess(req)) return res.status(401).json({ error: 'No autorizado' });
+    try {
+      const supaRes = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_messages?deleted_at=is.null&select=*&order=timestamp.desc&limit=50`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (supaRes.ok) {
+        const rawMessages = await supaRes.json();
+        // La tabla estructurada conserva la URL exacta de pines nativos aunque
+        // la tabla de alertas tradicional haya recibido texto sin enlace.
+        let structuredMessages = [];
+        try {
+          const structuredRes = await fetch(SUPABASE_URL + '/rest/v1/messages?select=id,phone_number,content,maps_url,media_type,created_at&order=created_at.desc&limit=50', {
+            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+          });
+          if (structuredRes.ok) structuredMessages = await structuredRes.json();
+        } catch (error) {
+          console.warn('[SUPABASE STRUCTURED LOCATION FALLBACK WARN]', error.message);
+        }
+        const messages = [
+          ...rawMessages.map(m => ({
+            id: m.id,
+            appName: m.app_name || 'WhatsApp Business API (Cloud)',
+            title: m.title,
+            phone: m.phone,
+            text: m.text,
+            mapsUrl: m.maps_url || '',
+            timestamp: parseInt(m.timestamp) || Date.now()
+          })),
+          ...structuredMessages.map(m => ({
+            id: m.id,
+            appName: 'WhatsApp Business API (Cloud)',
+            title: '',
+            phone: m.phone_number || '',
+            text: m.content || '',
+            mapsUrl: m.maps_url || '',
+            timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now()
+          }))
+        ];
+        const unique = new Map();
+        messages.forEach(m => {
+          const current = unique.get(m.id);
+          if (!current || (!current.mapsUrl && m.mapsUrl)) unique.set(m.id, m);
+        });
+        return res.status(200).json({ status: 'ok', source: 'supabase', messages: Array.from(unique.values()).sort((a, b) => b.timestamp - a.timestamp).slice(0, 50) });
+      }
+    } catch(e) {
+      console.error('[SUPABASE GET MESSAGES ERROR]', e);
+    }
+    return res.status(200).json({ status: 'ok', source: 'empty', messages: [] });
+  }
+
+  // 4. Recepción de mensajes en tiempo real (POST /api/webhook)
+  if (req.method === 'POST') {
+    try {
+      const body = req.body;
+      console.log('[WEBHOOK META RECEIVED]', JSON.stringify(body, null, 2));
+
+      // Normaliza Meta Cloud, mensajes entrantes de YCloud, historial de
+      // coexistencia y mensajes enviados desde WhatsApp Business.
+      const ycloudEventType = String(body && body.type || '');
+      const ycloudSourceMessage = (
+        ycloudEventType === 'whatsapp.inbound_message.received' ? body.whatsappInboundMessage
+          : (ycloudEventType === 'whatsapp.smb.history' || ycloudEventType === 'whatsapp.smb.message.echoes')
+            ? body.whatsappMessage
+            : null
+      );
+      const ycloudIsHistorical = ycloudEventType === 'whatsapp.smb.history';
+      const ycloudIsOutbound = ycloudEventType === 'whatsapp.smb.message.echoes'
+        || (ycloudIsHistorical && ['sent', 'delivered', 'read'].includes(String(ycloudSourceMessage && ycloudSourceMessage.status || '').toLowerCase()));
+      const value = body && body.entry && body.entry[0] && body.entry[0].changes && body.entry[0].changes[0]
+        ? body.entry[0].changes[0].value
+        : (ycloudSourceMessage ? {
+            messages: [{
+              id: ycloudSourceMessage.id,
+              wamid: ycloudSourceMessage.wamid,
+              from: ycloudIsOutbound ? ycloudSourceMessage.to : ycloudSourceMessage.from,
+              timestamp: ycloudSourceMessage.sendTime
+                ? String(Math.floor(new Date(ycloudSourceMessage.sendTime).getTime() / 1000))
+                : undefined,
+              type: ycloudSourceMessage.type,
+              text: ycloudSourceMessage.text,
+              image: ycloudSourceMessage.image,
+              video: ycloudSourceMessage.video,
+              audio: ycloudSourceMessage.audio,
+              document: ycloudSourceMessage.document,
+              sticker: ycloudSourceMessage.sticker,
+              location: ycloudSourceMessage.location,
+              _yarbiDirection: ycloudIsOutbound ? 'outgoing' : 'incoming',
+              _yarbiHistorical: ycloudIsHistorical,
+              _yarbiYcloudEvent: ycloudEventType
+            }],
+            contacts: [{ profile: { name: ycloudSourceMessage.customerProfile?.name }, wa_id: ycloudIsOutbound ? ycloudSourceMessage.to : ycloudSourceMessage.from }]
+          } : null);
+
+      if (value) {
+        if (value.messages && value.messages[0]) {
+          const msg = value.messages[0];
+          const messageId = msg.id || ('meta_' + Date.now());
+          const messageDirection = msg._yarbiDirection === 'outgoing' ? 'outgoing' : 'incoming';
+          const isHistoricalMessage = Boolean(msg._yarbiHistorical);
+          const messageSourceEvent = String(msg._yarbiYcloudEvent || 'meta.cloud');
+          const messageSourceLabel = messageSourceEvent === 'whatsapp.smb.history'
+            ? 'YCloud Coexistence · Historial'
+            : messageSourceEvent === 'whatsapp.smb.message.echoes'
+              ? 'YCloud Coexistence · Enviado desde WhatsApp Business'
+              : 'WhatsApp Business API (Cloud)';
+          const senderPhone = cleanPhone(msg.from);
+          const contacts = Array.isArray(value.contacts) ? value.contacts : [];
+          const contact = contacts.find(item => cleanPhone(item && item.wa_id) === senderPhone) || contacts[0] || {};
+          const rawProfileName = contact.profile && contact.profile.name ? String(contact.profile.name).trim() : '';
+          const profileName = isPlaceholderName(rawProfileName) ? '' : rawProfileName;
+          const identityLabel = profileName || senderPhone || 'Cliente WhatsApp';
+          if (!senderPhone) return res.status(200).json({ status: 'ignored_without_customer_phone', sourceEvent: messageSourceEvent });
+          console.log('[WEBHOOK IDENTITY]', JSON.stringify({
+            source: profileName ? 'cloud_profile' : 'phone_fallback',
+            phone: senderPhone || null,
+            profileName: profileName || null,
+            contactWaId: contact.wa_id || null
+          }));
+
+          if (SUPABASE_KEY && messageId) {
+            try {
+              const duplicateUrl = SUPABASE_URL + '/rest/v1/messages?id=eq.' + encodeURIComponent(messageId) + '&select=id&limit=1';
+              const duplicateRes = await fetch(duplicateUrl, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } });
+              if (duplicateRes.ok && (await duplicateRes.json()).length > 0) {
+                console.log('[WEBHOOK] Mensaje duplicado ignorado:', messageId);
+                return res.status(200).json({ status: 'duplicate_ignored' });
+              }
+            } catch (duplicateError) {
+              console.warn('[WEBHOOK DUPLICATE CHECK WARN]', duplicateError.message);
+            }
+          }
+
+          let messageText = '';
+          let mediaType = msg.type || 'text';
+          let locationObj = null;
+
+          // A) Procesamiento de Mensajes de Voz / Audio
+          if (msg.type === 'audio' && msg.audio) {
+            console.log('[WEBHOOK AUDIO] Descargando audio de Meta Media ID:', msg.audio.id);
+            try {
+              if (META_ACCESS_TOKEN && GEMINI_KEY) {
+                // Obtener URL de descarga desde Meta Graph API
+                const mediaRes = await fetch(`https://graph.facebook.com/v18.0/${msg.audio.id}`, {
+                  headers: { 'Authorization': `Bearer ${META_ACCESS_TOKEN}` }
+                });
+                if (mediaRes.ok) {
+                  const mediaData = await mediaRes.json();
+                  if (mediaData.url) {
+                    const audioBinRes = await fetch(mediaData.url, {
+                      headers: { 'Authorization': `Bearer ${META_ACCESS_TOKEN}` }
+                    });
+                    if (audioBinRes.ok) {
+                      const arrayBuffer = await audioBinRes.arrayBuffer();
+                      const base64Audio = Buffer.from(arrayBuffer).toString('base64');
+
+                      // Transcribir audio con Gemini 1.5 Multimodal
+                      const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_AUDIO_MODEL}:generateContent?key=${GEMINI_KEY}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          contents: [{
+                            parts: [
+                              { text: 'Transcribe exactamente el siguiente audio dictado por un cliente:' },
+                              { inline_data: { mime_type: msg.audio.mime_type || 'audio/ogg', data: base64Audio } }
+                            ]
+                          }]
+                        })
+                      });
+                      if (geminiRes.ok) {
+                        const gData = await geminiRes.json();
+                        messageText = gData.candidates?.[0]?.content?.parts?.[0]?.text || '[Audio recibido sin transcripción]';
+                        console.log('[AUDIO TRANSCRIBIDO]:', messageText);
+                      }
+                    }
+                  }
+                }
+              }
+            } catch(aErr) {
+              console.error('[AUDIO TRANSCRIPTION ERROR]', aErr);
+            }
+            if (!messageText) messageText = '[Mensaje de voz de WhatsApp]';
+          } else if (msg.type === 'location' && msg.location) {
+            // B) Ubicación Nativa de WhatsApp
+            mediaType = 'location';
+            locationObj = {
+              latitude: msg.location.latitude,
+              longitude: msg.location.longitude,
+              name: msg.location.name,
+              address: msg.location.address
+            };
+            messageText = `📍 Ubicación compartida por WhatsApp: ${msg.location.name || ''} ${msg.location.address || ''}`;
+          } else if (msg.type === 'text' && msg.text) {
+            messageText = msg.text.body;
+          } else {
+            messageText = `Mensaje de WhatsApp (${msg.type || 'multimedia'})`;
+          }
+
+          // C) Resolver Ubicación (Google Maps URL o Coordenadas)
+          const locResult = await processLocationInput(locationObj || messageText);
+          const hasExactLocation = Boolean(locResult && locResult.lat != null && locResult.lng != null);
+          const finalMapsUrl = hasExactLocation ? locResult.resolvedUrl : '';
+
+          console.log(`[PROCESANDO] Cliente: ${profileName} (${senderPhone}) | Maps: ${finalMapsUrl || 'Ninguno'}`);
+
+          // D) Buscar o Crear Cliente en Supabase (`clients`)
+          let clientId = null;
+          let existingClientName = '';
+          let notesContext = '';
+          try {
+            const clientRes = await fetch(`${SUPABASE_URL}/rest/v1/clients?phone_number=eq.${senderPhone}&select=*`, {
+              headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            });
+            if (clientRes.ok) {
+              const clients = await clientRes.json();
+              if (clients && clients.length > 0) {
+                clientId = clients[0].id;
+                existingClientName = clients[0].name || '';
+                notesContext = clients[0].notes_context || '';
+                if (profileName && isPlaceholderName(existingClientName)) {
+                  await fetch(SUPABASE_URL + '/rest/v1/clients?id=eq.' + encodeURIComponent(clientId), {
+                    method: 'PATCH',
+                    headers: {
+                      'apikey': SUPABASE_KEY,
+                      'Authorization': 'Bearer ' + SUPABASE_KEY,
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: profileName })
+                  }).catch(e => console.warn('[SUPABASE PROFILE NAME UPDATE WARN]', e));
+                  existingClientName = profileName;
+                }
+              } else {
+                // Crear nuevo cliente
+                const newClientRes = await fetch(`${SUPABASE_URL}/rest/v1/clients`, {
+                  method: 'POST',
+                  headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                  },
+                  body: JSON.stringify([{
+                    phone_number: senderPhone,
+                    name: identityLabel,
+                    address_summary: hasExactLocation ? locResult.formattedAddress : ''
+                  }])
+                });
+                if (newClientRes.ok) {
+                  const created = await newClientRes.json();
+                  if (created && created[0]) clientId = created[0].id;
+                }
+              }
+            }
+          } catch(cErr) {
+            console.error('[SUPABASE CLIENT ERROR]', cErr);
+          }
+
+          // E) Guardar Mensaje Crudo en `messages` y `whatsapp_messages`
+          const msgPayload = {
+            id: messageId,
+            client_id: clientId,
+            phone_number: senderPhone,
+            sender: messageDirection === 'outgoing' ? 'operator' : 'client',
+            content: messageText,
+            media_type: mediaType,
+            maps_url: finalMapsUrl || null,
+            raw_payload: { ...msg, _yarbi: { direction: messageDirection, historical: isHistoricalMessage, source_event: messageSourceEvent } }
+          };
+
+          await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify([msgPayload])
+          }).catch(e => console.warn('[SUPABASE MSG SAVE WARN]', e));
+
+          // Guardar en tabla tradicional
+          await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_messages`, {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify([{
+              id: messageId,
+              phone: senderPhone,
+              title: identityLabel,
+              text: messageText,
+              maps_url: finalMapsUrl || null,
+              app_name: messageSourceLabel,
+              metadata: { direction: messageDirection, historical: isHistoricalMessage, source_event: messageSourceEvent, ycloud_message_id: msg.id || null, wamid: msg.wamid || null },
+              timestamp: msg.timestamp ? (parseInt(msg.timestamp) * 1000) : Date.now()
+            }])
+          }).catch(e => console.warn('[SUPABASE WA MSG SAVE WARN]', e));
+
+          // F) Extracción estructurada de bajo costo con Gemini Flash-Lite
+          // El historial y los mensajes salientes se guardan primero. No deben crear
+          // visitas/alertas antiguas ni inferencias comerciales como si fueran nuevos.
+          if (GEMINI_KEY && messageDirection === 'incoming' && !isHistoricalMessage) {
+            try {
+              const currentDateStr = new Date().toISOString().split('T')[0];
+              const priorHistory = await loadRecentClientHistory(senderPhone);
+              const priorHistoryText = priorHistory.map(m => '[' + (m.sender || m.title || 'Contacto') + '] ' + (m.content || m.text || '')).join('\n').slice(-24000);
+              const promptInstruction = `Eres un asistente operativo y CRM experto en gas natural e instalaciones técnicas en Lima, Perú.
+Analiza la siguiente conversación de WhatsApp del cliente y extrae la información en JSON estricto.
+
+FECHA ACTUAL: ${currentDateStr}
+
+HISTORIAL TÉCNICO Y NOTAS ACUMULADAS DEL CLIENTE:
+${notesContext || 'Sin historial previo registrado.'}
+
+CONVERSACIÓN PREVIA DEL MISMO CLIENTE (usar para resolver referencias como "mañana", "lo de antes" o "confirmado"):
+${priorHistoryText}
+
+MENSAJE RECIBIDO DE WHATSAPP:
+Cliente: "${identityLabel}" (Tel: ${senderPhone})
+Mensaje: "${messageText}"
+Ubicación Detectada: "${finalMapsUrl}"
+
+REGLAS DE EXTRACCIÓN:
+1. "has_actionable_request": true si el cliente solicita o confirma una visita, cotización, trabajo de construcción o seguimiento.
+2. "type": "visita" | "construccion" | "seguimiento" | "ninguno"
+3. "client_name": Nombre completo detectado del cliente.
+4. "service": Descripción detallada del trabajo o falla técnica.
+5. "date": Fecha acordada en formato YYYY-MM-DD (Calcula con respecto a la fecha actual si dice "mañana", "este viernes", etc.).
+6. "time": Hora acordada en formato HH:mm (formato 24 Horas).
+7. "location": Dirección o distrito mencionado.
+8. "coordinates": { "lat": numero, "lng": numero } si hay mapa, o null.
+9. "maps_url": Enlace exacto a Google Maps.
+10. "price": Monto en soles si fue mencionado (ej. 150.00), o null.
+11. "service_details": Lista de hasta tres servicios adicionales detectados, o [].
+12. "summary_update": Breve resumen para actualizar la memoria acumulada del cliente.
+
+REGLA CRITICA: nunca inventes coordenadas. Usa solamente la ubicacion exacta verificada por el servidor. Si esta vacia, devuelve coordinates:null y maps_url:"".
+
+DEBES RESPONDER ÚNICAMENTE CON UN OBJETO JSON VÁLIDO CON ESTE ESQUEMA:
+{
+  "has_actionable_request": boolean,
+  "type": "visita" | "construccion" | "seguimiento" | "ninguno",
+  "client_name": string,
+  "service": string,
+  "date": string | null,
+  "time": string | null,
+  "location": string,
+  "coordinates": { "lat": number, "lng": number } | null,
+  "maps_url": string,
+  "price": number | null,
+  "service_details": string[],
+  "summary_update": string
+}`;
+
+              const llmRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_ANALYSIS_MODEL}:generateContent?key=${GEMINI_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: promptInstruction }] }],
+                  generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
+                })
+              });
+
+              if (llmRes.ok) {
+                const llmData = await llmRes.json();
+                const jsonText = llmData.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (jsonText) {
+                  const extractedData = JSON.parse(jsonText);
+                  console.log('[LLM EXTRACTED DATA]:', JSON.stringify(extractedData, null, 2));
+
+                  // G) Si hay solicitud accionable, crear borrador en `draft_actions`
+                  if (extractedData.has_actionable_request && extractedData.type !== 'ninguno') {
+                    // Gemini clasifica; el servidor es la unica fuente valida de coordenadas.
+                    const coords = hasExactLocation ? { lat: locResult.lat, lng: locResult.lng } : null;
+                    const mapsLink = hasExactLocation ? finalMapsUrl : '';
+
+                    const draftItem = {
+                      client_id: clientId,
+                      type: extractedData.type,
+                      status: 'pending_review',
+                      payload: {
+                        client_name: extractedData.client_name || identityLabel,
+                        phone: senderPhone,
+                        service: extractedData.service || 'Servicio técnico de gas natural',
+                        service_details: Array.isArray(extractedData.service_details) ? extractedData.service_details.filter(Boolean).slice(0, 3) : [],
+                        date: extractedData.date || null,
+                        time: extractedData.time || null,
+                        location: extractedData.location || (hasExactLocation ? locResult.formattedAddress : ''),
+                        coordinates: coords,
+                        maps_url: mapsLink,
+                        price: extractedData.price || null,
+                        summary_update: extractedData.summary_update || ''
+                      }
+                    };
+
+                    await fetch(`${SUPABASE_URL}/rest/v1/draft_actions`, {
+                      method: 'POST',
+                      headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify([draftItem])
+                    });
+                    console.log('[DRAFT ACTION CREADO DE MANERA EXITOSA]:', draftItem.type);
+                  }
+
+                  // H) Actualizar Memoria Acumulada del Cliente (`clients.notes_context`)
+                  if (clientId && extractedData.summary_update) {
+                    const updatedNotes = ((notesContext ? notesContext + '\n' : '') + new Date().toLocaleDateString('es-PE') + ': ' + extractedData.summary_update).slice(-12000);
+                    const extractedName = String(extractedData.client_name || '').trim();
+                    const profileCandidate = String(profileName || '').trim();
+                    const candidateName = !isPlaceholderName(extractedName) ? extractedName : profileCandidate;
+                    const clientUpdate = { notes_context: updatedNotes };
+                    if (!isPlaceholderName(candidateName) && (isPlaceholderName(existingClientName) || !isPlaceholderName(extractedName))) clientUpdate.name = candidateName;
+                    const clientUrl = SUPABASE_URL + '/rest/v1/clients?id=eq.' + encodeURIComponent(clientId);
+                    await fetch(clientUrl, {
+                      method: 'PATCH',
+                      headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify(clientUpdate)
+                    }).catch(e => console.warn('[CLIENT NOTES UPDATE WARN]', e));
+                  }
+                }
+              }
+            } catch(llmErr) {
+              console.error('[LLM EXTRACTION ERROR]', llmErr);
+            }
+          }
+        }
+      }
+
+      return res.status(200).json({ status: 'success', message: 'Evento de WhatsApp procesado exitosamente' });
+    } catch (err) {
+      console.error('[WEBHOOK POST ERROR]', err);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  return res.status(405).json({ error: 'Método no permitido' });
+}

@@ -1,0 +1,394 @@
+{
+  "phase": "gemini_v4_post_corrections_pending_13",
+  "state": "preview_batch_dispatched",
+  "preview": "https://misfinanzas-backend-157z0q1cn-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "fixture_ids": [
+    "F3PC-04",
+    "F3PC-05",
+    "F3PC-06",
+    "F3PC-07",
+    "F3PC-08",
+    "F3PC-09",
+    "F3PC-10",
+    "F3PC-11",
+    "F3PC-12",
+    "F3PC-13",
+    "F3PC-14",
+    "F3PC-15",
+    "F3PC-16"
+  ],
+  "max_calls": 13,
+  "automatic_retries": 0,
+  "execute_false": true,
+  "local_preflight": [
+    {
+      "file": "test-yarbi-compact-understanding-local.cjs",
+      "ok": true,
+      "passed": 12,
+      "total": 12
+    },
+    {
+      "file": "test-yarbi-polarity-proposal-local.cjs",
+      "ok": true,
+      "passed": 18,
+      "total": 18
+    },
+    {
+      "file": "test-yarbi-v4-v1-integration-local.cjs",
+      "ok": true,
+      "passed": 15,
+      "total": 15
+    },
+    {
+      "file": "test-yarbi-v4-adapter-hardening-local.cjs",
+      "ok": true,
+      "passed": 14,
+      "total": 14
+    },
+    {
+      "file": "test-gemini-v4-semantic-validation-local.cjs",
+      "ok": true,
+      "passed": 5,
+      "total": 5
+    },
+    {
+      "file": "test-yarbi-v4-forensic-regression-local.cjs",
+      "ok": true,
+      "passed": 6,
+      "total": 6
+    },
+    {
+      "file": "test-yarbi-v4-post-corrections-local.cjs",
+      "ok": true,
+      "passed": 17,
+      "total": 17
+    },
+    {
+      "file": "test-gemini-v4-post-corrections-ledger-preflight-local.cjs",
+      "ok": true,
+      "passed": 3,
+      "total": 3
+    }
+  ],
+  "integrity": {
+    "source_files": [
+      {
+        "file": "PREVIEW_REFERENCIAS_AISLADO/lib/yarbi-v4-post-corrections-fixtures.js",
+        "sha256": "227536f92a3b4e16f0f0d28d8ca8c4cda5c8b6b1b3e1fe6ee3cc0801fc8fdc56"
+      },
+      {
+        "file": "PREVIEW_REFERENCIAS_AISLADO/lib/yarbi-gemini-v4-probe.js",
+        "sha256": "f9786380481088b49de2efd90ec16c8ccb86ebdba16886c3722edc461145c92d"
+      },
+      {
+        "file": "PREVIEW_REFERENCIAS_AISLADO/lib/yarbi-understanding-polarity-proposal.js",
+        "sha256": "bde3923915eaf6a359d9382a87ca898bfc8e6e7f360c57a583a50cf41ff0bcaf"
+      },
+      {
+        "file": "PREVIEW_REFERENCIAS_AISLADO/lib/yarbi-v4-v1-adapter-proposal.js",
+        "sha256": "b7fcf691b5e417b611b046ce4cecb8610e40133cf020be5a126fb57b86ba4615"
+      },
+      {
+        "file": "PREVIEW_REFERENCIAS_AISLADO/lib/yarbi-semantic-hardening.js",
+        "sha256": "c6d9fe5d9894f0c818f3a7996aa5c2085f2e806766ef3304845ba702fabdbdc4"
+      }
+    ],
+    "schema_sha256": "c72ccc5895d02dbbb56fa482cca4397f3d119b73f64a707fb45fea7cfcee87c6",
+    "schema_bytes": 2068,
+    "prompt_sha256": "2954955ef3395d35cf3167874fe9bf5acb2ed5ea16761942b7fc633d17e342ba",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "historical_verified": {
+    "consumed_fixture_ids": [
+      "F3PC-01",
+      "F3PC-02",
+      "F3PC-03"
+    ],
+    "fourth_rejected_before_gemini": true
+  },
+  "ledger_preflight": {
+    "route_mode": "ledger_preflight",
+    "passed": true
+  },
+  "dispatched_at": "2026-11-05T07:19:11.187Z",
+  "credentials_persisted": false,
+  "prompts_persisted": false,
+  "provider_responses_persisted": false,
+  "result": "GEMINI_V4_PENDING_13_VALIDATION_BLOCKED",
+  "completed_calls": 4,
+  "results": [
+    {
+      "fixture_id": "F3PC-04",
+      "fixture_family": "correction",
+      "request_http_status": 200,
+      "provider_http_status": 200,
+      "model": "gemini-3.5-flash-lite",
+      "schema_sha256": "c72ccc5895d02dbbb56fa482cca4397f3d119b73f64a707fb45fea7cfcee87c6",
+      "schema_bytes": 2068,
+      "execute_false": true,
+      "commercial_actions_executed": false,
+      "resolver_invoked": false,
+      "automatic_retries": 0,
+      "request_count": 1,
+      "gemini_ms": 1428,
+      "server_total_ms": 3116,
+      "trace_closed": true,
+      "pipeline": {
+        "status": "passed",
+        "stage": "completed",
+        "code": null,
+        "semantic_pass": true,
+        "critical_security_failure": false,
+        "safe_outcome": "adapted_v3",
+        "assertions": {
+          "must_positive": true,
+          "must_negated": true,
+          "no_forbidden_positive": true,
+          "correction_expected": true,
+          "clarification_expected": true,
+          "negated_never_positive_constraint": true,
+          "may_auto_select_false": true,
+          "unresolved_contradiction_blocked": true,
+          "pipeline_expected": true,
+          "resolver_not_invoked": true,
+          "commercial_actions_not_executed": true
+        },
+        "timings_ms": {
+          "strict_normalize_ms": 0,
+          "v4_hardener_ms": 3,
+          "v4_v1_adapter_ms": 1,
+          "v1_normalize_ms": 1,
+          "v3_hardener_ms": 4
+        }
+      },
+      "error": null,
+      "allowed_egress": [
+        "isolated_supabase_auth_and_ledger",
+        "gemini_generate_content"
+      ],
+      "round_trip_ms": 8286
+    },
+    {
+      "fixture_id": "F3PC-05",
+      "fixture_family": "temporal",
+      "request_http_status": 422,
+      "provider_http_status": 200,
+      "model": "gemini-3.5-flash-lite",
+      "schema_sha256": "c72ccc5895d02dbbb56fa482cca4397f3d119b73f64a707fb45fea7cfcee87c6",
+      "schema_bytes": 2068,
+      "execute_false": true,
+      "commercial_actions_executed": false,
+      "resolver_invoked": false,
+      "automatic_retries": 0,
+      "request_count": 1,
+      "gemini_ms": 1828,
+      "server_total_ms": 3201,
+      "trace_closed": true,
+      "pipeline": {
+        "status": "failed",
+        "stage": "semantic_assertions",
+        "code": "v4_semantic_assertions_failed",
+        "semantic_pass": false,
+        "critical_security_failure": false,
+        "safe_outcome": "abstained",
+        "assertions": {
+          "must_positive": false,
+          "must_negated": true,
+          "no_forbidden_positive": true,
+          "correction_expected": true,
+          "clarification_expected": false,
+          "negated_never_positive_constraint": true,
+          "may_auto_select_false": true,
+          "unresolved_contradiction_blocked": true,
+          "pipeline_expected": true,
+          "resolver_not_invoked": true,
+          "commercial_actions_not_executed": true
+        },
+        "timings_ms": {
+          "strict_normalize_ms": 0,
+          "v4_hardener_ms": 1,
+          "v4_v1_adapter_ms": 0
+        }
+      },
+      "error": "v4_semantic_assertions_failed",
+      "allowed_egress": [
+        "isolated_supabase_auth_and_ledger",
+        "gemini_generate_content"
+      ],
+      "round_trip_ms": 8120
+    },
+    {
+      "fixture_id": "F3PC-06",
+      "fixture_family": "temporal",
+      "request_http_status": 422,
+      "provider_http_status": 200,
+      "model": "gemini-3.5-flash-lite",
+      "schema_sha256": "c72ccc5895d02dbbb56fa482cca4397f3d119b73f64a707fb45fea7cfcee87c6",
+      "schema_bytes": 2068,
+      "execute_false": true,
+      "commercial_actions_executed": false,
+      "resolver_invoked": false,
+      "automatic_retries": 0,
+      "request_count": 1,
+      "gemini_ms": 1382,
+      "server_total_ms": 3020,
+      "trace_closed": true,
+      "pipeline": {
+        "status": "failed",
+        "stage": "semantic_assertions",
+        "code": "v4_semantic_assertions_failed",
+        "semantic_pass": false,
+        "critical_security_failure": false,
+        "safe_outcome": "abstained",
+        "assertions": {
+          "must_positive": false,
+          "must_negated": true,
+          "no_forbidden_positive": true,
+          "correction_expected": true,
+          "clarification_expected": false,
+          "negated_never_positive_constraint": true,
+          "may_auto_select_false": true,
+          "unresolved_contradiction_blocked": true,
+          "pipeline_expected": true,
+          "resolver_not_invoked": true,
+          "commercial_actions_not_executed": true
+        },
+        "timings_ms": {
+          "strict_normalize_ms": 0,
+          "v4_hardener_ms": 2,
+          "v4_v1_adapter_ms": 0
+        }
+      },
+      "error": "v4_semantic_assertions_failed",
+      "allowed_egress": [
+        "isolated_supabase_auth_and_ledger",
+        "gemini_generate_content"
+      ],
+      "round_trip_ms": 8247
+    },
+    {
+      "fixture_id": "F3PC-07",
+      "fixture_family": "temporal",
+      "request_http_status": 422,
+      "provider_http_status": 503,
+      "model": "gemini-3.5-flash-lite",
+      "schema_sha256": "c72ccc5895d02dbbb56fa482cca4397f3d119b73f64a707fb45fea7cfcee87c6",
+      "schema_bytes": 2068,
+      "execute_false": true,
+      "commercial_actions_executed": false,
+      "resolver_invoked": false,
+      "automatic_retries": 0,
+      "request_count": 1,
+      "gemini_ms": 1618,
+      "server_total_ms": 3355,
+      "trace_closed": true,
+      "pipeline": {
+        "status": null,
+        "stage": null,
+        "code": null,
+        "semantic_pass": false,
+        "critical_security_failure": false,
+        "safe_outcome": null,
+        "assertions": null,
+        "timings_ms": {}
+      },
+      "error": "gemini_v4_provider_rejected",
+      "allowed_egress": [
+        "isolated_supabase_auth_and_ledger",
+        "gemini_generate_content"
+      ],
+      "round_trip_ms": 8352,
+      "stop_reason": "provider_or_safety_stop"
+    }
+  ],
+  "cumulative": {
+    "completed_calls": 7,
+    "semantic_pass": "1/7",
+    "unambiguous_pass": "1/13",
+    "correct_abstentions": "0/3",
+    "threshold_90_percent_met": false,
+    "by_family": {
+      "correction": {
+        "completed": 4,
+        "semantic_pass": 1
+      },
+      "temporal": {
+        "completed": 3,
+        "semantic_pass": 0
+      },
+      "continuity": {
+        "completed": 0,
+        "semantic_pass": 0
+      },
+      "independent_negation": {
+        "completed": 0,
+        "semantic_pass": 0
+      },
+      "identification_service": {
+        "completed": 0,
+        "semantic_pass": 0
+      },
+      "ambiguity": {
+        "completed": 0,
+        "semantic_pass": 0
+      }
+    }
+  },
+  "metrics_ms": {
+    "gemini": {
+      "min": 1382,
+      "median": 1523,
+      "max": 1828,
+      "p95": 1828
+    },
+    "handler": {
+      "min": 3020,
+      "median": 3159,
+      "max": 3355,
+      "p95": 3355
+    },
+    "runner": {
+      "min": 8120,
+      "median": 8267,
+      "max": 8352,
+      "p95": 8352
+    },
+    "pipeline": {
+      "strict_normalize": {
+        "min": 0,
+        "median": 0,
+        "max": 0,
+        "p95": 0
+      },
+      "v4_hardener": {
+        "min": 1,
+        "median": 2,
+        "max": 3,
+        "p95": 3
+      },
+      "v4_v1_adapter": {
+        "min": 0,
+        "median": 0,
+        "max": 1,
+        "p95": 1
+      },
+      "v1_normalize": {
+        "min": 1,
+        "median": 1,
+        "max": 1,
+        "p95": 1
+      },
+      "v3_hardener": {
+        "min": 4,
+        "median": 4,
+        "max": 4,
+        "p95": 4
+      }
+    }
+  },
+  "critical_security_failure": true,
+  "production_used": false,
+  "commercial_actions_executed": false,
+  "generated_at": "2026-11-05T07:19:44.194Z"
+}

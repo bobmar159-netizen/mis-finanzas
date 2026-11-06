@@ -1,0 +1,51 @@
+{
+  "phase": "gemini_http_400_instrumentation_prevalidation_preview",
+  "result": "PREVIEW_INSTRUMENTADO_LISTO_PARA_SONDA",
+  "baseline": {
+    "source": "vercel_preview_source",
+    "deployment_id": "dpl_9tAQtQEtNbyz36mEYqLH5gprg3bR",
+    "deployment_url": "misfinanzas-backend-9s6vmn1rk-omar-dfc4.vercel.app",
+    "trace_sha256": "e6e42bdc9d829c8c2cea90843e05cc15f643aae6719514b3f14113381bbbf0db"
+  },
+  "regression_comparison": {
+    "test_files": 16,
+    "current_failures": 35,
+    "baseline_failures": 35,
+    "failure_names_identical": true,
+    "new_failures": 0,
+    "resolved_failures": 0,
+    "current_tap_sha256": "fe2b193d92aaf8dbae0ff78a643cb91513eb8a1fe71aa325b0d5b51f91fa45a2",
+    "baseline_tap_sha256": "bde66fdfdbe9fadcf24df78e97cdba6efe57005a372055d7c56e3e92d8684206"
+  },
+  "targeted_tests": {
+    "total": 34,
+    "passed": 34,
+    "failed": 0,
+    "real_gemini_calls": 0
+  },
+  "preview": {
+    "project_id": "prj_LzmQFg4ybpNyzeIBjcYZjP1ZGdJq",
+    "project_name": "misfinanzas-backend",
+    "team": "omar-dfc4",
+    "deployment_id": "dpl_ZQ8HWhm1qcr7H7itfPox9ZVCYAz5",
+    "url": "misfinanzas-backend-gfioh0970-omar-dfc4.vercel.app",
+    "state": "READY",
+    "target": "preview",
+    "production_url": null,
+    "aliases": [],
+    "function_count": 1,
+    "supabase_project_ref": "uevilhbstnmmdlgyshlv"
+  },
+  "production": {
+    "alias": "misfinanzas-backend.vercel.app",
+    "deployment_before": "dpl_3KHdcxT1Hvi7ZufphvQeNKSA4DtJ",
+    "deployment_after": "dpl_3KHdcxT1Hvi7ZufphvQeNKSA4DtJ",
+    "unchanged": true
+  },
+  "network": {
+    "deployment_only": true,
+    "preview_endpoint_invocations": 0,
+    "gemini_calls": 0,
+    "commercial_actions": 0
+  }
+}

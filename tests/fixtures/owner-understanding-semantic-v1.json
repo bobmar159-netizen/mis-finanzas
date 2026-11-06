@@ -1,0 +1,19 @@
+{
+  "schema": "yarbi.owner-understanding-dataset.v1",
+  "cases": [
+    { "id": "F3G-CORRECTION", "utterance": "No, ese no, el Carlos de Comas.", "act": "correction", "district": "Comas" },
+    { "id": "F3G-CONFIRMATION", "utterance": "Sí, ese.", "act": "confirmation" },
+    { "id": "F3G-CONTINUATION", "utterance": "Hazlo igual.", "act": "continuation" },
+    { "id": "F3G-CANCEL", "utterance": "Déjalo.", "act": "cancellation", "cancel_scope": "task" },
+    { "id": "F3G-CANCEL-AMBIGUOUS", "utterance": "Cancela eso.", "act": "cancellation", "cancel_scope": "unknown" },
+    { "id": "F3G-TEMPORAL", "utterance": "Creo que fue hace un mes, no estoy seguro.", "days": 30, "certainty": "approximate" },
+    { "id": "F3G-DAY-PART", "utterance": "Fue en la mañana.", "day_part": "morning" },
+    { "id": "F3G-TEMPORAL-CORRECTION", "utterance": "No, fue de noche.", "act": "correction", "day_part": "night" },
+    { "id": "F3G-LOCATION", "utterance": "El de Ventanilla.", "district": "Ventanilla" },
+    { "id": "F3G-SERVICE", "utterance": "El del punto adicional.", "service": "punto_adicional" },
+    { "id": "F3G-RECENT", "utterance": "El cliente que escribió esta mañana.", "day_part": "morning" },
+    { "id": "F3G-COMBINED", "utterance": "El Carlos de Comas que escribió anoche.", "name": "Carlos", "district": "Comas", "day_part": "night" },
+    { "id": "F3G-AMBIGUOUS", "utterance": "El Carlos.", "name": "Carlos", "reference_specificity": "partial", "resolver_outcome": "needs_clarification" },
+    { "id": "F3G-RECURRENT", "utterance": "El Carlos al que ya le hicimos un trabajo el año pasado.", "name": "Carlos", "historical_relationship": true, "days": 365, "certainty": "approximate" }
+  ]
+}

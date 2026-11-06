@@ -1,0 +1,213 @@
+{
+  "phase": "gemini_v4_temporal_validation",
+  "state": "preview_dispatched",
+  "preview": "https://misfinanzas-backend-s87nsccze-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "fixture_count": 3,
+  "max_calls": 3,
+  "automatic_retries": 0,
+  "execute_false": true,
+  "local_preflight_total": 105,
+  "local_preflight": [
+    {
+      "file": "test-yarbi-compact-understanding-local.cjs",
+      "ok": true,
+      "passed": 12,
+      "total": 12
+    },
+    {
+      "file": "test-yarbi-polarity-proposal-local.cjs",
+      "ok": true,
+      "passed": 18,
+      "total": 18
+    },
+    {
+      "file": "test-yarbi-v4-v1-integration-local.cjs",
+      "ok": true,
+      "passed": 15,
+      "total": 15
+    },
+    {
+      "file": "test-yarbi-v4-adapter-hardening-local.cjs",
+      "ok": true,
+      "passed": 14,
+      "total": 14
+    },
+    {
+      "file": "test-gemini-v4-semantic-validation-local.cjs",
+      "ok": true,
+      "passed": 5,
+      "total": 5
+    },
+    {
+      "file": "test-yarbi-v4-forensic-regression-local.cjs",
+      "ok": true,
+      "passed": 6,
+      "total": 6
+    },
+    {
+      "file": "test-yarbi-v4-post-corrections-local.cjs",
+      "ok": true,
+      "passed": 17,
+      "total": 17
+    },
+    {
+      "file": "test-gemini-v4-post-corrections-ledger-preflight-local.cjs",
+      "ok": true,
+      "passed": 3,
+      "total": 3
+    },
+    {
+      "file": "test-yarbi-v4-temporal-forensics-local.cjs",
+      "ok": true,
+      "passed": 7,
+      "total": 7
+    },
+    {
+      "file": "test-yarbi-v4-temporal-instrumentation-local.cjs",
+      "ok": true,
+      "passed": 8,
+      "total": 8
+    }
+  ],
+  "auth_only_passed": true,
+  "credentials_persisted": false,
+  "prompts_persisted": false,
+  "provider_responses_persisted": false,
+  "dispatched_at": "2026-11-05T09:40:31.895Z",
+  "result": "YARBI_V4_TEMPORAL_PREVIEW_BLOCKED",
+  "completed_calls": 1,
+  "results": [
+    {
+      "fixture_id": "F3TV-01",
+      "fixture_family": "clear_temporal",
+      "provider_http_status": 503,
+      "model": "gemini-3.5-flash-lite",
+      "schema_sha256": "c72ccc5895d02dbbb56fa482cca4397f3d119b73f64a707fb45fea7cfcee87c6",
+      "schema_bytes": 2068,
+      "execute_false": true,
+      "commercial_actions_executed": false,
+      "resolver_invoked": false,
+      "automatic_retries": 0,
+      "request_count": 1,
+      "gemini_ms": 1837,
+      "server_total_ms": 3928,
+      "trace_closed": true,
+      "temporal_diagnostic": {
+        "schema": "yarbi.v4.temporal-diagnostic.v1",
+        "stages": [
+          {
+            "stage": "provider_input",
+            "executed": false,
+            "decision": "not_executed",
+            "reason": "PROVIDER_UNAVAILABLE",
+            "temporal_mentions": []
+          },
+          {
+            "stage": "v4_normalize",
+            "executed": false,
+            "decision": "not_executed",
+            "reason": "TEMPORAL_DOWNSTREAM_NOT_REACHED",
+            "temporal_mentions": []
+          },
+          {
+            "stage": "v4_hardener",
+            "executed": false,
+            "decision": "not_executed",
+            "reason": "TEMPORAL_DOWNSTREAM_NOT_REACHED",
+            "temporal_mentions": []
+          },
+          {
+            "stage": "v4_v1_adapter",
+            "executed": false,
+            "decision": "not_executed",
+            "reason": "TEMPORAL_DOWNSTREAM_NOT_REACHED",
+            "temporal_mentions": []
+          },
+          {
+            "stage": "v1_normalize",
+            "executed": false,
+            "decision": "not_executed",
+            "reason": "TEMPORAL_DOWNSTREAM_NOT_REACHED",
+            "temporal_mentions": []
+          },
+          {
+            "stage": "v3_hardener",
+            "executed": false,
+            "decision": "not_executed",
+            "reason": "TEMPORAL_DOWNSTREAM_NOT_REACHED",
+            "temporal_mentions": []
+          },
+          {
+            "stage": "semantic_evaluation",
+            "executed": false,
+            "decision": "not_executed",
+            "reason": "TEMPORAL_DOWNSTREAM_NOT_REACHED",
+            "temporal_mentions": []
+          }
+        ]
+      },
+      "pipeline": {
+        "status": null,
+        "stage": null,
+        "code": null,
+        "timings_ms": {},
+        "semantic": {
+          "pass": false,
+          "critical_security_failure": false,
+          "safe_outcome": null,
+          "assertions": null
+        }
+      },
+      "error": "gemini_v4_provider_rejected",
+      "allowed_egress": [
+        "isolated_supabase_auth_and_ledger",
+        "gemini_generate_content"
+      ],
+      "request_http_status": 422,
+      "round_trip_ms": 8930,
+      "stop_reason": "provider_or_safety_stop"
+    }
+  ],
+  "contract": {
+    "clear_temporal": false,
+    "correction_no_negated_positive": false,
+    "correction_explicit": false,
+    "ambiguous_safe_abstention": false,
+    "all_traces_closed": false,
+    "no_external_commercial_action": true
+  },
+  "metrics_ms": {
+    "gemini": {
+      "min": 1837,
+      "median": 1837,
+      "max": 1837
+    },
+    "handler": {
+      "min": 3928,
+      "median": 3928,
+      "max": 3928
+    },
+    "pipeline": {
+      "min": 0,
+      "median": 0,
+      "max": 0
+    },
+    "instrumentation": {
+      "min": null,
+      "median": null,
+      "max": null
+    },
+    "runner": {
+      "min": 8930,
+      "median": 8930,
+      "max": 8930
+    }
+  },
+  "semantic": {
+    "passed": "0/1"
+  },
+  "production_used": false,
+  "commercial_actions_executed": false,
+  "generated_at": "2026-11-05T09:40:40.828Z"
+}

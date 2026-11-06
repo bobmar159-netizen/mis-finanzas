@@ -1,0 +1,25 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const { CASES, validateFixtures } = require('../PREVIEW_REFERENCIAS_AISLADO/lib/yarbi-v4-semantic-fixtures');
+const { createGeminiV4SemanticValidationHandler, runLocalPipeline } = require('../PREVIEW_REFERENCIAS_AISLADO/api/diagnostics/gemini-v4-semantic-validation');
+
+const saved = Object.fromEntries(['VERCEL_ENV','YARBI_PREVIEW_GEMINI_SCHEMA_EXPERIMENT','YARBI_PREVIEW_SUPABASE_PROJECT_REF','SUPABASE_URL','SUPABASE_SECRET_KEY','YARBI_TRACE_HMAC_KEY','YARBI_PREVIEW_GEMINI_SCHEMA_EXPERIMENT_OWNER_ID','YARBI_PREVIEW_OWNER_GEMINI_UNDERSTANDING','GEMINI_API_KEY'].map(key => [key, process.env[key]]));
+Object.assign(process.env, { VERCEL_ENV: 'preview', YARBI_PREVIEW_GEMINI_SCHEMA_EXPERIMENT: 'true', YARBI_PREVIEW_SUPABASE_PROJECT_REF: 'uevilhbstnmmdlgyshlv', SUPABASE_URL: 'https://uevilhbstnmmdlgyshlv.supabase.co', SUPABASE_SECRET_KEY: 's'.repeat(40), YARBI_TRACE_HMAC_KEY: 't'.repeat(40), YARBI_PREVIEW_GEMINI_SCHEMA_EXPERIMENT_OWNER_ID: '11111111-1111-4111-8111-111111111111', YARBI_PREVIEW_OWNER_GEMINI_UNDERSTANDING: 'true', GEMINI_API_KEY: 'test-not-real' });
+
+function res() { return { statusCode: 0, body: null, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } }; }
+function rawCorrection() { return { schema: 'yarbi.owner-understanding.v4', intent: 'reference_lookup', conversational_act: 'correction', target_type: 'contact', mentions: [{ kind: 'proper_name', value: 'Carlos', polarity: 'negated', certainty: 'confirmed', claimed_source: 'utterance' }, { kind: 'proper_name', value: 'Carla', polarity: 'affirmed', certainty: 'confirmed', claimed_source: 'utterance' }], control: { correction: 'replace_previous', continuation: 'none', cancel_scope: 'none' }, confidence: 0.9, ambiguity: false, missing_information: [] }; }
+function rawNegatedCancellation() { return { schema: 'yarbi.owner-understanding.v4', intent: 'cancel', conversational_act: 'cancellation', target_type: 'agenda', mentions: [], control: { correction: 'none', continuation: 'none', cancel_scope: 'agenda' }, confidence: 0.9, ambiguity: false, missing_information: [] }; }
+const results = [];
+async function test(name, fn) { try { await fn(); results.push({ name, status: 'PASS' }); } catch (error) { results.push({ name, status: 'FAIL', error: error.message }); } }
+
+(async () => {
+  await test('batería sintética contiene 18 gate y 14 fresh únicos', () => { const value = validateFixtures(); assert.equal(value.valid, true); assert.equal(value.groups.gate, 18); assert.equal(value.groups.fresh, 14); });
+  await test('corrección positiva conserva polaridad y llega a v3 sin resolver', () => { const fixture = CASES.find(item => item.id === 'F3V4G-02'); const outcome = runLocalPipeline(rawCorrection(), fixture); assert.equal(outcome.ok, true); assert.equal(outcome.semantic.assertions.negated_never_positive_constraint, true); assert.equal(outcome.semantic.assertions.resolver_not_invoked, true); });
+  await test('cancelación negada se detiene como abstención segura', () => { const fixture = CASES.find(item => item.id === 'F3V4G-03'); const outcome = runLocalPipeline(rawNegatedCancellation(), fixture); assert.equal(outcome.ok, true); assert.equal(outcome.semantic.safe_outcome, 'abstained'); assert.equal(outcome.semantic.assertions.may_auto_select_false, true); });
+  await test('ruta bloquea fixture no estático antes de Gemini', async () => { let calls = 0; const handler = createGeminiV4SemanticValidationHandler({ authenticate: async () => ({ ok: true, user: { id: '11111111-1111-4111-8111-111111111111' } }), runProbe: async () => { calls += 1; return { accepted: true }; } }); const response = res(); await handler({ method: 'POST', url: '/api/diagnostics/gemini-v4-semantic-validation', headers: { authorization: 'Bearer synthetic' }, body: { fixture_id: 'invented' } }, response); assert.equal(response.statusCode, 400); assert.equal(calls, 0); });
+  await test('segunda entrega se bloquea antes de Gemini', async () => { let calls = 0; const handler = createGeminiV4SemanticValidationHandler({ authenticate: async () => ({ ok: true, user: { id: '11111111-1111-4111-8111-111111111111' } }), runProbe: async () => { calls += 1; return { accepted: true }; }, startTrace: async () => ({ ok: true, duplicate: true }) }); const response = res(); await handler({ method: 'POST', url: '/api/diagnostics/gemini-v4-semantic-validation', headers: { authorization: 'Bearer synthetic' }, body: { fixture_id: 'F3V4G-01' } }, response); assert.equal(response.statusCode, 409); assert.equal(calls, 0); });
+  const failed = results.filter(item => item.status === 'FAIL');
+  process.stdout.write(JSON.stringify({ phase: 'gemini_v4_semantic_validation_local', result: failed.length ? 'FAIL' : 'PASS', passed: results.length - failed.length, total: results.length, failures: failed, network_calls: 0, commercial_actions: 0 }, null, 2) + '\n');
+  process.exitCode = failed.length ? 1 : 0;
+})().finally(() => { for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } });

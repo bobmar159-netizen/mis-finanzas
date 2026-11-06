@@ -1,0 +1,11 @@
+{
+  "phase": "gemini_http400_single_probe",
+  "state": "preview_request_dispatched",
+  "deployment_id": "dpl_ZQ8HWhm1qcr7H7itfPox9ZVCYAz5",
+  "preview": "https://misfinanzas-backend-gfioh0970-omar-dfc4.vercel.app",
+  "isolated_project_ref": "uevilhbstnmmdlgyshlv",
+  "fixture_id": "F3G-SERVICE",
+  "expected_route": "NEEDS_LANGUAGE_MODEL",
+  "automatic_retries": 0,
+  "dispatched_at": "2026-11-03T04:43:20.737Z"
+}

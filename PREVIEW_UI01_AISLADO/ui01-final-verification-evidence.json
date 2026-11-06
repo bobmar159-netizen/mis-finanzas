@@ -1,0 +1,28 @@
+{
+  "phase": "UI01-FINAL-VERIFY",
+  "project_ref": "uevilhbstnmmdlgyshlv",
+  "verified_at": "2026-11-01T04:33:59.307Z",
+  "auth": {
+    "inbox_id": 19,
+    "status": "authorized",
+    "decision_count": 1,
+    "order_count": 1,
+    "execution_states": [
+      "authorized_pending_execution"
+    ],
+    "pass": true
+  },
+  "dismiss": {
+    "inbox_id": 20,
+    "status": "dismissed",
+    "decision_count": 1,
+    "order_count": 0,
+    "pass": true
+  },
+  "allowed_hosts": [
+    "uevilhbstnmmdlgyshlv.supabase.co"
+  ],
+  "external_egress": false,
+  "secrets_stored": false,
+  "pii_stored": false
+}

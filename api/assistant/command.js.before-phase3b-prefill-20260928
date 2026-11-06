@@ -1,0 +1,368 @@
+const { extractCoordinatesFromMapsUrl } = require('../../lib/location-resolver');
+
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://haifktjvyhbsazmiyqps.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || '';
+const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
+const ASSISTANT_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
+const GEMINI_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-3.6-flash';
+
+function cors(res) {
+  res.setHeader('Access-Control-Allow-Origin', process.env.APP_ORIGIN || '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+}
+
+function authorized(req) {
+  const header = req.headers?.['x-assistant-token'] || req.headers?.authorization || '';
+  const token = String(header).replace(/^Bearer\s+/i, '').trim();
+  return Boolean(ASSISTANT_TOKEN && token === ASSISTANT_TOKEN);
+}
+
+function cleanPhone(value) {
+  let phone = String(value || '').replace(/\D/g, '');
+  if (phone.startsWith('51') && phone.length === 11) phone = phone.slice(2);
+  return phone;
+}
+
+function phoneVariants(value) {
+  const phone = cleanPhone(value);
+  return phone ? Array.from(new Set([phone, '51' + phone])) : [];
+}
+
+async function supabase(endpoint, options = {}) {
+  const response = await fetch(SUPABASE_URL + endpoint, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: 'Bearer ' + SUPABASE_KEY,
+      ...(options.headers || {})
+    }
+  });
+  const data = await response.json().catch(() => ({}));
+  return { response, data };
+}
+
+async function findClient(phone) {
+  if (!SUPABASE_KEY || !phone) return null;
+  for (const variant of phoneVariants(phone)) {
+    const result = await supabase('/rest/v1/clients?phone_number=eq.' + encodeURIComponent(variant) + '&select=*');
+    if (result.response.ok && result.data[0]) return result.data[0];
+  }
+  return null;
+}
+
+async function findClientsByName(name) {
+  if (!SUPABASE_KEY || String(name || '').trim().length < 3) return [];
+  const result = await supabase('/rest/v1/clients?name=ilike.' + encodeURIComponent('*' + String(name).trim() + '*') + '&select=id,name,phone_number,address_summary&limit=8');
+  return result.response.ok && Array.isArray(result.data) ? result.data : [];
+}
+
+function compactAlert(value) {
+  if (!value || typeof value !== 'object') return null;
+  return {
+    id: String(value.id || ''),
+    clientName: String(value.clientName || value.name || value.title || '').slice(0, 160),
+    phone: cleanPhone(value.phone || ''),
+    text: String(value.text || '').slice(-4000),
+    mapsUrl: String(value.mapsUrl || value.maps_url || '').trim(),
+    coordinates: value.coordinates || value.coordenadas || null,
+    timestamp: Number(value.timestamp || 0) || null
+  };
+}
+
+function phoneFromText(value) {
+  const match = String(value || '').match(/(?:\+?51[\s.-]*)?(9\d{2}[\s.-]?\d{3}[\s.-]?\d{3})/);
+  return cleanPhone(match ? match[0] : '');
+}
+
+function phoneIsTrusted(candidate, lockedPhone, text) {
+  const value = cleanPhone(candidate);
+  if (!value) return false;
+  const locked = cleanPhone(lockedPhone);
+  const explicit = cleanPhone(phoneFromText(text));
+  return Boolean((locked && value === locked) || (explicit && value === explicit));
+}
+
+function publicCandidates(clients) {
+  return clients.map((client) => ({ id: client.id || '', name: client.name || 'Cliente sin nombre', phone: cleanPhone(client.phone_number || ''), address: client.address_summary || '' }));
+}
+
+function ambiguityResponse(name, clients) {
+  const matches = publicCandidates(clients);
+  return {
+    reply: 'Encontré ' + matches.length + ' coincidencias para ' + name + ': ' + matches.map((client) => client.name + (client.phone ? ' (' + client.phone + ')' : '')).join(', ') + '. Dime el número o la fecha para elegir sin modificar al equivocado.',
+    action: { intent: 'disambiguate_client', client_name: name, candidates: matches, requires_consent: false },
+    draft: null,
+    requiresConsent: false,
+    requiresDisambiguation: true,
+    matches,
+    model: GEMINI_MODEL
+  };
+}
+
+async function loadMessages(phone) {
+  if (!SUPABASE_KEY || !phone) return [];
+  const rows = [];
+  for (const variant of phoneVariants(phone)) {
+    const result = await supabase('/rest/v1/whatsapp_messages?deleted_at=is.null&phone=eq.' + encodeURIComponent(variant) + '&select=*&order=timestamp.desc&limit=30');
+    if (result.response.ok && Array.isArray(result.data)) rows.push(...result.data);
+  }
+  const unique = new Map(rows.map((row) => [row.id || (row.timestamp + '|' + row.text), row]));
+  return Array.from(unique.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0)).slice(-30);
+}
+
+function geminiDetail(data) {
+  return String(data?.error?.message || data?.error?.status || 'Gemini request failed').slice(0, 300);
+}
+
+function limaParts(value) {
+  const numeric = Number(value);
+  const input = value ? (Number.isFinite(numeric) && numeric < 100000000000 ? numeric * 1000 : value) : Date.now();
+  const sourceDate = new Date(input);
+  const safeDate = Number.isNaN(sourceDate.getTime()) ? new Date() : sourceDate;
+  // Peru does not observe DST: UTC-05:00 is stable and avoids server UTC leakage.
+  const lima = new Date(safeDate.getTime() - (5 * 60 * 60 * 1000));
+  const pad = (number) => String(number).padStart(2, '0');
+  return {
+    date: lima.getUTCFullYear() + '-' + pad(lima.getUTCMonth() + 1) + '-' + pad(lima.getUTCDate()),
+    time: pad(lima.getUTCHours()) + ':' + pad(lima.getUTCMinutes())
+  };
+}
+
+function messageTimestamp(message) {
+  return message?.timestamp || message?.created_at || 0;
+}
+
+function isGenericTodayQuestion(text) {
+  const value = String(text || '').toLowerCase();
+  return /\b(hoy|ayer)\b/.test(value) && /(mensaje|whatsapp|cliente|escribi[oó]|contact[oó]|alerta)/.test(value);
+}
+
+function isCurrentDateQuestion(text) {
+  const value = String(text || '').toLowerCase();
+  return /(fecha|día|dia|qué día|que dia)/.test(value) && /(hoy|actual)/.test(value);
+}
+
+async function loadMessagesForLimaDate(dateKey) {
+  if (!SUPABASE_KEY) return [];
+  const result = await supabase('/rest/v1/whatsapp_messages?deleted_at=is.null&select=id,title,phone,text,maps_url,timestamp,app_name&order=timestamp.desc&limit=200');
+  if (!result.response.ok || !Array.isArray(result.data)) return [];
+  const dated = result.data.filter((message) => limaParts(messageTimestamp(message)).date === dateKey);
+  const cloud = dated.filter((message) => /cloud|meta/i.test(String(message.app_name || '')));
+  return (cloud.length ? cloud : dated).slice(0, 12);
+}
+
+function localMessagesForLimaDate(values, dateKey) {
+  if (!Array.isArray(values)) return [];
+  return values.slice(-80).map((value) => ({
+    title: String(value?.name || value?.title || value?.phone || 'Cliente sin nombre').slice(0, 160),
+    phone: cleanPhone(value?.phone || ''),
+    text: String(value?.text || '').slice(0, 1000),
+    timestamp: Number(value?.timestamp || 0) || 0,
+    app_name: 'Android local notification history'
+  })).filter((value) => value.text && value.timestamp && limaParts(value.timestamp).date === dateKey);
+}
+
+function mergeMessageLists(primary, secondary) {
+  const unique = new Map();
+  [...(primary || []), ...(secondary || [])].forEach((message) => {
+    const key = cleanPhone(message.phone || '') + '|' + Number(message.timestamp || 0) + '|' + String(message.text || '');
+    if (!unique.has(key)) unique.set(key, message);
+  });
+  return Array.from(unique.values()).sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0)).slice(0, 40);
+}
+function todayReply(messages, dateKey) {
+  if (!messages.length) return 'No encontré mensajes de WhatsApp con fecha ' + dateKey + ' en la base de datos.';
+  const list = messages.slice(0, 5).map((message) => {
+    const at = limaParts(messageTimestamp(message));
+    const name = message.title || cleanPhone(message.phone) || 'Cliente sin nombre';
+    const preview = String(message.text || 'Mensaje recibido').replace(/\s+/g, ' ').slice(0, 90);
+    return name + ' a las ' + at.time + ': ' + preview;
+  });
+  return 'Hoy, ' + dateKey + ', encontré ' + messages.length + ' mensaje(s). ' + list.join(' | ');
+}
+
+module.exports = async function handler(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
+  if (!ASSISTANT_TOKEN || !GEMINI_KEY) return res.status(503).json({ error: 'assistant_not_configured' });
+  if (!authorized(req)) return res.status(401).json({ error: 'unauthorized' });
+
+  try {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    const text = String(body.text || '').trim();
+    if (!text) return res.status(400).json({ error: 'text_required' });
+    const nowLima = limaParts();
+    if (isCurrentDateQuestion(text)) {
+      return res.status(200).json({ reply: 'Hoy en Lima es ' + nowLima.date + ' y son las ' + nowLima.time + '.', action: { intent: 'read_current_datetime', date: nowLima.date, time: nowLima.time }, draft: null, requiresConsent: false, requiresDisambiguation: false, model: GEMINI_MODEL });
+    }
+    if (isGenericTodayQuestion(text)) {
+      const wantsYesterday = /\bayer\b/i.test(text);
+      const ref = new Date();
+      if (wantsYesterday) ref.setDate(ref.getDate() - 1);
+      const requestedDate = limaParts(ref).date;
+      const cloudMessages = await loadMessagesForLimaDate(requestedDate);
+      const deviceMessages = localMessagesForLimaDate(body.localMessages, requestedDate);
+      const todayMessages = mergeMessageLists(deviceMessages, cloudMessages);
+      return res.status(200).json({ reply: todayReply(todayMessages, requestedDate), action: { intent: 'read_today_messages', date: requestedDate, count: todayMessages.length, sources: { device: deviceMessages.length, cloud: cloudMessages.length } }, draft: null, requiresConsent: false, requiresDisambiguation: false, model: GEMINI_MODEL });
+    }
+
+    const activeAlert = compactAlert(body.activeAlert);
+    const requestedName = String(body.clientName || activeAlert?.clientName || '').trim();
+    const phone = cleanPhone(body.phone || activeAlert?.phone || phoneFromText(text));
+    let client = await findClient(phone);
+    let candidates = !client && !phone && requestedName ? await findClientsByName(requestedName) : [];
+    if (candidates.length > 1) return res.status(200).json(ambiguityResponse(requestedName, candidates));
+    if (!client && candidates.length === 1) client = candidates[0];
+    let messages = await loadMessages(phone || client?.phone_number);
+    const history = messages
+      .map((message) => { const at = limaParts(messageTimestamp(message)); return '[' + at.date + ' ' + at.time + ' Lima] [' + (message.title || 'Cliente') + '] ' + (message.text || ''); })
+      .join('\n')
+      .slice(-24000);
+    const agenda = Array.isArray(body.agenda) ? body.agenda.slice(0, 80) : [];
+    const appContext = activeAlert ? JSON.stringify(activeAlert).slice(0, 7000) : '[sin alerta activa]';
+    const liveMemory = String(body.liveMemory || '').slice(-16000);
+
+    const prompt = [
+      'Eres Yarbi, asistente operativo de finanzas y CRM de instalaciones de gas natural en Lima.',
+      'Analiza la orden del Maestro y devuelve solo JSON valido.',
+      'FECHA Y HORA ACTUAL EN LIMA: ' + nowLima.date + ' ' + nowLima.time + '.',
+      'Cada mensaje del historial incluye fecha y hora de Lima. Si el Maestro pregunta por hoy, ayer o el último mensaje, usa solo la fecha solicitada y nunca presentes un mensaje antiguo como actual.',
+      'No inventes clientes, fechas, teléfonos, coordenadas ni ubicaciones.',
+      'La ALERTA ACTIVA corresponde al cliente cuando el Maestro diga ese cliente, la alerta o el último mensaje. Si hay más de una coincidencia por nombre, usa intent disambiguate_client y pide teléfono o fecha; jamás elijas al azar.',
+      'Para crear una visita, construcción o seguimiento, extrae fecha y hora únicamente de la ORDEN y de la ALERTA ACTIVA. El HISTORIAL antiguo sirve como apoyo, pero nunca copies de allí una fecha u hora si no aparece en la conversación activa.',
+      'El teléfono de la alerta activa identifica al cliente. Nunca uses un teléfono de otro mensaje, otro cliente o una coincidencia aproximada. Si el dato no está confirmado, devuelve phone vacío y pide confirmación.',
+      'Para servicios múltiples usa service como principal y service_details como lista. Extrae también price cuando el Maestro mencione un precio acordado. No afirmes que una acción se guardó: la app confirma el resultado real.',
+      'intent puede ser read_latest_message, read_client, read_agenda, read_finances, read_inventory, read_notes, create_visit, create_construction, create_followup, update_agenda, create_expense, create_income, create_note, send_whatsapp, open_location o general. Para cambiar una agenda existente usa update_agenda y completa agenda_id si existe; new_type puede ser visita, construccion o trabajo; new_status solo si el Maestro lo pide explicitamente. Para finanzas y notas devuelve una propuesta para revisar; nunca afirmes que se guardo.',
+      'Si pide enviar WhatsApp marca requires_consent true y no envies nada desde esta ruta.',
+      '',
+      'ORDEN:',
+      text,
+      '',
+      'CLIENTE:',
+      JSON.stringify(client || {}),
+      '',
+      'HISTORIAL:',
+      history || '[sin historial]',
+      '',
+      'AGENDA:',
+      JSON.stringify(agenda),
+      '',
+      'ALERTA ACTIVA:',
+      appContext,
+      '',
+      'MEMORIA LIVE PERSISTENTE:',
+      liveMemory || '[sin memoria Live]',
+      '',
+      'ESQUEMA:',
+      '{"intent":"general","reply":"respuesta breve","client_name":"","phone":"","agenda_id":"","new_type":"","new_status":"","date":null,"time":null,"service":"","service_details":[],"location":"","maps_url":"","coordinates":null,"price":null,"amount":null,"category":"","description":"","note_title":"","note_text":"","message":"","media_url":"","media_type":"","scope":"","requires_consent":false}'
+    ].join('\n');
+
+    const response = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + GEMINI_KEY,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
+        })
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return res.status(502).json({ error: 'gemini_error', detail: geminiDetail(data) });
+
+    const raw = data.candidates?.[0]?.content?.parts?.find((part) => part.text)?.text || '{}';
+    const action = JSON.parse(raw.trim());
+    const lockedPhone = cleanPhone(activeAlert?.phone || phone || '');
+    if (action.phone && !phoneIsTrusted(action.phone, lockedPhone, text)) {
+      action.phone = '';
+      action.phone_conflict = true;
+    }
+    if (!client && action.client_name && !phone) {
+      candidates = await findClientsByName(action.client_name);
+      if (candidates.length > 1) return res.status(200).json(ambiguityResponse(action.client_name, candidates));
+      if (candidates.length === 1) {
+        client = candidates[0];
+        messages = await loadMessages(cleanPhone(client.phone_number));
+      }
+    }
+
+    const types = {
+      create_visit: 'visita',
+      create_construction: 'construccion',
+      create_followup: 'seguimiento'
+    };
+    if (types[action.intent]) {
+      action.reply = 'Preparé una propuesta de ' + types[action.intent] + '. Revisa el formulario y confirma antes de guardarla.';
+    }
+    let draft = null;
+    let draftId = null;
+
+    if (types[action.intent]) {
+      const exactMessage = messages
+        .slice()
+        .reverse()
+        .find((message) => message.maps_url && /^https?:\/\//i.test(message.maps_url));
+        const mapCandidates = [activeAlert?.mapsUrl, action.maps_url, action.location, exactMessage?.maps_url];
+      const mapsUrl = mapCandidates.find((value) => /^https?:\/\//i.test(String(value || '')) && extractCoordinatesFromMapsUrl(String(value))) || '';
+      const coordinates = mapsUrl ? extractCoordinatesFromMapsUrl(mapsUrl) : null;
+
+      draft = {
+        kind: types[action.intent],
+        clientName: activeAlert?.clientName || client?.name || action.client_name || requestedName || 'Cliente sin nombre',
+        phone: cleanPhone(client?.phone_number || activeAlert?.phone || action.phone || phone),
+        date: action.date || '',
+        time: action.time || '',
+        service: action.service || '',
+        serviceDetails: Array.isArray(action.service_details) ? action.service_details.filter(Boolean).slice(0, 3) : [],
+        price: Number.isFinite(Number(action.price)) ? Number(action.price) : 0,
+        summary: action.reply || '',
+        location: action.location || '',
+        notes: action.description || action.reply || '',
+        mapsUrl: coordinates ? mapsUrl : '',
+        latitude: coordinates?.lat ?? null,
+        longitude: coordinates?.lng ?? null,
+        confidence: coordinates ? 'high' : 'medium',
+        sourceAlertId: activeAlert?.id || null,
+        phoneConflict: Boolean(action.phone_conflict)
+      };
+      const missing = [];
+      if (!draft.phone) missing.push('teléfono');
+      if (!draft.location && !draft.mapsUrl) missing.push('ubicación');
+      if (!draft.service) missing.push('servicio');
+      if (draft.kind === 'construccion' && !(draft.price > 0)) missing.push('precio');
+      draft.missing = missing;
+
+      if (SUPABASE_KEY) {
+        const draftResponse = await supabase('/rest/v1/draft_actions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+          body: JSON.stringify([{
+            client_id: client?.id || null,
+            type: draft.kind,
+            status: 'pending_review',
+            payload: { ...draft, summary_update: action.reply || '' }
+          }])
+        });
+        if (draftResponse.response.ok && Array.isArray(draftResponse.data) && draftResponse.data[0]?.id) draftId = draftResponse.data[0].id;
+      }
+    }
+
+    return res.status(200).json({
+      reply: String(action.reply || 'Orden analizada.'),
+      action,
+      draft: draft ? { ...draft, _draftId: draftId } : null,
+      requiresConsent: Boolean(action.requires_consent),
+      requiresDisambiguation: false,
+      matches: publicCandidates(candidates),
+      resolvedClient: client ? { id: client.id || '', name: client.name || '', phone: cleanPhone(client.phone_number || '') } : null,
+      model: GEMINI_MODEL
+    });
+  } catch (error) {
+    console.error('[ASSISTANT COMMAND]', error);
+    return res.status(500).json({ error: 'assistant_command_failed' });
+  }
+};

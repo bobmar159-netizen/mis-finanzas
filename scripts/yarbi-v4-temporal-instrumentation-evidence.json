@@ -1,0 +1,50 @@
+{
+  "phase": "YARBI_V4_TEMPORAL_INSTRUMENTATION_LOCAL",
+  "result": "YARBI_V4_TEMPORAL_INSTRUMENTATION_LOCAL_READY",
+  "synthetic_only": true,
+  "network_calls": 0,
+  "gemini_calls": 0,
+  "preview_calls": 0,
+  "supabase_remote_calls": 0,
+  "production_calls": 0,
+  "commercial_actions": 0,
+  "fixtures": [
+    "TEMPORAL_PAST_AFTERNOON",
+    "TEMPORAL_PRESENT_NIGHT",
+    "TEMPORAL_FUTURE_MORNING",
+    "TEMPORAL_INCONSISTENT_ATTRIBUTE",
+    "TEMPORAL_STRUCTURAL_REJECTION",
+    "PROVIDER_UNAVAILABLE"
+  ],
+  "observed_stage_order": [
+    "provider_input",
+    "v4_normalize",
+    "v4_hardener",
+    "v4_v1_adapter",
+    "v1_normalize",
+    "v3_hardener",
+    "semantic_evaluation"
+  ],
+  "reason_codes_exercised": [
+    "TEMPORAL_VERIFICATION_PASSED",
+    "TEMPORAL_ATTRIBUTE_INCONSISTENT",
+    "TEMPORAL_NORMALIZATION_REJECTED",
+    "TEMPORAL_DOWNSTREAM_NOT_REACHED",
+    "PROVIDER_UNAVAILABLE"
+  ],
+  "privacy_checks": {
+    "raw_utterance_persisted": false,
+    "raw_provider_response_persisted": false,
+    "prompt_persisted": false,
+    "credentials_persisted": false,
+    "arbitrary_diagnostic_fields_preserved": false
+  },
+  "tests": {
+    "regression_passed": 97,
+    "regression_total": 97,
+    "instrumentation_passed": 8,
+    "instrumentation_total": 8,
+    "combined_passed": 105,
+    "combined_total": 105
+  }
+}

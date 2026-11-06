@@ -1,0 +1,20 @@
+{
+  "schema": "yarbi.owner-understanding-dataset.fresh.v3",
+  "description": "Batería fresca sintética para validación real posterior a menciones tipadas. No contiene personas, teléfonos ni conversaciones reales.",
+  "cases": [
+    { "id": "F3F-CORRECTION", "utterance": "No, era Carlos de Ate.", "act": "correction", "district": "Ate" },
+    { "id": "F3F-CONFIRMATION", "utterance": "Sí, es ese.", "act": "confirmation" },
+    { "id": "F3F-CONTINUATION", "utterance": "Continúa con eso.", "act": "continuation" },
+    { "id": "F3F-CANCEL", "utterance": "Cancela esta tarea.", "act": "cancellation", "cancel_scope": "task" },
+    { "id": "F3F-CANCEL-AMBIGUOUS", "utterance": "Cancela eso.", "act": "cancellation", "cancel_scope": "unknown" },
+    { "id": "F3F-TEMPORAL", "utterance": "Fue hace casi dos meses, no estoy seguro.", "days": 60, "certainty": "approximate" },
+    { "id": "F3F-DAY-PART", "utterance": "Fue en la tarde.", "day_part": "afternoon" },
+    { "id": "F3F-TEMPORAL-CORRECTION", "utterance": "No, fue en la tarde.", "act": "correction", "day_part": "afternoon" },
+    { "id": "F3F-LOCATION", "utterance": "El de Ate.", "district": "Ate" },
+    { "id": "F3F-SERVICE", "utterance": "El que pidió modificación de tubería.", "service": "modificacion_tuberia" },
+    { "id": "F3F-RECENT", "utterance": "El cliente que escribió ayer en la tarde.", "day_part": "afternoon" },
+    { "id": "F3F-COMBINED", "utterance": "Carlos de Ate que escribió anoche.", "name": "Carlos", "district": "Ate", "day_part": "night" },
+    { "id": "F3F-AMBIGUOUS", "utterance": "El Carlos.", "name": "Carlos", "reference_specificity": "partial", "resolver_outcome": "needs_clarification" },
+    { "id": "F3F-RECURRENT", "utterance": "El Carlos al que atendimos el año pasado.", "name": "Carlos", "historical_relationship": true, "days": 365, "certainty": "approximate" }
+  ]
+}

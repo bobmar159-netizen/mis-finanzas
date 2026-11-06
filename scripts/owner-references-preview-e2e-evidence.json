@@ -1,0 +1,391 @@
+{
+  "phase": "owner_references_preview_e2e",
+  "result": "PASS",
+  "preview": "https://misfinanzas-backend-2y04kg0c0-omar-dfc4.vercel.app",
+  "allowed_hosts": [
+    "misfinanzas-backend-2y04kg0c0-omar-dfc4.vercel.app",
+    "uevilhbstnmmdlgyshlv.supabase.co"
+  ],
+  "requests": [
+    {
+      "label": "A_owner_a_same_name",
+      "status": 200,
+      "status_source": "response_contract_fallback",
+      "ok": true,
+      "error": null,
+      "execute": false,
+      "is_read_only": true,
+      "operation_id_present": true,
+      "candidate_outcome": "candidates_found",
+      "candidate_count": 1,
+      "candidate_ids": [
+        13
+      ],
+      "metrics": {
+        "auth_ms": 720,
+        "scope_ms": 196,
+        "candidate_query_ms": 448,
+        "enrichment_ms": 447,
+        "resolver_ms": 1,
+        "trace_ms": 1295,
+        "other_overhead_ms": 4,
+        "adapter_ms": 1092,
+        "total_ms": 3110,
+        "query_count": 3,
+        "candidate_count": 1
+      },
+      "round_trip_ms": 8994
+    },
+    {
+      "label": "B_owner_b_same_name",
+      "status": 200,
+      "status_source": "response_contract_fallback",
+      "ok": true,
+      "error": null,
+      "execute": false,
+      "is_read_only": true,
+      "operation_id_present": true,
+      "candidate_outcome": "candidates_found",
+      "candidate_count": 1,
+      "candidate_ids": [
+        15
+      ],
+      "metrics": {
+        "auth_ms": 549,
+        "scope_ms": 405,
+        "candidate_query_ms": 433,
+        "enrichment_ms": 535,
+        "resolver_ms": 0,
+        "trace_ms": 1213,
+        "other_overhead_ms": 1,
+        "adapter_ms": 1373,
+        "total_ms": 3136,
+        "query_count": 3,
+        "candidate_count": 1
+      },
+      "round_trip_ms": 8353
+    },
+    {
+      "label": "C_owner_b_phone_of_a",
+      "status": 200,
+      "status_source": "response_contract_fallback",
+      "ok": true,
+      "error": null,
+      "execute": false,
+      "is_read_only": true,
+      "operation_id_present": true,
+      "candidate_outcome": "no_candidates",
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "metrics": {
+        "auth_ms": 428,
+        "scope_ms": 387,
+        "candidate_query_ms": 466,
+        "enrichment_ms": 0,
+        "resolver_ms": 0,
+        "trace_ms": 1248,
+        "other_overhead_ms": 0,
+        "adapter_ms": 853,
+        "total_ms": 2530,
+        "query_count": 1,
+        "candidate_count": 0
+      },
+      "round_trip_ms": 7637
+    },
+    {
+      "label": "E_owner_a_district_comas",
+      "status": 200,
+      "status_source": "response_contract_fallback",
+      "ok": true,
+      "error": null,
+      "execute": false,
+      "is_read_only": true,
+      "operation_id_present": true,
+      "candidate_outcome": "candidates_found",
+      "candidate_count": 1,
+      "candidate_ids": [
+        13
+      ],
+      "metrics": {
+        "auth_ms": 441,
+        "scope_ms": 423,
+        "candidate_query_ms": 858,
+        "enrichment_ms": 454,
+        "resolver_ms": 0,
+        "trace_ms": 1249,
+        "other_overhead_ms": 0,
+        "adapter_ms": 1735,
+        "total_ms": 3425,
+        "query_count": 4,
+        "candidate_count": 1
+      },
+      "round_trip_ms": 8674
+    },
+    {
+      "label": "F_owner_a_service",
+      "status": 200,
+      "status_source": "response_contract_fallback",
+      "ok": true,
+      "error": null,
+      "execute": false,
+      "is_read_only": true,
+      "operation_id_present": true,
+      "candidate_outcome": "candidates_found",
+      "candidate_count": 1,
+      "candidate_ids": [
+        13
+      ],
+      "metrics": {
+        "auth_ms": 492,
+        "scope_ms": 407,
+        "candidate_query_ms": 459,
+        "enrichment_ms": 415,
+        "resolver_ms": 0,
+        "trace_ms": 842,
+        "other_overhead_ms": 0,
+        "adapter_ms": 1281,
+        "total_ms": 2615,
+        "query_count": 3,
+        "candidate_count": 1
+      },
+      "round_trip_ms": 9368
+    },
+    {
+      "label": "G_owner_a_morning",
+      "status": 200,
+      "status_source": "response_contract_fallback",
+      "ok": true,
+      "error": null,
+      "execute": false,
+      "is_read_only": true,
+      "operation_id_present": true,
+      "candidate_outcome": "candidates_found",
+      "candidate_count": 2,
+      "candidate_ids": [
+        13,
+        14
+      ],
+      "metrics": {
+        "auth_ms": 383,
+        "scope_ms": 396,
+        "candidate_query_ms": 187,
+        "enrichment_ms": 435,
+        "resolver_ms": 4,
+        "trace_ms": 1259,
+        "other_overhead_ms": 28,
+        "adapter_ms": 1046,
+        "total_ms": 2692,
+        "query_count": 3,
+        "candidate_count": 2
+      },
+      "round_trip_ms": 7853
+    },
+    {
+      "label": "H_owner_a_last_night",
+      "status": 200,
+      "status_source": "response_contract_fallback",
+      "ok": true,
+      "error": null,
+      "execute": false,
+      "is_read_only": true,
+      "operation_id_present": true,
+      "candidate_outcome": "no_candidates",
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "metrics": {
+        "auth_ms": 427,
+        "scope_ms": 424,
+        "candidate_query_ms": 511,
+        "enrichment_ms": 0,
+        "resolver_ms": 0,
+        "trace_ms": 1203,
+        "other_overhead_ms": 1,
+        "adapter_ms": 936,
+        "total_ms": 2567,
+        "query_count": 1,
+        "candidate_count": 0
+      },
+      "round_trip_ms": 7934
+    },
+    {
+      "label": "I_owner_a_unknown",
+      "status": 200,
+      "status_source": "response_contract_fallback",
+      "ok": true,
+      "error": null,
+      "execute": false,
+      "is_read_only": true,
+      "operation_id_present": true,
+      "candidate_outcome": "no_candidates",
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "metrics": {
+        "auth_ms": 404,
+        "scope_ms": 394,
+        "candidate_query_ms": 415,
+        "enrichment_ms": 0,
+        "resolver_ms": 0,
+        "trace_ms": 1269,
+        "other_overhead_ms": 0,
+        "adapter_ms": 809,
+        "total_ms": 2482,
+        "query_count": 1,
+        "candidate_count": 0
+      },
+      "round_trip_ms": 7752
+    },
+    {
+      "label": "J_owner_id_injected",
+      "status": 400,
+      "status_source": "response_contract_fallback",
+      "ok": false,
+      "error": "owner_scope_client_input_forbidden",
+      "execute": null,
+      "is_read_only": false,
+      "operation_id_present": false,
+      "candidate_outcome": null,
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "metrics": null,
+      "round_trip_ms": 5016
+    },
+    {
+      "label": "J_scope_injected",
+      "status": 400,
+      "status_source": "response_contract_fallback",
+      "ok": false,
+      "error": "owner_scope_client_input_forbidden",
+      "execute": null,
+      "is_read_only": false,
+      "operation_id_present": false,
+      "candidate_outcome": null,
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "metrics": null,
+      "round_trip_ms": 5707
+    },
+    {
+      "label": "C_invalid_jwt",
+      "status": 401,
+      "status_source": "response_contract_fallback",
+      "ok": false,
+      "error": "owner_reference_unauthorized",
+      "execute": null,
+      "is_read_only": false,
+      "operation_id_present": false,
+      "candidate_outcome": null,
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "metrics": null,
+      "round_trip_ms": 5418
+    },
+    {
+      "label": "K_valid_no_scope",
+      "status": 200,
+      "status_source": "response_contract_fallback",
+      "ok": true,
+      "error": null,
+      "execute": false,
+      "is_read_only": true,
+      "operation_id_present": true,
+      "candidate_outcome": "owner_scope_empty",
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "metrics": {
+        "auth_ms": 418,
+        "scope_ms": 393,
+        "candidate_query_ms": 0,
+        "enrichment_ms": 0,
+        "resolver_ms": 0,
+        "trace_ms": 1018,
+        "other_overhead_ms": 0,
+        "adapter_ms": 393,
+        "total_ms": 1830,
+        "query_count": 0,
+        "candidate_count": 0
+      },
+      "round_trip_ms": 6966
+    }
+  ],
+  "latency_phone_exact": {
+    "n": 20,
+    "min_ms": 13006,
+    "p50_ms": 13826,
+    "p95_ms": 33808,
+    "max_ms": 38070
+  },
+  "performance_baseline": {
+    "server_processing_ms": {
+      "n": 20,
+      "min_ms": 1618,
+      "p50_ms": 2771,
+      "p95_ms": 3346,
+      "max_ms": 3621
+    },
+    "auth_ms": {
+      "n": 20,
+      "min_ms": 144,
+      "p50_ms": 400,
+      "p95_ms": 571,
+      "max_ms": 620
+    },
+    "scope_ms": {
+      "n": 20,
+      "min_ms": 149,
+      "p50_ms": 428,
+      "p95_ms": 502,
+      "max_ms": 636
+    },
+    "candidate_query_ms": {
+      "n": 20,
+      "min_ms": 340,
+      "p50_ms": 628,
+      "p95_ms": 873,
+      "max_ms": 960
+    },
+    "enrichment_ms": {
+      "n": 20,
+      "min_ms": 157,
+      "p50_ms": 218,
+      "p95_ms": 483,
+      "max_ms": 488
+    },
+    "resolver_ms": {
+      "n": 20,
+      "min_ms": 0,
+      "p50_ms": 0,
+      "p95_ms": 0,
+      "max_ms": 1
+    },
+    "trace_ms": {
+      "n": 20,
+      "min_ms": 508,
+      "p50_ms": 1056,
+      "p95_ms": 1232,
+      "max_ms": 1248
+    },
+    "other_overhead_ms": {
+      "n": 20,
+      "min_ms": 0,
+      "p50_ms": 0,
+      "p95_ms": 1,
+      "max_ms": 4
+    },
+    "cli_test_overhead_ms": {
+      "n": 20,
+      "min_ms": 10064,
+      "p50_ms": 10945,
+      "p95_ms": 31858,
+      "max_ms": 36452
+    }
+  },
+  "execute_contract": {
+    "successful_responses_execute_false": true
+  },
+  "generated_at": "2026-11-01T19:25:07.661Z",
+  "notes": {
+    "tokens_persisted": false,
+    "passwords_persisted": false,
+    "server_trace_reconstruction": "requires separate service-role metadata read; not performed by this runner"
+  }
+}

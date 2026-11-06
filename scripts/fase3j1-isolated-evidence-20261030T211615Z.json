@@ -1,0 +1,30 @@
+{
+  "phase": "F3J.1",
+  "project_ref": "uevilhbstnmmdlgyshlv",
+  "migration": {
+    "file": "20261030_f3j_proactive_loop.sql",
+    "sha256": "58EA483828FFC5A681D2147584CA4559073906351A3B28D364DF813CB2EEA02E"
+  },
+  "preflight": {
+    "base_objects": ["crm_contacts", "yarbi_contact_operational_memory"],
+    "loop_objects_before": []
+  },
+  "fixture": null,
+  "handler": null,
+  "fixture_result": null,
+  "egress": {
+    "management": [
+      {"host":"api.supabase.com","path":"/v1/projects/uevilhbstnmmdlgyshlv","method":"GET","allowed":true},
+      {"host":"api.supabase.com","path":"/v1/projects/uevilhbstnmmdlgyshlv/database/query/read-only","method":"POST","allowed":true},
+      {"host":"api.supabase.com","path":"/v1/projects/uevilhbstnmmdlgyshlv/database/migrations","method":"POST","allowed":true}
+    ],
+    "handler": []
+  },
+  "result": "FAIL",
+  "error": {
+    "code": "F3J1_HTTP_400",
+    "message": "Supabase Management API respondió HTTP 400: PostgreSQL 42601; faltaba el cierre del filtro antes de ORDER BY en list_yarbi_proactive_candidates."
+  },
+  "started_at": "2026-10-30T21:16:15.326Z",
+  "completed_at": "2026-10-30T21:16:19.446Z"
+}

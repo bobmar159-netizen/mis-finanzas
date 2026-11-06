@@ -1,0 +1,23 @@
+{
+  "schema": "yarbi.product-completion-performance.v1",
+  "environment": "local_synthetic",
+  "rounds": 300,
+  "baseline_direct_search": {
+    "samples": 300,
+    "p50_ms": 1.9352,
+    "p95_ms": 2.23,
+    "min_ms": 1.8032,
+    "max_ms": 5.4711
+  },
+  "cached_warm_search": {
+    "samples": 300,
+    "p50_ms": 0.0063,
+    "p95_ms": 0.0146,
+    "min_ms": 0.0059,
+    "max_ms": 0.0426
+  },
+  "notes": [
+    "Misma consulta y fixtures sintéticos.",
+    "No mide red, Supabase, Vercel, cold starts ni Gemini."
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "phase": "gemini_v4_v1_v3_adapter_local",
+  "result": "PASS",
+  "directed_suites": {
+    "compact_contract": { "passed": 12, "total": 12 },
+    "polarity_contradiction": { "passed": 18, "total": 18 },
+    "v4_v1_v3_integration": { "passed": 15, "total": 15 }
+  },
+  "network_calls": 0,
+  "crm_queries": 0,
+  "commercial_actions": 0,
+  "active_handlers_modified": false,
+  "adapter_imported_by_active_code": false,
+  "decision": "LOCAL_ADAPTER_VALIDATED_NOT_CONNECTED"
+}

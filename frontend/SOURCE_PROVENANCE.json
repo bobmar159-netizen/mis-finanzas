@@ -1,0 +1,12 @@
+{
+  "schema": "yarbi.frontend-source.v1",
+  "base": "YARBI_BACKEND_MERGED_20260930/www",
+  "android_delta": "YARBI_LATEST_CRM_PHASE2_BUILD_2026-09-15/www",
+  "preserved_backend_module": "yarbi-owner-inbox-ui.js",
+  "generated_by": "scripts/bootstrap-unified-frontend.cjs",
+  "notes": [
+    "Los árboles originales no fueron modificados.",
+    "El origen API se resuelve solamente en runtime-config.js generado.",
+    "El Service Worker usa una caché estática versionada por release y excluye /api/."
+  ]
+}

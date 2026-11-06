@@ -1,0 +1,528 @@
+{
+  "phase": "F3K",
+  "project_ref": "uevilhbstnmmdlgyshlv",
+  "migration": {
+    "file": "20261030_f3k_owner_authorization.sql",
+    "sha256": "A6215F318646154880011BA9DA128CE508F1219BB072E16F9A527A66F24E30F0",
+    "already_applied": true,
+    "rpc_fix": {
+      "already_applied": true
+    },
+    "rpc_fix_v2": {
+      "already_applied": true
+    },
+    "rpc_fix_v3": {
+      "applied": true,
+      "sha256": "2F2618900EEF2F5C46C77C5F1A81A88C3E41EE3BC827ACB005AA428AA17E5B94"
+    }
+  },
+  "fixtures": {
+    "authorize": {
+      "inbox_id": 11,
+      "outcomes": [
+        "authorized",
+        "already_authorized"
+      ],
+      "owner_statuses": [
+        "authorized",
+        "authorized"
+      ],
+      "decision_count": 1,
+      "order_count": 1,
+      "execution_state": "authorized_pending_execution"
+    },
+    "concurrent_authorize": {
+      "inbox_id": 12,
+      "outcomes": [
+        "already_authorized",
+        "authorized"
+      ],
+      "decision_count": 1,
+      "order_count": 1
+    },
+    "authorize_dismiss": {
+      "inbox_id": 13,
+      "outcomes": [
+        "already_dismissed",
+        "dismissed"
+      ],
+      "final_status": "dismissed",
+      "order_count": 0
+    },
+    "postpone": {
+      "inbox_id": 14,
+      "outcome": "postponed",
+      "past_date_rejected": true
+    },
+    "dismiss": {
+      "inbox_id": 15,
+      "outcomes": [
+        "dismissed",
+        "already_dismissed"
+      ],
+      "evidence_retained": true
+    },
+    "stale": {
+      "inbox_id": 16,
+      "outcome": "stale_recommendation",
+      "order_count": 0
+    },
+    "owner_review": {
+      "inbox_id": 17,
+      "outcome": "owner_review",
+      "order_count": 0
+    },
+    "prepare_quote": {
+      "inbox_id": 18,
+      "outcome": "authorized",
+      "order_action": "prepare_quote",
+      "no_price_or_egress": true
+    }
+  },
+  "checks": {
+    "no_external_egress": true,
+    "no_gemini": true,
+    "no_whatsapp_ycloud": true,
+    "no_maps_notion_calendar": true,
+    "production_not_used": true,
+    "no_execution_external": true,
+    "msg_id_without_stable_value": "NOT_PROVEN"
+  },
+  "egress": {
+    "management": [
+      {
+        "host": "api.supabase.com",
+        "path": "/v1/projects/uevilhbstnmmdlgyshlv",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "api.supabase.com",
+        "path": "/v1/projects/uevilhbstnmmdlgyshlv/database/query/read-only",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "api.supabase.com",
+        "path": "/v1/projects/uevilhbstnmmdlgyshlv/database/query/read-only",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "api.supabase.com",
+        "path": "/v1/projects/uevilhbstnmmdlgyshlv/database/query/read-only",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "api.supabase.com",
+        "path": "/v1/projects/uevilhbstnmmdlgyshlv/database/query/read-only",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "api.supabase.com",
+        "path": "/v1/projects/uevilhbstnmmdlgyshlv/database/migrations",
+        "method": "POST",
+        "allowed": true
+      }
+    ],
+    "isolated": [
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/claim_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/complete_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/deliver_yarbi_owner_brief",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_inbox",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_action_decisions",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_authorized_orders",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/claim_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/complete_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/deliver_yarbi_owner_brief",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_inbox",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_action_decisions",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_authorized_orders",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/claim_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/complete_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/deliver_yarbi_owner_brief",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_inbox",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_action_decisions",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_authorized_orders",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/claim_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/complete_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/deliver_yarbi_owner_brief",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_inbox",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_action_decisions",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_authorized_orders",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/claim_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/complete_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/deliver_yarbi_owner_brief",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_inbox",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_action_decisions",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_authorized_orders",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/crm_contacts",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_contact_operational_memory",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/claim_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/complete_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/deliver_yarbi_owner_brief",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_inbox",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_action_decisions",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_authorized_orders",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/claim_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/complete_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/deliver_yarbi_owner_brief",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_inbox",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_action_decisions",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_authorized_orders",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/claim_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/complete_yarbi_proactive_run",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/deliver_yarbi_owner_brief",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/rpc/apply_yarbi_owner_action",
+        "method": "POST",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_inbox",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_owner_action_decisions",
+        "method": "GET",
+        "allowed": true
+      },
+      {
+        "host": "uevilhbstnmmdlgyshlv.supabase.co",
+        "path": "/rest/v1/yarbi_authorized_orders",
+        "method": "GET",
+        "allowed": true
+      }
+    ]
+  },
+  "result": "FASE3K_AUTORIZACION_CONTROLADA_VALIDADA_EN_AISLADO",
+  "error": null,
+  "started_at": "2026-10-31T00:10:54.538Z",
+  "preflight": {
+    "project_ref": "uevilhbstnmmdlgyshlv",
+    "f3k_state": "already_applied",
+    "objects": [
+      "crm_contacts",
+      "yarbi_authorized_orders",
+      "yarbi_contact_operational_memory",
+      "yarbi_owner_action_decisions",
+      "yarbi_owner_inbox",
+      "yarbi_owner_notification_state",
+      "yarbi_proactive_runs"
+    ]
+  },
+  "completed_at": "2026-10-31T00:11:10.573Z"
+}

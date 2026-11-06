@@ -1,0 +1,24 @@
+# Solo se despliegan las funciones API y los assets web necesarios.
+android/
+node_modules/
+dist/
+.env*
+*.apk
+*.aab
+*.zip
+*.log
+.git/
+.vercel/
+.tmp*/
+npm-cache/
+backups/
+backup*/
+historical/
+audit_apk/
+gabinetes/
+api keys eleven labs 2026.txt
+token.txt
+output-metadata.json
+# El plan Hobby admite 12 funciones. Esta tarea se conserva en el código para
+# moverla a Supabase Cron o Vercel Pro; no se publica hasta entonces.
+api/assistant/scheduled-followups.js

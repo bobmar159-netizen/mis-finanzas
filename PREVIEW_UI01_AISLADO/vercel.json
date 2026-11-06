@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "routes": [
+    { "src": "/api/assistant/owner-inbox", "dest": "/api/assistant/owner-inbox.js" },
+    { "src": "/api/assistant/owner-action", "dest": "/api/assistant/owner-action.js" }
+  ]
+}

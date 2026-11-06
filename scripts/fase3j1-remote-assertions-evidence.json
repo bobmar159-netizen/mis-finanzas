@@ -1,0 +1,100 @@
+{
+  "phase": "F3J.1-remote-assertions",
+  "project_ref": "uevilhbstnmmdlgyshlv",
+  "source_fixture": "F3J-REMOTE-mvvhg4wl-92ce5a7d",
+  "concurrent_claim": {
+    "run_key_prefix": "F3J-REMOTE-RUN-",
+    "claims": [
+      true,
+      false
+    ],
+    "completed": true
+  },
+  "same_fingerprint": {
+    "outcomes": [
+      "delivered",
+      "duplicate_recent_notification"
+    ]
+  },
+  "material_change": {
+    "outcome": "delivered"
+  },
+  "deferred_without_delivery": {
+    "inbox_before": 2,
+    "inbox_after": 2,
+    "recorded": true,
+    "completed": true
+  },
+  "egress": [
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/rpc/claim_yarbi_proactive_run",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/rpc/claim_yarbi_proactive_run",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/rpc/complete_yarbi_proactive_run",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/rpc/deliver_yarbi_owner_brief",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/rpc/deliver_yarbi_owner_brief",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/rpc/deliver_yarbi_owner_brief",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/yarbi_owner_inbox",
+      "method": "GET",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/rpc/claim_yarbi_proactive_run",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/rpc/record_yarbi_proactive_evaluation",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/rpc/complete_yarbi_proactive_run",
+      "method": "POST",
+      "allowed": true
+    },
+    {
+      "host": "uevilhbstnmmdlgyshlv.supabase.co",
+      "path": "/rest/v1/yarbi_owner_inbox",
+      "method": "GET",
+      "allowed": true
+    }
+  ],
+  "result": "F3J1_REMOTE_ASSERTIONS_VALIDATED_IN_ISOLATION",
+  "error": null,
+  "started_at": "2026-10-30T21:56:04.697Z",
+  "completed_at": "2026-10-30T21:56:07.126Z"
+}

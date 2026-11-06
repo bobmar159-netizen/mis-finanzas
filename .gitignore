@@ -1,0 +1,15 @@
+.vercel/
+.env*
+node_modules/
+dist/
+android/
+*.apk
+*.aab
+*.zip
+*.log
+.tmp*/
+npm-cache/
+backups/
+backup*/
+historical/
+coverage/

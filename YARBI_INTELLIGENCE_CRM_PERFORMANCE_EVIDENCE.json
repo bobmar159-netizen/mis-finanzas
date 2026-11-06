@@ -1,0 +1,30 @@
+{
+  "schema": "yarbi.intelligence-crm-performance.v1",
+  "mode": "local_synthetic_no_network",
+  "scope": {
+    "owner_verified": true,
+    "contact_count": 2
+  },
+  "crm_search": {
+    "cold_ms": 1.389,
+    "cold_query_count": 7,
+    "warm": {
+      "samples": 25,
+      "min_ms": 0.01,
+      "median_ms": 0.021,
+      "p95_ms": 0.042,
+      "max_ms": 0.089
+    },
+    "all_warm_cache_hits": true
+  },
+  "v4_plan": {
+    "samples": 100,
+    "min_ms": 0.002,
+    "median_ms": 0.003,
+    "p95_ms": 0.017,
+    "max_ms": 0.401
+  },
+  "commercial_effects": 0,
+  "external_calls": 0,
+  "contains_personal_data": false
+}

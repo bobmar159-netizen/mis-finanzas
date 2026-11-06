@@ -1,0 +1,62 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+
+const root = path.resolve(__dirname, '..');
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
+
+test('P0: supabase-secure authenticates before selecting an action', () => {
+  const source = read('api/supabase-secure.js');
+  const auth = source.indexOf("if (!expected || token !== expected) return res.status(401)");
+  const action = source.indexOf('const { action } = req.query;');
+  assert.ok(auth >= 0, 'missing global assistant-token validation');
+  assert.ok(action >= 0 && auth < action, 'authorization must run before any action');
+});
+
+test('P0: notion proxy requires the Yarbi token', () => {
+  const source = read('api/notion-proxy.js');
+  assert.match(source, /x-assistant-token/);
+  assert.match(source, /expectedAssistantToken/);
+  assert.match(source, /status\(401\)/);
+});
+
+test('P1: canonical agenda checks the same contact, type and time slot', () => {
+  const source = read('api/actions/approve.js');
+  assert.match(source, /dedupe_key=eq/);
+  assert.match(source, /contact_id=eq/);
+  assert.match(source, /event_type=eq/);
+  assert.match(source, /starts_at=eq/);
+  assert.match(source, /source=eq\.yarbi_form/);
+});
+
+test('Safety: background analysis proposes agenda instead of creating it', () => {
+  const source = read('api/ai/process.js');
+  const functionBody = source.slice(source.indexOf('async function createAgendaEvent'), source.indexOf('async function createIntelligentAlert'));
+  assert.match(functionBody, /requires_review: true/);
+  assert.doesNotMatch(functionBody, /\/rest\/v1\/agenda_events/);
+});
+
+test('Fast path: stale local snapshots refresh in the background', () => {
+  const source = read('www/index.html');
+  const memoryBlock = source.slice(source.indexOf('async function gfcYarbiLocalFindMemory'), source.indexOf('async function gfcYarbiLocalMessages'));
+  const messagesBlock = source.slice(source.indexOf('async function gfcYarbiLocalMessages'), source.indexOf('const GFC_CLIENT_MEMORY_CACHE_KEY'));
+  assert.match(memoryBlock, /memory-query-background/);
+  assert.match(messagesBlock, /messages-query-background/);
+  assert.doesNotMatch(memoryBlock, /await gfcYarbiLocalEnsureFresh\('memory-query'\)/);
+  assert.doesNotMatch(messagesBlock, /await gfcYarbiLocalEnsureFresh\('messages-query'\)/);
+});
+test('Identity: ambiguous clients expose only the final three phone digits', () => {
+  const frontend = read('www/index.html');
+  const backend = read('lib/whatsapp-messages.js');
+  assert.match(frontend, /phone_last3: phone\.slice\(-3\)/);
+  assert.match(backend, /phone_last3: String\(phoneByContact\.get\(Number\(contact\.id\)\) \|\| ''\)\.slice\(-3\)/);
+  assert.doesNotMatch(backend, /candidates: contacts\.map\(\(contact\) => \(\{[^}]*phone: phoneByContact/s);
+});
+test('Processing status identifies a Gemini quota blocker without exposing the raw error', () => {
+  const backend = read('api/ai/process.js');
+  const frontend = read('www/index.html');
+  assert.match(backend, /blocker === 'gemini_quota'/);
+  assert.match(backend, /Gemini no tiene cuota disponible para procesar mensajes/);
+  assert.match(frontend, /Gemini sin cuota: procesamiento en pausa/);
+});

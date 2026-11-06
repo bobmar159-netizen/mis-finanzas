@@ -1,0 +1,93 @@
+[WEBHOOK AUTH REJECTED] ycloud_signature_missing
+[WEBHOOK AUTH REJECTED] ycloud_signature_missing
+[WEBHOOK AUTH REJECTED] ycloud_signature_missing
+[WEBHOOK AUTH REJECTED] ycloud_signature_missing
+[WEBHOOK AUTH REJECTED] ycloud_signature_missing
+[AI QUEUE CONTINUATION] 202 {"status":"synthetic_accepted"}
+✔ F2D2 resolver never fetches Google Maps or short links in synthetic preview (2.8222ms)
+✖ F2D2 real webhook handles Maps, short Maps and no location without external egress (13.7946ms)
+✖ F2D2 real webhook records dependency failure locally and schedules no processor (1.3029ms)
+✖ F2D6 commits canonical storage before client mutation and deduplicates a re-delivery (4.6931ms)
+✖ F2D6 preserves canonical evidence when post-canonical client association fails (1.0359ms)
+✔ F2D6 rejects missing or forbidden runtime destinations before handler side effects (2.4119ms)
+✔ F2D6 processor rejects a missing explicit processor URL before reading the queue (7.713ms)
+✔ F2D6 assistant chat rejects missing Supabase configuration before history or model calls (1.4824ms)
+✔ F2D2 real processor keeps URL-only synthetic message identity_pending without egress (4.9866ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 5
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 103.4516
+
+✖ failing tests:
+
+test at tests\phase2d2-egress-isolation.test.js:154:1
+✖ F2D2 real webhook handles Maps, short Maps and no location without external egress (13.7946ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  401 !== 200
+  
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:160:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 401,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\phase2d2-egress-isolation.test.js:169:1
+✖ F2D2 real webhook records dependency failure locally and schedules no processor (1.3029ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  401 !== 503
+  
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:174:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 401,
+    expected: 503,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\phase2d2-egress-isolation.test.js:181:1
+✖ F2D6 commits canonical storage before client mutation and deduplicates a re-delivery (4.6931ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(canonicalPost >= 0 && clientPost > canonicalPost)
+  
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:192:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests\phase2d2-egress-isolation.test.js:203:1
+✖ F2D6 preserves canonical evidence when post-canonical client association fails (1.0359ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  401 !== 200
+  
+      at TestContext.<anonymous> (C:\Users\BOB\Desktop\Codex Finanzas\YARBI_BACKEND_MERGED_20260930\tests\phase2d2-egress-isolation.test.js:208:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 401,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
