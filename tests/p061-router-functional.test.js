@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
-const assistantNames = Object.freeze(['chat', 'collections', 'command', 'conversation', 'crm-dossier', 'crm-search', 'live-token', 'owner-action', 'owner-inbox', 'preferences', 'proactive-loop', 'reference-candidates', 'scheduled-followups']);
+const assistantNames = Object.freeze(['chat', 'collections', 'command', 'conversation', 'memory', 'crm-dossier', 'crm-search', 'live-token', 'owner-action', 'owner-inbox', 'preferences', 'proactive-loop', 'reference-candidates', 'scheduled-followups']);
 const utilityNames = Object.freeze(['trace', 'resolve']);
 
 function response() {

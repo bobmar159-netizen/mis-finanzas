@@ -12515,6 +12515,9 @@ function gfcOwnerInstructionSetCachedList(list) {
   const normalized = (list || []).map(gfcOwnerInstructionNormalize).filter(Boolean).slice(0, 50);
   gfcOwnerInstructionWriteList(gfcOwnerInstructionCacheKey(), normalized);
   window._gfcOwnerInstructionsCache = normalized;
+  // Una regla modificada no puede permanecer cinco minutos en el contexto de
+  // entrenamiento. Solo se invalida esta caché del propietario.
+  window._gfcYarbiTrainingContextCache = null;
 }
 function gfcOwnerInstructionSettingsHtml() {
   const list = gfcOwnerInstructionVisibleList();
@@ -12524,10 +12527,11 @@ function gfcOwnerInstructionSettingsHtml() {
     return '<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--surface);display:grid;gap:7px">' +
       '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div style="font-weight:900;color:var(--text)">' + npEsc(item.name) + '</div><span style="font-size:11px;font-weight:800;color:' + color + '">' + status + '</span></div>' +
       '<div style="font-size:12px;color:var(--muted);line-height:1.4">' + npEsc(item.instruction) + '</div>' +
+      '<small style="color:var(--muted)">Origen: ' + npEsc(item.origin || 'propietario confirmado') + (item.updated_at || item.updatedAt ? ' · actualizado ' + npEsc(new Date(item.updated_at || item.updatedAt).toLocaleDateString('es-PE')) : '') + '</small>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="aj-btn soft" onclick="gfcOwnerInstructionEdit(' + index + ')">Editar</button><button class="aj-btn soft" onclick="gfcOwnerInstructionToggle(' + index + ')">' + (item.active !== false ? 'Pausar' : 'Activar') + '</button><button class="aj-btn warn" onclick="gfcOwnerInstructionRemove(' + index + ')">Eliminar</button></div>' +
     '</div>';
   }).join('') : '<div class="aj-status">Todavía no hay instrucciones permanentes. También puedes decirle a Yarbi: “recuerda que...”</div>';
-  return '<div class="aj-status" style="line-height:1.45">Estas reglas definen cómo debe comportarse Yarbi. Se guardan de inmediato en el dispositivo y se sincronizan con Supabase. Pausar o eliminar exige confirmación y queda registrado en la auditoría.</div>' +
+  return '<div class="aj-status" style="line-height:1.45"><b>' + list.filter(item => item.active !== false).length + ' instrucciones activas.</b> Estas reglas definen cómo debe comportarse Yarbi. Pausar o eliminar exige confirmación; los recuerdos temporales no se guardan como reglas permanentes.</div>' +
     '<div class="aj-field"><label>Nombre corto</label><input id="yarbi-instruction-name-input" placeholder="Ej: Solicitar ubicación"></div>' +
     '<div class="aj-field"><label>Instrucción permanente</label><textarea id="yarbi-instruction-text-input" class="aj-textarea" rows="4" placeholder="Ej: Si falta la ubicación, guarda la visita como pendiente y pregúntamela después."></textarea><input id="yarbi-instruction-id-input" type="hidden"></div>' +
     '<div class="aj-row"><button class="aj-btn primary" onclick="gfcOwnerInstructionSaveFromSettings()">Guardar instrucción</button><button class="aj-btn" onclick="gfcOwnerInstructionClearSettingsForm()">Limpiar</button></div>' +
@@ -12547,7 +12551,7 @@ function gfcOwnerInstructionEdit(index) {
   if (id) id.value = item.id || item.instruction || '';
   name?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
-function gfcOwnerInstructionSaveFromSettings() {
+async function gfcOwnerInstructionSaveFromSettings() {
   const nameEl = document.getElementById('yarbi-instruction-name-input');
   const textEl = document.getElementById('yarbi-instruction-text-input');
   const idEl = document.getElementById('yarbi-instruction-id-input');
@@ -12556,6 +12560,14 @@ function gfcOwnerInstructionSaveFromSettings() {
   const current = gfcOwnerInstructionVisibleList();
   const existing = current.find(item => String(item.id || item.instruction) === String(idEl?.value || ''));
   const record = { id: existing?.id || ('instr_' + Date.now()), name: String(nameEl?.value || '').trim() || gfcOwnerInstructionName(instruction), instruction, scope: 'all', active: true, updatedAt: Date.now() };
+  if (existing && typeof window.gfcOwnerMemoryEditWithConfirmation === 'function') {
+    const result = await window.gfcOwnerMemoryEditWithConfirmation(record);
+    if (result?.handled) { if (!result.cancelled) { gfcOwnerInstructionClearSettingsForm(); render(); toast('Instrucción confirmada y sincronizada ✓', 'success'); } return; }
+  }
+  if (!existing && typeof window.gfcOwnerMemorySaveWithConfirmation === 'function') {
+    const result = await window.gfcOwnerMemorySaveWithConfirmation(record);
+    if (result?.handled) { if (!result.cancelled) { gfcOwnerInstructionClearSettingsForm(); render(); toast(result.duplicate ? 'La instrucción ya estaba activa.' : 'Instrucción confirmada y sincronizada ✓', 'success'); } return; }
+  }
   gfcOwnerInstructionSetCachedList([record, ...current.filter(item => item.id !== record.id && item.instruction !== record.instruction)]);
   const overrides = gfcOwnerInstructionOverridesRead(); delete overrides[record.id]; delete overrides[record.instruction]; gfcOwnerInstructionOverridesWrite(overrides);
   gfcOwnerInstructionClearSettingsForm();
@@ -12568,6 +12580,10 @@ async function gfcOwnerInstructionToggle(index) {
   const item = list[index];
   if (!item) return;
   const nextActive = item.active === false;
+  if (typeof window.gfcOwnerMemorySetActiveWithConfirmation === 'function') {
+    const result = await window.gfcOwnerMemorySetActiveWithConfirmation(item, nextActive);
+    if (result?.handled) { if (!result.cancelled) { render(); toast(nextActive ? 'Instrucción activada ✓' : 'Instrucción pausada ✓', 'success'); } return; }
+  }
   const overrides = gfcOwnerInstructionOverridesRead();
   overrides[item.id || item.instruction] = { active: nextActive, removed: false, at: Date.now() };
   gfcOwnerInstructionOverridesWrite(overrides);
@@ -12587,6 +12603,10 @@ async function gfcOwnerInstructionRemove(index) {
   const item = list[index];
   if (!item) return;
   if (!confirm('Se eliminará esta instrucción de todos tus dispositivos. ¿Continuar?')) return;
+  if (typeof window.gfcOwnerMemorySetActiveWithConfirmation === 'function') {
+    const result = await window.gfcOwnerMemorySetActiveWithConfirmation(item, false);
+    if (result?.handled) { if (!result.cancelled) { render(); toast('Instrucción pausada; permanece en el historial ✓', 'success'); } return; }
+  }
   const overrides = gfcOwnerInstructionOverridesRead();
   overrides[item.id || item.instruction] = { removed: true, active: false, at: Date.now() };
   gfcOwnerInstructionOverridesWrite(overrides);
@@ -48316,6 +48336,7 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
   };
 })();
 </script>
+<script src="./yarbi-owner-memory-ui.js"></script>
 <script src="./yarbi-product-completion-ui.js"></script>
 <script src="./yarbi-owner-inbox-ui.js"></script>
 </body>

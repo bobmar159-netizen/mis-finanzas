@@ -7,7 +7,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 
-// Twenty-two public API patterns: webhook exposes one documented alias, so it
+// Twenty-three public API patterns: webhook exposes one documented alias, so it
 // accounts for two URLs but one direct Function. Conversation is routed
 // through the existing assistant router, so it does not add a Vercel bundle.
 // The two non-API routes in
@@ -24,6 +24,7 @@ const apiMatrix = Object.freeze([
   ['/api/assistant/collections', '/api/assistant-router.js?__p06_route=collections', 'assistant:collections', 'api_handlers/assistant/collections.js'],
   ['/api/assistant/command', '/api/assistant-router.js?__p06_route=command', 'assistant:command', 'api_handlers/assistant/command.js'],
   ['/api/assistant/conversation', '/api/assistant-router.js?__p06_route=conversation', 'assistant:conversation', 'api_handlers/assistant/conversation.js'],
+  ['/api/assistant/memory', '/api/assistant-router.js?__p06_route=memory', 'assistant:memory', 'api_handlers/assistant/memory.js'],
   ['/api/assistant/crm-dossier', '/api/assistant-router.js?__p06_route=crm-dossier', 'assistant:crm-dossier', 'api_handlers/assistant/crm-dossier.js'],
   ['/api/assistant/crm-search', '/api/assistant-router.js?__p06_route=crm-search', 'assistant:crm-search', 'api_handlers/assistant/crm-search.js'],
   ['/api/assistant/live-token', '/api/assistant-router.js?__p06_route=live-token', 'assistant:live-token', 'api_handlers/assistant/live-token.js'],
@@ -44,16 +45,16 @@ const logicalHandlers = Object.freeze([
   'api_handlers/audit/trace.js', 'api_handlers/location/resolve.js'
 ]);
 
-test('F05 rewrite matrix has twenty-two API patterns and keeps the existing Vercel Function budget', () => {
+test('F06 rewrite matrix has twenty-three API patterns and keeps the existing Vercel Function budget', () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
-  assert.equal(config.routes.length, 24, '22 API patterns + auth callback + static privacy route');
+  assert.equal(config.routes.length, 25, '23 API patterns + auth callback + static privacy route');
   const seenSources = new Set();
   for (const route of config.routes) {
     assert.equal(seenSources.has(route.src), false, `duplicate rewrite source: ${route.src}`);
     seenSources.add(route.src);
   }
-  assert.equal(new Set(apiMatrix.map(([src]) => src)).size, 22);
-  assert.equal(new Set(logicalHandlers).size, 21);
+  assert.equal(new Set(apiMatrix.map(([src]) => src)).size, 23);
+  assert.equal(new Set(logicalHandlers).size, 22);
   for (const [src, dest, routerId, handler] of apiMatrix) {
     const matches = config.routes.filter(route => route.src === src);
     assert.equal(matches.length, 1, `one rewrite for ${src}`);
