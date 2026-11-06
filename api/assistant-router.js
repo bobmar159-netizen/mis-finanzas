@@ -6,6 +6,7 @@ const handlers = Object.freeze({
   chat: require('../api_handlers/assistant/chat.js'),
   collections: require('../api_handlers/assistant/collections.js'),
   command: require('../api_handlers/assistant/command.js'),
+  conversation: require('../api_handlers/assistant/conversation.js'),
   'crm-dossier': require('../api_handlers/assistant/crm-dossier.js'),
   'crm-search': require('../api_handlers/assistant/crm-search.js'),
   'live-token': require('../api_handlers/assistant/live-token.js'),

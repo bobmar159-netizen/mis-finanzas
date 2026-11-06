@@ -1,0 +1,12 @@
+[
+  { "id": "F05-SEM-01", "utterance": "¿Qué tengo mañana?", "kind": "agenda_day", "unambiguous": true },
+  { "id": "F05-SEM-02", "utterance": "¿A qué clientes tengo que llamar?", "kind": "agenda_follow_up", "unambiguous": true },
+  { "id": "F05-SEM-03", "utterance": "¿Qué visitas siguen pendientes?", "kind": "agenda_pending", "unambiguous": true },
+  { "id": "F05-SEM-04", "utterance": "¿Cuánto hemos cobrado por instalaciones este mes?", "kind": "finance", "unambiguous": true },
+  { "id": "F05-SEM-05", "utterance": "No era Carlos, era Carla", "kind": "v4_correction", "unambiguous": true },
+  { "id": "F05-SEM-06", "utterance": "El segundo cliente, ¿cuánto debe?", "kind": "ordinal_continuation", "unambiguous": true },
+  { "id": "F05-SEM-07", "utterance": "No envíes nada todavía", "kind": "safe_abstention", "unambiguous": true },
+  { "id": "F05-SEM-08", "utterance": "Recuérdame llamar al cliente el lunes", "kind": "safe_abstention", "unambiguous": false },
+  { "id": "F05-SEM-09", "utterance": "Ayer vino a preguntar por una terma", "kind": "safe_abstention", "unambiguous": false },
+  { "id": "F05-SEM-10", "utterance": "No pagó completo, solo abonó 200", "kind": "safe_abstention", "unambiguous": false }
+]

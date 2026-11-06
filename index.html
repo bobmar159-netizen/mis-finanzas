@@ -10691,7 +10691,31 @@ function gfcAppendCopilotChatMessage(role, text) {
     window._gfcMascot.syncDialogueMessage(isUser ? 'user' : 'assistant', String(text));
   }
 }
+const GFC_OWNER_CONVERSATION_TOKEN_KEY = 'gfc_owner_conversation_token_v1';
+async function gfcCallAuthenticatedOwnerConversation(payload) {
+  const contents = payload?.contents || [];
+  const current = contents.filter(x => x?.role === 'user').pop()?.parts?.[0]?.text || '';
+  const token = await gfcAccountFreshAccessToken();
+  if (!token) return { ok:false, status:401, message:'Inicia sesión con el propietario autorizado para conversar con Yarbi.' };
+  const response = await fetch(window.gfcRuntimeApiOrigin() + '/api/assistant/conversation', {
+    method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
+    body:JSON.stringify({ utterance:current, conversation_token:localStorage.getItem(GFC_OWNER_CONVERSATION_TOKEN_KEY) || '' })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok !== true) return { ok:false, status:response.status, message:data.error || 'No se pudo consultar el contexto de Yarbi.' };
+  if (data.conversation_token) localStorage.setItem(GFC_OWNER_CONVERSATION_TOKEN_KEY, data.conversation_token);
+  return { ok:true, text:data.reply || 'No tengo una respuesta verificable todavía.', conversation:data };
+}
 async function gfcCallGeminiAPI(_apiKey, payload) {
+  // En el Preview aislado el chat real se limita al owner autenticado y al
+  // cerebro server-side. Si falta esa configuración, falla cerrado: jamás
+  // reutiliza el chat legado como fallback hacia otro entorno.
+  try {
+    const config = await gfcSupabaseAuthConfig();
+    if (config.previewOwnerReferencesOnly === true) return await gfcCallAuthenticatedOwnerConversation(payload);
+  } catch (error) {
+    return { ok:false, status:0, message:'No está disponible la configuración aislada de Yarbi.' };
+  }
   const token = localStorage.getItem('fnz_assistant_token') || '';
   gfcChatDiag('backend-request');
   const contents = payload?.contents || [];

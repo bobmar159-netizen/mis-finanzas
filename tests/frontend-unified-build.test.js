@@ -27,7 +27,7 @@ test('P0.2I: source preserves Android-only flows and backend owner inbox', () =>
     'gfcManualAgendaDraft', 'gfcRepairLegacyVisitedAgenda', 'crm-followup-planner', 'crm-delete-record-sheet',
     "case 'yarbi-pendientes':", 'yarbi-owner-inbox-ui.js', 'gfcStartGeminiLive', 'gfcCallGeminiAPI',
     'gfcYarbiApplyQuickAgendaStatus', 'crmSendFollowUpNow', '/api/notion-proxy',
-    '/api/assistant/send-whatsapp', '/api/assistant/chat', '/api/assistant/live-token', '/api/whatsapp/messages'
+    '/api/assistant/send-whatsapp', '/api/assistant/chat', '/api/assistant/conversation', 'gfcCallAuthenticatedOwnerConversation', '/api/assistant/live-token', '/api/whatsapp/messages'
   ]) {
     assert.ok(html.includes(marker), `missing ${marker}`);
   }

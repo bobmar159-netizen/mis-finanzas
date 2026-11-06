@@ -7,8 +7,10 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 
-// Nineteen public API patterns: webhook exposes one documented alias, so it
-// accounts for two URLs but one logical handler. The two non-API routes in
+// Twenty-two public API patterns: webhook exposes one documented alias, so it
+// accounts for two URLs but one direct Function. Conversation is routed
+// through the existing assistant router, so it does not add a Vercel bundle.
+// The two non-API routes in
 // vercel.json (/auth/callback and /privacy) are checked separately below.
 const apiMatrix = Object.freeze([
   ['/api/webhook', '/api/webhook.js', 'direct:webhook', 'api/webhook.js'],
@@ -21,6 +23,9 @@ const apiMatrix = Object.freeze([
   ['/api/assistant/chat', '/api/assistant-router.js?__p06_route=chat', 'assistant:chat', 'api_handlers/assistant/chat.js'],
   ['/api/assistant/collections', '/api/assistant-router.js?__p06_route=collections', 'assistant:collections', 'api_handlers/assistant/collections.js'],
   ['/api/assistant/command', '/api/assistant-router.js?__p06_route=command', 'assistant:command', 'api_handlers/assistant/command.js'],
+  ['/api/assistant/conversation', '/api/assistant-router.js?__p06_route=conversation', 'assistant:conversation', 'api_handlers/assistant/conversation.js'],
+  ['/api/assistant/crm-dossier', '/api/assistant-router.js?__p06_route=crm-dossier', 'assistant:crm-dossier', 'api_handlers/assistant/crm-dossier.js'],
+  ['/api/assistant/crm-search', '/api/assistant-router.js?__p06_route=crm-search', 'assistant:crm-search', 'api_handlers/assistant/crm-search.js'],
   ['/api/assistant/live-token', '/api/assistant-router.js?__p06_route=live-token', 'assistant:live-token', 'api_handlers/assistant/live-token.js'],
   ['/api/assistant/owner-action', '/api/assistant-router.js?__p06_route=owner-action', 'assistant:owner-action', 'api_handlers/assistant/owner-action.js'],
   ['/api/assistant/owner-inbox', '/api/assistant-router.js?__p06_route=owner-inbox', 'assistant:owner-inbox', 'api_handlers/assistant/owner-inbox.js'],
@@ -39,16 +44,16 @@ const logicalHandlers = Object.freeze([
   'api_handlers/audit/trace.js', 'api_handlers/location/resolve.js'
 ]);
 
-test('P0.6.1 rewrite matrix has nineteen API patterns, eighteen logical handlers, exact destinations and no source collisions', () => {
+test('F05 rewrite matrix has twenty-two API patterns and keeps the existing Vercel Function budget', () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
-  assert.equal(config.routes.length, 21, '19 API patterns + auth callback + static privacy route');
+  assert.equal(config.routes.length, 24, '22 API patterns + auth callback + static privacy route');
   const seenSources = new Set();
   for (const route of config.routes) {
     assert.equal(seenSources.has(route.src), false, `duplicate rewrite source: ${route.src}`);
     seenSources.add(route.src);
   }
-  assert.equal(new Set(apiMatrix.map(([src]) => src)).size, 19);
-  assert.equal(new Set(logicalHandlers).size, 18);
+  assert.equal(new Set(apiMatrix.map(([src]) => src)).size, 22);
+  assert.equal(new Set(logicalHandlers).size, 21);
   for (const [src, dest, routerId, handler] of apiMatrix) {
     const matches = config.routes.filter(route => route.src === src);
     assert.equal(matches.length, 1, `one rewrite for ${src}`);

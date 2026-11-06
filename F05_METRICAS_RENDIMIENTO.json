@@ -1,0 +1,17 @@
+{
+  "schema": "yarbi.f05.performance.v1",
+  "environment": "local_synthetic",
+  "measured_at": "2026-11-06",
+  "sample_count": 40,
+  "workload": "FAST_LOCAL agenda and finance read-only turns",
+  "metrics_ms": {
+    "local_cpu": { "p50": 0.32, "p95": 0.46 },
+    "gemini": { "status": "not_invoked", "p50": null, "p95": null },
+    "preview_http": { "status": "not_measured", "p50": null, "p95": null },
+    "android_device": { "status": "not_measured", "p50": null, "p95": null }
+  },
+  "notes": [
+    "The sample excludes authentication, owner-scope and remote Supabase timing by design.",
+    "No real Gemini request, Preview HTTP request, or Android device measurement was performed in F05."
+  ]
+}
