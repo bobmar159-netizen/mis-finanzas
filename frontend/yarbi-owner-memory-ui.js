@@ -18,6 +18,8 @@
   async function propose(body) {
     const proposal = await request({ action: 'propose', ...body });
     if (proposal.outcome === 'duplicate') return { handled: true, duplicate: true, instruction: proposal.instruction };
+    if (proposal.outcome === 'list') return { handled: true, outcome: 'list', instructions: Array.isArray(proposal.instructions) ? proposal.instructions : [] };
+    if (proposal.outcome && proposal.outcome !== 'proposal_requires_confirmation') return { handled: true, outcome: proposal.outcome, code: proposal.code || '' };
     if (!proposal.proposal_token || !proposal.proposal) throw new Error('No se pudo preparar una propuesta segura.');
     const operation = proposal.proposal.operation === 'set_active' ? (proposal.proposal.active ? 'activar' : 'pausar') : proposal.proposal.operation === 'edit' ? 'editar' : 'guardar';
     const accepted = window.confirm('Yarbi propone ' + operation + ' esta instrucción:\n\n“' + proposal.proposal.instruction + '”\n\n¿Confirmas este cambio permanente?');
@@ -28,7 +30,7 @@
   }
   window.gfcOwnerMemorySaveWithConfirmation = async function (record) {
     if (!(await previewEnabled())) return { handled: false };
-    return propose({ utterance: 'Recuerda que ' + String(record?.instruction || '') });
+    return propose({ utterance: 'Recuerda que ' + String(record?.instruction || ''), source_channel: record?.source_channel === 'voice' ? 'voice' : 'app' });
   };
   window.gfcOwnerMemorySetActiveWithConfirmation = async function (record, active) {
     if (!(await previewEnabled())) return { handled: false };
@@ -37,5 +39,9 @@
   window.gfcOwnerMemoryEditWithConfirmation = async function (record) {
     if (!(await previewEnabled())) return { handled: false };
     return propose({ operation: 'edit', instruction_id: record?.id, instruction: record?.instruction, name: record?.name, category: record?.category });
+  };
+  window.gfcOwnerMemoryReviewUtterance = async function (utterance, sourceChannel) {
+    if (!(await previewEnabled())) return { handled: false };
+    return propose({ utterance: String(utterance || ''), source_channel: sourceChannel === 'voice' ? 'voice' : 'app' });
   };
 })();

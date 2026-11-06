@@ -10104,8 +10104,9 @@ function gfcToggleCopilotMaster(isActive) {
 
 function gfcSpeakText(text) {
   if (window._gfcLiveSession?.active) return;
+  if (window.gfcVoiceOutputEnabled === false) { gfcChatDiag('tts-disabled-by-owner'); return; }
   const selectedVoice = typeof getElevenLabsConfig === 'function' ? getElevenLabsConfig() : null;
-  if (selectedVoice?.enabled && selectedVoice.key && selectedVoice.voiceId && typeof reproducirDiscurso === 'function') {
+  if (!window.gfcF07PreferDeviceTts && selectedVoice?.enabled && selectedVoice.key && selectedVoice.voiceId && typeof reproducirDiscurso === 'function') {
     reproducirDiscurso(text);
     return;
   }
@@ -48337,6 +48338,7 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
 })();
 </script>
 <script src="./yarbi-owner-memory-ui.js"></script>
+<script src="./yarbi-app-voice.js"></script>
 <script src="./yarbi-product-completion-ui.js"></script>
 <script src="./yarbi-owner-inbox-ui.js"></script>
 </body>

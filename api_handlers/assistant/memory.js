@@ -31,14 +31,15 @@ function createOwnerMemoryHandler({ fetchImpl = fetch, now = () => Date.now() } 
       if (action === 'propose') {
         const requestedOperation = clean(body.operation, 24).toLowerCase();
         const requestedTarget = instructions.find(row => row.id && row.id === clean(body.instruction_id, 80));
+        const source_channel = clean(body.source_channel, 24) === 'voice' ? 'voice' : 'app';
         const direct = requestedTarget && ['edit', 'set_active'].includes(requestedOperation)
-          ? { outcome: 'proposal', operation: requestedOperation, target_id: requestedTarget.id, instruction: requestedOperation === 'edit' ? clean(body.instruction, 1200) : requestedTarget.instruction, name: clean(body.name, 120) || requestedTarget.name, category: clean(body.category, 40) || requestedTarget.category, active: requestedOperation === 'set_active' ? body.active !== false : requestedTarget.active }
+          ? { outcome: 'proposal', operation: requestedOperation, target_id: requestedTarget.id, instruction: requestedOperation === 'edit' ? clean(body.instruction, 1200) : requestedTarget.instruction, name: clean(body.name, 120) || requestedTarget.name, category: clean(body.category, 40) || requestedTarget.category, active: requestedOperation === 'set_active' ? body.active !== false : requestedTarget.active, source_channel }
           : null;
         if (requestedOperation && !direct) return res.status(404).json({ ok: false, error: 'owner_memory_instruction_not_found' });
-        const result = direct || classifyMemoryInput({ utterance: body.utterance, instructions });
+        const result = direct || { ...classifyMemoryInput({ utterance: body.utterance, instructions }), source_channel };
         if (result.outcome !== 'proposal') return res.status(200).json({ ok: true, outcome: result.outcome, code: result.code || null, active_count: instructions.filter(row => row.active).length, instructions: result.outcome === 'list' ? result.instructions : undefined });
         const proposal_token = createProposalToken({ ownerId, proposal: result, secret, now: now() });
-        return res.status(200).json({ ok: true, outcome: 'proposal_requires_confirmation', active_count: instructions.filter(row => row.active).length, proposal: { operation: result.operation, name: result.name, instruction: result.instruction, active: result.active !== false }, proposal_token });
+        return res.status(200).json({ ok: true, outcome: 'proposal_requires_confirmation', active_count: instructions.filter(row => row.active).length, proposal: { operation: result.operation, name: result.name, instruction: result.instruction, active: result.active !== false, source_channel: result.source_channel }, proposal_token });
       }
       if (action !== 'confirm') return res.status(400).json({ ok: false, error: 'owner_memory_action_invalid' });
       if (body.confirm !== true) return res.status(400).json({ ok: false, error: 'owner_memory_confirmation_required' });
@@ -47,7 +48,8 @@ function createOwnerMemoryHandler({ fetchImpl = fetch, now = () => Date.now() } 
       if (proposal.operation === 'create') {
         const duplicate = instructions.find(row => row.semantic_key === proposal.semantic_key);
         if (duplicate) return res.status(200).json({ ok: true, outcome: 'duplicate', instruction: duplicate, active_count: instructions.filter(row => row.active).length });
-        const result = await supabase('/rest/v1/yarbi_owner_instructions', { method: 'POST', headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify({ owner_account_id: ownerId, name: proposal.name || proposal.instruction.slice(0, 64), instruction: proposal.instruction, category: proposal.category || 'behavior', scope: 'owner', active: true, origin: 'owner_confirmed', source_channel: 'app', semantic_key: proposal.semantic_key, version: 1 }) });
+        const source_channel = proposal.source_channel === 'voice' ? 'voice' : 'app';
+        const result = await supabase('/rest/v1/yarbi_owner_instructions', { method: 'POST', headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify({ owner_account_id: ownerId, name: proposal.name || proposal.instruction.slice(0, 64), instruction: proposal.instruction, category: proposal.category || 'behavior', scope: 'owner', active: true, origin: source_channel === 'voice' ? 'voice_proposed' : 'owner_confirmed', source_channel, semantic_key: proposal.semantic_key, version: 1 }) });
         const row = rows(result.data)[0]; if (!result.response.ok || !row) return res.status(502).json({ ok: false, error: 'owner_memory_persist_failed' });
         return res.status(200).json({ ok: true, outcome: 'created', instruction: row, active_count: instructions.filter(row => row.active).length + 1 });
       }

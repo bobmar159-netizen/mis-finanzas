@@ -26,3 +26,11 @@ test('F06 rechaza owner declarado por navegador y no sale del Supabase aislado',
   await handler({ method:'POST', url:'/api/assistant/memory', headers:{ authorization:'Bearer synthetic' }, body:{ action:'list', owner_account_id:'00000000-0000-4000-8000-0000000000a2' } }, res);
   assert.equal(res.state.status, 400); assert.equal(calls.length, 0);
 }));
+
+test('F07 conserva procedencia voice solo tras la confirmación explícita del owner', async () => preview(async () => {
+  const calls = []; const store = { rows: [] }; const handler = createOwnerMemoryHandler({ fetchImpl: client(calls, store), now: () => Date.parse('2026-11-06T12:00:00.000Z') });
+  const proposed = responseBox(); await handler({ method:'POST', url:'/api/assistant/memory', headers:{ authorization:'Bearer synthetic' }, body:{ action:'propose', source_channel:'voice', utterance:'Yarbi, recuerda que prefiero respuestas cortas.' } }, proposed);
+  assert.equal(proposed.state.body.proposal.source_channel, 'voice'); assert.equal(store.rows.length, 0);
+  const confirmed = responseBox(); await handler({ method:'POST', url:'/api/assistant/memory', headers:{ authorization:'Bearer synthetic' }, body:{ action:'confirm', confirm:true, proposal_token:proposed.state.body.proposal_token } }, confirmed);
+  assert.equal(store.rows[0].source_channel, 'voice'); assert.equal(store.rows[0].origin, 'voice_proposed');
+}));
