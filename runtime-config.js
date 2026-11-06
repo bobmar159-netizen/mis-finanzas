@@ -4,7 +4,7 @@
   const config = Object.freeze({
     apiOrigin: '__YARBI_SAME_ORIGIN__',
     environment: 'web',
-    releaseId: 'p02i-34096a4bac245a5b'
+    releaseId: 'p02i-7b27f6a29bf30416'
   });
   function apiOrigin() {
     if (config.apiOrigin === '__YARBI_SAME_ORIGIN__') return window.location.origin;

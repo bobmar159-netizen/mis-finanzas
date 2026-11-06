@@ -35,6 +35,8 @@ test('F02 dossier is built from canonical owner scope with a bounded chronologic
   assert.equal(result.timeline.length, 4);
   assert.equal(result.activities.schema, 'yarbi.agenda-summary.v1');
   assert.equal(result.activities.activities.length, 1);
+  assert.equal(result.finance.schema, 'yarbi.finance-context.v1');
+  assert.equal(result.finance.summary.quote_is_not_income, true);
   assert.ok(result.timeline.every(event => !Object.prototype.hasOwnProperty.call(event, 'owner_id')));
   assert.equal(calls.every(path => /(?:id|contact_id)=in\.\(101\)|contact_id=eq\.101/.test(decodeURIComponent(path))), true);
   assert.equal(calls.every(path => !/https?:\/\/(?![^/]*supabase\.co)/i.test(path)), true);

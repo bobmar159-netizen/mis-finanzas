@@ -1,0 +1,5 @@
+6c3a36d11d88d19739452c3d04fa312af429feb525700b82d314a27d0bcd47c2  lib/yarbi-finance-context.js
+55431bd1b7febfe32fe88abbd386908cdaf1388c2bec7e4c5dfd1accecab8a8c  lib/yarbi-crm-dossier-runtime.js
+bf045fe7178b789e9455cccd1b096e468c511369a73c2c7b4c21311f47c03a04  frontend/yarbi-product-completion-ui.js
+cc492719affeab1c16298e423eeb689093b4b9938d4adeb99605b7d8819f1198  tests/finance-context.test.js
+0c3feb868f4dd56bec09b231c0de2c52a695fc6ae61dd94d2d22f68d33ce828f  tests/crm-dossier-runtime.test.js
