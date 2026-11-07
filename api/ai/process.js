@@ -178,9 +178,13 @@ function scheduleNextBatch(limit, delayMs = 0, continuationDepth = 1) {
     })
   })).then(async response => {
     const result = await response.json().catch(() => ({}));
-    console.log('[AI QUEUE CONTINUATION]', response.status, JSON.stringify(result));
+    console.log('[AI QUEUE CONTINUATION]', JSON.stringify({
+      http_status: response.status,
+      status: typeof result?.status === 'string' ? result.status : null,
+      messages_processed: Number.isFinite(Number(result?.messages_processed)) ? Number(result.messages_processed) : null
+    }));
   }).catch(error => {
-    console.warn('[AI QUEUE CONTINUATION] La cola permanece durable para el próximo intento:', error.message);
+    console.warn('[AI QUEUE CONTINUATION]', errorCode(error));
   });
   waitUntil(task);
 }
@@ -1463,7 +1467,7 @@ export default async function handler(req, res) {
       message: processed ? 'Procesamiento incremental finalizado' : 'No hubo mensajes procesables'
     });
   } catch (error) {
-    console.error('[AI PROCESS ERROR]', error);
+    console.error('[AI PROCESS ERROR]', errorCode(error));
     try {
       const unfinishedJobs = claimedJobs.filter(Boolean);
       if (unfinishedJobs.length) await markJobsFailed(unfinishedJobs, run?.id || null, error, lockToken);
@@ -1479,7 +1483,7 @@ export default async function handler(req, res) {
         });
       }
     } catch (recoveryError) {
-      console.error('[AI PROCESS RECOVERY ERROR]', recoveryError);
+    console.error('[AI PROCESS RECOVERY ERROR]', errorCode(recoveryError));
     }
     traceProcessing({
       stage: 'processing_failed',

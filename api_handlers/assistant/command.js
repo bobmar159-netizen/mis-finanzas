@@ -1,22 +1,16 @@
 const { extractCoordinatesFromMapsUrl } = require('../../lib/location-resolver');
 const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
+const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 
 let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
-const ASSISTANT_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
 const GEMINI_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-3.6-flash';
 
 function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', process.env.APP_ORIGIN || '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+  if (process.env.APP_ORIGIN) res.setHeader('Access-Control-Allow-Origin', process.env.APP_ORIGIN);
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-}
-
-function authorized(req) {
-  const header = req.headers?.['x-assistant-token'] || req.headers?.authorization || '';
-  const token = String(header).replace(/^Bearer\s+/i, '').trim();
-  return Boolean(ASSISTANT_TOKEN && token === ASSISTANT_TOKEN);
 }
 
 function cleanPhone(value) {
@@ -360,12 +354,13 @@ module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
-  if (!authorized(req)) return res.status(401).json({ error: 'unauthorized' });
-  const runtime = validateServerRouteConfig();
+  const runtime = validateServerRouteConfig({ requirePublicAuth: true });
   if (!runtime.ok) return res.status(503).json({ error: 'configuration_invalid', code: runtime.code });
+  const identity = await authenticatedOwnerIdentity(req, runtime);
+  if (!identity.ok) return res.status(identity.status).json({ error: identity.code });
   SUPABASE_URL = runtime.supabaseUrl;
   SUPABASE_KEY = runtime.supabaseKey;
-  if (!ASSISTANT_TOKEN || !GEMINI_KEY) return res.status(503).json({ error: 'assistant_not_configured' });
+  if (!GEMINI_KEY) return res.status(503).json({ error: 'assistant_not_configured' });
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
@@ -619,7 +614,7 @@ module.exports = async function handler(req, res) {
       model: GEMINI_MODEL
     });
   } catch (error) {
-    console.error('[ASSISTANT COMMAND]', error);
+    console.error('[ASSISTANT COMMAND]', JSON.stringify({ category: errorCode(error) || 'request_failed' }));
     return res.status(500).json({ error: 'assistant_command_failed' });
   }
 };

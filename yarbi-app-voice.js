@@ -2,30 +2,14 @@
    sale del dispositivo; solo el texto revisado llega al mismo flujo F05. */
 (function () {
   const MAX_DURATION_MS = 60000;
-  const TTS_KEY = 'gfc_f07_tts_enabled';
   const state = { recognition: null, timer: 0, transcript: '', startedAt: 0, cancelled: false, review: null };
 
   function clean(value, limit = 1200) { return String(value || '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, limit); }
   function nativePlatform() { return Boolean(window.Capacitor?.isNativePlatform?.()); }
-  function ttsEnabled() { return localStorage.getItem(TTS_KEY) === '1'; }
   function setStatus(message, error) {
     const node = document.getElementById('gfc-f07-voice-status');
     if (node) { node.textContent = message; node.style.color = error ? '#B42318' : '#667085'; }
   }
-  function stopSpeech() {
-    try { window.speechSynthesis?.cancel(); } catch (_) {}
-    const native = window.Capacitor?.Plugins?.YarbiTts;
-    try { native?.stop?.(); } catch (_) {}
-  }
-  function syncTtsControl() {
-    window.gfcVoiceOutputEnabled = ttsEnabled();
-    window.gfcF07PreferDeviceTts = true;
-    document.querySelectorAll('[data-f07-tts]').forEach(button => {
-      button.setAttribute('aria-pressed', ttsEnabled() ? 'true' : 'false');
-      button.textContent = ttsEnabled() ? '🔊 Voz activa' : '🔇 Voz desactivada';
-    });
-  }
-  function toggleTts() { localStorage.setItem(TTS_KEY, ttsEnabled() ? '0' : '1'); if (!ttsEnabled()) stopSpeech(); syncTtsControl(); }
   function resetCapture() { if (state.timer) clearTimeout(state.timer); state.timer = 0; state.recognition = null; state.startedAt = 0; }
   function friendly(error) {
     const code = String(error?.error || error?.message || error || '').toLowerCase();
@@ -75,10 +59,10 @@
             const names = (memory.instructions || []).map(item => item.name || item.instruction).slice(0, 8);
             const reply = names.length ? 'Estas son tus instrucciones activas: ' + names.join('; ') + '.' : 'Todavía no tienes instrucciones permanentes activas.';
             window.gfcAppendCopilotChatMessage?.('user', text); window.gfcAppendCopilotChatMessage?.('assistant', reply);
-            if (ttsEnabled()) window.gfcSpeakText?.(reply); setStatus('Consulta de memoria lista.'); return;
+            setStatus('Consulta de memoria lista.'); return;
           }
-          if (memory.duplicate) { const reply = 'Esa instrucción ya estaba activa.'; window.gfcAppendCopilotChatMessage?.('assistant', reply); if (ttsEnabled()) window.gfcSpeakText?.(reply); setStatus(reply); return; }
-          if (memory.saved) { const reply = 'Guardé la instrucción confirmada.'; window.gfcAppendCopilotChatMessage?.('user', text); window.gfcAppendCopilotChatMessage?.('assistant', reply); if (ttsEnabled()) window.gfcSpeakText?.(reply); setStatus(reply); return; }
+          if (memory.duplicate) { const reply = 'Esa instrucción ya estaba activa.'; window.gfcAppendCopilotChatMessage?.('assistant', reply); setStatus(reply); return; }
+          if (memory.saved) { const reply = 'Guardé la instrucción confirmada.'; window.gfcAppendCopilotChatMessage?.('user', text); window.gfcAppendCopilotChatMessage?.('assistant', reply); setStatus(reply); return; }
           const reply = memory.code === 'memory_temporal_not_permanent' ? 'Eso parece un recordatorio temporal; no lo guardé como instrucción permanente.' : 'No guardé esa frase como instrucción permanente.';
           window.gfcAppendCopilotChatMessage?.('assistant', reply); setStatus(reply); return;
         }
@@ -117,22 +101,18 @@
     document.querySelectorAll('.gfc-yarbi-composer').forEach(composer => {
       if (composer.querySelector('[data-f07-voice]')) return;
       const mic = document.createElement('button'); mic.type = 'button'; mic.dataset.f07Voice = 'true'; mic.className = 'gfc-f07-voice-button'; mic.textContent = '🎙 Dictar'; mic.setAttribute('aria-label', 'Dictar y revisar antes de enviar'); mic.onclick = start;
-      const stop = document.createElement('button'); stop.type = 'button'; stop.dataset.f07Stop = 'true'; stop.className = 'gfc-f07-stop-button'; stop.textContent = '■'; stop.setAttribute('aria-label', 'Detener respuesta hablada'); stop.onclick = stopSpeech;
-      const tts = document.createElement('button'); tts.type = 'button'; tts.dataset.f07Tts = 'true'; tts.className = 'gfc-f07-tts-button'; tts.onclick = toggleTts;
-      composer.insertBefore(mic, composer.querySelector('.gfc-yarbi-send-btn') || null); composer.insertBefore(stop, composer.querySelector('.gfc-yarbi-send-btn') || null); composer.insertBefore(tts, composer.querySelector('.gfc-yarbi-send-btn') || null);
+      composer.insertBefore(mic, composer.querySelector('.gfc-yarbi-send-btn') || null);
     });
     document.querySelectorAll('.gfc-yarbi-composer-wrap').forEach(wrap => { if (!wrap.querySelector('#gfc-f07-voice-status')) { const status = document.createElement('small'); status.id = 'gfc-f07-voice-status'; status.textContent = 'Dicta, revisa y confirma antes de enviar.'; wrap.append(status); } });
-    syncTtsControl();
   }
   function installStyles() {
     if (document.getElementById('gfc-f07-voice-style')) return;
     const style = document.createElement('style'); style.id = 'gfc-f07-voice-style';
-    style.textContent = '.gfc-f07-voice-button,.gfc-f07-stop-button,.gfc-f07-tts-button{border:1px solid #cbd5e1;background:#fff;color:#16325c;border-radius:10px;padding:8px 9px;font-weight:800;cursor:pointer}.gfc-f07-voice-button{color:#0f766e;border-color:#99d8c7}.gfc-f07-voice-review{position:fixed;inset:0;z-index:20050;background:rgba(15,23,42,.48);display:grid;place-items:center;padding:20px}.gfc-f07-voice-review section{width:min(540px,100%);background:#fff;border-radius:16px;padding:20px;box-shadow:0 18px 46px rgba(15,23,42,.28)}.gfc-f07-voice-review h3{margin:0 0 8px}.gfc-f07-voice-review p{color:#475569;line-height:1.45}.gfc-f07-voice-review textarea{box-sizing:border-box;width:100%;resize:vertical;border:1px solid #cbd5e1;border-radius:10px;padding:10px;font:inherit}.gfc-f07-voice-review-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.gfc-f07-voice-review button{border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer}.gfc-f07-voice-review button.primary{background:#0f766e;border-color:#0f766e;color:#fff}#gfc-f07-voice-status{display:block;margin-top:7px;font-size:12px;line-height:1.35}';
+    style.textContent = '.gfc-f07-voice-button{border:1px solid #99d8c7;background:#fff;color:#0f766e;border-radius:10px;padding:8px 9px;font-weight:800;cursor:pointer}.gfc-f07-voice-review{position:fixed;inset:0;z-index:20050;background:rgba(15,23,42,.48);display:grid;place-items:center;padding:20px}.gfc-f07-voice-review section{width:min(540px,100%);background:#fff;border-radius:16px;padding:20px;box-shadow:0 18px 46px rgba(15,23,42,.28)}.gfc-f07-voice-review h3{margin:0 0 8px}.gfc-f07-voice-review p{color:#475569;line-height:1.45}.gfc-f07-voice-review textarea{box-sizing:border-box;width:100%;resize:vertical;border:1px solid #cbd5e1;border-radius:10px;padding:10px;font:inherit}.gfc-f07-voice-review-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.gfc-f07-voice-review button{border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer}.gfc-f07-voice-review button.primary{background:#0f766e;border-color:#0f766e;color:#fff}#gfc-f07-voice-status{display:block;margin-top:7px;font-size:12px;line-height:1.35}';
     document.head.append(style);
   }
   const observer = new MutationObserver(() => controls());
-  window.gfcF07Voice = Object.freeze({ start, stop, stopSpeech, submitReviewed, state: () => ({ active: !!state.recognition, transcript: state.transcript, tts: ttsEnabled(), retention: 'no_audio_persistence' }) });
-  window.gfcF07StopSpeech = stopSpeech;
+  window.gfcF07Voice = Object.freeze({ start, stop, submitReviewed, state: () => ({ active: !!state.recognition, transcript: state.transcript, retention: 'no_audio_persistence' }) });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { installStyles(); controls(); observer.observe(document.body, { childList:true, subtree:true }); });
   else { installStyles(); controls(); observer.observe(document.body, { childList:true, subtree:true }); }
 })();

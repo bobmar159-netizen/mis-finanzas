@@ -17,12 +17,11 @@ test('F07 UI revisa la transcripción antes del cerebro central y no incorpora u
   assert.equal(ui.includes('ElevenLabs'), false);
 });
 
-test('F07 UI ofrece control de TTS del dispositivo y parada sin cambiar el proveedor comercial', () => {
+test('F01 conserva Gemini Live como voz principal y no sustituye Live por TTS local', () => {
   const html = fs.readFileSync(path.join(root, 'frontend', 'index.html'), 'utf8');
   const ui = fs.readFileSync(path.join(root, 'frontend', 'yarbi-app-voice.js'), 'utf8');
   assert.match(html, /yarbi-app-voice\.js/);
-  assert.match(html, /window\.gfcVoiceOutputEnabled === false/);
-  assert.match(html, /!window\.gfcF07PreferDeviceTts/);
-  assert.match(ui, /speechSynthesis\?\.cancel/);
-  assert.match(ui, /YarbiTts/);
+  assert.match(html, /voice_output_text_only/);
+  assert.equal(ui.includes('speechSynthesis'), false);
+  assert.equal(ui.includes('YarbiTts'), false);
 });

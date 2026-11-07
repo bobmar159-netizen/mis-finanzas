@@ -3824,7 +3824,21 @@ gfcRegisterSpeechRecognitionPolyfill();
 document.addEventListener('DOMContentLoaded', gfcRegisterSpeechRecognitionPolyfill);
 window.addEventListener('load', gfcRegisterSpeechRecognitionPolyfill);
 
-const GEMINI_URL = k => `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${k}`;
+// Las utilidades históricas conservan su forma de respuesta Gemini, pero la
+// generación se hace en el backend autenticado. El parámetro legado se ignora:
+// no representa ni debe representar una API key del navegador.
+const GEMINI_URL = () => window.gfcRuntimeApiOrigin() + '/api/assistant/gemini';
+async function gfcSecureGeminiFetch(_legacyUrl, options = {}) {
+  const accessToken = await gfcAccountFreshAccessToken();
+  if (!accessToken) throw new Error('gemini_authenticated_session_required');
+  const headers = { ...(options.headers || {}), Authorization: 'Bearer ' + accessToken };
+  return fetch(GEMINI_URL(), { ...options, headers });
+}
+function gfcGeminiBackendReady() {
+  // Sólo señala que existe una ruta segura. La sesión se refresca justo antes
+  // del request en gfcSecureGeminiFetch; nunca se almacena una clave maestra.
+  return 'server_backed_gemini';
+}
 
 // ── Colores de hoja de nota ──
 const NOTA_COLORES = {
@@ -10046,14 +10060,14 @@ async function gfcGenerateWhatsappFollowupMessage(suggestionId) {
     msgText += `¿Me confirmas por favor si quedamos en agendar la visita? Muchas gracias.`;
   }
 
-  const geminiKey = localStorage.getItem('fnz_gemini_key') || localStorage.getItem('gfc_gemini_api_key') || state.settings?.geminiKey || state.settings?.apiKey || '';
+  const geminiKey = gfcGeminiBackendReady();
   if (geminiKey) {
     try {
       toast('Redactando mensaje con IA...', 'info');
       const prompt = `Eres el técnico de instalaciones y gas en Lima. Redacta un mensaje CORTO, cordial y profesional para WhatsApp al cliente "${name}".
 Pendientes que necesitas que te envíe: ${pendientes.length ? pendientes.join(', ') : 'confirmación de la fecha/hora y dirección'}.
 Responde ÚNICAMENTE con el texto del mensaje listo para enviar, sin explicaciones ni comillas.`;
-      const res = await fetch(GEMINI_URL(geminiKey), {
+      const res = await gfcSecureGeminiFetch(GEMINI_URL(geminiKey), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
@@ -10104,46 +10118,10 @@ function gfcToggleCopilotMaster(isActive) {
 
 function gfcSpeakText(text) {
   if (window._gfcLiveSession?.active) return;
-  if (window.gfcVoiceOutputEnabled === false) { gfcChatDiag('tts-disabled-by-owner'); return; }
-  const selectedVoice = typeof getElevenLabsConfig === 'function' ? getElevenLabsConfig() : null;
-  if (!window.gfcF07PreferDeviceTts && selectedVoice?.enabled && selectedVoice.key && selectedVoice.voiceId && typeof reproducirDiscurso === 'function') {
-    reproducirDiscurso(text);
-    return;
-  }
-  window._gfcCopilotActive = true;
-  if (!text) return;
-  let clean = text.replace(/[*_#`~]/g, '').replace(/https?:\/\/\S+/g, 'enlace de mapa').trim();
-  clean = gfcCleanTextForSpeech(clean);
-  const nativeTts = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.YarbiTts;
-  if (nativeTts && typeof nativeTts.speak === 'function') {
-    gfcChatDiag('tts-native-request', { chars: clean.length });
-    nativeTts.speak({ text: clean, language: 'es-PE' })
-      .then(() => gfcChatDiag('tts-native-queued'))
-      .catch(error => gfcChatDiag('tts-native-error', { message: error?.message || String(error) }));
-    return;
-  }
-  if (!window.speechSynthesis) {
-    gfcChatDiag('tts-unavailable', { reason: 'No existe YarbiTts ni speechSynthesis' });
-    return;
-  }
-  gfcChatDiag('tts-start', { chars: String(text).length });
-  try {
-    window.speechSynthesis.cancel();
-    const synth = window.speechSynthesis;
-    const utter = new SpeechSynthesisUtterance(clean);
-    utter.rate = 1.0;
-    utter.pitch = 1.0;
-    utter.lang = 'es-PE';
-    utter.onstart = () => gfcChatDiag('tts-speaking');
-    utter.onend = () => gfcChatDiag('tts-end');
-    utter.onerror = event => gfcChatDiag('tts-error', { message: event?.error || 'speech synthesis error' });
-    const voices = synth.getVoices();
-    const peVoice = voices.find(v => v.lang.includes('es-PE') || v.lang.includes('es-MX') || v.lang.includes('es-US') || v.lang.includes('es-ES'));
-    if (peVoice) utter.voice = peVoice;
-    synth.speak(utter);
-  } catch (error) {
-    gfcChatDiag('tts-error', { message: error?.message || String(error) });
-  }
+  // La respuesta conversacional por voz pertenece a Gemini Live. Fuera de
+  // Live mantenemos el texto visible y no sustituimos al proveedor por un TTS
+  // de dispositivo que pueda dar una experiencia o semántica distinta.
+  gfcChatDiag('voice_output_text_only', { chars: String(text || '').length });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -10717,7 +10695,8 @@ async function gfcCallGeminiAPI(_apiKey, payload) {
   } catch (error) {
     return { ok:false, status:0, message:'No está disponible la configuración aislada de Yarbi.' };
   }
-  const token = localStorage.getItem('fnz_assistant_token') || '';
+  const token = await gfcAccountFreshAccessToken();
+  if (!token) return { ok: false, status: 401, message: 'Inicia sesión para usar Gemini.' };
   gfcChatDiag('backend-request');
   const contents = payload?.contents || [];
   const current = contents.filter(x => x?.role === 'user').pop()?.parts?.[0]?.text || '';
@@ -10725,7 +10704,7 @@ async function gfcCallGeminiAPI(_apiKey, payload) {
   try {
     const res = await fetch(window.gfcRuntimeApiOrigin() + '/api/assistant/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({
         text: current,
         systemInstruction,
@@ -10749,19 +10728,19 @@ async function gfcCallGeminiAPI(_apiKey, payload) {
   }
 }
 async function gfcTestGeminiConnection() {
-  const k = localStorage.getItem('fnz_gemini_key') || localStorage.getItem('gfc_gemini_api_key') || state.settings?.geminiKey || state.settings?.apiKey || '';
+  const k = gfcGeminiBackendReady();
   if (!k) {
-    toast('No hay API Key de Gemini guardada', 'error');
+    toast('La configuración segura de Gemini no está disponible', 'error');
     return;
   }
-  toast('Probando conexión con Gemini API...', 'info');
+  toast('Probando la conexión segura con Gemini...', 'info');
   const result = await gfcCallGeminiAPI(k, { contents: [{ role: 'user', parts: [{ text: 'Di OK' }] }] });
   if (result.ok) {
     toast('✅ Gemini OK: ' + result.text.trim(), 'success');
-    console.log('[Diagnóstico Gemini] Éxito:', result.text);
+    console.log('[Diagnóstico Gemini]', { status: result.status, response_received: Boolean(result.text) });
   } else {
     toast('🔴 Error Gemini (' + (result.status || 'Red') + '): ' + (result.message ? result.message.slice(0, 60) : 'Falla de conexión'), 'error');
-    console.error('[Diagnóstico Gemini] Fallaron todos los modelos:', result);
+    console.error('[Diagnóstico Gemini]', { status: result.status || 0, category: 'connection_failed' });
   }
 }
 
@@ -10769,20 +10748,20 @@ window._gfcAssistantDiag = { status: 'No probado', http: 0, detail: '' };
 
 async function gfcRunAssistantDiagnostic() {
   const el = document.getElementById('gfc-assistant-backend-status');
-  const token = localStorage.getItem('fnz_assistant_token') || '';
+  const token = await gfcAccountFreshAccessToken();
   gfcChatDiag('backend-request');
   const started = Date.now();
   window._gfcAssistantDiag = { status: 'Comprobando...', http: 0, detail: '' };
   if (el) { el.textContent = 'Comprobando...'; el.style.color = '#F59E0B'; }
   if (!token) {
-    window._gfcAssistantDiag = { status: 'Falta token en este dispositivo', http: 0, detail: 'Ajustes > Yarbi Copiloto' };
-    if (el) { el.textContent = '🔴 Falta token'; el.style.color = '#EF4444'; }
+    window._gfcAssistantDiag = { status: 'Inicia sesión para usar Gemini', http: 0, detail: 'Cuenta de Yarbi' };
+    if (el) { el.textContent = '🔴 Inicia sesión'; el.style.color = '#EF4444'; }
     return window._gfcAssistantDiag;
   }
   try {
     const res = await fetch(window.gfcRuntimeApiOrigin() + '/api/assistant/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({ text: 'Responde únicamente OK.', phone: '', agenda: [], rules: '' })
     });
     const data = await res.json().catch(() => ({}));
@@ -10879,7 +10858,7 @@ async function gfcOpenDiagnosticModal() {
   void gfcSyncYarbiLocalMirror({ reason: 'diagnostic-open', backfill: true }).catch(error => {
     gfcChatDiag('yarbi-local-mirror-error', { reason: 'diagnostic-open', message: error?.message || String(error) });
   });
-  const geminiKey = localStorage.getItem('fnz_gemini_key') || localStorage.getItem('gfc_gemini_api_key') || state.settings?.geminiKey || state.settings?.apiKey || '';
+  const geminiKey = gfcGeminiBackendReady();
   const notionToken = localStorage.getItem('fnz_notion_token') || '';
   const notionDb = localStorage.getItem('fnz_notion_db_agenda') || '';
   const assistantToken = localStorage.getItem('fnz_assistant_token') || '';
@@ -10929,7 +10908,7 @@ async function gfcOpenDiagnosticModal() {
         <div style="background:#0F172A; border:1px solid #334155; padding:10px; border-radius:10px">
           <div style="font-size:11px; color:#94A3B8; font-weight:800">🤖 Gemini IA</div>
           <div style="font-size:12px; font-weight:900; color:${geminiKey ? '#10B981' : '#EF4444'}; margin-top:2px">
-            ${geminiKey ? '✅ Configurado (' + geminiKey.slice(0, 6) + '...)' : '🔴 Falta API Key'}
+            ${geminiKey ? '✅ Configuración segura del servidor disponible' : '🔴 Configuración segura no disponible'}
           </div>
           <button onclick="gfcTestGeminiConnection()" style="margin-top:6px; background:#0284C7; color:#FFF; border:none; padding:4px 8px; border-radius:6px; font-size:10px; font-weight:800; cursor:pointer; width:100%">🧪 Probar Conexión</button>
         </div>
@@ -11011,30 +10990,12 @@ async function gfcOpenDiagnosticModal() {
 
 function gfcRunAudioDiagnostic() {
   const result = window._gfcAudioDiagnostic = { at: new Date().toISOString(), provider: '', status: 'Comprobando', detail: '' };
-  const nativeTts = window.Capacitor?.Plugins?.YarbiTts;
-  if (nativeTts && typeof nativeTts.speak === 'function') {
-    result.provider = 'YarbiTts nativo';
-    try {
-      nativeTts.speak({ text: 'Prueba de audio de Yarbi. Si escuchas esta frase, la salida de Android funciona.', language: 'es-PE' })
-        .then(() => { result.status = 'OK'; result.detail = 'El plugin nativo aceptó el audio'; gfcChatDiag('tts-diagnostic-ok', result); })
-        .catch(error => { result.status = 'ERROR'; result.detail = error?.message || String(error); gfcChatDiag('tts-diagnostic-error', result); });
-      gfcChatDiag('tts-diagnostic-start', { provider: result.provider });
-    } catch (error) {
-      result.status = 'ERROR'; result.detail = error?.message || String(error);
-      gfcChatDiag('tts-diagnostic-error', result);
-    }
-    return result;
-  }
-  if ('speechSynthesis' in window) {
-    result.provider = 'speechSynthesis WebView';
-    result.status = 'DISPONIBLE';
-    result.detail = 'El WebView expone speechSynthesis, pero no se encontró YarbiTts nativo';
-    gfcChatDiag('tts-diagnostic-web', result);
-    return result;
-  }
-  result.status = 'ERROR';
-  result.detail = 'No existe salida de audio nativa ni speechSynthesis';
-  gfcChatDiag('tts-diagnostic-error', result);
+  result.provider = 'Gemini Live';
+  result.status = window._gfcLiveSession?.active ? 'ACTIVO' : 'REQUIERE_CONEXION_LIVE';
+  result.detail = window._gfcLiveSession?.active
+    ? 'La salida de voz está controlada por la sesión Gemini Live.'
+    : 'Inicia Conversación Live con Gemini; no se usa un motor TTS alternativo.';
+  gfcChatDiag('live-audio-diagnostic', result);
   return result;
 }
 
@@ -11145,7 +11106,7 @@ async function gfcRunLiveDiagnostic() {
 }
 
 function gfcBuildDiagnosticReport() {
-  const geminiKey = localStorage.getItem('fnz_gemini_key') || localStorage.getItem('gfc_gemini_api_key') || state.settings?.geminiKey || state.settings?.apiKey || '';
+  const geminiKey = gfcGeminiBackendReady();
   const isCapacitor = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   const liveDiag = window._gfcLiveDiagnostic || { status: 'No probado', detail: '' };
   const report = [];
@@ -12044,6 +12005,19 @@ async function gfcAccountFreshAccessToken(options = {}) {
 // implícito de un script grande.
 window.gfcAccountAccessToken = gfcAccountAccessToken;
 window.gfcAccountFreshAccessToken = gfcAccountFreshAccessToken;
+// Migración de seguridad F01. Las versiones históricas guardaban claves de
+// Gemini, tokens del backend y claves de voz en localStorage. Se eliminan al
+// arrancar, antes de que cualquier flujo legado pueda intentar reutilizarlas.
+const GFC_RETIRED_CLIENT_CREDENTIAL_KEYS = Object.freeze([
+  'fnz_' + 'gemini_key', 'gfc_' + 'gemini_api_key', 'fnz_' + 'api_key',
+  'fnz_' + 'assistant_token', 'fnz_' + 'eleven_enabled', 'fnz_' + 'eleven_key',
+  'fnz_' + 'eleven_voice_id', 'fnz_' + 'eleven_model_id',
+  'fnz_' + 'eleven_stability', 'fnz_' + 'eleven_similarity', 'fnz_' + 'eleven_style'
+]);
+function gfcRetireClientAiCredentials() {
+  GFC_RETIRED_CLIENT_CREDENTIAL_KEYS.forEach(key => localStorage.removeItem(key));
+}
+gfcRetireClientAiCredentials();
 async function gfcAccountSetUserFromAccessToken(accessToken) {
   const config = await gfcSupabaseAuthConfig();
   const response = await fetch(config.supabaseUrl.replace(/\/$/, '') + '/auth/v1/user', {
@@ -12056,15 +12030,12 @@ async function gfcAccountSetUserFromAccessToken(accessToken) {
   return data;
 }
 function gfcAccountSettingsPayload() {
-  return { theme: localStorage.getItem('fnz_tema') || '', voiceProvider: localStorage.getItem('fnz_voice_provider') || '', geminiLiveVoice: localStorage.getItem('fnz_gemini_live_voice') || '', elevenVoiceId: localStorage.getItem('fnz_eleven_voice_id') || '', elevenModel: localStorage.getItem('fnz_eleven_model_id') || '', elevenStability: localStorage.getItem('fnz_eleven_stability') || '', elevenSimilarity: localStorage.getItem('fnz_eleven_similarity') || '', elevenStyle: localStorage.getItem('fnz_eleven_style') || '', notionDbId: localStorage.getItem('fnz_notion_dbid') || '', notionClientsDbId: localStorage.getItem('fnz_notion_dbid_clientes') || '', notionInterval: localStorage.getItem('fnz_notion_interval') || '', yarbiAutonomy: localStorage.getItem('gfc_yarbi_autonomy_v1') || '', yarbiClientResolutions: localStorage.getItem('gfc_yarbi_client_resolutions_v2') || '' };
+  return { theme: localStorage.getItem('fnz_tema') || '', geminiLiveVoice: localStorage.getItem('fnz_gemini_live_voice') || '', notionDbId: localStorage.getItem('fnz_notion_dbid') || '', notionClientsDbId: localStorage.getItem('fnz_notion_dbid_clientes') || '', notionInterval: localStorage.getItem('fnz_notion_interval') || '', yarbiAutonomy: localStorage.getItem('gfc_yarbi_autonomy_v1') || '', yarbiClientResolutions: localStorage.getItem('gfc_yarbi_client_resolutions_v2') || '' };
 }const GFC_ACCOUNT_VAULT_STATUS_KEY = 'gfc_account_vault_status_v1';
 function gfcAccountVaultPayload() {
   return {
     sheetsUrl: localStorage.getItem('fnz_sheets_url') || '',
-    notionToken: localStorage.getItem('fnz_notion_token') || '',
-    geminiKey: localStorage.getItem('fnz_gemini_key') || '',
-    assistantToken: localStorage.getItem('fnz_assistant_token') || '',
-    elevenKey: localStorage.getItem('fnz_eleven_key') || ''
+    notionToken: localStorage.getItem('fnz_notion_token') || ''
   };
 }
 function gfcAccountVaultHaveValues(secrets) {
@@ -12072,7 +12043,7 @@ function gfcAccountVaultHaveValues(secrets) {
 }
 function gfcAccountApplyVault(secrets) {
   const source = secrets && typeof secrets === 'object' ? secrets : {};
-  const map = { sheetsUrl: 'fnz_sheets_url', notionToken: 'fnz_notion_token', geminiKey: 'fnz_gemini_key', assistantToken: 'fnz_assistant_token', elevenKey: 'fnz_eleven_key' };
+  const map = { sheetsUrl: 'fnz_sheets_url', notionToken: 'fnz_notion_token' };
   Object.entries(map).forEach(([remote, local]) => {
     if (String(source[remote] || '').trim()) localStorage.setItem(local, String(source[remote]));
   });
@@ -12082,9 +12053,6 @@ function gfcAccountVaultStatusLabel(status) {
   const labels = [];
   if (status.sheets) labels.push('Sheets');
   if (status.notion) labels.push('Notion');
-  if (status.gemini) labels.push('Gemini');
-  if (status.yarbi) labels.push('Yarbi');
-  if (status.elevenLabs) labels.push('ElevenLabs');
   const text = labels.length ? 'Bóveda cifrada: ' + labels.join(', ') : 'Bóveda activa, sin credenciales guardadas';
   localStorage.setItem(GFC_ACCOUNT_VAULT_STATUS_KEY, text);
   return text;
@@ -12141,7 +12109,7 @@ function gfcAccountSettingsHaveValues(settings) {
 }
 function gfcAccountApplySettings(settings) {
   const source = settings && typeof settings === 'object' ? settings : {};
-  const map = { theme: 'fnz_tema', voiceProvider: 'fnz_voice_provider', geminiLiveVoice: 'fnz_gemini_live_voice', elevenVoiceId: 'fnz_eleven_voice_id', elevenModel: 'fnz_eleven_model_id', elevenStability: 'fnz_eleven_stability', elevenSimilarity: 'fnz_eleven_similarity', elevenStyle: 'fnz_eleven_style', notionDbId: 'fnz_notion_dbid', notionClientsDbId: 'fnz_notion_dbid_clientes', notionInterval: 'fnz_notion_interval', yarbiAutonomy: 'gfc_yarbi_autonomy_v1', yarbiClientResolutions: 'gfc_yarbi_client_resolutions_v2' };
+  const map = { theme: 'fnz_tema', geminiLiveVoice: 'fnz_gemini_live_voice', notionDbId: 'fnz_notion_dbid', notionClientsDbId: 'fnz_notion_dbid_clientes', notionInterval: 'fnz_notion_interval', yarbiAutonomy: 'gfc_yarbi_autonomy_v1', yarbiClientResolutions: 'gfc_yarbi_client_resolutions_v2' };
   Object.entries(map).forEach(([remote, local]) => { if (source[remote] !== undefined && source[remote] !== '') localStorage.setItem(local, String(source[remote])); });
 }
 async function gfcAccountSettingsRestore() {
@@ -18285,10 +18253,11 @@ async function gfcHandleLiveToolCalls(socket, calls) {
   gfcVoicePipelineEvent('tool_response_sent', { turnId: window._gfcVoicePipelineDiag?.currentTurn?.id || 0, names: functionResponses.map(item => item.name), count: functionResponses.length });
   gfcChatDiag('live-tool-response', { names: functionResponses.map(item => item.name), count: functionResponses.length, elapsedMs: Date.now() - toolStartedAt });
 }async function gfcGetGeminiLiveToken() {
-  const token = localStorage.getItem('fnz_assistant_token') || '';
+  const token = await gfcAccountFreshAccessToken();
+  if (!token) throw new Error('Inicia sesión con tu cuenta Yarbi para activar Gemini Live.');
   const res = await fetch(window.gfcRuntimeApiOrigin() + '/api/assistant/live-token?protocol=v1beta', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token }
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }
   });
   const data = await res.json().catch(() => ({}));
   gfcChatDiag('live-token-response', { status: res.status, ok: res.ok });
@@ -19293,8 +19262,8 @@ function gfcGetYarbiAlertContext(preferLatest) {
 }
 
 async function gfcTryYarbiCommand(text) {
-  const token = localStorage.getItem('fnz_assistant_token') || '';
-  if (!token) { window._gfcLastAssistantCommand = { at: Date.now(), text, http: 0, status: 'token_missing', detail: 'Falta fnz_assistant_token en el dispositivo' }; return null; }
+  const token = await gfcAccountFreshAccessToken();
+  if (!token) { window._gfcLastAssistantCommand = { at: Date.now(), text, http: 0, status: 'authentication_required', detail: 'Inicia sesión en Cuenta de Yarbi.' }; return null; }
   if (gfcReadPendingAgendaProposal() && /\b(?:sí|si|agéndalo|agendalo|agenda|guárdalo|guardalo|hazlo|porfa|por favor|confirmo)\b/i.test(String(text || ''))) {
     const proposalResult = await gfcConfirmPendingAgendaProposal(text);
     if (proposalResult?.saved || proposalResult?.dismissed || proposalResult?.confirmation_required) return { reply: proposalResult.instruction || '', action: { intent: proposalResult.saved ? 'agenda_saved' : proposalResult.dismissed ? 'agenda_proposal_dismissed' : 'awaiting_confirmation', ...proposalResult } };
@@ -19331,7 +19300,7 @@ async function gfcTryYarbiCommand(text) {
   } : null;
   try {
     const response = await fetch(window.gfcRuntimeApiOrigin() + '/api/assistant/command', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({ text, phone, clientName, activeAlert, conversationFocus: commandFocus, agenda: Array.isArray(state?.agenda) ? state.agenda.slice(0, 80) : [], pendingDraft: gfcOpenAgendaFormContext(), liveMemory: typeof gfcBuildLiveMemoryContext === 'function' ? gfcBuildLiveMemoryContext() : '', localMessages: typeof gfcLocalWhatsAppMessages === 'function' ? gfcLocalWhatsAppMessages('today').messages : [] })
     });
     const data = await response.json().catch(() => ({}));
@@ -21108,12 +21077,10 @@ async function gfcUploadVisualMemory(input) {
       reader.onload = async (e) => {
         const base64 = e.target.result.split(',')[1];
         const mimeType = file.type || 'image/jpeg';
-        const apiKey = state.settings?.geminiKey || '';
-
         let aiAnalysis = 'Estándar de trabajo técnico registrado.';
-        if (apiKey) {
+        if (gfcGeminiBackendReady()) {
           try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
+            const res = await gfcSecureGeminiFetch(GEMINI_URL(), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -21413,7 +21380,7 @@ async function gfcRunAiAutoPilotFollowup(suggestionId) {
   toast('🤖 Piloto Automático IA: Analizando hilo comercial...', 'info');
 
   const threadText = gfcGetConvThreadText(phone, notif.title) || notif.text;
-  const geminiKey = localStorage.getItem('fnz_gemini_key');
+const geminiKey = gfcGeminiBackendReady();
 
   let defaultPitch = `Estimado(a) ${clientName}, le saluda el servicio técnico especializado en instalaciones de gas.\n\n` +
     `Le compartimos la evidencia y especificaciones técnicas de nuestras instalaciones:\n` +
@@ -21434,7 +21401,7 @@ REGLAS DE SEGUIMIENTO AUTOMÁTICO:
 3. Si el cliente propuso fecha, pídele confirmación final de la visita técnica.
 Responde ÚNICAMENTE con el mensaje final de WhatsApp redactado listo para enviar (sin comillas ni explicaciones).`;
 
-      const res = await fetch(GEMINI_URL(geminiKey), {
+const res = await gfcSecureGeminiFetch(GEMINI_URL(geminiKey), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
@@ -22099,7 +22066,7 @@ function gfcScheduleBackgroundAnalysis(suggestionId, phone, name) {
   });
 }
 async function gfcBackgroundAnalyzeSuggestion(suggestionId, phone, name) {
-  const geminiKey = localStorage.getItem('fnz_gemini_key') || localStorage.getItem('gfc_gemini_api_key') || state.settings?.geminiKey || state.settings?.apiKey || state.settings?.['api-key'] || localStorage.getItem('fnz_api_key') || '';
+const geminiKey = gfcGeminiBackendReady();
   if (!geminiKey) {
     console.warn('[Yarbi] Falta API Key de Gemini para análisis de fondo');
     return;
@@ -22161,7 +22128,7 @@ Responde SOLO JSON estricto:
 }`;
 
   try {
-    const res = await fetch(GEMINI_ANALYSIS_URL(geminiKey), {
+    const res = await gfcSecureGeminiFetch(GEMINI_URL(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -22894,7 +22861,7 @@ async function gfcParseMessageWithGemini(text, contactName, targetType, phoneOve
     cleanName = '';
   }
 
-  const geminiKey = localStorage.getItem('fnz_gemini_key');
+const geminiKey = gfcGeminiBackendReady();
   if (!geminiKey) {
     gfcParseMessageLocally(text, contactName, targetType, phoneOverride);
     return;
@@ -22932,7 +22899,7 @@ Responde ÚNICAMENTE con el objeto JSON crudo sin formato markdown:
 }`;
 
   try {
-    const response = await fetch(GEMINI_ANALYSIS_URL(geminiKey), {
+    const response = await gfcSecureGeminiFetch(GEMINI_URL(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -23503,251 +23470,6 @@ function mentorLoadVoices() {
   });
 }
 
-function normalizeElevenLabsModelId(modelId) {
-  const raw = String(modelId || '').trim();
-  const compact = raw.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
-  if (!raw || compact === 'v3' || compact === 'eleven_v3') return 'eleven_v3';
-  if (compact === 'eleven_v2' || compact === 'multilingual_v2' || compact === 'eleven_multilingual_v2') return 'eleven_multilingual_v2';
-  return raw;
-}
-
-function getElevenLabsConfig() {
-  if (localStorage.getItem('fnz_voice_provider') === 'eleven' && localStorage.getItem('fnz_voice_mode_v2') !== '1') {
-    localStorage.setItem('fnz_voice_provider', 'native');
-    localStorage.setItem('fnz_eleven_enabled', '0');
-    localStorage.setItem('fnz_voice_mode_v2', '1');
-  }
-  return {
-    enabled: localStorage.getItem('fnz_voice_provider') === 'eleven' || localStorage.getItem('fnz_eleven_enabled') === '1',
-    key: localStorage.getItem('fnz_eleven_key') || '',
-    voiceId: localStorage.getItem('fnz_eleven_voice_id') || '',
-    modelId: normalizeElevenLabsModelId(localStorage.getItem('fnz_eleven_model_id') || 'eleven_multilingual_v2'),
-    stability: moneyValue(localStorage.getItem('fnz_eleven_stability') || 0.42),
-    similarity: moneyValue(localStorage.getItem('fnz_eleven_similarity') || 0.82),
-    style: moneyValue(localStorage.getItem('fnz_eleven_style') || 0.18)
-  };
-}
-
-function mentorTextoParaVoz(texto) {
-  let limpio = String(texto || '')
-    .replace(/\s+/g, ' ')
-    .replace(/Escuchame bien\.?/i, 'Mira.')
-    .replace(/\*/g, '')
-    .trim();
-
-  // 1. Quitar la moneda S/ o S/. y poner soles al final del número formateado de forma leíble
-  limpio = limpio.replace(/S\/\.?\s*([\d,.]+)/gi, (match, p1) => {
-    let parts = p1.split(/[.,]/);
-    if (parts.length > 2) {
-      let decimal = parts.pop();
-      let entero = parts.join('');
-      return entero + ' punto ' + decimal + ' soles';
-    } else if (parts.length === 2) {
-      if (parts[1].length === 3) {
-        return parts[0] + parts[1] + ' soles';
-      } else {
-        return parts[0] + ' punto ' + parts[1] + ' soles';
-      }
-    }
-    return p1 + ' soles';
-  });
-
-  // 2. Reemplazar porcentaje
-  limpio = limpio.replace(/%/g, ' por ciento');
-
-  // 3. Limpiar separadores de otros números sueltos (miles y decimales)
-  limpio = limpio.replace(/(\d+)[.,](\d+)/g, (match, p1, p2) => {
-    if (p2.length === 3) {
-      return p1 + p2;
-    }
-    return p1 + ' punto ' + p2;
-  });
-
-  return limpio.length > 850 ? limpio.slice(0, 847).replace(/\s+\S*$/, '') + '...' : limpio;
-}
-
-const ELEVEN_AUDIO_CACHE_KEY = 'fnz_eleven_last_audio_cache_v1';
-
-function elevenCacheSignature(texto, cfg) {
-  const clean = mentorTextoParaVoz(texto).slice(0, 850);
-  return JSON.stringify({
-    text: clean,
-    voiceId: cfg.voiceId || '',
-    modelId: normalizeElevenLabsModelId(cfg.modelId || 'eleven_multilingual_v2'),
-    stability: String(Math.max(0, Math.min(1, cfg.stability || 0.42))),
-    similarity: String(Math.max(0, Math.min(1, cfg.similarity || 0.82))),
-    style: String(Math.max(0, Math.min(1, cfg.style || 0.18)))
-  });
-}
-
-function blobToDataUrl(blob) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const rawType = String(blob && blob.type || '').toLowerCase();
-      const type = rawType.indexOf('audio/') === 0 ? rawType : 'audio/mpeg';
-      const bytes = await blob.arrayBuffer();
-      const normalized = new Blob([bytes], { type });
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = reject;
-      reader.readAsDataURL(normalized);
-    } catch (error) { reject(error); }
-  });
-}
-
-async function playMentorAudioUrl(url, cacheUrl = false) {
-  if (window._mentorAudio) { try { window._mentorAudio.pause(); window._mentorAudio.currentTime = 0; } catch(e) {} }
-  if (window._mentorAudioUrl && window._mentorAudioUrl !== url) { try { URL.revokeObjectURL(window._mentorAudioUrl); } catch(e) {} window._mentorAudioUrl = null; }
-  const audio = document.createElement('audio');
-  audio.preload = 'auto';
-  audio.setAttribute('playsinline', 'true');
-  audio.src = String(url || '');
-  window._mentorAudio = audio;
-  window._mentorAudioUrl = cacheUrl ? null : url;
-  audio.onended = () => { if (!cacheUrl && window._mentorAudioUrl === url) { try { URL.revokeObjectURL(url); } catch(e) {} window._mentorAudioUrl = null; } };
-  await new Promise((resolve, reject) => {
-    let settled = false;
-    const finish = (error) => { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolve(); };
-    const timer = setTimeout(() => finish(new Error('El dispositivo no pudo decodificar el audio de ElevenLabs')), 9000);
-    audio.onerror = () => finish(new Error('El dispositivo no pudo reproducir el formato de audio de ElevenLabs'));
-    audio.oncanplay = () => audio.play().then(() => finish()).catch(finish);
-    try { audio.load(); } catch(error) { finish(error); }
-  });
-}
-
-function getElevenAudioCache(signature) {
-  try {
-    const cache = JSON.parse(localStorage.getItem(ELEVEN_AUDIO_CACHE_KEY) || 'null');
-    if (!cache || cache.signature !== signature || !cache.audioDataUrl) return null;
-    if (Date.now() - Number(cache.createdAt || 0) > 1000 * 60 * 60 * 24 * 7) return null;
-    return cache.audioDataUrl;
-  } catch(e) {
-    return null;
-  }
-}
-
-function setElevenAudioCache(signature, audioDataUrl) {
-  try {
-    localStorage.setItem(ELEVEN_AUDIO_CACHE_KEY, JSON.stringify({
-      signature,
-      audioDataUrl,
-      createdAt: Date.now()
-    }));
-  } catch(e) {
-    console.warn('No se pudo guardar cache de audio ElevenLabs:', e);
-  }
-}
-
-function elevenLabsErrorMessage(err) {
-  const raw = String(err && err.message ? err.message : err || '');
-  const lower = raw.toLowerCase();
-  if (raw.includes('401') || lower.includes('invalid_api_key') || lower.includes('invalid api key')) {
-    return 'ElevenLabs rechazo la API key. Revisa que este copiada completa. No uses el ID de clave.';
-  }
-  if (raw.includes('403') || lower.includes('authorization_error') || lower.includes('doesn') || lower.includes('permission')) {
-    return 'La API key existe, pero no tiene permiso para esta accion o tu plan no permite esa voz/modelo. Para diagnosticar voces activa tambien lectura de Voces/Models, o usa Probar voz con una voz permitida.';
-  }
-  if (raw.includes('400') && (lower.includes('invalid id') || lower.includes('invalid_id') || lower.includes('voice'))) {
-    return 'ElevenLabs no reconoce ese Voice ID. Copia el voice_id exacto desde la voz, no el nombre de la voz.';
-  }
-  if (lower.includes('creator tier') || lower.includes('creator plan') || lower.includes('above to use')) {
-    return 'Esa voz no esta disponible por API en tu plan. En Free, muchas voces de Explorar/Voice Library no funcionan por API. Prueba una voz base o una voz de Mis Voces permitida.';
-  }
-  if (raw.includes('429') || lower.includes('quota') || lower.includes('credits')) {
-    return 'ElevenLabs no pudo generar audio por limite de creditos o uso.';
-  }
-  if (lower.includes('failed to fetch') || lower.includes('cors')) {
-    return 'El navegador bloqueo la conexion. Si pasa en GitHub Pages, conviene usar un puente con Apps Script.';
-  }
-  return 'ElevenLabs no conecto: ' + raw.slice(0, 160);
-}
-
-async function reproducirDiscursoElevenLabs(texto, cfg = getElevenLabsConfig()) {
-  if (!cfg.enabled || !cfg.key || !cfg.voiceId) return false;
-  const clean = mentorTextoParaVoz(texto).slice(0, 850);
-  if (!clean) return false;
-  const signature = elevenCacheSignature(texto, cfg);
-  const cachedAudio = getElevenAudioCache(signature);
-  if (cachedAudio) {
-    try {
-      await playMentorAudioUrl(cachedAudio, true);
-      toast('Reproduciendo audio guardado. No se gastaron caracteres.', 'info');
-      return true;
-    } catch (error) {
-      try { localStorage.removeItem(ELEVEN_AUDIO_CACHE_KEY); } catch(e) {}
-      throw error;
-    }
-  }
-  const res = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + encodeURIComponent(cfg.voiceId) + '?output_format=mp3_44100_128', {
-    method: 'POST',
-    headers: {
-      'Accept': 'audio/mpeg',
-      'Content-Type': 'application/json',
-      'xi-api-key': cfg.key
-    },
-    body: JSON.stringify({
-      text: clean,
-      model_id: normalizeElevenLabsModelId(cfg.modelId || 'eleven_multilingual_v2'),
-      voice_settings: {
-        stability: Math.max(0, Math.min(1, cfg.stability || 0.42)),
-        similarity_boost: Math.max(0, Math.min(1, cfg.similarity || 0.82)),
-        style: Math.max(0, Math.min(1, cfg.style || 0.18)),
-        use_speaker_boost: true
-      }
-    })
-  });
-  if (!res.ok) {
-    let detail = '';
-    try { detail = await res.text(); } catch(e) {}
-    throw new Error('ElevenLabs ' + res.status + ' ' + detail.slice(0, 120));
-  }
-  const blob = await res.blob();
-  const dataUrl = await blobToDataUrl(blob);
-  if (typeof gfcChatDiag === 'function') gfcChatDiag('tts-elevenlabs-response', { contentType: String(res.headers.get('content-type') || ''), bytes: blob.size });
-  await playMentorAudioUrl(dataUrl, true);
-  setElevenAudioCache(signature, dataUrl);
-  return true;
-}
-async function reproducirDiscursoNavegador(texto) {
-  const nativeTts = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.YarbiTts;
-  if (nativeTts && typeof nativeTts.speak === 'function') {
-    try {
-      await nativeTts.speak({ text: gfcCleanTextForSpeech(texto), language: 'es-PE' });
-      return true;
-    } catch (error) {
-      if (typeof gfcChatDiag === 'function') gfcChatDiag('tts-native-error', { message: error?.message || String(error) });
-    }
-  }
-  if (!('speechSynthesis' in window)) return toast('No hay salida de audio disponible en este dispositivo', 'error');
-  const chunks = mentorChunks(texto);
-  if (!chunks.length) return;
-  const voices = await mentorLoadVoices();
-  const voice = mentorPickMaleVoice(voices);
-  const player = { cancelled: false, index: 0, chunks, voice };
-  window._mentorSpeechPlayer = player;
-
-  const speakNext = () => {
-    if (player.cancelled || player.index >= player.chunks.length) return;
-    const msg = new SpeechSynthesisUtterance(player.chunks[player.index]);
-    msg.lang = voice?.lang || 'es-PE';
-    if (voice) msg.voice = voice;
-    msg.rate = 0.96;
-    msg.pitch = 0.72;
-    msg.volume = 1;
-    msg.onend = () => {
-      player.index += 1;
-      if (!player.cancelled) setTimeout(speakNext, 80);
-    };
-    msg.onerror = () => {
-      player.index += 1;
-      if (!player.cancelled) setTimeout(speakNext, 100);
-    };
-    window.speechSynthesis.speak(msg);
-  };
-
-  speakNext();
-}
-
 function gfcCleanTextForSpeech(text) {
   let cleaned = String(text || '');
   // Conserva los emojis en el chat, pero no permite que el motor TTS lea sus
@@ -23771,22 +23493,10 @@ function gfcCleanTextForSpeech(text) {
 }
 
 async function reproducirDiscurso(texto) {
-  detenerDiscurso();
-  const textoLimpio = gfcCleanTextForSpeech(texto);
-  const cfg = getElevenLabsConfig();
-  if (cfg.enabled && cfg.key && cfg.voiceId) {
-    try {
-      toast('Generando voz natural...', 'info');
-      await reproducirDiscursoElevenLabs(textoLimpio, cfg);
-      return;
-    } catch (e) {
-      const detail = e?.message || String(e);
-      console.warn('ElevenLabs fallback:', detail);
-      gfcChatDiag('tts-elevenlabs-error', { message: detail });
-      toast(elevenLabsErrorMessage(e) + ' Usando voz del dispositivo.', 'error');
-    }
-  }
-  reproducirDiscursoNavegador(textoLimpio);
+  void texto;
+  // F01: spoken responses are owned by Gemini Live. When it is unavailable,
+  // preserve the written answer instead of selecting an alternate TTS engine.
+  return false;
 }
 
 function detenerDiscurso() {
@@ -23805,7 +23515,7 @@ function detenerDiscurso() {
 async function escucharMentorActual() {
   const cached = localStorage.getItem('fnz_ultimo_discurso_ai');
   if (cached) {
-    reproducirDiscurso(cached);
+    toast('La respuesta está disponible en texto. Para escucharla, inicia Conversación Live con Gemini.', 'info');
   } else {
     refrescarMensajeMentor(true);
   }
@@ -23816,7 +23526,7 @@ async function refrescarMensajeMentor(forzarNuevaIA = true) {
   const data = gfcBuildInputs();
   const json = window._graficosControlJson || gfcBuildPanelJson(data);
   const stateLbl = json.header.estado || 'amarillo';
-  const key = localStorage.getItem('fnz_gemini_key');
+const key = gfcGeminiBackendReady();
   const today = gfcGetDateString(new Date());
 
   const txt = document.getElementById('txt-mentor-ai');
@@ -23842,7 +23552,7 @@ Si el estado es rojo o amarillo, llámale la atención de forma directa y seria,
 IMPORTANTE: No uses negritas, viñetas, asteriscos ni formato Markdown. Escribe todo corrido en un párrafo como si se lo estuvieras diciendo en persona de forma muy hablada.`;
 
     try {
-      const res = await fetch(GEMINI_URL(key), {
+const res = await gfcSecureGeminiFetch(GEMINI_URL(key), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -24888,16 +24598,10 @@ function renderAjustes(){
   ensureLazyData('sonidos');
   const temaActual = localStorage.getItem('fnz_tema') || 'esmeralda';
   const sheetsUrl = localStorage.getItem('fnz_sheets_url') || '';
-  const gemKey = localStorage.getItem('fnz_gemini_key') || '';
-  const assistantToken = localStorage.getItem('fnz_assistant_token') || '';
-  const elevenKey = localStorage.getItem('fnz_eleven_key') || '';
-  const elevenVoice = localStorage.getItem('fnz_eleven_voice_id') || '';
-  const elevenModel = localStorage.getItem('fnz_eleven_model_id') || 'eleven_multilingual_v2';
-  const elevenEnabled = localStorage.getItem('fnz_eleven_enabled') === '1';
-  const voiceProvider = localStorage.getItem('fnz_voice_provider') || (elevenEnabled ? 'eleven' : 'native');
-  const elevenStability = localStorage.getItem('fnz_eleven_stability') || '0.42';
-  const elevenSimilarity = localStorage.getItem('fnz_eleven_similarity') || '0.82';
-  const elevenStyle = localStorage.getItem('fnz_eleven_style') || '0.18';
+  // Compatibilidad de render para instalaciones antiguas: los campos
+  // heredados quedan vacíos y nunca se leen desde almacenamiento local.
+  const elevenKey = '', elevenVoice = '', elevenModel = '', elevenEnabled = false;
+  const voiceProvider = 'gemini_live', elevenStability = '', elevenSimilarity = '', elevenStyle = '';
   const notionToken = localStorage.getItem('fnz_notion_token') || '';
   const notionDb = localStorage.getItem('fnz_notion_dbid') || '';
   const notionClientesDb = localStorage.getItem('fnz_notion_dbid_clientes') || '';
@@ -27083,7 +26787,7 @@ function renderNotas(){
   ].map(({k,lbl})=>`<button class="nh-fpill${filter===k?' active':''}" onclick="setNotaFilter('${k}')">${lbl}${counts[k]>0?` <b style="opacity:.6">${counts[k]}</b>`:''}</button>`).join('');
 
   // Gemini AI summary card
-  const gemKey=localStorage.getItem('fnz_gemini_key');
+const gemKey=gfcGeminiBackendReady();
   const aiCard = gemKey ? `
     <div class="nh-ai-card" id="nh-ai-card">
       <div class="nh-ai-icon">✨</div>
@@ -27261,13 +26965,13 @@ function renderNotaCard3(n){
 function renderNotaCard(n){ return renderNotaCard3(n); }
 
 function nhGeminiResumen(){
-  const key=localStorage.getItem('fnz_gemini_key');
+const key=gfcGeminiBackendReady();
   if(!key){toast('Configurá Gemini en Ajustes','error');return;}
   if(!state.notas||!state.notas.length){toast('No hay notas para resumir','error');return;}
   const el=document.getElementById('nh-ai-text');
   if(el)el.textContent='✨ Generando resumen...';
   const resumen=state.notas.slice(0,15).map(n=>`- ${n.titulo||'Sin título'} (${n.tipo||'texto'}): ${(n.texto||'').replace(/<[^>]+>/g,'').trim().substring(0,60)}`).join('\n');
-  fetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:`Sos un asistente personal en español de Perú. Resumí en 2-3 oraciones el estado del cuaderno de notas del usuario, destacando lo más importante:\n${resumen}`}]}],generationConfig:{temperature:0.3,maxOutputTokens:200}})})
+gfcSecureGeminiFetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:`Sos un asistente personal en español de Perú. Resumí en 2-3 oraciones el estado del cuaderno de notas del usuario, destacando lo más importante:\n${resumen}`}]}],generationConfig:{temperature:0.3,maxOutputTokens:200}})})
   .then(r=>r.json()).then(d=>{
     const txt=d?.candidates?.[0]?.content?.parts?.[0]?.text||'No se pudo generar el resumen.';
     window._nhAiSummary=txt;
@@ -27643,7 +27347,7 @@ function guardarNotaAudio(){
   cerrarGrabarAudio();
 
   // Limpiar con Gemini si hay clave
-  const geminiKey = localStorage.getItem('fnz_gemini_key');
+const geminiKey = gfcGeminiBackendReady();
   if(geminiKey) _mejorarTranscriptoIA(nota.id, txt, geminiKey);
 
   toast('🎙 Nota de voz guardada ✓');
@@ -27657,7 +27361,7 @@ Devuelve el resultado como HTML usando solo <p> y <strong> si es necesario resal
 Texto original: "${rawText}"
 Responde SOLO con el HTML limpio, sin explicaciones ni markdown.`;
   try{
-    const res = await fetch(GEMINI_URL(key),{
+const res = await gfcSecureGeminiFetch(GEMINI_URL(key),{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:500}})
     });
@@ -27677,7 +27381,7 @@ Responde SOLO con el HTML limpio, sin explicaciones ni markdown.`;
 let _chatNotaId = null;
 
 function abrirChatIA(notaId){
-  const geminiKey = localStorage.getItem('fnz_gemini_key');
+const geminiKey = gfcGeminiBackendReady();
   if(!geminiKey){
     toast('⚙ Configura tu clave Gemini en Ajustes para usar Chat IA','info');
     return;
@@ -27756,7 +27460,7 @@ function _chatIASendInput(){
 }
 
 async function chatIASend(msg){
-  const geminiKey = localStorage.getItem('fnz_gemini_key');
+const geminiKey = gfcGeminiBackendReady();
   if(!geminiKey) return;
   const n = (state.notas||[]).find(x=>x.id===_chatNotaId);
   if(!n) return;
@@ -27794,7 +27498,7 @@ Respondé de forma clara, útil y concisa. Usá viñetas cuando sea apropiado.
 Pregunta del usuario: ${msg}`;
 
   try{
-    const res = await fetch(GEMINI_URL(geminiKey),{
+const res = await gfcSecureGeminiFetch(GEMINI_URL(geminiKey),{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{role:'user',parts:[{text:fullPrompt}]}],generationConfig:{temperature:0.5,maxOutputTokens:700}})
     });
@@ -35506,7 +35210,7 @@ function pnedChangeFontSize(delta){
 }
 
 function pnedMicGemini(){
-  const geminiKey = localStorage.getItem('fnz_gemini_key');
+const geminiKey = gfcGeminiBackendReady();
   if(!geminiKey){
     toast('⚠ Configurá tu API de Gemini en Ajustes primero', 'error');
     return;
@@ -35658,7 +35362,7 @@ function pnedClose(){
 
 // ── IA Panel ──
 async function pnedIAPanel(){
-  const k=localStorage.getItem('fnz_gemini_key');
+const k=gfcGeminiBackendReady();
   if(!k){toast('Configurá tu clave Gemini en Ajustes','error');return;}
   const existing=document.getElementById('pned-ia-panel');
   if(existing){existing.remove();return;}
@@ -35681,7 +35385,7 @@ async function pnedIAPanel(){
 }
 
 async function pnedIA(action){
-  const k=localStorage.getItem('fnz_gemini_key');if(!k)return;
+const k=gfcGeminiBackendReady();if(!k)return;
   const res=document.getElementById('pned-ia-res');if(!res)return;
   res.innerHTML=`<div class="pn-ia-proc"><div class="pn-ia-dot"></div> Gemini procesando...</div>`;
   const ctx=pnedCollect().map(b=>{
@@ -35697,7 +35401,7 @@ async function pnedIA(action){
     precios:`Sumá todos los precios mencionados y mostrá el desglose:\n${ctx}`,
   };
   try{
-    const r=await fetch(GEMINI_URL(k),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompts[action]}]}],generationConfig:{temperature:0.2,maxOutputTokens:500}})});
+const r=await gfcSecureGeminiFetch(GEMINI_URL(k),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompts[action]}]}],generationConfig:{temperature:0.2,maxOutputTokens:500}})});
     const d=await r.json();
     const txt=(d?.candidates?.[0]?.content?.parts?.[0]?.text||'Sin respuesta').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
     res.innerHTML=txt;
@@ -35784,7 +35488,7 @@ async function pnMicSave(notaId){
   if(!transcript){toast('No hay texto grabado','error');return;}
   const st=document.getElementById('pn-mic-status');
   if(st)st.innerHTML=`<div class="pn-ia-proc" style="justify-content:center"><div class="pn-ia-dot"></div> Gemini organizando...</div>`;
-  const k=localStorage.getItem('fnz_gemini_key');
+const k=gfcGeminiBackendReady();
   let newBlocks=[];
   if(k){
     const prompt=`Analizá este texto dictado por voz en español peruano para una nota de finanzas.
@@ -35797,7 +35501,7 @@ Reglas:
 - Máximo 15 bloques
 Texto: "${transcript}"`;
     try{
-      const r=await fetch(GEMINI_URL(k),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:0.1,maxOutputTokens:500}})});
+const r=await gfcSecureGeminiFetch(GEMINI_URL(k),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:0.1,maxOutputTokens:500}})});
       const d=await r.json();
       const raw=(d?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```json|```/g,'').trim();
       const parsed=JSON.parse(raw);
@@ -35829,7 +35533,7 @@ Texto: "${transcript}"`;
     save('fnz_notas',state.notas);
   }
   pnMicClose();
-  toast(`✓ ${newBlocks.length} bloque${newBlocks.length!==1?'s':''} agregados${localStorage.getItem('fnz_gemini_key')?' con IA':''}`);
+toast(`✓ ${newBlocks.length} bloque${newBlocks.length!==1?'s':''} agregados${gfcGeminiBackendReady()?' con IA':''}`);
   render();
 }
 
@@ -39138,7 +38842,7 @@ async function _cerrarListaConIA(){
     return;
   }
 
-  const geminiKey = localStorage.getItem('fnz_gemini_key');
+const geminiKey = gfcGeminiBackendReady();
 
   // Sin Gemini → guardar directo automáticamente
   if(!geminiKey){
@@ -39183,7 +38887,7 @@ Respondé SOLO con JSON válido, sin explicaciones ni markdown:
 }`;
 
   try{
-    const res = await fetch(GEMINI_URL(geminiKey),{
+const res = await gfcSecureGeminiFetch(GEMINI_URL(geminiKey),{
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         contents:[{role:'user',parts:[{text:prompt}]}],
@@ -39501,231 +39205,32 @@ function compartirListaWhatsApp(){
 
 
 function saveAssistantToken(){
-  const token = document.getElementById('assistant-token-input')?.value.trim() || '';
-  if(!token){ toast('Pega el token configurado en Vercel','error'); return; }
-  localStorage.setItem('fnz_assistant_token', token);
-  void gfcAccountVaultSync({ silent: true }).catch(error => console.warn('[YARBI VAULT TOKEN]', error));
-  toast(gfcAccountAccessToken() ? 'Token de Yarbi guardado y enviado a tu bóveda cifrada' : 'Token de Yarbi guardado en este dispositivo','success');
+  gfcRetireClientAiCredentials();
+  toast('Yarbi usa tu sesión autenticada; ya no guarda tokens de asistente en este dispositivo.', 'info');
   render();
 }
 
 function saveGeminiKey(){
-  const key = document.getElementById('gemini-key-input')?.value.trim();
-  if(!key){ toast('Pega tu API key de Gemini','error'); return; }
-  if(!key.startsWith('AIza')){ toast('La key debe empezar con AIza...','error'); return; }
-  localStorage.setItem('fnz_gemini_key', key);
-  void gfcAccountVaultSync({ silent: true }).catch(error => console.warn('[YARBI VAULT GEMINI]', error));
-  toast('✨ Gemini activado — el micrófono ahora usa IA');
+  gfcRetireClientAiCredentials();
+  toast('Gemini se configura de forma segura en el servidor. No pegues API keys en la aplicación.', 'info');
   render();
 }
 
 function testGeminiKey(){
-  const key = document.getElementById('gemini-key-input')?.value.trim() || localStorage.getItem('fnz_gemini_key')||'';
-  if(!key){ toast('Primero pega tu API key','error'); return; }
-  const btn = document.querySelector('[onclick="testGeminiKey()"]');
-  if(btn){ btn.textContent = '⏳ Probando...'; btn.disabled = true; }
-
-  // ★ Test específico: simular extracción de agenda
-  const testPrompt = 'Respondé SOLO con este JSON exacto (sin cambios): {"ok":true,"modelo":"gemini","fecha":"2025-01-01","cliente":"Luis","servicio":"Punto Adicional","precio":400}';
-
-  callGemini(testPrompt, key).then(r=>{
-    if(btn){ btn.textContent = 'Probar'; btn.disabled = false; }
-    if(r){
-      // Intentar parsear para ver si devuelve JSON válido
-      try{
-        const parsed = JSON.parse(r.replace(/```json|```/g,'').trim());
-        if(parsed.ok && parsed.cliente){
-          toast('✓ Gemini activo — extrae datos correctamente ✨');
-        } else {
-          toast('✓ Gemini conectado pero revisar el formato de respuesta');
-        }
-      } catch(e){
-        // Respuesta en texto — Gemini está activo pero responde diferente
-        toast('✓ Gemini conectado — respondió: '+r.substring(0,40));
-      }
-    } else {
-      toast('⚠ Gemini no respondió — verificá tu API key en aistudio.google.com','error');
-    }
-  }).catch(()=>{
-    if(btn){ btn.textContent = 'Probar'; btn.disabled = false; }
-    toast('⚠ Error de conexión con Gemini','error');
-  });
+  gfcRetireClientAiCredentials();
+  if (typeof gfcTestGeminiConnection === 'function') return gfcTestGeminiConnection();
+  toast('La comprobación segura de Gemini no está disponible en esta pantalla.', 'info');
 }
 
-function saveElevenLabsSettings(){
-  const key = document.getElementById('eleven-key-input')?.value.trim() || '';
-  const voiceId = document.getElementById('eleven-voice-input')?.value.trim() || '';
-  const modelId = normalizeElevenLabsModelId(document.getElementById('eleven-model-input')?.value.trim() || 'eleven_multilingual_v2');
-  const provider = document.getElementById('voice-provider-input')?.value || 'native';
-  const enabled = provider === 'eleven';
-  const stability = moneyValue(document.getElementById('eleven-stability-input')?.value || 0.42);
-  const similarity = moneyValue(document.getElementById('eleven-similarity-input')?.value || 0.82);
-  const style = moneyValue(document.getElementById('eleven-style-input')?.value || 0.18);
-  if(enabled && (!key || !voiceId)) return toast('Para activar ElevenLabs necesitas API key y Voice ID', 'error');
-  localStorage.setItem('fnz_eleven_enabled', enabled ? '1' : '0');
-  localStorage.setItem('fnz_voice_provider', provider);
-  localStorage.setItem('fnz_eleven_key', key);
-  localStorage.setItem('fnz_eleven_voice_id', voiceId);
-  localStorage.setItem('fnz_eleven_model_id', modelId);
-  localStorage.setItem('fnz_eleven_stability', String(stability || 0.42));
-  localStorage.setItem('fnz_eleven_similarity', String(similarity || 0.82));
-  localStorage.setItem('fnz_eleven_style', String(style || 0.18));
-  void gfcAccountSettingsSync().catch(error => console.warn('[YARBI SETTINGS ELEVEN]', error));
-  void gfcAccountVaultSync({ silent: true }).catch(error => console.warn('[YARBI VAULT ELEVEN]', error));
-  toast(enabled ? 'ElevenLabs activado para el mentor' : 'ElevenLabs guardado pero desactivado');
-  render();
-}
-
-async function testElevenLabsSafeVoice(){
-  const key = document.getElementById('eleven-key-input')?.value.trim() || localStorage.getItem('fnz_eleven_key') || '';
-  if(!key) return toast('Pega API key primero', 'error');
-  const prev = {
-    enabled: localStorage.getItem('fnz_eleven_enabled'),
-    key: localStorage.getItem('fnz_eleven_key'),
-    voiceId: localStorage.getItem('fnz_eleven_voice_id'),
-    modelId: localStorage.getItem('fnz_eleven_model_id')
-  };
-  localStorage.setItem('fnz_eleven_enabled','1');
-  localStorage.setItem('fnz_eleven_key', key);
-  localStorage.setItem('fnz_eleven_voice_id', '21m00Tcm4TlvDq8ikWAM');
-  localStorage.setItem('fnz_eleven_model_id', 'eleven_multilingual_v2');
-  try{
-    await reproducirDiscursoElevenLabs('Prueba correcta. Tu API key funciona con una voz base de ElevenLabs.');
-    toast('API key correcta. Si tu voz no funciona, esa voz no esta habilitada para API en tu plan.');
-  }catch(e){
-    console.error(e);
-    toast(elevenLabsErrorMessage(e), 'error');
-  }finally{
-    if(prev.enabled === null) localStorage.removeItem('fnz_eleven_enabled'); else localStorage.setItem('fnz_eleven_enabled', prev.enabled);
-    if(prev.key === null) localStorage.removeItem('fnz_eleven_key'); else localStorage.setItem('fnz_eleven_key', prev.key);
-    if(prev.voiceId === null) localStorage.removeItem('fnz_eleven_voice_id'); else localStorage.setItem('fnz_eleven_voice_id', prev.voiceId);
-    if(prev.modelId === null) localStorage.removeItem('fnz_eleven_model_id'); else localStorage.setItem('fnz_eleven_model_id', prev.modelId);
-  }
-}
-
-function elevenLabsStatus(html, type = '') {
-  const el = document.getElementById('eleven-api-status');
-  if (!el) return;
-  const color = type === 'ok' ? '#087f5b' : type === 'error' ? '#c92a2a' : '#475569';
-  const bg = type === 'ok' ? '#E6FCF5' : type === 'error' ? '#FFF5F5' : '#F8FAFC';
-  el.style.cssText = 'margin-top:10px;padding:10px 12px;border-radius:14px;border:1px solid #E2E8F0;background:' + bg + ';color:' + color + ';font-size:12px;line-height:1.45;display:grid;gap:8px';
-  el.innerHTML = html;
-}
-
-async function elevenLabsJson(path, key) {
-  const res = await fetch('https://api.elevenlabs.io/v1/' + path, {
-    method: 'GET',
-    headers: { 'Accept': 'application/json', 'xi-api-key': key }
-  });
-  const text = await res.text();
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch(e) {}
-  if (!res.ok) throw new Error('ElevenLabs ' + res.status + ' ' + (text || '').slice(0, 220));
-  return data;
-}
-
-function useElevenVoiceFromApi(voiceId, name) {
-  const voiceEl = document.getElementById('eleven-voice-input');
-  const modelEl = document.getElementById('eleven-model-input');
-  if (voiceEl) voiceEl.value = voiceId || '';
-  if (modelEl && !modelEl.value.trim()) modelEl.value = 'eleven_multilingual_v2';
-  toast('Voz seleccionada: ' + (name || voiceId || 'ElevenLabs'));
-}
-
-async function diagnoseElevenLabsApi() {
-  const key = document.getElementById('eleven-key-input')?.value.trim() || localStorage.getItem('fnz_eleven_key') || '';
-  if (!key) return toast('Pega API key primero', 'error');
-  elevenLabsStatus('Consultando ElevenLabs sin mostrar tu clave...', '');
-  try {
-    let sub = null;
-    let voicesData = null;
-    let models = [];
-    let diagNotes = [];
-    try {
-      sub = await elevenLabsJson('user/subscription', key);
-    } catch(e) {
-      diagNotes.push('La clave no permite leer suscripcion. Esto es normal si la creaste solo para texto a voz.');
-    }
-    try {
-      voicesData = await elevenLabsJson('voices', key);
-    } catch(e) {
-      diagNotes.push('La clave no permite listar voces. Para usar esta lista activa permiso de lectura de Voces/Models o pega el Voice ID manualmente.');
-      voicesData = { voices: [] };
-    }
-    try {
-      models = await elevenLabsJson('models', key);
-    } catch(e) {
-      diagNotes.push('La clave no permite listar modelos. Puedes usar eleven_multilingual_v2 para probar.');
-      models = [];
-    }
-    const voices = Array.isArray(voicesData?.voices) ? voicesData.voices : [];
-    const ttsModels = Array.isArray(models) ? models.filter(m => m.can_do_text_to_speech !== false) : [];
-    const tier = sub?.tier || sub?.character_limit ? (sub?.tier || 'plan activo') : 'permiso limitado';
-    const remaining = Number.isFinite(Number(sub?.character_count)) && Number.isFinite(Number(sub?.character_limit))
-      ? Math.max(0, Number(sub.character_limit) - Number(sub.character_count)).toLocaleString('es-PE') + ' caracteres restantes'
-      : 'sin lectura de creditos';
-    const voiceCards = voices.slice(0, 16).map(v => {
-      const id = npEsc(v.voice_id || '');
-      const name = npEsc(v.name || 'Voz sin nombre');
-      const category = npEsc(v.category || 'voz');
-      const labels = v.labels ? Object.values(v.labels).filter(Boolean).slice(0, 3).map(npEsc).join(' · ') : '';
-      return '<div style="display:grid;gap:5px;padding:9px;border:1px solid #E2E8F0;border-radius:12px;background:white">' +
-        '<b style="color:#0f172a">' + name + '</b>' +
-        '<span style="color:#64748b">' + category + (labels ? ' · ' + labels : '') + '</span>' +
-        '<code style="white-space:normal;word-break:break-all;color:#334155">' + id + '</code>' +
-        '<button class="aj-btn soft" style="justify-self:start;padding:7px 10px" onclick="useElevenVoiceFromApi(&quot;' + npEsc(v.voice_id || '') + '&quot;,&quot;' + npEsc(v.name || '') + '&quot;)">Usar esta voz</button>' +
-      '</div>';
-    }).join('');
-    const modelNames = ttsModels.slice(0, 8).map(m => '<code>' + npEsc(m.model_id || m.name || '') + '</code>').join(' ');
-    elevenLabsStatus(
-      '<b>API key conectada.</b><span>' + npEsc(tier) + ' · ' + npEsc(remaining) + '</span>' +
-      '<span><b>Modelos TTS visibles:</b> ' + (modelNames || 'no listados por permiso') + '</span>' +
-      '<span><b>Voces visibles para tu API:</b> ' + voices.length + '. Usa una de estas si aparece lista; si no, pega Voice ID manual y usa Probar voz.</span>' +
-      (diagNotes.length ? '<div style="display:grid;gap:5px;color:#92400e;background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:8px">' + diagNotes.map(npEsc).join('<br>') + '</div>' : '') +
-      '<div style="display:grid;gap:8px;margin-top:4px">' + (voiceCards || '<span>No se pudieron listar voces con los permisos actuales de esta clave.</span>') + '</div>',
-      'ok'
-    );
-  } catch(e) {
-    console.error(e);
-    elevenLabsStatus(npEsc(elevenLabsErrorMessage(e)), 'error');
-    toast(elevenLabsErrorMessage(e), 'error');
-  }
-}
-
-async function testElevenLabs(){
-  const key = document.getElementById('eleven-key-input')?.value.trim() || localStorage.getItem('fnz_eleven_key') || '';
-  const voiceId = document.getElementById('eleven-voice-input')?.value.trim() || localStorage.getItem('fnz_eleven_voice_id') || '';
-  if(!key || !voiceId) return toast('Pega API key y Voice ID primero', 'error');
-  const prev = {
-    enabled: localStorage.getItem('fnz_eleven_enabled'),
-    key: localStorage.getItem('fnz_eleven_key'),
-    voiceId: localStorage.getItem('fnz_eleven_voice_id')
-  };
-  localStorage.setItem('fnz_eleven_enabled','1');
-  localStorage.setItem('fnz_eleven_key', key);
-  localStorage.setItem('fnz_eleven_voice_id', voiceId);
-  try{
-    await reproducirDiscursoElevenLabs('Listo. La voz natural del mentor ya esta conectada.');
-    toast('ElevenLabs conectado');
-  }catch(e){
-    console.error(e);
-    toast(elevenLabsErrorMessage(e), 'error');
-    if(prev.enabled === null) localStorage.removeItem('fnz_eleven_enabled'); else localStorage.setItem('fnz_eleven_enabled', prev.enabled);
-    if(prev.key === null) localStorage.removeItem('fnz_eleven_key'); else localStorage.setItem('fnz_eleven_key', prev.key);
-    if(prev.voiceId === null) localStorage.removeItem('fnz_eleven_voice_id'); else localStorage.setItem('fnz_eleven_voice_id', prev.voiceId);
-  }
-}
-
-async function callGemini(prompt, keyOverride){
-  const key = keyOverride || localStorage.getItem('fnz_gemini_key');
-  if(!key) return null;
-  const url = GEMINI_URL(key);
+async function callGemini(prompt){
+  if(!gfcGeminiBackendReady()) return null;
+  const url = GEMINI_URL();
   const body = {
     contents:[{role:'user', parts:[{text: prompt}]}],
     generationConfig:{temperature:0.1, maxOutputTokens:600}
   };
   try{
-    const res = await fetch(url, {
+    const res = await gfcSecureGeminiFetch(url, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(body)
@@ -39803,7 +39308,7 @@ REGLAS IMPORTANTES:
     }
     return parsed;
   } catch(e){
-    console.error('Gemini parse error:', e, response);
+    console.error('Gemini parse error:', { category: 'invalid_model_json' });
     return null;
   }
 }
@@ -39944,7 +39449,7 @@ function _mostrarResumenAgendaEnMic(data, rawText, tipo){
     const h12 = h%12||12;
     return `${h12}:${mm} ${period}`;
   })() : '';
-  const hasGeminiAgenda = !!localStorage.getItem('fnz_gemini_key');
+const hasGeminiAgenda = !!gfcGeminiBackendReady();
   const agStatusHtml = hasGeminiAgenda
     ? `<div id="ag-mic-status" style="font-size:11px;color:#7C3AED;text-align:center;padding:7px;background:#F5F3FF;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:6px;animation:pulse 1.2s infinite">
       <span>✨</span> Gemini verificando datos...
@@ -40063,7 +39568,7 @@ function _agendaMicGuardarDirecto(){
 
 // ── Gemini corrige/completa el formulario de agenda después del parse local ──
 async function rellenarAgendaConGemini(text, tipoDetectado, localData){
-  const geminiKey = localStorage.getItem('fnz_gemini_key');
+const geminiKey = gfcGeminiBackendReady();
   if(!geminiKey) return;
 
   const ahora = new Date();
@@ -40095,7 +39600,7 @@ Responde obligatoriamente siguiendo esta estructura JSON (asegúrate de que sea 
 {"fecha": "YYYY-MM-DD", "hora": "HH:MM", "cliente": "nombre", "servicio": "servicio", "precio": 123, "ubicacion": "lugar", "notas": "texto"}`;
 
   try{
-    const res = await fetch(GEMINI_URL(geminiKey),{
+const res = await gfcSecureGeminiFetch(GEMINI_URL(geminiKey),{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -40319,7 +39824,7 @@ function processVoiceResult(text) {
                       parsed.cat.id !== 'ce10' && 
                       parsed.cat.id !== 'cn9';
 
-  const geminiKey = localStorage.getItem('fnz_gemini_key');
+const geminiKey = gfcGeminiBackendReady();
 
   if (isConfident || !geminiKey) {
     // Si el parse local es certero o no tenemos API Key de Gemini, mostramos la vista previa local de inmediato
@@ -40347,7 +39852,7 @@ function processVoiceResultManual(text) {
     const tipoF = p ? p.tipo : (esVis ? 'visita' : 'trabajo');
     const localData = p ? {...p, tipo: tipoF} : {tipo: tipoF};
     _mostrarResumenAgendaEnMic(localData, text, tipoF);
-    if(localStorage.getItem('fnz_gemini_key')) rellenarAgendaConGemini(text, tipoF, localData);
+if(gfcGeminiBackendReady()) rellenarAgendaConGemini(text, tipoF, localData);
     return;
   }
   const pagoLocal = parsePagoPrestamoVoz(text);
@@ -40462,16 +39967,9 @@ function speakAndListen(mensaje, campoId, onDone){
   if(micText) micText.textContent = '🤖 ' + mensaje;
   if(hint) hint.innerHTML = `<em>Di el ${campoId === 'cliente' ? 'nombre del cliente' : 'distrito'}</em>`;
 
-  // Usar síntesis de voz si está disponible
-  if('speechSynthesis' in window){
-    const utt = new SpeechSynthesisUtterance(mensaje);
-    utt.lang = 'es-PE';
-    utt.rate = 1.0;
-    utt.onend = () => startListeningForField(campoId, onDone);
-    window.speechSynthesis.speak(utt);
-  } else {
-    setTimeout(() => startListeningForField(campoId, onDone), 500);
-  }
+  // La instrucción se muestra en pantalla; la conversación hablada corresponde
+  // exclusivamente a Gemini Live y no se sustituye por un TTS del dispositivo.
+  setTimeout(() => startListeningForField(campoId, onDone), 500);
 }
 
 let _fieldListening = false;
@@ -42478,9 +41976,9 @@ function abrirEditorPlano(notaId){
   window.pExportPNG=function(){const a=document.createElement('a');a.download='plano.png';a.href=cv.toDataURL();a.click();};
 
   window.pGeminiDescribe=function(){
-    const key=localStorage.getItem('fnz_gemini_key');if(!key){toast('Configurá Gemini en Ajustes','error');return;}
+const key=gfcGeminiBackendReady();if(!key){toast('Inicia sesión para usar Gemini de forma segura','error');return;}
     const b64=cv.toDataURL('image/jpeg',0.8).split(',')[1];toast('✨ Analizando plano...');
-    fetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{inline_data:{mime_type:'image/jpeg',data:b64}},{text:'Describí este plano arquitectónico en español de Perú. Identificá habitaciones, muros dobles, puertas, ventanas y escaleras. Sé conciso (máx 3 oraciones).'}]}],generationConfig:{temperature:0.3,maxOutputTokens:300}})})
+gfcSecureGeminiFetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{inline_data:{mime_type:'image/jpeg',data:b64}},{text:'Describí este plano arquitectónico en español de Perú. Identificá habitaciones, muros dobles, puertas, ventanas y escaleras. Sé conciso (máx 3 oraciones).'}]}],generationConfig:{temperature:0.3,maxOutputTokens:300}})})
     .then(r=>r.json()).then(d=>{const txt=d?.candidates?.[0]?.content?.parts?.[0]?.text||'Sin respuesta.';toast('✨ '+txt.substring(0,100));})
     .catch(()=>toast('Error Gemini','error'));
   };
@@ -42711,12 +42209,12 @@ window.tClearCell=function(){const{selR,selC}=_tablaState;_tablaState.data[selR]
 window.tSuma=function(){const c=_tablaState.selC,r=_tablaState.selR;_tablaState.data[r][c]=`=SUMA(${tColLetter(c)}1:${tColLetter(c)}${r})`;tRenderFormulas();};
 window.tProm=function(){const c=_tablaState.selC,r=_tablaState.selR;_tablaState.data[r][c]=`=PROMEDIO(${tColLetter(c)}1:${tColLetter(c)}${r})`;tRenderFormulas();};
 window.tGeminiAnalizar=function(){
-  const key=localStorage.getItem('fnz_gemini_key');if(!key){toast('Configurá tu API key de Gemini en Ajustes','error');return;}
+const key=gfcGeminiBackendReady();if(!key){toast('Inicia sesión para usar Gemini de forma segura','error');return;}
   const filas=_tablaState.data.filter(r=>r.some(c=>c!==''));
   if(!filas.length){toast('La tabla está vacía','error');return;}
   const csv=filas.map(r=>r.join('\t')).join('\n');
   toast('✨ Analizando tabla con Gemini...');
-  fetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:`Analizá estos datos de tabla en español de Perú. Identificá patrones, totales relevantes, y dá 2-3 observaciones útiles. Datos:\n${csv}`}]}],generationConfig:{temperature:0.3,maxOutputTokens:400}})})
+gfcSecureGeminiFetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:`Analizá estos datos de tabla en español de Perú. Identificá patrones, totales relevantes, y dá 2-3 observaciones útiles. Datos:\n${csv}`}]}],generationConfig:{temperature:0.3,maxOutputTokens:400}})})
   .then(r=>r.json()).then(d=>{
     const txt=d?.candidates?.[0]?.content?.parts?.[0]?.text||'No se pudo analizar.';
     const bar=document.getElementById('tabla-gemini-bar');if(bar)bar.querySelector('span').textContent='✨ '+txt;
@@ -43823,14 +43321,13 @@ function procesarBoleta(input){
 // ── FASE 12-14: Gemini Vision para boletas ──────────────────────────
 async function analizarBoletaGemini(){
   if(!window._boletaBase64){ toast('Primero selecciona una imagen','error'); return; }
-  const geminiKey = localStorage.getItem('fnz_gemini_key')||'';
-  if(!geminiKey){ toast('Configura tu API key de Gemini en Ajustes','error'); return; }
+  if(!gfcGeminiBackendReady()){ toast('La comprensión segura de Gemini no está disponible en esta sesión','error'); return; }
 
   const btn = document.querySelector('#boleta-preview button');
   if(btn){ btn.textContent='⏳ Analizando...'; btn.disabled=true; }
 
   try {
-    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`,{
+    const resp = await gfcSecureGeminiFetch(GEMINI_URL(),{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -44898,7 +44395,7 @@ function npParseSmartInput(text,mode){
 }
 
 async function npGeminiOrganize(text,mode,local){
-  const key=localStorage.getItem('fnz_gemini_key');
+const key=gfcGeminiBackendReady();
   if(!key) return local;
   const prompt=`Eres asistente de notas para una app financiera de un negocio de gas natural en Peru. Responde solo JSON valido.
 Modo: ${mode}
@@ -44911,7 +44408,7 @@ Formato exacto:
 {"kind":"smart_list|meeting|doc","titulo":"...","listType":"compras|mercado|materiales|gastos|tareas","items":[{"texto":"...","cantidad":1,"precio":0,"total":0,"done":false,"categoria":""}],"transcript":"...","resumen":"...","acuerdos":["..."],"tareas":["..."],"gastos":["..."],"texto":"..."}
 Dictado: ${JSON.stringify(text)}`;
   try{
-    const r=await fetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:.08,maxOutputTokens:1600,responseMimeType:'application/json'}})});
+const r=await gfcSecureGeminiFetch(GEMINI_URL(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:.08,maxOutputTokens:1600,responseMimeType:'application/json'}})});
     const d=await r.json();
     const raw=(d?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```json|```/g,'').trim();
     const p=JSON.parse(raw);
@@ -45034,7 +44531,7 @@ async function npMicProcess(forceGemini){
   if(!raw){ toast('No hay texto grabado','error'); return; }
   const local=npParseSmartInput(raw,m.mode);
   const words=nrm(raw).split(/\s+/).filter(Boolean).length;
-  const hasKey=!!localStorage.getItem('fnz_gemini_key');
+const hasKey=!!gfcGeminiBackendReady();
   const needsGemini=hasKey&&(forceGemini||local.kind==='meeting'||local.confidence<.72||words>70);
   const prev=document.getElementById('np-mic-preview');
   if(prev){ prev.style.display='block'; prev.textContent=needsGemini?'Organizando con IA...':'Organizando localmente...'; }
@@ -46702,16 +46199,8 @@ function renderAjustes(){
   const open = window._ajOpen || '';
   const temaActual = localStorage.getItem('fnz_tema') || 'esmeralda';
   const sheetsUrl = localStorage.getItem('fnz_sheets_url') || '';
-  const gemKey = localStorage.getItem('fnz_gemini_key') || '';
+  const gemKey = gfcGeminiBackendReady();
   const assistantToken = localStorage.getItem('fnz_assistant_token') || '';
-  const elevenKey = localStorage.getItem('fnz_eleven_key') || '';
-  const elevenVoice = localStorage.getItem('fnz_eleven_voice_id') || '';
-  const elevenModel = localStorage.getItem('fnz_eleven_model_id') || 'eleven_multilingual_v2';
-  const elevenEnabled = localStorage.getItem('fnz_eleven_enabled') === '1';
-  const voiceProvider = localStorage.getItem('fnz_voice_provider') || (elevenEnabled ? 'eleven' : 'native');
-  const elevenStability = localStorage.getItem('fnz_eleven_stability') || '0.42';
-  const elevenSimilarity = localStorage.getItem('fnz_eleven_similarity') || '0.82';
-  const elevenStyle = localStorage.getItem('fnz_eleven_style') || '0.18';
   const notionToken = localStorage.getItem('fnz_notion_token') || '';
   const notionDb = localStorage.getItem('fnz_notion_dbid') || '';
   const notionClientesDb = localStorage.getItem('fnz_notion_dbid_clientes') || '';
@@ -46773,13 +46262,11 @@ function renderAjustes(){
          <div class="aj-row" style="margin-top:8px"><button class="aj-btn soft" onclick="notionCargarManual()">Preview Notion</button><button class="aj-btn soft" onclick="notionApiSyncStart()">Auto sync</button><button class="aj-btn soft" onclick="notionApiSyncStop()">Detener</button></div>
          <div class="aj-row" style="margin-top:8px"><button class="aj-btn" style="background:#E6FCF5;border-color:#099268;color:#099268;font-weight:800" onclick="syncNotionMirrorToSheets()">🔄 Espejo completo → Sheets</button><button class="aj-btn warn" onclick="ajArchivarGastosSueltosNotion()">Archivar gastos sueltos</button></div>
          <div style="display:grid;gap:7px;margin-top:10px"><div id="notion-api-status" class="aj-status"></div><div id="notion-load-status" class="aj-status"></div><div id="notion-import-status" class="aj-status"></div></div>`)}
-      ${sec('gemini','note','Gemini','IA para agenda, notas y reuniones.',
-        `<div class="aj-field"><label>API key</label><input id="gemini-key-input" type="password" autocomplete="off" value="${npEsc(gemKey)}" placeholder="AIza..."></div>
-         <div class="aj-row"><button class="aj-btn primary" onclick="saveGeminiKey()">Guardar</button><button class="aj-btn" onclick="testGeminiKey()">Probar</button></div>`)}
-      ${sec('asistente','note','Yarbi Copiloto','Conecta el chat seguro con Vercel y Gemini.',
-        `<div class="aj-status">Este token autoriza a tu app a usar el backend seguro. No pegues aqui tu API key de Gemini.</div>
-         <div class="aj-field"><label>Token de conexión</label><input id="assistant-token-input" type="password" value="${npEsc(assistantToken)}" placeholder="Token configurado en Vercel"></div>
-         <div class="aj-row"><button class="aj-btn primary" onclick="saveAssistantToken()">Guardar token</button><button class="aj-btn" onclick="gfcTestGeminiConnection()">Probar chat</button></div>`)}
+      ${sec('gemini','note','Gemini y voz','La IA se autoriza con tu sesión y la clave permanece en el servidor.',
+        `<div class="aj-status">No pegues ni guardes API keys o tokens de Gemini aquí. Conversación por voz usa Gemini Live con un token temporal de una sola sesión.</div>
+         <div class="aj-row"><button class="aj-btn" onclick="gfcTestGeminiConnection()">Comprobar conexión segura</button></div>`)}
+      ${sec('voz_live','mic','Voz de Yarbi','Conversación por voz con Gemini Live.',
+        `<div class="aj-status">La voz usa una sesión temporal autenticada de Gemini Live. ElevenLabs ya no está disponible ni guarda credenciales en este dispositivo.</div>`)}
       ${sec('cuenta_yarbi','user','Cuenta de Yarbi','Recupera tus preferencias después de reinstalar.',
         `<div class="aj-status">${accountUserId ? 'Cuenta activa: ' + npEsc(accountEmail) + '<br>' + npEsc(accountVaultStatus) : 'Activa tu cuenta por correo para guardar credenciales cifradas y recuperarlas después de reinstalar.'}</div>
          <div class="aj-field"><label>Correo</label><input id="yarbi-account-email" type="email" value="${npEsc(accountEmail)}" placeholder="tu-correo@ejemplo.com"></div>
@@ -46788,17 +46275,6 @@ function renderAjustes(){
          <div class="aj-row"><button class="aj-btn" onclick="gfcAccountRequestCode()">Enviar enlace mágico</button><button class="aj-btn primary" onclick="gfcAccountVerifyCode()">Activar / recuperar</button><button class="aj-btn" onclick="gfcAccountSignInPreview()">Iniciar Preview aislado</button><button class="aj-btn soft" onclick="gfcAccountLogout()">Cerrar cuenta</button></div><div class="aj-row" style="margin-top:8px"><button class="aj-btn primary" onclick="gfcAccountVaultSync().catch(error=>gfcAccountSetStatus(error?.message||'No se pudo guardar la bóveda.','error'))">Guardar credenciales cifradas</button><button class="aj-btn" onclick="gfcAccountVaultRestore().then(()=>render()).catch(error=>gfcAccountSetStatus(error?.message||'No se pudo recuperar la bóveda.','error'))">Recuperar credenciales</button></div>
          <div id="yarbi-account-status" class="aj-status">${npEsc(accountStatus)}</div>`)}
       ${sec('yarbi_instrucciones','note','Instrucciones de Yarbi','Reglas permanentes para su forma de ayudarte.', gfcOwnerInstructionSettingsHtml())}
-      ${sec('eleven','mic','ElevenLabs','Voz natural para el Mentor IA.',
-        `<div class="aj-status">Recomendado: usa esto solo en tu app local. Si publicas la app, conviene pasar la llamada por Apps Script para no exponer tu API key.</div>
-         <div class="aj-status">Si tu clave fue creada solo con De texto a voz, <b>Diagnosticar API</b> puede no listar voces/modelos por permisos. Eso no significa que la clave este mal. Para confirmar la voz usa <b>Probar voz</b>.</div>
-                  <div class="aj-field"><label>Proveedor de voz para Yarbi</label><select id="voice-provider-input" style="width:100%;padding:9px 10px;border-radius:9px;border:1.5px solid #CBD5E1;font-size:12px"><option value="native" ${voiceProvider==='native'?'selected':''}>Android TTS (respaldo, sin consumo API)</option><option value="eleven" ${voiceProvider==='eleven'?'selected':''}>ElevenLabs (voz natural y expresiva)</option></select><small style="display:block;color:#64748b;margin-top:5px;font-size:12px;line-height:1.35">Para charla continua usa el botón <b>Conversación Live</b> en el chat.</small></div>
-         <div class="aj-field"><label>API key ElevenLabs</label><input id="eleven-key-input" type="password" autocomplete="off" value="${npEsc(elevenKey)}" placeholder="sk_..."></div>
-         <div class="aj-field"><label>Voice ID</label><input id="eleven-voice-input" value="${npEsc(elevenVoice)}" placeholder="Pega el voice_id de ElevenLabs"></div>
-         <div class="aj-field"><label>Modelo</label><input id="eleven-model-input" value="${npEsc(elevenModel)}" placeholder="eleven_multilingual_v2"><small style="display:block;color:#64748b;margin-top:5px;font-size:12px;line-height:1.35">Para probar usa <b>eleven_multilingual_v2</b>. Si tu plan permite v3, puedes escribir <b>eleven_v3</b>.</small></div>
-         <div class="aj-field"><label>Naturalidad / estabilidad</label><input id="eleven-stability-input" type="number" min="0" max="1" step="0.01" value="${npEsc(elevenStability)}"></div>
-         <div class="aj-field"><label>Similitud de voz</label><input id="eleven-similarity-input" type="number" min="0" max="1" step="0.01" value="${npEsc(elevenSimilarity)}"></div>
-         <div class="aj-field"><label>Estilo expresivo</label><input id="eleven-style-input" type="number" min="0" max="1" step="0.01" value="${npEsc(elevenStyle)}"></div>
-         <div class="aj-row"><button class="aj-btn primary" onclick="saveElevenLabsSettings()">Guardar voz</button><button class="aj-btn" onclick="diagnoseElevenLabsApi()">Diagnosticar API</button><button class="aj-btn" onclick="testElevenLabs()">Probar voz</button><button class="aj-btn" onclick="testElevenLabsSafeVoice()">Probar voz base</button></div><div id="eleven-api-status"></div>`)}
       ${sec('alertas','clipboard','Alertas','Notificaciones, sonidos y recordatorios.',
         `<div class="aj-row"><button id="notif-btn" class="aj-btn" onclick="requestNotifPermission()">Activar notificaciones</button><button class="aj-btn primary" onclick="openAddReminder()">Nuevo recordatorio</button></div>
          <div style="display:grid;gap:10px;margin-top:10px"><div id="sounds-list" class="aj-listbox"></div><div id="reminders-list" class="aj-listbox"></div></div>

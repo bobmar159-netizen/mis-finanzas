@@ -41,7 +41,10 @@ function vaultEncryptionKey() {
 }
 function safeVaultSecrets(value) {
   const source = value && typeof value === 'object' ? value : {};
-  const limits = { sheetsUrl: 3000, notionToken: 800, geminiKey: 800, assistantToken: 800, elevenKey: 800 };
+  // Gemini y proveedores de voz se configuran sólo del lado servidor. Esta
+  // bóveda nunca acepta ni vuelve a entregar claves de modelos o tokens de
+  // asistente almacenados históricamente en el cliente.
+  const limits = { sheetsUrl: 3000, notionToken: 800 };
   const result = {};
   Object.entries(limits).forEach(([key, max]) => {
     if (source[key] !== undefined && source[key] !== null) result[key] = String(source[key]).trim().slice(0, max);
@@ -53,9 +56,6 @@ function vaultStatus(secrets) {
   return {
     sheets: Boolean(source.sheetsUrl),
     notion: Boolean(source.notionToken),
-    gemini: Boolean(source.geminiKey),
-    yarbi: Boolean(source.assistantToken),
-    elevenLabs: Boolean(source.elevenKey),
     count: Object.values(source).filter(Boolean).length
   };
 }
@@ -150,7 +150,7 @@ async function authenticatedSupabaseUser(req) {
 }
 function safeAccountSettings(value) {
   const source = value && typeof value === 'object' ? value : {};
-  const limits = { theme:300, voiceProvider:300, geminiLiveVoice:300, elevenVoiceId:300, elevenModel:300, elevenStability:300, elevenSimilarity:300, elevenStyle:300, notionDbId:300, notionClientsDbId:300, notionInterval:300, yarbiAutonomy:2000, yarbiClientResolutions:60000 };
+  const limits = { theme:300, geminiLiveVoice:300, notionDbId:300, notionClientsDbId:300, notionInterval:300, yarbiAutonomy:2000, yarbiClientResolutions:60000 };
   const result = {};
   Object.entries(limits).forEach(([key,max]) => {
     if (source[key] !== undefined && source[key] !== null) result[key] = String(source[key]).slice(0, max);

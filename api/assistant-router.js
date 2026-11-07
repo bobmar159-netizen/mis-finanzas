@@ -10,6 +10,7 @@ const handlers = Object.freeze({
   memory: require('../api_handlers/assistant/memory.js'),
   'crm-dossier': require('../api_handlers/assistant/crm-dossier.js'),
   'crm-search': require('../api_handlers/assistant/crm-search.js'),
+  gemini: require('../api_handlers/assistant/gemini.js'),
   'live-token': require('../api_handlers/assistant/live-token.js'),
   'owner-action': require('../api_handlers/assistant/owner-action.js'),
   'owner-inbox': require('../api_handlers/assistant/owner-inbox.js'),

@@ -1,32 +1,26 @@
 const { waitUntil } = require('@vercel/functions');
 const { errorCode, eventIdFor, hashReference, newOperationId, recordTrace, traceConfigError, traceSecret, traceVersion } = require('../../lib/yarbi-trace');
-const { validateRuntimeConfig } = require('../../lib/yarbi-runtime-config');
-const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
-const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || '';
+const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
+const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
+let SUPABASE_URL = '';
+let SUPABASE_KEY = '';
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
-const ASSISTANT_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
 const GEMINI_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 const TRACE_HMAC_KEY = process.env.YARBI_TRACE_HMAC_KEY || '';
 let traceConfigWarned = false;
 
 function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', process.env.APP_ORIGIN || '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+  if (process.env.APP_ORIGIN) res.setHeader('Access-Control-Allow-Origin', process.env.APP_ORIGIN);
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
 }
 
 function safeGeminiDetail(data, fallback) {
-  const raw = data?.error?.message || data?.error?.status || data?.error?.code || fallback || 'Gemini request failed';
-  return String(raw)
-    .replace(/AIza[0-9A-Za-z_-]+/g, '[redacted-key]')
-    .replace(/([?&]key=)[^&\s]+/gi, '$1[redacted]')
-    .slice(0, 300);
-}
-
-function authorized(req) {
-  const header = req.headers?.['x-assistant-token'] || req.headers?.authorization || '';
-  const token = String(header).replace(/^Bearer\s+/i, '').trim();
-  return Boolean(ASSISTANT_TOKEN && token && token === ASSISTANT_TOKEN);
+  // A provider message can include prompt fragments or request metadata. The
+  // public route and server logs intentionally retain only a stable category.
+  if (Number(data?.error?.code) === 429) return 'provider_rate_limited';
+  if (Number(data?.error?.code) >= 500) return 'provider_unavailable';
+  return fallback === 'empty_reply' ? 'empty_reply' : 'provider_rejected';
 }
 
 async function clientHistory(phone) {
@@ -47,10 +41,13 @@ module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
-  const runtime = validateRuntimeConfig();
+  const runtime = validateServerRouteConfig({ requirePublicAuth: true });
   if (!runtime.ok) return res.status(503).json({ error: 'configuration_invalid', code: runtime.code });
-  if (!ASSISTANT_TOKEN || !GEMINI_KEY) return res.status(503).json({ error: 'assistant_not_configured' });
-  if (!authorized(req)) return res.status(401).json({ error: 'unauthorized' });
+  if (!GEMINI_KEY) return res.status(503).json({ error: 'assistant_not_configured' });
+  const identity = await authenticatedOwnerIdentity(req, runtime);
+  if (!identity.ok) return res.status(identity.status).json({ error: identity.code });
+  SUPABASE_URL = runtime.supabaseUrl;
+  SUPABASE_KEY = runtime.supabaseKey;
 
   const traceStartedAt = new Date().toISOString();
   const traceSecretValue = traceSecret(TRACE_HMAC_KEY);
@@ -96,7 +93,7 @@ module.exports = async function handler(req, res) {
     const data = await result.json().catch(() => ({}));
     if (!result.ok) {
       const detail = safeGeminiDetail(data, `HTTP ${result.status}`);
-      console.error('[ASSISTANT GEMINI ERROR]', JSON.stringify({ status: result.status, detail }));
+      console.error('[ASSISTANT GEMINI ERROR]', JSON.stringify({ status: result.status, category: detail }));
       traceQuery({ stage: 'yarbi_query', outcome: 'failed', event_key: 'model_failed', started_at: traceStartedAt, ended_at: new Date().toISOString(), error_code: 'model_request_failed', counts: { history_messages: history.length } });
       return res.status(502).json({ error: 'gemini_error', detail });
     }
@@ -108,7 +105,7 @@ module.exports = async function handler(req, res) {
     traceQuery({ stage: 'yarbi_query', outcome: 'completed', event_key: 'completed', started_at: traceStartedAt, ended_at: new Date().toISOString(), counts: { history_messages: history.length } });
     return res.status(200).json({ reply, text: reply, model: GEMINI_CHAT_MODEL });
   } catch (error) {
-    console.error('[ASSISTANT CHAT]', error);
+    console.error('[ASSISTANT CHAT]', JSON.stringify({ category: errorCode(error) || 'request_failed' }));
     traceQuery({ stage: 'yarbi_query', outcome: 'failed', event_key: 'request_failed', started_at: traceStartedAt, ended_at: new Date().toISOString(), error_code: errorCode(error) });
     return res.status(500).json({ error: 'assistant_failed' });
   }

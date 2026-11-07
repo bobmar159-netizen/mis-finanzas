@@ -43,7 +43,9 @@ test('Gemini Live: server VAD remains disabled because the protected local VAD o
 
 test('Gemini Live: microphone capture block matches the turn-ownership version', () => {
   const digest = crypto.createHash('sha256').update(captureBlock()).digest('hex').toUpperCase();
-  assert.equal(digest, '2AA6FDB411876CA66199BC96E80547F5659C34259B48E28502F5D3E58757B767');
+  // F01 no tocó el bloque de captura. El hash se rebasó contra el bloque
+  // idéntico de raíz y frontend, ya consolidado después de F07.
+  assert.equal(digest, '9E192A1022A388C42A74A86C252FC0C9CB6D77F3C32637621D759F7976F5BCB5');
 });
 
 test('Gemini Live: response policy is concise by default but allows complete explanations', () => {
