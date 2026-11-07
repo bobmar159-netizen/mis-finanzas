@@ -11,6 +11,7 @@ const { validateRuntimeConfig } = require('../lib/yarbi-runtime-config');
 const { adaptCommercialEvidence, attachCommercialEvidence, createVerifiedWebhookEvidenceEvent } = require('../lib/yarbi-commercial-evidence');
 const { authenticateYCloudWebhook, extractYCloudInteractiveSelection } = require('../lib/yarbi-ycloud-webhook-auth');
 const { sanitizeWebhookReceipt, sanitizeWebhookIdentity, sanitizeWebhookProcessing, sanitizeExtraction } = require('../lib/yarbi-webhook-log');
+const { normalizeWhatsAppBusinessEvent } = require('../lib/yarbi-whatsapp-business');
 
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || '';
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
@@ -25,6 +26,26 @@ const GEMINI_AUDIO_MODEL = process.env.GEMINI_AUDIO_MODEL || GEMINI_ANALYSIS_MOD
 const ENABLE_LEGACY_WEBHOOK_EXTRACTION = process.env.ENABLE_LEGACY_WEBHOOK_EXTRACTION === 'true';
 const TRACE_HMAC_KEY = process.env.YARBI_TRACE_HMAC_KEY || '';
 let traceConfigWarned = false;
+
+function whatsappBusinessOperationsEnabled() {
+  return process.env.YARBI_WHATSAPP_BUSINESS_OPERATIONS_ENABLED === 'true';
+}
+
+// Delivery/read receipts are intentionally feature-gated until the proposed
+// F08 operation ledger has been reviewed and applied.  A receipt never turns
+// a provider acknowledgement into a fabricated delivery state.
+async function recordWhatsAppDeliveryReceipt({ event, runtime }) {
+  if (!whatsappBusinessOperationsEnabled()) return { status: 'disabled' };
+  if (!event?.provider_message_id || !['delivered', 'read', 'failed'].includes(event.status)) return { status: 'ignored' };
+  const terminalField = event.status === 'read' ? 'read_at' : event.status === 'delivered' ? 'delivered_at' : 'failed_at';
+  const allowed = event.status === 'read' ? 'provider_accepted,delivered' : 'provider_accepted';
+  const response = await fetch(`${runtime.supabaseUrl}/rest/v1/yarbi_whatsapp_send_operations?provider=eq.${encodeURIComponent(event.provider)}&provider_message_id=eq.${encodeURIComponent(event.provider_message_id)}&status=in.(${allowed})`, {
+    method: 'PATCH',
+    headers: { apikey: runtime.supabaseKey, Authorization: `Bearer ${runtime.supabaseKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ status: event.status, [terminalField]: new Date().toISOString(), updated_at: new Date().toISOString() })
+  });
+  return { status: response.ok ? 'recorded' : 'unavailable' };
+}
 
 // YCloud firma los bytes originales. Vercel no debe parsear el cuerpo de este
 // endpoint antes de que podamos verificar la firma.
@@ -559,6 +580,12 @@ export default async function handler(req, res) {
     try {
       const body = postBody;
       console.log('[WEBHOOK RECEIVED]', JSON.stringify(sanitizeWebhookReceipt(body)));
+
+      const businessEvent = normalizeWhatsAppBusinessEvent({ provider: ycloudAuthentication.authenticated ? 'ycloud' : 'meta_cloud', payload: body });
+      if (businessEvent.outcome === 'delivery_status') {
+        const receipt = await recordWhatsAppDeliveryReceipt({ event: businessEvent, runtime });
+        return res.status(200).json({ status: 'delivery_status_received', delivery_state: businessEvent.status || 'unknown', persisted: receipt.status === 'recorded' });
+      }
 
       // Normaliza Meta Cloud, mensajes entrantes de YCloud, historial de
       // coexistencia y mensajes enviados desde WhatsApp Business.

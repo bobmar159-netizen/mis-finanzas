@@ -5,6 +5,10 @@ try {
   // El runtime local de pruebas no necesita instalar el paquete de Vercel.
 }
 const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
+const { active: previewOwnerUiActive, configuration: previewOwnerUiConfiguration } = require('../../lib/preview-owner-ui-policy');
+const { authenticatedOwnerIdentity, authenticatedPreviewOwner } = require('../../lib/yarbi-owner-ui-auth');
+const { createSendAuthorization, verifySendAuthorization } = require('../../lib/yarbi-whatsapp-send-authorization');
+const { createSupabaseWhatsAppSendOperationStore } = require('../../lib/yarbi-whatsapp-send-operations');
 
 let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
@@ -33,6 +37,28 @@ function authorized(req) {
   const header = req.headers?.['x-assistant-token'] || req.headers?.authorization || '';
   const token = String(header).replace(/^Bearer\s+/i, '').trim();
   return Boolean(ASSISTANT_TOKEN && token && token === ASSISTANT_TOKEN);
+}
+
+function authorizationSecret() { return String(process.env.YARBI_WHATSAPP_SEND_AUTHORIZATION_SECRET || ''); }
+function authorizationsEnabled() { return String(process.env.YARBI_WHATSAPP_SEND_AUTHORIZATIONS_ENABLED || '').toLowerCase() === 'true'; }
+function parseBody(req) { return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); }
+function runtimeConfiguration() {
+  if (previewOwnerUiActive(process.env)) {
+    const state = previewOwnerUiConfiguration(process.env);
+    if (!state.valid || !state.config) return { ok: false, code: state.code || 'owner_ui_preview_not_configured' };
+    return { ok: true, supabaseUrl: state.config.supabaseUrl, supabaseKey: state.config.supabaseKey, processorUrl: '', previewOwnerUi: true, ownerAccountId: state.config.ownerAccountId };
+  }
+  return { ...validateServerRouteConfig({ optionalProcessor: true }), previewOwnerUi: false };
+}
+async function authenticatedSender(req, runtime) {
+  const config = { supabaseUrl: runtime.supabaseUrl, supabaseKey: runtime.supabaseKey };
+  return runtime.previewOwnerUi
+    ? authenticatedPreviewOwner(req, { ...config, ownerAccountId: runtime.ownerAccountId })
+    : authenticatedOwnerIdentity(req, config);
+}
+function selectedProvider(body) {
+  const value = String(body?.provider || '').trim().toLowerCase();
+  return value === 'ycloud' || value === 'meta_cloud' ? value : '';
 }
 
 function cleanPhone(value) {
@@ -159,10 +185,10 @@ async function sendWithMeta(to, type, message, mediaUrl) {
   if (!messageId) {
     throw providerError('meta_send_unverified', 'Meta aceptó la petición pero no devolvió un identificador de WhatsApp verificable.', response.status);
   }
-  return { provider: 'meta', messageId };
+  return { provider: 'meta_cloud', messageId };
 }
 
-async function rememberOutbound(messageId, to, type, message) {
+async function rememberOutbound(messageId, to, type, message, { operationId, provider } = {}) {
   if (!SUPABASE_KEY || !messageId) return 'not_configured';
   const saved = await fetch(SUPABASE_URL + '/rest/v1/whatsapp_messages', {
     method: 'POST',
@@ -179,7 +205,7 @@ async function rememberOutbound(messageId, to, type, message) {
       text: message || `[${type} enviado por Yarbi]`,
       app_name: 'YCloud WhatsApp Business',
       timestamp: Date.now(),
-      metadata: { direction: 'outgoing', source: 'assistant_api', status: 'accepted_by_provider' }
+      metadata: { direction: 'outgoing', source: 'assistant_api', status: 'accepted_by_provider', operation_id: operationId || null, provider: provider || null }
     }])
   });
   if (!saved.ok) throw new Error('Supabase HTTP ' + saved.status);
@@ -198,22 +224,21 @@ module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
-  if (!authorized(req)) return res.status(401).json({ error: 'unauthorized' });
-  const runtime = validateServerRouteConfig({ optionalProcessor: true });
+  const runtime = runtimeConfiguration();
   if (!runtime.ok) return res.status(503).json({ error: 'configuration_invalid', code: runtime.code });
   SUPABASE_URL = runtime.supabaseUrl;
   SUPABASE_KEY = runtime.supabaseKey;
   AI_PROCESSOR_URL = runtime.processorUrl;
-  if (!YCLOUD_API_KEY && !(META_ACCESS_TOKEN && META_PHONE_ID)) {
-    return res.status(503).json({
-      error: 'whatsapp_not_configured',
-      detail: 'Falta configurar YCloud o Meta para el envio de WhatsApp.'
-    });
-  }
+  let claimedStore = null;
+  let claimedOperationId = '';
 
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    if (body.confirmed !== true) return res.status(409).json({ error: 'explicit_confirmation_required' });
+    const body = parseBody(req);
+    if (!authorizationsEnabled() || authorizationSecret().trim().length < 32) return res.status(503).json({ error: 'whatsapp_send_authorization_not_configured' });
+
+    const authenticated = await authenticatedSender(req, runtime);
+    if (!authenticated.ok) return res.status(authenticated.status || 401).json({ error: authenticated.code || 'whatsapp_send_unauthorized' });
+    const ownerId = authenticated.user.id;
 
     const to = internationalPhone(body.to || body.phone);
     const message = String(body.message || '').trim().slice(0, 4096);
@@ -227,13 +252,47 @@ module.exports = async function handler(req, res) {
     if (!message && !mediaUrl) return res.status(400).json({ error: 'message_or_media_required' });
     if (mediaUrl && !mediaType) return res.status(400).json({ error: 'media_type_invalid' });
 
-    const sent = YCLOUD_API_KEY
+    const provider = selectedProvider(body);
+    if (!provider) return res.status(400).json({ error: 'whatsapp_provider_required' });
+    const store = createSupabaseWhatsAppSendOperationStore({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY });
+
+    // The first call creates a signed, expiring authorization.  It cannot
+    // reach a provider, which keeps review/approval separate from sending.
+    if (String(body.action || '').toLowerCase() === 'request_authorization') {
+      const created = createSendAuthorization({ secret: authorizationSecret(), ownerId, provider, to, type, message, mediaUrl });
+      if (!created.ok) return res.status(400).json({ error: created.code });
+      const stored = await store.request({ operation_id: created.authorization.operation_id, owner_account_id: ownerId, provider, recipient_fingerprint: created.authorization.recipient_fingerprint, content_fingerprint: created.authorization.content_fingerprint, authorization_fingerprint: created.token ? require('node:crypto').createHmac('sha256', authorizationSecret()).update(`authorization:${created.token}`).digest('hex') : '', expires_at: new Date(created.authorization.expires_at).toISOString(), status: 'requested' });
+      if (!stored.ok) return res.status(503).json({ error: stored.code });
+      return res.status(200).json({ ok: true, outcome: 'authorization_requested', execute: false, provider, operation_id: created.authorization.operation_id, expires_at: new Date(created.authorization.expires_at).toISOString(), send_authorization: created.token });
+    }
+
+    const checked = verifySendAuthorization({ token: body.send_authorization, secret: authorizationSecret(), ownerId, provider, to, type, message, mediaUrl });
+    if (!checked.ok) return res.status(409).json({ error: checked.code });
+    const claimed = await store.claim({ operationId: checked.authorization.operation_id, ownerId, provider, recipientFingerprint: checked.authorization.recipient_fingerprint, contentFingerprint: checked.authorization.content_fingerprint, authorizationFingerprint: checked.token_fingerprint });
+    if (!claimed.ok) return res.status(409).json({ error: claimed.code });
+    claimedStore = store;
+    claimedOperationId = checked.authorization.operation_id;
+
+    if ((provider === 'ycloud' && !YCLOUD_API_KEY) || (provider === 'meta_cloud' && !(META_ACCESS_TOKEN && META_PHONE_ID))) {
+      // Claiming is intentionally not retriable automatically: a later
+      // operator must make a fresh, explicit authorization after configuration
+      // is fixed, preventing accidental duplicate sends.
+      await store.uncertain({ operationId: checked.authorization.operation_id });
+      return res.status(503).json({ error: 'whatsapp_provider_not_configured', provider });
+    }
+
+    const sent = provider === 'ycloud'
       ? await sendWithYCloud(to, type, message, mediaUrl)
       : await sendWithMeta(to, type, message, mediaUrl);
 
+    const accepted = await store.accepted({ operationId: checked.authorization.operation_id, providerMessageId: sent.messageId });
+    if (!accepted.ok) return res.status(502).json({ error: accepted.code || 'whatsapp_send_accept_record_failed' });
+    claimedStore = null;
+    claimedOperationId = '';
+
     let syncStatus = 'not_configured';
     try {
-      syncStatus = await rememberOutbound(sent.messageId, to, type, message);
+      syncStatus = await rememberOutbound(sent.messageId, to, type, message, { operationId: checked.authorization.operation_id, provider: sent.provider });
     } catch (error) {
       syncStatus = 'failed';
       console.error('[WHATSAPP OUTBOUND SYNC]', error.message);
@@ -244,12 +303,18 @@ module.exports = async function handler(req, res) {
       accepted: true,
       deliveryConfirmed: false,
       provider: sent.provider,
+      operationId: checked.authorization.operation_id,
       messageId: sent.messageId,
       to: cleanPhone(to),
       type,
       syncStatus
     });
   } catch (error) {
+    if (claimedStore && claimedOperationId) {
+      // A timeout or ambiguous provider error must not be retried automatically:
+      // the provider may already have accepted the message.
+      await claimedStore.uncertain({ operationId: claimedOperationId }).catch(() => null);
+    }
     console.error('[WHATSAPP SEND]', error.code || error.message, error.providerStatus || '');
     return res.status(502).json({
       error: error.code || 'whatsapp_send_failed',
