@@ -1,27 +1,23 @@
 const crypto = require('crypto');
 const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
+const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
+const { blockedOwnerInput } = require('../../lib/yarbi-authenticated-route');
 
 let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
-const ASSISTANT_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '';
 const AUDIT_TEST_ENABLED = String(process.env.AUDIT_TEST || '').trim().toLowerCase() === 'true';
 const YARBI_VAULT_KEY = process.env.YARBI_VAULT_KEY || '';
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', process.env.APP_ORIGIN || '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 }
-function tokenFrom(req) {
-  return String(req.headers?.['x-assistant-token'] || req.headers?.authorization || '').replace(/^Bearer\s+/i, '').trim();
-}
-function authorized(req) {
-  const token = tokenFrom(req);
-  return Boolean(ASSISTANT_TOKEN && token && token === ASSISTANT_TOKEN);
-}
-function ownerKey(req) {
-  return crypto.createHash('sha256').update(tokenFrom(req)).digest('hex');
+function ownerKey(identity) {
+  // No deriva la pertenencia de un token compartido ni acepta un owner del
+  // cliente. El hash estable permite conservar el contrato legacy owner_key.
+  return crypto.createHash('sha256').update('yarbi-owner-v1:' + String(identity?.user?.id || '')).digest('hex');
 }
 async function supabase(path, options = {}) {
   const response = await fetch(SUPABASE_URL + path, {
@@ -622,7 +618,7 @@ async function handleAgentLedger(req, res) {
 module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
-  const runtime = validateServerRouteConfig();
+  const runtime = validateServerRouteConfig({ requirePublicAuth: true });
   if (!runtime.ok) return responseError(res, 503, 'configuration_invalid', runtime.code);
   SUPABASE_URL = runtime.supabaseUrl;
   SUPABASE_KEY = runtime.supabaseKey;
@@ -660,8 +656,11 @@ module.exports = async function handler(req, res) {
     }
   }
   if (!['GET', 'POST'].includes(req.method)) return responseError(res, 405, 'Método no permitido');
-  if (!authorized(req)) return responseError(res, 401, 'No autorizado');
-  const owner = ownerKey(req);
+  const bodyForScope = req.method === 'POST' && typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  if (blockedOwnerInput(bodyForScope)) return responseError(res, 400, 'owner_scope_client_input_forbidden');
+  const authenticated = await authenticatedOwnerIdentity(req, runtime);
+  if (!authenticated.ok) return responseError(res, authenticated.status, authenticated.code);
+  const owner = ownerKey(authenticated);
   if (action === 'agent') {
     try { return await handleAgentLedger(req, res); } catch (error) {
       console.error('[YARBI AGENT LEDGER]', error.code || error.message);

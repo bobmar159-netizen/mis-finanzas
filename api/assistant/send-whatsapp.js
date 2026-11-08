@@ -13,7 +13,9 @@ const { createSupabaseWhatsAppSendOperationStore } = require('../../lib/yarbi-wh
 let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
 let AI_PROCESSOR_URL = '';
-const ASSISTANT_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
+// Se usa sólo para despertar el procesador después de una aceptación ya
+// autorizada. La ruta HTTP pública autentica al dueño mediante Supabase Auth.
+const INTERNAL_PROCESSOR_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
 
 const YCLOUD_API_KEY = process.env.YCLOUD_API_KEY || process.env.YCLOUD_KEY || '';
 const YCLOUD_FROM = process.env.YCLOUD_WHATSAPP_NUMBER
@@ -29,14 +31,8 @@ let cachedYCloudFrom = '';
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', process.env.APP_ORIGIN || '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-}
-
-function authorized(req) {
-  const header = req.headers?.['x-assistant-token'] || req.headers?.authorization || '';
-  const token = String(header).replace(/^Bearer\s+/i, '').trim();
-  return Boolean(ASSISTANT_TOKEN && token && token === ASSISTANT_TOKEN);
 }
 
 function authorizationSecret() { return String(process.env.YARBI_WHATSAPP_SEND_AUTHORIZATION_SECRET || ''); }
@@ -213,7 +209,7 @@ async function rememberOutbound(messageId, to, type, message, { operationId, pro
   if (AI_PROCESSOR_URL) {
     waitUntil(fetch(AI_PROCESSOR_URL + '/api/ai/process', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': ASSISTANT_TOKEN },
+      headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': INTERNAL_PROCESSOR_TOKEN },
       body: JSON.stringify({ limit: 3, requested_by: 'assistant-send', trigger_message_id: messageId })
     }).catch(error => console.warn('[WHATSAPP OUTBOUND AI]', error.message)));
   }

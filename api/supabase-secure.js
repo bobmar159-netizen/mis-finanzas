@@ -1,12 +1,27 @@
 const { validateServerRouteConfig } = require('../lib/yarbi-runtime-config');
+const { authenticateScopedOwner, blockedOwnerInput, scopedContact } = require('../lib/yarbi-authenticated-route');
 let SUPABASE_URL = '';
 let SUPABASE_SECRET_KEY = ''; // Configurado únicamente por el entorno validado.
+
+async function supabaseRequest(path, options = {}) {
+  const response = await fetch(SUPABASE_URL + path, {
+    ...options,
+    headers: { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}`, ...(options.headers || {}) }
+  });
+  return { response, data: await response.json().catch(() => []) };
+}
+
+async function assertScopedMessages(ids, scope) {
+  const rows = await supabaseRequest('/rest/v1/whatsapp_messages?id=in.(' + ids.map(encodeURIComponent).join(',') + ')&select=id,contact_id');
+  if (!rows.response.ok || !Array.isArray(rows.data) || rows.data.length !== ids.length) return false;
+  return rows.data.every(row => scopedContact(scope, row.contact_id));
+}
 
 export default async function handler(req, res) {
   // Configurar cabeceras CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -16,15 +31,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
-  const header = req.headers?.['x-assistant-token'] || req.headers?.authorization || '';
-  const token = String(header).replace(/^Bearer\s+/i, '').trim();
-  const expected = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
-  if (!expected || token !== expected) return res.status(401).json({ error: 'No autorizado' });
-
-  const runtime = validateServerRouteConfig();
+  const runtime = validateServerRouteConfig({ requirePublicAuth: true });
   if (!runtime.ok) return res.status(503).json({ error: 'configuration_invalid', code: runtime.code });
   SUPABASE_URL = runtime.supabaseUrl;
   SUPABASE_SECRET_KEY = runtime.supabaseKey;
+
+  const access = await authenticateScopedOwner(req, runtime, supabaseRequest);
+  if (!access.ok) return res.status(access.status).json({ error: access.code });
 
   const { action } = req.query;
 
@@ -34,14 +47,12 @@ export default async function handler(req, res) {
     if (!payload) {
       return res.status(400).json({ error: 'Falta el cuerpo de la petición' });
     }
+    if (blockedOwnerInput(payload)) return res.status(400).json({ error: 'owner_scope_client_input_forbidden' });
 
     if (action === 'delete' || action === 'restore') {
-      const header = req.headers?.['x-assistant-token'] || req.headers?.authorization || '';
-      const token = String(header).replace(/^Bearer\s+/i, '').trim();
-      const expected = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
       const ids = Array.isArray(payload.ids) ? payload.ids.map(value => String(value || '').trim()).filter(value => /^[A-Za-z0-9_-]+$/.test(value)).slice(0, 500) : [];
-      if (!expected || token !== expected) return res.status(401).json({ error: 'No autorizado' });
       if (!ids.length) return res.status(400).json({ error: 'No hay IDs válidos' });
+      if (!(await assertScopedMessages(ids, access.scope))) return res.status(403).json({ error: 'owner_scope_forbidden' });
       const query = ids.join(',');
       const restoring = action === 'restore';
       const stateFilter = restoring ? 'deleted_at=not.is.null' : 'deleted_at=is.null';
@@ -66,6 +77,9 @@ export default async function handler(req, res) {
       });
     } else if (action === 'import' || action === 'rules' || action === 'visual') {
       const items = Array.isArray(payload) ? payload : [payload];
+      if (!items.length || !items.every(item => scopedContact(access.scope, item?.contact_id))) {
+        return res.status(403).json({ error: 'owner_scope_forbidden' });
+      }
 
       // Insertar en la tabla de Supabase usando la clave secreta segura
       const supaRes = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_messages`, {

@@ -1,12 +1,7 @@
 const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
+const { authenticateScopedOwner, blockedOwnerInput, scopedContact, scopedFilter } = require('../../lib/yarbi-authenticated-route');
 let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
-const ASSISTANT_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
-
-function bearer(req) {
-  const value = req.headers?.['x-assistant-token'] || req.headers?.authorization || '';
-  return String(value).replace(/^Bearer\s+/i, '').trim();
-}
 
 async function supabaseRequest(path, options = {}) {
   const response = await fetch(SUPABASE_URL + path, {
@@ -118,28 +113,33 @@ async function syncCanonicalCollectionContext({ event, agendaEventId, row }) {
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (!['GET', 'POST'].includes(req.method)) return res.status(405).json({ error: 'Método no permitido' });
-  if (!ASSISTANT_TOKEN || bearer(req) !== ASSISTANT_TOKEN) return res.status(401).json({ error: 'No autorizado' });
-  const runtime = validateServerRouteConfig();
+  const runtime = validateServerRouteConfig({ requirePublicAuth: true });
   if (!runtime.ok) return res.status(503).json({ error: 'configuration_invalid', code: runtime.code });
   SUPABASE_URL = runtime.supabaseUrl;
   SUPABASE_KEY = runtime.supabaseKey;
 
   try {
+    const source = req.method === 'POST' && typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.method === 'POST' ? (req.body || {}) : (req.query || {}));
+    if (blockedOwnerInput(source)) return res.status(400).json({ error: 'owner_scope_client_input_forbidden' });
+    const access = await authenticateScopedOwner(req, runtime, supabaseRequest);
+    if (!access.ok) return res.status(access.status).json({ error: access.code });
+    const scopeFilter = scopedFilter(access.scope);
+    if (!scopeFilter) return res.status(200).json({ ok: true, receivables: [] });
     if (req.method === 'GET') {
       const limit = Math.min(Math.max(Number(req.query?.limit || 30), 1), 100);
       const agendaId = Number(req.query?.agenda_event_id);
       const filter = Number.isInteger(agendaId) && agendaId > 0
-        ? '?agenda_event_id=eq.' + encodeURIComponent(String(agendaId))
-        : '?status=neq.paid&order=updated_at.desc&limit=' + limit;
+        ? '?agenda_event_id=eq.' + encodeURIComponent(String(agendaId)) + '&contact_id=' + scopeFilter
+        : '?contact_id=' + scopeFilter + '&status=neq.paid&order=updated_at.desc&limit=' + limit;
       const read = await supabaseRequest('/rest/v1/yarbi_receivables' + filter + '&select=*');
       if (!read.response.ok) throw new Error('No se pudieron consultar los saldos');
       return res.status(200).json({ ok: true, receivables: Array.isArray(read.data) ? read.data : [] });
     }
 
-    const body = req.body || {};
+    const body = source;
     const agendaEventId = Number(body.agenda_event_id);
     const agreedAmount = money(body.agreed_amount);
     const balanceAmount = money(body.balance_amount);
@@ -152,6 +152,7 @@ module.exports = async function handler(req, res) {
     if (!eventRead.response.ok || !event?.id) return res.status(404).json({ error: 'Evento de agenda no encontrado' });
     if (event.status !== 'completed') return res.status(409).json({ error: 'El trabajo todavía no está confirmado como realizado' });
     if (!event.contact_id) return res.status(409).json({ error: 'El evento no tiene un contacto canónico para actualizar CRM y memoria' });
+    if (!scopedContact(access.scope, event.contact_id)) return res.status(403).json({ error: 'owner_scope_forbidden' });
 
     const paidAmount = money(agreedAmount - balanceAmount);
     const status = balanceAmount === 0 ? 'paid' : paidAmount > 0 ? 'partial' : 'unpaid';

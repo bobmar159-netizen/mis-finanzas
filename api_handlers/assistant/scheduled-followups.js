@@ -1,23 +1,21 @@
 const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
+const { authenticateScopedOwner, blockedOwnerInput, scopedFilter } = require('../../lib/yarbi-authenticated-route');
 let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
-const ASSISTANT_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
+// Secreto estrictamente interno entre el cron/planificador y el procesador.
+// No autentica navegadores ni rutas interactivas.
+const INTERNAL_PROCESSOR_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
 const CRON_SECRET = process.env.CRON_SECRET || '';
 let BASE_URL = '';
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', process.env.APP_ORIGIN || '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 }
 
 function tokenFrom(req) {
   return String(req.headers?.['x-assistant-token'] || req.headers?.authorization || '').replace(/^Bearer\s+/i, '').trim();
-}
-
-function assistantAuthorized(req) {
-  const token = tokenFrom(req);
-  return Boolean(ASSISTANT_TOKEN && token && token === ASSISTANT_TOKEN);
 }
 
 function cronAuthorized(req) {
@@ -67,7 +65,7 @@ async function claimScheduled(id) {
 async function dispatchOne(row) {
   const response = await fetch(BASE_URL + '/api/assistant/send-whatsapp', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': ASSISTANT_TOKEN },
+    headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': INTERNAL_PROCESSOR_TOKEN },
     body: JSON.stringify({ to: row.recipient_phone, message: row.message, confirmed: true })
   });
   const data = await response.json().catch(() => ({}));
@@ -98,6 +96,15 @@ async function dispatchDue(limit = 12) {
   return result;
 }
 
+async function recipientBelongsToScope(phone, scope) {
+  const filter = scopedFilter(scope);
+  if (!filter) return false;
+  const rows = await supabaseJson('/rest/v1/contact_identifiers?identifier_type=eq.phone&normalized_value=eq.' + encodeURIComponent(phone) + '&contact_id=' + filter + '&select=contact_id&limit=1', {
+    headers: supabaseHeaders()
+  });
+  return Array.isArray(rows) && rows.length === 1;
+}
+
 module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -115,17 +122,23 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
-  if (!assistantAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  const runtime = validateServerRouteConfig();
+  const runtime = validateServerRouteConfig({ requirePublicAuth: true });
   if (!runtime.ok) return res.status(503).json({ ok: false, error: 'configuration_invalid', code: runtime.code });
   SUPABASE_URL = runtime.supabaseUrl;
   SUPABASE_KEY = runtime.supabaseKey;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    if (blockedOwnerInput(body)) return res.status(400).json({ ok: false, error: 'owner_scope_client_input_forbidden' });
+    const access = await authenticateScopedOwner(req, runtime, async (path, options = {}) => {
+      const response = await fetch(SUPABASE_URL + path, { ...options, headers: supabaseHeaders(options.headers || {}) });
+      return { response, data: await response.json().catch(() => []) };
+    });
+    if (!access.ok) return res.status(access.status).json({ ok: false, error: access.code });
     const phone = cleanPhone(body.to || body.phone);
     const message = String(body.message || '').trim().slice(0, 4096);
     const scheduledFor = new Date(String(body.scheduled_for || body.scheduledFor || ''));
     if (!/^\d{8,15}$/.test(phone)) return res.status(400).json({ ok: false, error: 'recipient_invalid' });
+    if (!(await recipientBelongsToScope(phone, access.scope))) return res.status(403).json({ ok: false, error: 'owner_scope_forbidden' });
     if (message.length < 5) return res.status(400).json({ ok: false, error: 'message_invalid' });
     if (Number.isNaN(scheduledFor.getTime()) || scheduledFor.getTime() < Date.now() + 30 * 1000) return res.status(400).json({ ok: false, error: 'scheduled_time_invalid', detail: 'El envío debe programarse al menos 30 segundos en el futuro.' });
     const rows = await supabaseJson('/rest/v1/yarbi_scheduled_messages', {

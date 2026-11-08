@@ -12018,6 +12018,32 @@ function gfcRetireClientAiCredentials() {
   GFC_RETIRED_CLIENT_CREDENTIAL_KEYS.forEach(key => localStorage.removeItem(key));
 }
 gfcRetireClientAiCredentials();
+// Puente transitorio de F02: módulos históricos aún construyen el encabezado
+// X-Assistant-Token, pero ese valor ya se elimina al iniciar. Para las rutas
+// migradas se sustituye, justo antes del envío, por la sesión fresca del dueño.
+// El token legado nunca vuelve a salir del navegador ni es aceptado por ellas.
+const GFC_SESSION_AUTH_ROUTES = Object.freeze([
+  '/api/actions/approve', '/api/supabase-secure', '/api/location/resolve',
+  '/api/assistant/collections', '/api/assistant/preferences',
+  '/api/assistant/scheduled-followups'
+]);
+const gfcNativeFetchForSessionBridge = window.fetch.bind(window);
+function gfcRequiresSessionBridge(input) {
+  try {
+    const url = new URL(typeof input === 'string' ? input : input.url, window.location.href);
+    return url.origin === window.location.origin && GFC_SESSION_AUTH_ROUTES.includes(url.pathname);
+  } catch (_) { return false; }
+}
+window.fetch = async function gfcSessionAuthenticatedFetch(input, init = {}) {
+  if (!gfcRequiresSessionBridge(input)) return gfcNativeFetchForSessionBridge(input, init);
+  const token = await gfcAccountFreshAccessToken();
+  if (!token) return new Response(JSON.stringify({ error: 'session_required' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+  const headers = new Headers((input && typeof input !== 'string' && input.headers) || undefined);
+  new Headers(init.headers || undefined).forEach((value, key) => headers.set(key, value));
+  headers.delete('X-Assistant-Token');
+  headers.set('Authorization', 'Bearer ' + token);
+  return gfcNativeFetchForSessionBridge(input, { ...init, headers });
+};
 async function gfcAccountSetUserFromAccessToken(accessToken) {
   const config = await gfcSupabaseAuthConfig();
   const response = await fetch(config.supabaseUrl.replace(/\/$/, '') + '/auth/v1/user', {

@@ -5,9 +5,9 @@
  */
 
 const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
+const { authenticateScopedOwner, blockedOwnerInput, scopedContact } = require('../../lib/yarbi-authenticated-route');
 let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
-const ASSISTANT_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
 
 // Credenciales / Variables de Entorno para Integraciones
 const NOTION_TOKEN = process.env.NOTION_TOKEN || process.env.FNZ_NOTION_TOKEN || '';
@@ -56,12 +56,15 @@ async function supabaseRequest(path, options = {}) {
   return { response, data };
 }
 
-async function resolveCanonicalContact(payload) {
+async function resolveCanonicalContact(payload, scope) {
   const phone = cleanPhone(payload.phone);
   if (!phone) return null;
   const identifier = await supabaseRequest('/rest/v1/contact_identifiers?identifier_type=eq.phone&normalized_value=eq.' + encodeURIComponent(phone) + '&select=contact_id&limit=1');
   const existingId = Array.isArray(identifier.data) ? identifier.data[0]?.contact_id : null;
   if (existingId) {
+    if (!scopedContact(scope, existingId)) {
+      const error = new Error('owner_scope_forbidden'); error.code = error.message; throw error;
+    }
     const trustedNameSource = /^(android_phonebook|phonebook|local_agenda|master_explicit|manual|user)$/i.test(String(payload.client_name_source || ''));
     if (trustedNameSource && String(payload.client_name || '').trim()) {
       const renamed = await supabaseRequest('/rest/v1/crm_contacts?id=eq.' + encodeURIComponent(String(existingId)), {
@@ -73,22 +76,21 @@ async function resolveCanonicalContact(payload) {
     }
     return Number(existingId);
   }
-  const created = await supabaseRequest('/rest/v1/crm_contacts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
-    body: JSON.stringify([{ full_name: payload.client_name, display_name: payload.client_name, source: 'yarbi_form' }])
-  });
-  const contact = Array.isArray(created.data) ? created.data[0] : null;
-  if (!created.response.ok || !contact?.id) throw new Error('No se pudo crear el contacto CRM');
-  const linked = await supabaseRequest('/rest/v1/contact_identifiers', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ contact_id: contact.id, identifier_type: 'phone', identifier_value: phone, normalized_value: phone, is_primary: true }])
-  });
-  if (!linked.response.ok) throw new Error('No se pudo vincular el teléfono al contacto CRM');
-  return Number(contact.id);
+  // Crear un contacto aquí no permite demostrar a qué dueño pertenece sin
+  // escribir la relación canónica. Cerramos la operación antes de cualquier
+  // escritura lateral hasta que exista esa transacción explícita.
+  const error = new Error('owner_scope_new_contact_unavailable'); error.code = error.message; throw error;
 }
 
-async function upsertCanonicalAgenda(payload) {
+async function payloadContactIsScoped(payload, scope) {
+  const phone = cleanPhone(payload?.phone);
+  if (!phone) return false;
+  const identifier = await supabaseRequest('/rest/v1/contact_identifiers?identifier_type=eq.phone&normalized_value=eq.' + encodeURIComponent(phone) + '&select=contact_id&limit=1');
+  const contactId = Array.isArray(identifier.data) ? identifier.data[0]?.contact_id : null;
+  return identifier.response.ok && scopedContact(scope, contactId);
+}
+
+async function upsertCanonicalAgenda(payload, scope) {
   const startsAt = limaStartAt(payload.date, payload.time);
   if (!startsAt) throw new Error('Fecha inválida para la agenda remota');
   const requestedEventId = Number(payload.agenda_event_id);
@@ -98,11 +100,12 @@ async function upsertCanonicalAgenda(payload) {
     if (!target.response.ok) throw new Error('No se pudo comprobar el evento remoto a actualizar');
     requestedEvent = Array.isArray(target.data) ? target.data[0] : null;
     if (!requestedEvent?.id) throw new Error('El evento remoto indicado no pertenece a Yarbi');
+    if (!scopedContact(scope, requestedEvent.contact_id)) { const error = new Error('owner_scope_forbidden'); error.code = error.message; throw error; }
   }
   const phone = cleanPhone(payload.phone);
   const type = payload.type === 'trabajo' || payload.type === 'construccion' ? 'construccion' : payload.type === 'seguimiento' ? 'seguimiento' : 'visita';
   const dedupeKey = ['yarbi-form-v1', phone || keyPart(payload.client_name), type, payload.date, payload.time || '09:00', keyPart(payload.service)].join(':');
-  const contactId = requestedEvent?.contact_id || await resolveCanonicalContact(payload);
+  const contactId = requestedEvent?.contact_id || await resolveCanonicalContact(payload, scope);
   const label = type === 'construccion' ? 'Construcción' : type === 'seguimiento' ? 'Seguimiento' : 'Visita';
   const event = {
     contact_id: contactId,
@@ -182,17 +185,18 @@ async function upsertCanonicalAgenda(payload) {
   return { id: confirmed.id, contactId, created: !eventId, dedupeKey, readBackVerified: true, extendedColumnsPersisted };
 }
 
-async function deleteCanonicalAgenda(input = {}) {
+async function deleteCanonicalAgenda(input = {}, scope) {
   const agendaEventId = Number(input.agenda_event_id) || 0;
   const localRef = String(input.local_ref || '').trim().slice(0, 120);
   if (!agendaEventId && !localRef) throw new Error('agenda_identifier_required');
   const filter = agendaEventId
     ? 'id=eq.' + encodeURIComponent(String(agendaEventId))
     : 'local_ref=eq.' + encodeURIComponent(localRef);
-  const lookup = await supabaseRequest('/rest/v1/agenda_events?' + filter + '&source=eq.yarbi_form&select=id,local_ref&limit=1');
+  const lookup = await supabaseRequest('/rest/v1/agenda_events?' + filter + '&source=eq.yarbi_form&select=id,local_ref,contact_id&limit=1');
   if (!lookup.response.ok) throw new Error('agenda_lookup_failed');
   const row = Array.isArray(lookup.data) ? lookup.data[0] : null;
   if (!row?.id) return { deleted: true, already_absent: true, local_ref: localRef || null };
+  if (!scopedContact(scope, row.contact_id)) { const error = new Error('owner_scope_forbidden'); error.code = error.message; throw error; }
   const removed = await supabaseRequest('/rest/v1/agenda_events?id=eq.' + encodeURIComponent(String(row.id)) + '&source=eq.yarbi_form', {
     method: 'DELETE', headers: { Prefer: 'return=representation' }
   });
@@ -206,7 +210,7 @@ async function deleteCanonicalAgenda(input = {}) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -216,27 +220,27 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
-  const header = req.headers?.['x-assistant-token'] || req.headers?.authorization || '';
-  const token = String(header).replace(/^Bearer\s+/i, '').trim();
-  if (!ASSISTANT_TOKEN || token !== ASSISTANT_TOKEN) {
-    return res.status(401).json({ error: 'No autorizado' });
-  }
-
-  const runtime = validateServerRouteConfig();
+  const runtime = validateServerRouteConfig({ requirePublicAuth: true });
   if (!runtime.ok) return res.status(503).json({ error: 'configuration_invalid', code: runtime.code });
   SUPABASE_URL = runtime.supabaseUrl;
   SUPABASE_KEY = runtime.supabaseKey;
 
   try {
     const { draft_id, payload, operation } = req.body || {};
+    if (blockedOwnerInput(req.body || {})) return res.status(400).json({ error: 'owner_scope_client_input_forbidden' });
+    const access = await authenticateScopedOwner(req, runtime, supabaseRequest);
+    if (!access.ok) return res.status(access.status).json({ error: access.code });
 
     if (operation === 'delete_agenda') {
-      const result = await deleteCanonicalAgenda(req.body || {});
+      const result = await deleteCanonicalAgenda(req.body || {}, access.scope);
       return res.status(200).json(result);
     }
 
     if (!payload || !payload.client_name) {
       return res.status(400).json({ error: 'Faltan datos obligatorios del borrador (client_name)' });
+    }
+    if (!(await payloadContactIsScoped(payload, access.scope))) {
+      return res.status(403).json({ error: 'owner_scope_forbidden' });
     }
 
     console.log(`[APROBANDO BORRADOR ${draft_id}] Cliente: ${payload.client_name} | Tipo: ${payload.type || 'visita'}`);
@@ -299,7 +303,7 @@ export default async function handler(req, res) {
     // 3. Supabase es la fuente de verdad de agenda. La sincronización externa
     // nunca puede convertir un guardado remoto fallido en un “éxito”.
     try {
-      const canonicalAgenda = await upsertCanonicalAgenda(payload);
+      const canonicalAgenda = await upsertCanonicalAgenda(payload, access.scope);
       syncResults.supabase_agenda = true;
       syncResults.supabase_agenda_readback = canonicalAgenda.readBackVerified === true;
       syncResults.agenda_event_id = canonicalAgenda.id;

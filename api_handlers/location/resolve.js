@@ -1,21 +1,20 @@
 const { processLocationInput } = require('../../lib/location-resolver');
+const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
+const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', process.env.APP_ORIGIN || '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-}
-function authorized(req) {
-  const configured = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
-  const header = req.headers?.['x-assistant-token'] || req.headers?.authorization || '';
-  const token = String(header).replace(/^Bearer\s+/i, '').trim();
-  return Boolean(configured && token && token === configured);
 }
 module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
-  if (!authorized(req)) return res.status(401).json({ error: 'unauthorized' });
+  const runtime = validateServerRouteConfig({ requirePublicAuth: true });
+  if (!runtime.ok) return res.status(503).json({ error: 'configuration_invalid', code: runtime.code });
+  const authenticated = await authenticatedOwnerIdentity(req, runtime);
+  if (!authenticated.ok) return res.status(authenticated.status).json({ error: authenticated.code });
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const input = String(body.url || '').trim();
