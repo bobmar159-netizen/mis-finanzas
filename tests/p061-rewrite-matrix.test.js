@@ -7,20 +7,22 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 
-// Twenty-three public API patterns: webhook exposes one documented alias, so it
-// accounts for two URLs but one direct Function. Conversation is routed
-// through the existing assistant router, so it does not add a Vercel bundle.
+// Twenty-four public API patterns. Interactive WhatsApp reads use their own
+// authenticated handler instead of sharing the provider webhook. Conversation
+// and drafts are routed through the existing assistant router, so neither adds
+// a Vercel bundle.
 // The two non-API routes in
 // vercel.json (/auth/callback and /privacy) are checked separately below.
 const apiMatrix = Object.freeze([
   ['/api/webhook', '/api/webhook.js', 'direct:webhook', 'api/webhook.js'],
-  ['/api/whatsapp/messages', '/api/webhook.js', 'direct:webhook_alias', 'api/webhook.js'],
+  ['/api/whatsapp/messages', '/api/whatsapp/messages.js', 'direct:whatsapp-messages', 'api/whatsapp/messages.js'],
   ['/api/supabase-secure', '/api/supabase-secure.js', 'direct:supabase-secure', 'api/supabase-secure.js'],
   ['/api/notion-proxy', '/api/notion-proxy.js', 'direct:notion-proxy', 'api/notion-proxy.js'],
   ['/api/actions/approve', '/api/actions/approve.js', 'direct:approve', 'api/actions/approve.js'],
   ['/api/ai/process', '/api/ai/process.js', 'direct:process', 'api/ai/process.js'],
   ['/api/assistant/send-whatsapp', '/api/assistant/send-whatsapp.js', 'direct:send-whatsapp', 'api/assistant/send-whatsapp.js'],
   ['/api/assistant/chat', '/api/assistant-router.js?__p06_route=chat', 'assistant:chat', 'api_handlers/assistant/chat.js'],
+  ['/api/assistant/drafts', '/api/assistant-router.js?__p06_route=drafts', 'assistant:drafts', 'api_handlers/assistant/drafts.js'],
   ['/api/assistant/collections', '/api/assistant-router.js?__p06_route=collections', 'assistant:collections', 'api_handlers/assistant/collections.js'],
   ['/api/assistant/command', '/api/assistant-router.js?__p06_route=command', 'assistant:command', 'api_handlers/assistant/command.js'],
   ['/api/assistant/conversation', '/api/assistant-router.js?__p06_route=conversation', 'assistant:conversation', 'api_handlers/assistant/conversation.js'],
@@ -45,16 +47,16 @@ const logicalHandlers = Object.freeze([
   'api_handlers/audit/trace.js', 'api_handlers/location/resolve.js'
 ]);
 
-test('F06 rewrite matrix has twenty-three API patterns and keeps the existing Vercel Function budget', () => {
+test('F02.1 rewrite matrix has twenty-four API patterns and remains under the Vercel Function budget', () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
-  assert.equal(config.routes.length, 25, '23 API patterns + auth callback + static privacy route');
+  assert.equal(config.routes.length, 26, '24 API patterns + auth callback + static privacy route');
   const seenSources = new Set();
   for (const route of config.routes) {
     assert.equal(seenSources.has(route.src), false, `duplicate rewrite source: ${route.src}`);
     seenSources.add(route.src);
   }
-  assert.equal(new Set(apiMatrix.map(([src]) => src)).size, 23);
-  assert.equal(new Set(logicalHandlers).size, 22);
+  assert.equal(new Set(apiMatrix.map(([src]) => src)).size, 24);
+  assert.equal(new Set(logicalHandlers).size, 23);
   for (const [src, dest, routerId, handler] of apiMatrix) {
     const matches = config.routes.filter(route => route.src === src);
     assert.equal(matches.length, 1, `one rewrite for ${src}`);

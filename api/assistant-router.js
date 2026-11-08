@@ -4,6 +4,7 @@
 // reach only the reviewed Assistant handlers below.
 const handlers = Object.freeze({
   chat: require('../api_handlers/assistant/chat.js'),
+  drafts: require('../api_handlers/assistant/drafts.js'),
   collections: require('../api_handlers/assistant/collections.js'),
   command: require('../api_handlers/assistant/command.js'),
   conversation: require('../api_handlers/assistant/conversation.js'),

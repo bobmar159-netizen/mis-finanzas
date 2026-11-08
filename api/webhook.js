@@ -20,7 +20,9 @@ const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN || '';
 const YCLOUD_API_KEY = process.env.YCLOUD_API_KEY || process.env.YCLOUD_KEY || '';
 const YCLOUD_WEBHOOK_SECRET = process.env.YCLOUD_WEBHOOK_SECRET || '';
-const ASSISTANT_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
+// Exclusivo del procesador interno en segundo plano. No autentica navegador ni
+// consultas interactivas; esas rutas usan Supabase Auth en handlers separados.
+const INTERNAL_PROCESSOR_TOKEN = process.env.ASSISTANT_API_TOKEN || process.env.TOKEN_API_DE_ASISTENTE || '';
 const GEMINI_ANALYSIS_MODEL = process.env.GEMINI_ANALYSIS_MODEL || 'gemini-3.1-flash-lite';
 const GEMINI_AUDIO_MODEL = process.env.GEMINI_AUDIO_MODEL || GEMINI_ANALYSIS_MODEL;
 const ENABLE_LEGACY_WEBHOOK_EXTRACTION = process.env.ENABLE_LEGACY_WEBHOOK_EXTRACTION === 'true';
@@ -114,11 +116,11 @@ function traceWhatsApp(event) {
 }
 
 function scheduleCanonicalProcessing(messageId) {
-  if (!ASSISTANT_TOKEN || !messageId) return;
+  if (!INTERNAL_PROCESSOR_TOKEN || !messageId) return;
   const baseUrl = internalProcessorBaseUrl();
   const task = fetch(baseUrl + '/api/ai/process', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': ASSISTANT_TOKEN },
+    headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': INTERNAL_PROCESSOR_TOKEN },
     body: JSON.stringify({ limit: 25, priority_message_id: messageId, requested_by: 'whatsapp-webhook-background' })
   }).then(async response => {
     const result = await response.json().catch(() => ({}));
@@ -201,12 +203,6 @@ function cleanPhone(value) {
 
 function isPlaceholderName(value) {
   return !value || /^(cliente whatsapp|cliente|sin nombre|unknown)$/i.test(String(value).trim());
-}
-
-function hasAssistantAccess(req) {
-  const headers = req && req.headers ? req.headers : {};
-  const token = headers['x-assistant-token'] || (headers.authorization || '').replace(/^Bearer\s+/i, '');
-  return Boolean(ASSISTANT_TOKEN && token === ASSISTANT_TOKEN);
 }
 
 function isTrustedYCloudMediaLink(value) {
@@ -400,7 +396,7 @@ export default async function handler(req, res) {
   // Configurar cabeceras CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Assistant-Token');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -422,9 +418,9 @@ export default async function handler(req, res) {
   const runtime = validateRuntimeConfig({ requireProcessor: req.method === 'POST' });
   if (!runtime.ok) return res.status(503).json({ error: 'configuration_invalid', code: runtime.code });
 
-  // Se conserva el cuerpo original para HMAC. Solo el POST interno de resumen
-  // de audio puede carecer de firma, y está restringido por el token de Yarbi;
-  // cualquier otro POST sin firma se detiene antes de cualquier efecto.
+    // Se conserva el cuerpo original para HMAC. Ningún POST de usuario comparte
+    // este handler: un proveedor debe aportar una firma válida antes de causar
+    // efectos. Los flujos interactivos están en rutas autenticadas separadas.
   let postBody = req.body;
   let ycloudAuthentication = { authenticated: false, code: 'not_post' };
   if (req.method === 'POST') {
@@ -442,135 +438,39 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'webhook_invalid_body', code: error.code || 'webhook_json_invalid' });
       }
     } else {
-      if (!hasAssistantAccess(req)) {
-        console.warn('[WEBHOOK AUTH REJECTED] ycloud_signature_missing');
-        return res.status(401).json({ error: 'webhook_unauthorized', code: 'ycloud_signature_missing' });
-      }
-      try {
-        postBody = Buffer.isBuffer(rawBody) ? parseWebhookJson(rawBody) : postBody;
-      } catch (error) {
-        return res.status(400).json({ error: 'webhook_invalid_body', code: error.code || 'webhook_json_invalid' });
-      }
+      console.warn('[WEBHOOK AUTH REJECTED] ycloud_signature_missing');
+      return res.status(401).json({ error: 'webhook_unauthorized', code: 'ycloud_signature_missing' });
     }
     req.body = postBody;
   }
 
   // La memoria CRM comparte esta función para respetar el límite Hobby de Vercel.
   const requestPath = String(req.url || '').split('?')[0];
-  if (requestPath === '/api/whatsapp/messages' || requestPath.endsWith('/api/whatsapp/messages') || ['memory', 'memory-overview'].includes(String(req.query?.action || ''))) {
-    return whatsappMessagesHandler(req, res);
+  if (['memory', 'memory-overview'].includes(String(req.query?.action || ''))) {
+    // La memoria interactiva ahora vive en /api/assistant/memory, donde la
+    // sesión y el scope canónico se validan antes de cualquier lectura.
+    return res.status(410).json({ error: 'interactive_memory_moved', route: '/api/assistant/memory' });
   }
 
   // 2. Consulta de borradores de acciones y mensajes para el Frontend (GET /api/webhook?action=get_drafts)
   if (req.method === 'GET' && req.query['action'] === 'get_drafts') {
-    if (!hasAssistantAccess(req)) return res.status(401).json({ error: 'No autorizado' });
-    try {
-      const supaRes = await fetch(`${SUPABASE_URL}/rest/v1/draft_actions?select=*,clients(*)&status=eq.pending_review&order=created_at.desc&limit=100`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (supaRes.ok) {
-        const drafts = await supaRes.json();
-        return res.status(200).json({ status: 'ok', drafts });
-      }
-    } catch(e) {
-      console.error('[SUPABASE GET DRAFTS ERROR]', e);
-    }
-    return res.status(200).json({ status: 'ok', drafts: [] });
+    res.setHeader('Location', '/api/assistant/drafts');
+    return res.status(307).json({ status: 'moved', route: '/api/assistant/drafts' });
   }
 
   // Diagnóstico seguro: confirma si WhatsApp Cloud guardó una ubicación para este cliente.
   if (req.method === 'GET' && req.query['action'] === 'location_debug') {
-    if (!hasAssistantAccess(req)) return res.status(401).json({ error: 'No autorizado' });
-    const phone = cleanPhone(req.query.phone);
-    if (!phone) return res.status(400).json({ error: 'La alerta no contiene teléfono para consultar Cloud', locationStatus: 'missing_phone' });
-    try {
-      const encoded = encodeURIComponent(phone);
-      const headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
-      const [traditionalRes, structuredRes] = await Promise.all([
-        fetch(SUPABASE_URL + '/rest/v1/whatsapp_messages?deleted_at=is.null&phone=eq.' + encoded + '&select=id,timestamp,maps_url,app_name&order=timestamp.desc&limit=10', { headers }),
-        fetch(SUPABASE_URL + '/rest/v1/messages?phone_number=eq.' + encoded + '&select=id,created_at,maps_url,media_type&order=created_at.desc&limit=10', { headers })
-      ]);
-      const traditional = traditionalRes.ok ? await traditionalRes.json() : [];
-      const structured = structuredRes.ok ? await structuredRes.json() : [];
-      const exactTraditional = traditional.filter(row => row.maps_url).length;
-      const exactStructured = structured.filter(row => row.maps_url).length;
-      return res.status(200).json({
-        status: 'ok',
-        phone,
-        locationStatus: exactTraditional || exactStructured ? 'exact_location_saved' : ((traditional.length || structured.length) ? 'messages_saved_without_exact_location' : 'no_cloud_message_for_phone'),
-        whatsappMessages: { count: traditional.length, exactLocationCount: exactTraditional, latest: traditional.slice(0, 3).map(row => ({ timestamp: row.timestamp, hasMapsUrl: Boolean(row.maps_url), source: row.app_name || '' })) },
-        structuredMessages: { count: structured.length, exactLocationCount: exactStructured, latest: structured.slice(0, 3).map(row => ({ createdAt: row.created_at, hasMapsUrl: Boolean(row.maps_url), mediaType: row.media_type || '' })) }
-      });
-    } catch (error) {
-      console.error('[LOCATION DEBUG ERROR]', error);
-      return res.status(500).json({ error: 'No se pudo consultar la traza Cloud', detail: error.message, locationStatus: 'diagnostic_error' });
-    }
+    return res.status(410).json({ error: 'interactive_location_debug_moved' });
   }
   // 3. Consulta de mensajes tradicionales (GET /api/webhook?action=get)
   if (req.method === 'GET' && req.query['action'] === 'get') {
-    if (!hasAssistantAccess(req)) return res.status(401).json({ error: 'No autorizado' });
-    try {
-      const supaRes = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_messages?deleted_at=is.null&select=*&order=timestamp.desc&limit=50`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (supaRes.ok) {
-        const rawMessages = await supaRes.json();
-        // La tabla estructurada conserva la URL exacta de pines nativos aunque
-        // la tabla de alertas tradicional haya recibido texto sin enlace.
-        let structuredMessages = [];
-        try {
-          const structuredRes = await fetch(SUPABASE_URL + '/rest/v1/messages?select=id,phone_number,content,maps_url,media_type,created_at&order=created_at.desc&limit=50', {
-            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-          });
-          if (structuredRes.ok) structuredMessages = await structuredRes.json();
-        } catch (error) {
-          console.warn('[SUPABASE STRUCTURED LOCATION FALLBACK WARN]', error.message);
-        }
-        const messages = [
-          ...rawMessages.map(m => ({
-            id: m.id,
-            appName: m.app_name || 'WhatsApp Business API (Cloud)',
-            title: m.title,
-            phone: m.phone,
-            text: m.text,
-            mapsUrl: m.maps_url || '',
-            timestamp: parseInt(m.timestamp) || Date.now()
-          })),
-          ...structuredMessages.map(m => ({
-            id: m.id,
-            appName: 'WhatsApp Business API (Cloud)',
-            title: '',
-            phone: m.phone_number || '',
-            text: m.content || '',
-            mapsUrl: m.maps_url || '',
-            timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now()
-          }))
-        ];
-        const unique = new Map();
-        messages.forEach(m => {
-          const current = unique.get(m.id);
-          if (!current || (!current.mapsUrl && m.mapsUrl)) unique.set(m.id, m);
-        });
-        return res.status(200).json({ status: 'ok', source: 'supabase', messages: Array.from(unique.values()).sort((a, b) => b.timestamp - a.timestamp).slice(0, 50) });
-      }
-    } catch(e) {
-      console.error('[SUPABASE GET MESSAGES ERROR]', e);
-    }
-    return res.status(200).json({ status: 'ok', source: 'empty', messages: [] });
+    res.setHeader('Location', '/api/whatsapp/messages');
+    return res.status(307).json({ status: 'moved', route: '/api/whatsapp/messages' });
   }
 
   // Reintento solicitado explícitamente desde Yarbi para una nota ya guardada.
   if (req.method === 'POST' && String(postBody?.action || '') === 'summarize-voice-note') {
-    if (!hasAssistantAccess(req)) return res.status(401).json({ error: 'No autorizado' });
-    try {
-      return res.status(200).json(await retryStoredWhatsAppAudioSummary(req.body?.message_id));
-    } catch (error) {
-      const detail = String(error?.message || error);
-      const unavailable = /no conserva|no es una nota|no se pudo leer/i.test(detail);
-      const failure = audioSummaryErrorInfo(error);
-      await markStoredWhatsAppAudioSummaryFailure(req.body?.message_id, error).catch(() => null);
-      return res.status(unavailable ? 404 : 502).json({ error: unavailable ? detail : 'No se pudo resumir la nota de voz en este momento', error_code: failure.code, detail: failure.detail });
-    }
+    return res.status(410).json({ error: 'interactive_audio_summary_moved' });
   }
   // 4. Recepción de mensajes en tiempo real (POST /api/webhook)
   if (req.method === 'POST') {

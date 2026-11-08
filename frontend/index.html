@@ -12025,13 +12025,15 @@ gfcRetireClientAiCredentials();
 const GFC_SESSION_AUTH_ROUTES = Object.freeze([
   '/api/actions/approve', '/api/supabase-secure', '/api/location/resolve',
   '/api/assistant/collections', '/api/assistant/preferences',
-  '/api/assistant/scheduled-followups'
+  '/api/assistant/scheduled-followups', '/api/assistant/drafts',
+  '/api/whatsapp/messages', '/api/notion-proxy'
 ]);
 const gfcNativeFetchForSessionBridge = window.fetch.bind(window);
 function gfcRequiresSessionBridge(input) {
   try {
     const url = new URL(typeof input === 'string' ? input : input.url, window.location.href);
-    return url.origin === window.location.origin && GFC_SESSION_AUTH_ROUTES.includes(url.pathname);
+    const configuredApiOrigin = new URL(window.gfcRuntimeApiOrigin(), window.location.href).origin;
+    return (url.origin === window.location.origin || url.origin === configuredApiOrigin) && GFC_SESSION_AUTH_ROUTES.includes(url.pathname);
   } catch (_) { return false; }
 }
 window.fetch = async function gfcSessionAuthenticatedFetch(input, init = {}) {
@@ -12387,26 +12389,14 @@ async function gfcOwnerInstructionSync(record) {
     body: JSON.stringify(payload)
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    if (operation === 'upsert' && response.status === 404) {
-      const legacy = await fetch(window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?action=preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },
-        body: JSON.stringify({ confirm: true, instruction: record.instruction, category: record.category || 'behavior', scope: record.scope || 'all', name: record.name })
-      });
-      const legacyData = await legacy.json().catch(() => ({}));
-      if (legacy.ok) return legacyData;
-    }
-    throw new Error(data.error || 'No se pudo sincronizar la instrucción');
-  }
+  if (!response.ok) throw new Error(data.error || 'No se pudo sincronizar la instrucción');
   if (data.ok !== true || data.source !== 'supabase') throw new Error('sync_unconfirmed');
   return data;
 }
 async function gfcOwnerInstructionRefreshFromBackend(cacheKey) {
   const token = localStorage.getItem('fnz_assistant_token') || '';
   if (!token) return null;
-  let response = await fetch(gfcOwnerInstructionApiUrl(), { headers: { 'X-Assistant-Token': token } });
-  if (!response.ok && response.status === 404) response = await fetch(window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?action=preferences', { headers: { 'X-Assistant-Token': token } });
+  const response = await fetch(gfcOwnerInstructionApiUrl(), { headers: { 'X-Assistant-Token': token } });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !Array.isArray(data.instructions)) return null;
   const cachedBeforeRefresh = gfcOwnerInstructionReadList(cacheKey);
