@@ -31,8 +31,17 @@ function financeRowsFrom(sources) {
     return { contact_id: contactId, service: String(byContact.get(contactId)?.latest_service || ''), collected_amount: context.summary?.collected_amount, verified: context.summary?.income_source !== 'unavailable' };
   });
 }
+function safeIntelligence(value) {
+  const source = object(value); const route = object(source.route); const deep = object(source.deep);
+  return {
+    tier: ['FAST', 'STANDARD', 'DEEP'].includes(String(route.tier || '')) ? route.tier : 'STANDARD',
+    reason: text(route.reason, 96) || 'unclassified',
+    transfer: source.transfer ? { from: text(source.transfer.from, 16), to: text(source.transfer.to, 16), reason: text(source.transfer.reason, 96), execute: false } : null,
+    deep: Object.keys(deep).length ? { outcome: text(deep.outcome, 80), accepted: deep.accepted === true } : null
+  };
+}
 function safeResponse(result) {
-  return { schema: RESPONSE_SCHEMA, ok: true, execute: false, outcome: text(result.outcome, 80), reply: text(result.reply, 1000), proposal: { kind: text(result.proposal?.kind, 64) || 'none', execute: false }, commercial_effects_allowed: false, selected_contact_id: Number.isSafeInteger(Number(result.selected_contact_id)) ? Number(result.selected_contact_id) : null, facts: object(result.facts), metrics: object(result.metrics) };
+  return { schema: RESPONSE_SCHEMA, ok: true, execute: false, outcome: text(result.outcome, 80), reply: text(result.reply, 1000), proposal: { kind: text(result.proposal?.kind, 64) || 'none', execute: false }, commercial_effects_allowed: false, selected_contact_id: Number.isSafeInteger(Number(result.selected_contact_id)) ? Number(result.selected_contact_id) : null, facts: object(result.facts), intelligence: safeIntelligence(result.intelligence), metrics: object(result.metrics) };
 }
 
 function createConversationHandler({ fetchImpl = fetch, providerFactory = createGeminiV4OwnerUnderstandingProvider, now = () => Date.now() } = {}) {
@@ -62,7 +71,7 @@ function createConversationHandler({ fetchImpl = fetch, providerFactory = create
       const sources = needsVerifiedFacts(utterance) && scope.ok ? await loadScopedCrmSources({ supabase, contactIds: scope.ids, metrics: { query_count: 0, sources: {} } }) : { contacts: [], agenda: [], analyses: [], receivables: [] };
       const provider = config.gemini.enabled ? providerFactory({ apiKey: config.gemini.apiKey, model: config.gemini.model, timeoutMs: config.gemini.timeoutMs, fetchImpl }) : null;
       const state = continuity.state || undefined;
-      const result = await runOwnerConversation({ utterance, state, provider, candidates: continuity.candidate_ids, agendaEvents: sources.agenda, financeRows: financeRowsFrom(sources), now: now() });
+      const result = await runOwnerConversation({ utterance, state, provider, candidates: continuity.candidate_ids, agendaEvents: sources.agenda, financeRows: financeRowsFrom(sources), now: now(), ownerId, deepIdempotencyKey: operationId });
       let candidateIds = continuity.candidate_ids;
       let search = null;
       if (result.crm_search?.outcome === 'crm_search_ready') {
@@ -86,3 +95,4 @@ function createConversationHandler({ fetchImpl = fetch, providerFactory = create
 module.exports = createConversationHandler();
 module.exports.createConversationHandler = createConversationHandler;
 module.exports.containsBlocked = containsBlocked;
+module.exports.safeIntelligence = safeIntelligence;

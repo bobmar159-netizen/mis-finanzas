@@ -1,48 +1,43 @@
-# YARBI — F03: Agenda y seguimiento inteligente
+# YARBI F03 — Cerebro inteligente FAST / STANDARD / DEEP
 
-**Estado:** `F03_IMPLEMENTADA_Y_VALIDADA_LOCALMENTE`  
-**Base preservada:** commit F02 `401f5ce` / etiqueta `f02-crm-local-20261105`  
-**Alcance:** código, builds y fixtures locales. No se consultaron ni modificaron servicios remotos.
+## Resultado
 
-## Entregado
+**F03 IMPLEMENTADA LOCALMENTE CON DEEP BLOQUEADO DE FORMA SEGURA.**
 
-- Se añadió `lib/yarbi-agenda-intelligence.js`, una capa determinista para normalizar los estados reales de Agenda, clasificar actividades en `America/Lima`, deduplicarlas y resumirlas como historial, próximas y pendientes.
-- El expediente CRM ahora recibe actividades del contacto canónico y las muestra separadas en **Agenda y seguimiento**, con fecha, estado y procedencia disponibles.
-- La lectura de CRM solicita los campos de Agenda necesarios para establecer contexto, sin interpretar una oportunidad o cobro como cerrado.
-- Se prepararon planes de lectura, sin efectos ni creación de actividades, para consultas naturales: agenda de mañana, llamadas pendientes, visitas pendientes e historial de una instalación.
-- Se preservaron los flujos existentes de propuesta, confirmación, reprogramación y cancelación: F03 no habilita mutaciones directas desde lenguaje natural.
-- Se mantuvo la deduplicación por identificador o clave de deduplicación; una reentrega no agrega actividades duplicadas al dossier.
-- La interfaz unificada conserva los flujos web/Android y el build de Android exige un origen HTTPS explícito.
+Se consolidó la selección de estrategia dentro del cerebro conversacional
+existente, sin crear otro asistente:
 
-## Verificación local
+- FAST: Agenda, Finanzas, FAQ y continuidad determinista sin Gemini.
+- STANDARD: Gemini V4 y contexto existente para lenguaje natural, con
+  abstención segura ante fallo de proveedor.
+- DEEP: contrato idempotente para cola durable. No inicia análisis hasta que
+  exista infraestructura persistente demostrable.
 
-| Verificación | Resultado |
-|---|---|
-| Batería focalizada Agenda, CRM, owner scope e integración | PASS — 29/29 |
-| Build unificado Web | PASS |
-| Build unificado Android con origen sintético HTTPS | PASS |
-| Pruebas de reproducibilidad y aislamiento de frontend | PASS — 4/4 |
-| `git diff --check` | PASS |
-| Servicios remotos, Production y APK de referencia | No utilizados ni modificados |
+La respuesta autenticada publica el tier y una telemetría sanitizada. Sigue
+siendo sólo de lectura: `execute:false` y efectos comerciales desactivados.
 
-Los fixtures y tests cubren estados programado, completado, cancelado, vencido y sin fecha; zona horaria Lima; reentregas; contactos ambiguos; owner scope; agenda/CRM; confirmaciones existentes y regresiones CRM.
+## Archivos creados
 
-## Archivos funcionales modificados
+- `lib/yarbi-intelligence-router.js`
+- `lib/yarbi-deep-analysis.js`
+- `tests/f03-intelligence-router.test.js`
+- Informes y manifiesto F03.
 
-- `lib/yarbi-agenda-intelligence.js`
-- `lib/yarbi-crm-dossier-runtime.js`
-- `lib/yarbi-crm-search-runtime.js`
-- `frontend/yarbi-product-completion-ui.js`
+## Archivos modificados
 
-Además se ajustaron pruebas de ruta de Agenda y aislamiento del entorno de prueba del build unificado. Los artefactos generados de la raíz (`runtime-config.js`, `service-worker.js` y `yarbi-product-completion-ui.js`) fueron actualizados por los builds reproducibles.
+- `lib/yarbi-conversation-runtime.js`
+- `api_handlers/assistant/conversation.js`
+- `tests/f05-conversation-handler.test.js`
 
-## Límites conocidos
+## Pendientes y riesgos
 
-- La validación de actividad, sincronización y avisos proactivos es local y sintética. La sincronización con una Agenda remota permanece **NO VALIDADA** hasta contar con configuración de Preview autorizada.
-- Cuando un dato o integración no esté disponible, la capa de dossier conserva el estado `no disponible`; no inventa actividades ni identidades.
-- Las consultas naturales de Agenda se preparan sin efectos. Crear, editar, reprogramar y cancelar siguen exigiendo los flujos de autorización y confirmación existentes.
-- No se generó APK ni se desplegó Preview o Production.
+1. DEEP requiere una tabla/RPC/worker durable autorizado; no se reutilizó
+   `ai_message_analysis` por no demostrar que sirva para analítica general.
+2. Las pistas CRM reutilizan fuentes existentes. Una tabla nueva de pistas
+   exige evidencia de esquema y autorización de migración.
+3. Rendimiento HTTP Preview, Gemini real, TTFT/TTFA y Android siguen sin medir.
+4. El cache CRM existente es scoped e invalidable; para una invalidación total
+   de nuevas fuentes deberá conectarse la futura cola durable a sus mutadores.
 
-## Siguiente paso
-
-F04 puede integrar Finanzas, Movimientos, cotizaciones, cobranzas y Notion sobre el mismo `contact_id` canónico, sin cambiar F03 ni habilitar acciones externas hasta que exista autorización específica.
+No se modificaron Production, Supabase remoto, migraciones, APK, Gemini Live,
+proveedores comerciales ni el worktree auditado por Antigravity.

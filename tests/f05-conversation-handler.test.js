@@ -40,6 +40,7 @@ test('F05 handler autentica, mantiene scope y responde Agenda sintética sin Gem
   assert.equal(res.state.status, 200, JSON.stringify(res.state.body));
   assert.equal(res.state.body.execute, false);
   assert.equal(res.state.body.outcome, 'fast_local_agenda');
+  assert.equal(res.state.body.intelligence.tier, 'FAST');
   assert.equal(res.state.body.commercial_effects_allowed, false);
   assert.equal(typeof res.state.body.conversation_token, 'string');
   assert.equal(calls.some(call => /gemini|google|whatsapp|notion|calendar/i.test(call.host)), false);
