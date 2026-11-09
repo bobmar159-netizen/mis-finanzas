@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const renderer = require('../frontend/yarbi-conversation-renderer');
 
 const paragraph = runs => ({ id:'p1', type:'paragraph', version:1, runs });
@@ -41,6 +43,13 @@ test('Etapa 1: aplica límites a runs, bloques y tablas', () => {
   assert.equal(tooManyRuns.ok, false); assert.equal(hugeTable.ok, false); assert.equal(tooManyBlocks.ok, false);
 });
 
+test('Etapa 1: aplica el límite total visible y rechaza contenido raíz con propiedades inesperadas', () => {
+  const withinLimit = renderer.validateContent('x'.repeat(renderer.LIMITS.messageChars));
+  const overLimit = renderer.validateContent(content([paragraph([{ text:'x'.repeat(renderer.LIMITS.runChars) }]), ...Array.from({ length:15 }, (_, index) => ({ id:'p' + index, type:'paragraph', version:1, runs:[{ text:'x'.repeat(renderer.LIMITS.runChars) }] }))]));
+  const extraRoot = renderer.validateContent({ schema:renderer.SCHEMA, blocks:[paragraph([{ text:'saldo' }])], html:'<b>no</b>' });
+  assert.equal(withinLimit.ok, true); assert.equal(overLimit.ok, false); assert.equal(extraRoot.ok, false);
+});
+
 test('Etapa 1: valida tabla, listas, paneles, chips y cita sin acciones ejecutables', () => {
   const result = renderer.validateContent(content([
     { id:'h1', type:'heading', version:1, level:1, text:'Resumen' },
@@ -53,4 +62,11 @@ test('Etapa 1: valida tabla, listas, paneles, chips y cita sin acciones ejecutab
   ]));
   assert.equal(result.ok, true);
   assert.equal(result.blocks.length, 7);
+});
+
+test('Etapa 1: el chat existente carga el renderer después de conservar su ruta F03', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  assert.match(html, /\/api\/assistant\/conversation/);
+  assert.match(html, /<script src="\.\/yarbi-conversation-renderer\.js"><\/script>/);
+  assert.match(html, /YarbiConversationRenderer\.appendMessage/);
 });

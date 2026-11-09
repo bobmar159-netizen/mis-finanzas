@@ -120,6 +120,16 @@
     return sourceId && alt ? { ...common, source_id:sourceId, alt } : null;
   }
 
+  function visibleCharacters(block) {
+    if (block.type === 'paragraph') return block.runs.reduce((total, run) => total + run.text.length, 0);
+    if (block.type === 'heading' || block.type === 'status_chip') return block.text.length;
+    if (block.type === 'ordered_list' || block.type === 'unordered_list' || block.type === 'checklist') return block.items.reduce((total, item) => total + item.text.length, 0);
+    if (block.type === 'table') return block.summary.length + block.columns.reduce((total, column) => total + column.length, 0) + block.rows.reduce((total, row) => total + row.reduce((rowTotal, cell) => rowTotal + cell.length, 0), 0);
+    if (block.type === 'information_panel' || block.type === 'warning_panel') return block.title.length + block.text.length;
+    if (block.type === 'source_citation') return block.label.length;
+    return block.alt ? block.alt.length : 0;
+  }
+
   function validateBlock(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     if (!BLOCKS.has(value.type) || value.version !== 1) return null;
@@ -135,19 +145,20 @@
 
   function plainTextContent(value, idPrefix) {
     const safe = typeof value === 'string' && value.length ? value.slice(0, LIMITS.messageChars) : 'No tengo una respuesta verificable todavía.';
-    return { schema:SCHEMA, blocks:[{ id:(idPrefix || 'plain') + '-1', type:'paragraph', version:1, runs:[{ text:safe, marks:[] }] }] };
+    const runs = [];
+    for (let offset = 0; offset < safe.length; offset += LIMITS.runChars) runs.push({ text:safe.slice(offset, offset + LIMITS.runChars), marks:[] });
+    return { schema:SCHEMA, blocks:[{ id:(idPrefix || 'plain') + '-1', type:'paragraph', version:1, runs }] };
   }
 
   function validateContent(value) {
     const content = typeof value === 'string' ? plainTextContent(value) : value;
     const issues = [];
-    if (!content || content.schema !== SCHEMA || !Array.isArray(content.blocks) || content.blocks.length > LIMITS.blocksPerMessage) return { ok:false, blocks:[fallbackBlock()], issues:[issue('content_schema_invalid')] };
+    if (!exactKeys(content, new Set(['schema', 'blocks'])) || content.schema !== SCHEMA || !Array.isArray(content.blocks) || content.blocks.length > LIMITS.blocksPerMessage) return { ok:false, blocks:[fallbackBlock()], issues:[issue('content_schema_invalid')] };
     let characterCount = 0;
     const blocks = content.blocks.map((block, index) => {
       const validated = validateBlock(block);
       if (!validated) { issues.push(issue('block_invalid_or_unknown', index)); return fallbackBlock(); }
-      const serialized = JSON.stringify(validated);
-      characterCount += serialized.length;
+      characterCount += visibleCharacters(validated);
       if (characterCount > LIMITS.messageChars) { issues.push(issue('message_character_limit', index)); return fallbackBlock('La respuesta excedió el límite de presentación.'); }
       return validated;
     });
