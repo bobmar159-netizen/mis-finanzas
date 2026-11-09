@@ -437,7 +437,17 @@
       ? normalizeTimelineItem({ role, text:value, at:Date.now(), channel:opts.channel || 'voice' })
       : persistTimelineMessage(role, value, Date.now(), opts.channel || 'voice');
     if (!item) return false;
-    if (draft?.wrap?.isConnected) {
+    const training = interactionMode() === 'training';
+    const box = training ? document.getElementById('gfc-yarbi-training-chat') : document.getElementById('gfc-copilot-chat-messages');
+    if (!training) {
+      // El borrador Live nunca se convierte directamente en un mensaje final del
+      // chat normal: se descarta y el mensaje persistido recorre el renderer
+      // canónico, que aplica validación, Markdown seguro y deduplicación visual.
+      if (draft?.wrap?.isConnected) draft.wrap.remove();
+      if (box && !box.querySelector('[data-message-id="' + item.id + '"]')) renderTimelineItem(item);
+    } else if (draft?.wrap?.isConnected) {
+      // El simulador de entrenamiento conserva su superficie independiente;
+      // el historial conversacional normal siempre usa el renderer canónico.
       draft.wrap.classList.remove('is-live');
       draft.wrap.removeAttribute('data-live-draft-key');
       draft.wrap.dataset.messageId = item.id;
@@ -445,13 +455,11 @@
       draft.body.textContent = value;
       draft.time.textContent = timeLabel(item.at);
     } else {
-      const box = interactionMode() === 'training' ? document.getElementById('gfc-yarbi-training-chat') : document.getElementById('gfc-copilot-chat-messages');
       if (box && !box.querySelector('[data-message-id="' + item.id + '"]')) renderTimelineItem(item);
     }
     liveTranscriptDrafts.delete(key);
     finalizedLiveTranscriptKeys.set(key, item.id);
     pruneFinalizedLiveKeys();
-    const box = interactionMode() === 'training' ? document.getElementById('gfc-yarbi-training-chat') : document.getElementById('gfc-copilot-chat-messages');
     if (box && chatIsNearBottom(box)) box.scrollTop = box.scrollHeight;
     return true;
   };
