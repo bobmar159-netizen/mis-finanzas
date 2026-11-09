@@ -17,9 +17,6 @@
       });
   }
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="preconnect" href="https://cdnjs.cloudflare.com">
 <style>
 :root {
@@ -10653,14 +10650,15 @@ function gfcRefreshVoicePipelinePanel() {
 }
 function gfcAppendCopilotChatMessage(role, text) {
   const box = document.getElementById('gfc-copilot-chat-messages');
-  if (!box || !text) return;
+  if (!box || typeof text !== 'string' || !text.trim()) return { ok:false, code:'content_empty' };
   const isUser = role === 'user';
   if (window.YarbiConversationRenderer && typeof window.YarbiConversationRenderer.appendMessage === 'function') {
     const rendered = window.YarbiConversationRenderer.appendMessage(box, { role:isUser ? 'user' : 'assistant', text:String(text), status:'complete' });
     if (rendered.ok) {
       if (window._gfcMascot && typeof window._gfcMascot.syncDialogueMessage === 'function') window._gfcMascot.syncDialogueMessage(isUser ? 'user' : 'assistant', String(text));
-      return;
+      return rendered;
     }
+    if (rendered.code === 'content_empty') return rendered;
   }
   const wrap = document.createElement('div');
   const label = document.createElement('div');
@@ -10676,6 +10674,7 @@ function gfcAppendCopilotChatMessage(role, text) {
   if (window._gfcMascot && typeof window._gfcMascot.syncDialogueMessage === 'function') {
     window._gfcMascot.syncDialogueMessage(isUser ? 'user' : 'assistant', String(text));
   }
+  return { ok:true, legacy:true };
 }
 const GFC_OWNER_CONVERSATION_TOKEN_KEY = 'gfc_owner_conversation_token_v1';
 async function gfcCallAuthenticatedOwnerConversation(payload) {
@@ -47365,18 +47364,9 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
     menu.innerHTML='<button type="button" onclick="gfcOpenCopilotModal(\'masivo\')">Memoria y aprendizaje</button><button type="button" onclick="gfcOpenCopilotModal(\'ordenes\')">Instrucciones permanentes</button><button type="button" onclick="gfcClearLiveMemory();toast(\'Se reinició el contexto reciente. Tus clientes no se borraron.\',\'info\')">Reiniciar conversación</button>';
     document.getElementById('modal-content')?.appendChild(menu);
   };
-  const previousAppend = window.gfcAppendCopilotChatMessage;
-  window.gfcAppendCopilotChatMessage = function(role, text){
-    const box = document.getElementById('gfc-copilot-chat-messages');
-    if (!box || !text) return typeof previousAppend === 'function' ? previousAppend(role,text) : undefined;
-    const wrap=document.createElement('article'); const isUser=role==='user';
-    wrap.className='gfc-yarbi-message '+(isUser?'user':'assistant');
-    wrap.style.alignSelf=isUser?'flex-end':'flex-start';
-    const now=new Date(); const time=now.toLocaleTimeString('es-PE',{hour:'numeric',minute:'2-digit'});
-    wrap.innerHTML='<div class="gfc-yarbi-message-label">'+(isUser?'Tú':'Yarbi')+'</div><div class="gfc-yarbi-message-body"></div><div class="gfc-yarbi-message-time">'+time+'</div>';
-    wrap.querySelector('.gfc-yarbi-message-body').textContent=String(text);
-    box.appendChild(wrap); box.scrollTop=box.scrollHeight;
-  };
+  // The canonical chat entry point is the earlier gfcAppendCopilotChatMessage.
+  // Keeping this contextual modal free of a second override ensures every real
+  // assistant and owner message goes through YarbiConversationRenderer exactly once.
   const legacyOpen = window.gfcOpenCopilotModal;
   window.gfcOpenCopilotModal = function(initialTab, suggestionId){
     const tab=initialTab || 'chat';
