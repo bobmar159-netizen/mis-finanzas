@@ -10649,9 +10649,19 @@ function gfcRefreshVoicePipelinePanel() {
   root.replaceWith(wrapper.firstElementChild);
 }
 function gfcAppendCopilotChatMessage(role, text) {
-  const box = document.getElementById('gfc-copilot-chat-messages');
-  if (!box || typeof text !== 'string' || !text.trim()) return { ok:false, code:'content_empty' };
+  if (typeof text !== 'string' || !text.trim()) return { ok:false, code:'content_empty' };
   const isUser = role === 'user';
+  // Timeline persistence is registered by yarbi-memory-center.js. It is a hook,
+  // not a replacement: this remains the only global chat entry point.
+  if (typeof window.gfcAppendCopilotTimelineMessage === 'function') {
+    const timelineResult = window.gfcAppendCopilotTimelineMessage(isUser ? 'user' : 'assistant', text);
+    if (timelineResult && timelineResult.handled) {
+      if (window._gfcMascot && typeof window._gfcMascot.syncDialogueMessage === 'function') window._gfcMascot.syncDialogueMessage(isUser ? 'user' : 'assistant', String(text));
+      return timelineResult.result || { ok:true };
+    }
+  }
+  const box = document.getElementById('gfc-copilot-chat-messages');
+  if (!box) return { ok:false, code:'renderer_container_missing' };
   if (window.YarbiConversationRenderer && typeof window.YarbiConversationRenderer.appendMessage === 'function') {
     const rendered = window.YarbiConversationRenderer.appendMessage(box, { role:isUser ? 'user' : 'assistant', text:String(text), status:'complete' });
     if (rendered.ok) {

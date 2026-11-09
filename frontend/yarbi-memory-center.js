@@ -316,6 +316,7 @@
   function renderTimelineItem(item) {
     const box = document.getElementById('gfc-copilot-chat-messages');
     if (!box || !item) return;
+    const shouldFollow = chatIsNearBottom(box);
     const key = dayKey(item.at);
     if (key !== renderedDay) {
       const divider = document.createElement('div');
@@ -333,6 +334,18 @@
     const body = document.createElement('div');
     body.className = 'gfc-yarbi-message-body';
     const dashboard = item.role === 'assistant' ? boardPayload(item.text) : null;
+    if (!dashboard && window.YarbiConversationRenderer && typeof window.YarbiConversationRenderer.appendMessage === 'function') {
+      const rendered = window.YarbiConversationRenderer.appendMessage(box, { role:item.role, text:item.text, status:'complete' });
+      if (rendered.ok && rendered.element) {
+        rendered.element.classList.add('gfc-yarbi-message');
+        rendered.element.dataset.messageId = item.id;
+        const time = document.createElement('div');
+        time.className = 'gfc-yarbi-message-time';
+        time.textContent = timeLabel(item.at);
+        rendered.element.appendChild(time);
+        return rendered;
+      }
+    }
     if (dashboard) {
       wrap.classList.add('board-message');
       renderBoardBody(body, dashboard);
@@ -342,6 +355,7 @@
     time.textContent = timeLabel(item.at);
     wrap.append(label, body, time);
     box.appendChild(wrap);
+    if (shouldFollow) box.scrollTop = box.scrollHeight;
   }
 
   // La transcripcion Live se pinta como un borrador visual y se persiste una
@@ -451,18 +465,18 @@
     });
   };
 
-  window.gfcAppendCopilotChatMessage = function (role, text, at, options) {
-    if (!text) return;
+  window.gfcAppendCopilotTimelineMessage = function (role, text, at, options) {
+    if (typeof text !== 'string' || !text.trim()) return { handled:true, result:{ ok:false, code:'content_empty' } };
     const opts = options || {};
     const item = opts.persist === false
       ? normalizeTimelineItem({ id:opts.id, role, text, at:at || opts.at || Date.now(), channel:opts.channel || 'chat' })
       : persistTimelineMessage(role, text, at || opts.at, opts.channel);
-    if (!item) return;
+    if (!item) return { handled:true, result:{ ok:false, code:'timeline_item_invalid' } };
     const box = document.getElementById('gfc-copilot-chat-messages');
-    if (!box) return;
-    if ([...box.querySelectorAll('[data-message-id]')].some(node => node.dataset.messageId === item.id)) return;
-    renderTimelineItem(item);
-    box.scrollTop = box.scrollHeight;
+    if (!box) return { handled:false };
+    if ([...box.querySelectorAll('[data-message-id]')].some(node => node.dataset.messageId === item.id)) return { handled:true, result:{ ok:true, duplicate:true } };
+    const rendered = renderTimelineItem(item);
+    return { handled:true, result:{ ok:true, timelineId:item.id, rendered:!!rendered } };
   };
   window.gfcRestoreCopilotChat = function () {
     const box = document.getElementById('gfc-copilot-chat-messages');

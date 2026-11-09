@@ -70,6 +70,10 @@ test('Etapa 1: el chat existente carga el renderer después de conservar su ruta
   assert.match(html, /<script src="\.\/yarbi-conversation-renderer\.js"><\/script>/);
   assert.match(html, /YarbiConversationRenderer\.appendMessage/);
   assert.equal((html.match(/window\.gfcAppendCopilotChatMessage\s*=/g) || []).length, 0);
+  const memoryCenter = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-memory-center.js'), 'utf8');
+  assert.equal((memoryCenter.match(/window\.gfcAppendCopilotChatMessage\s*=/g) || []).length, 0);
+  assert.match(memoryCenter, /window\.gfcAppendCopilotTimelineMessage\s*=/);
+  assert.match(memoryCenter, /YarbiConversationRenderer\.appendMessage/);
 });
 
 test('Etapa 1.1: el punto de entrada real usa el renderer una sola vez para un mensaje del asistente', () => {
@@ -102,6 +106,10 @@ test('Etapa 1.1: contenido vacío no fabrica una respuesta ni crea una burbuja',
   const result = renderer.appendMessage(container, { role:'assistant', text:'   ' });
   assert.equal(result.code, 'content_empty');
   assert.equal(container.appended, 0);
+  const emptyBlocks = renderer.validateContent(content([]));
+  const noTextBlock = renderer.validateContent(content([paragraph([{ text:'' }])]));
+  assert.equal(emptyBlocks.issues[0].code, 'content_empty');
+  assert.equal(noTextBlock.status, 'partial');
 });
 
 test('Etapa 1.1: no corta Unicode ni presenta una respuesta mayor a 30k como completa', () => {
@@ -121,6 +129,16 @@ test('Etapa 1.1: adapta Markdown permitido a bloques tipados y conserva sintaxis
   const literal = renderer.validateContent('Texto con **asterisco sin cierre y x < y; `código`');
   assert.equal(literal.ok, true);
   assert.equal(literal.blocks[0].runs[0].text.includes('**asterisco sin cierre'), true);
+  assert.equal(renderer.validateContent('Comparación segura: x < y.').ok, true);
+});
+
+test('Etapa 1.1: corta la validación estructural al exceder el presupuesto global', () => {
+  const large = paragraph(Array.from({ length:renderer.LIMITS.runsPerParagraph }, () => ({ text:'x'.repeat(renderer.LIMITS.runChars) })));
+  const unvisited = {};
+  Object.defineProperty(unvisited, 'type', { get() { throw new Error('No debe validar bloques posteriores al truncamiento'); } });
+  const result = renderer.validateContent(content([large, unvisited]));
+  assert.equal(result.truncated, true);
+  assert.equal(result.issues[0].code, 'message_truncated');
 });
 
 test('Etapa 1.1: conserva la lectura al no estar cerca del final y sigue mensajes cuando sí lo está', () => {
