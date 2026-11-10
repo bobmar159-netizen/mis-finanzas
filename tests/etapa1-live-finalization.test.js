@@ -159,6 +159,40 @@ function createLiveHarness(mode = 'normal') {
   return { api, normalBox, trainingBox, persisted, renders, state };
 }
 
+function createTimelinePersistenceHarness() {
+  const storage = new Map();
+  let failWrites = false;
+  const localStorage = {
+    getItem(key) { return storage.has(key) ? storage.get(key) : null; },
+    setItem(key, value) {
+      if (failWrites) throw new Error('synthetic storage quota');
+      storage.set(key, String(value));
+    },
+    setFailWrites(value) { failWrites = !!value; }
+  };
+  const parts = [
+    "const TIMELINE_KEY = 'yarbi_timeline';",
+    "const TIMELINE_OUTBOX_KEY = 'yarbi_timeline_outbox';",
+    'const MAX_LOCAL_MESSAGES = 500;',
+    "const BACKEND = '';",
+    extractFunction(memoryCenter, 'function token('),
+    extractFunction(memoryCenter, 'function readJson('),
+    extractFunction(memoryCenter, 'function writeJson('),
+    extractFunction(memoryCenter, 'function makeId('),
+    extractFunction(memoryCenter, 'function normalizeTimelineItem('),
+    extractFunction(memoryCenter, 'function loadTimeline('),
+    extractFunction(memoryCenter, 'function queueTimeline('),
+    extractFunction(memoryCenter, 'async function postTimeline('),
+    "let lastTimelinePersistence = Object.freeze({ outcome:'idle' });",
+    extractFunction(memoryCenter, 'function setTimelinePersistence('),
+    extractFunction(memoryCenter, 'function timelineImmutableMatch('),
+    extractFunction(memoryCenter, 'function persistTimelineMessage('),
+    'return { persist:persistTimelineMessage, status:() => lastTimelinePersistence, timeline:loadTimeline, raw:(key) => storage.get(key), setFailWrites:(value) => localStorage.setFailWrites(value) };'
+  ];
+  const build = new Function('localStorage', 'fetch', parts.join('\n'));
+  return build(localStorage, async () => { throw new Error('network disabled'); });
+}
+
 test('Etapa 1.1.2: Gemini Live muestra un borrador transitorio y finaliza una sola vez por el renderer canónico', () => {
   const harness = createLiveHarness();
   const draft = harness.api.begin('assistant', 'turn-1', 'Preparando respuesta…');
@@ -250,6 +284,34 @@ test('Hardening Live: la identidad v2 conserva cada componente sin sanitización
     harness.api.itemId('assistant', 'y:z', { liveSessionId:'a_b:c_x' })
   );
   assert.notEqual(harness.api.itemId('user', turn, { liveSessionId:'sesion/123' }), slash);
+  assert.notEqual(harness.api.itemId('user', 1, { liveSessionId:'session' }), harness.api.itemId('user', '1', { liveSessionId:'session' }));
+  assert.equal(harness.api.itemId('user', Number.NaN, { liveSessionId:'session' }), null);
+  assert.equal(harness.api.itemId('user', {}, { liveSessionId:'session' }), null);
+  assert.equal(harness.api.itemId('operator', 'turn', { liveSessionId:'session' }), null);
+});
+
+test('Etapa 1.2A: la persistencia confirma lectura, conserva inmutabilidad y no oculta fallos de almacenamiento', () => {
+  const harness = createTimelinePersistenceHarness();
+  const first = harness.persist('user', 'Mensaje sintético', 100, 'voice', 'turno-😀-muy-largo-' + 'x'.repeat(256));
+  assert.equal(first?.text, 'Mensaje sintético');
+  assert.equal(harness.status().outcome, 'persisted');
+  assert.equal(harness.timeline().length, 1);
+
+  const retry = harness.persist('user', 'Mensaje sintético', 200, 'voice', first.id);
+  assert.equal(retry?.id, first.id);
+  assert.equal(harness.status().outcome, 'idempotent');
+  assert.equal(harness.timeline().length, 1);
+
+  assert.equal(harness.persist('assistant', 'Mensaje sintético', 300, 'voice', first.id), null);
+  assert.equal(harness.status().outcome, 'identity_conflict');
+  assert.deepEqual(harness.timeline(), [first]);
+
+  harness.setFailWrites(true);
+  assert.equal(harness.persist('user', 'No debe persistir', 400, 'voice', 'turno-cuota'), null);
+  assert.equal(harness.status().outcome, 'storage_write_failed');
+  assert.equal(harness.timeline().length, 1);
+  assert.equal(harness.persist('user', 'ID inválido', 500, 'voice', 1), null);
+  assert.equal(harness.status().outcome, 'identity_invalid');
 });
 
 test('Hardening Live: ausente, null y vacío son distintos; sesiones distintas no cruzan borradores', () => {

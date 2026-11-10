@@ -179,29 +179,60 @@
       return saveTimeline([...merged.values()]);
     } catch (_) { return loadTimeline(); }
   }
+  let lastTimelinePersistence = Object.freeze({ outcome:'idle' });
+  function setTimelinePersistence(outcome, id) {
+    lastTimelinePersistence = Object.freeze({ outcome, id:id || null });
+    return lastTimelinePersistence;
+  }
+  function timelineImmutableMatch(left, right) {
+    return !!left && !!right && left.id === right.id && left.role === right.role
+      && left.text === right.text && left.channel === right.channel;
+  }
   function persistTimelineMessage(role, text, at, channel, id) {
-    const explicitId = typeof id === 'string' && id.trim() ? id.trim() : '';
+    if (typeof id !== 'undefined' && (typeof id !== 'string' || !id.trim())) {
+      setTimelinePersistence('identity_invalid');
+      return null;
+    }
+    const explicitId = typeof id === 'string' ? id.trim() : '';
     const normalized = normalizeTimelineItem({ id:explicitId || undefined, role, text, at:at || Date.now(), channel:channel || 'chat' });
-    if (!normalized) return null;
+    if (!normalized) { setTimelinePersistence('content_invalid'); return null; }
     const list = loadTimeline();
     if (explicitId) {
       const existing = list.find(item => item.id === normalized.id);
-      if (existing) return existing;
+      if (existing) {
+        if (timelineImmutableMatch(existing, normalized)) {
+          setTimelinePersistence('idempotent', existing.id);
+          return existing;
+        }
+        setTimelinePersistence('identity_conflict', existing.id);
+        return null;
+      }
     }
     const last = list[list.length - 1];
-    if (!explicitId && last && last.role === normalized.role && last.text === normalized.text && Math.abs(last.at - normalized.at) < 2500) return last;
-    saveTimeline([...list, normalized]);
+    if (!explicitId && last && last.role === normalized.role && last.text === normalized.text && Math.abs(last.at - normalized.at) < 2500) {
+      setTimelinePersistence('idempotent', last.id);
+      return last;
+    }
+    const next = [...list, normalized].sort((a,b) => a.at - b.at).slice(-MAX_LOCAL_MESSAGES);
+    if (!writeJson(TIMELINE_KEY, next)) {
+      setTimelinePersistence('storage_write_failed', normalized.id);
+      return null;
+    }
     // writeJson falla de forma segura ante cuota o almacenamiento inaccesible.
     // Confirmamos la lectura antes de anunciar una finalización: sin esta
     // comprobación un callback Live podía ocultar un fallo de persistencia.
     const saved = loadTimeline().find(item => item.id === normalized.id);
-    if (!saved) return null;
-    queueTimeline(normalized);
+    if (!timelineImmutableMatch(saved, normalized)) {
+      setTimelinePersistence('storage_readback_failed', normalized.id);
+      return null;
+    }
+    queueTimeline(saved);
     postTimeline([normalized]).then(() => {
       const queue = readJson(TIMELINE_OUTBOX_KEY, []);
       if (Array.isArray(queue)) writeJson(TIMELINE_OUTBOX_KEY, queue.filter(x => x.id !== normalized.id));
     }).catch(() => {});
-    return normalized;
+    setTimelinePersistence('persisted', saved.id);
+    return saved;
   }
   function dayKey(ms) {
     try { return new Intl.DateTimeFormat('en-CA', { timeZone:'America/Lima', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date(ms)); }
@@ -380,10 +411,14 @@
     // espacios, Unicode, mayúsculas ni separadores internos.
     if (typeof value === 'undefined') return 'u';
     if (value === null) return 'n';
-    const raw = String(value);
+    const type = typeof value;
+    if (type === 'number' && (!Number.isFinite(value) || !Number.isSafeInteger(value))) return null;
+    if (!['string', 'number', 'boolean', 'bigint'].includes(type)) return null;
+    const raw = type === 'string' ? value : String(value);
     let hex = '';
     for (let index = 0; index < raw.length; index += 1) hex += raw.charCodeAt(index).toString(16).padStart(4, '0');
-    return 's' + raw.length.toString(36) + '_' + hex;
+    const prefix = type === 'string' ? 's' : type === 'number' ? 'd' : type === 'boolean' ? 'b' : 'g';
+    return prefix + raw.length.toString(36) + '_' + hex;
   }
   function liveIdentityValue(options, name) {
     return options && Object.prototype.hasOwnProperty.call(options, name) ? options[name] : undefined;
@@ -394,23 +429,28 @@
     return typeof sessionId === 'undefined' ? (options || {}) : { ...(options || {}), liveSessionId:sessionId };
   }
   function liveIdentityTuple(role, turnId, options) {
-    const safeRole = role === 'user' ? 'user' : 'assistant';
-    return 'r' + liveIdentityComponent(safeRole)
-      + '_s' + liveIdentityComponent(liveIdentityValue(options, 'liveSessionId'))
-      + '_t' + liveIdentityComponent(turnId);
+    if (role !== 'user' && role !== 'assistant') return null;
+    const safeRole = liveIdentityComponent(role);
+    const session = liveIdentityComponent(liveIdentityValue(options, 'liveSessionId'));
+    const turn = liveIdentityComponent(turnId);
+    if (!safeRole || !session || !turn) return null;
+    return 'r' + safeRole + '_s' + session + '_t' + turn;
   }
   function liveTranscriptKey(role, turnId, options) {
-    return 'live-draft-v2_' + liveIdentityTuple(role, turnId, options);
+    const tuple = liveIdentityTuple(role, turnId, options);
+    return tuple ? 'live-draft-v2_' + tuple : null;
   }
   function liveFinalizationKey(role, turnId, options) {
-    return 'live-final-v2_' + liveIdentityTuple(role, turnId, options);
+    const tuple = liveIdentityTuple(role, turnId, options);
+    return tuple ? 'live-final-v2_' + tuple : null;
   }
   function liveTranscriptItemId(role, turnId, options) {
     // No hay límite propio para id en el almacenamiento local ni en el
     // atributo data-* usado aquí. Por eso no se recortan componentes: si el
     // navegador no puede persistir una entrada excepcionalmente grande, la
     // finalización queda pendiente de recuperación, sin degradarla a otro id.
-    return 'yl_v2_' + liveIdentityTuple(role, turnId, options);
+    const tuple = liveIdentityTuple(role, turnId, options);
+    return tuple ? 'yl_v2_' + tuple : null;
   }
   function chatIsNearBottom(box) {
     return !box || (box.scrollHeight - box.scrollTop - box.clientHeight) < 110;
@@ -424,6 +464,7 @@
     const box = training ? document.getElementById('gfc-yarbi-training-chat') : document.getElementById('gfc-copilot-chat-messages');
     if (!box) return null;
     const key = liveTranscriptKey(role, turnId, liveIdentityOptions(options));
+    if (!key) return null;
     let draft = liveTranscriptDrafts.get(key);
     if (draft?.wrap?.isConnected) return draft;
     const shouldScroll = chatIsNearBottom(box);
@@ -472,6 +513,7 @@
     const value = String(text || '').trim();
     const opts = liveIdentityOptions(options);
     const draftKey = liveTranscriptKey(role, turnId, opts);
+    if (!draftKey) return false;
     const draft = liveTranscriptDrafts.get(draftKey);
     if (!value) {
       if (draft?.wrap?.isConnected) draft.wrap.remove();
@@ -479,8 +521,10 @@
       return false;
     }
     const finalizationKey = liveFinalizationKey(role, turnId, opts);
+    if (!finalizationKey) return false;
     if (finalizedLiveTranscriptKeys.has(finalizationKey)) return true;
     const itemId = liveTranscriptItemId(role, turnId, opts);
+    if (!itemId) return false;
     const item = opts.persist === false
       ? normalizeTimelineItem({ id:itemId || undefined, role, text:value, at:Date.now(), channel:opts.channel || 'voice' })
       : persistTimelineMessage(role, value, Date.now(), opts.channel || 'voice', itemId || undefined);
@@ -524,6 +568,7 @@
     const roles = role ? [role] : ['user', 'assistant'];
     roles.forEach(candidateRole => {
       const key = liveTranscriptKey(candidateRole, turnId, identityOptions);
+      if (!key) return;
       const draft = liveTranscriptDrafts.get(key);
       if (!draft) return;
       if (draft?.wrap?.isConnected) draft.wrap.remove();
