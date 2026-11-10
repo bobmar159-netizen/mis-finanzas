@@ -104,19 +104,29 @@ function createLiveHarness(mode = 'normal') {
     createElement(tag) { return makeNode(tag); }
   };
   const persisted = [];
+  const state = { failPersistence:false, failRenderer:false };
   const renders = [];
   const normalizeTimelineItem = item => {
     const text = String(item?.text || '').trim();
     const role = item?.role === 'user' ? 'user' : item?.role === 'assistant' ? 'assistant' : '';
     return text && role ? { id:String(item.id || `timeline-${persisted.length + 1}`), role, text, at:Number(item.at) || Date.now(), channel:item.channel || 'voice' } : null;
   };
-  const persistTimelineMessage = (role, text, at, channel) => {
-    const item = normalizeTimelineItem({ id:`timeline-${persisted.length + 1}`, role, text, at, channel });
+  const persistTimelineMessage = (role, text, at, channel, id) => {
+    if (state.failPersistence) return null;
+    const item = normalizeTimelineItem({ id:id || `timeline-${persisted.length + 1}`, role, text, at, channel });
+    if (id) {
+      const existing = persisted.find(candidate => candidate.id === item.id);
+      if (existing) return existing;
+    } else {
+      const last = persisted[persisted.length - 1];
+      if (last && last.role === item.role && last.text === item.text && Math.abs(last.at - item.at) < 2500) return last;
+    }
     if (item) persisted.push(item);
     return item;
   };
   const renderTimelineItem = item => {
     const validation = renderer.validateContent(item.text);
+    if (state.failRenderer) return undefined;
     const element = documentMock.createElement('article');
     element.dataset.messageId = item.id;
     element.dataset.canonical = 'true';
@@ -130,6 +140,8 @@ function createLiveHarness(mode = 'normal') {
     'const liveTranscriptDrafts = new Map();',
     'const finalizedLiveTranscriptKeys = new Map();',
     extractFunction(memoryCenter, 'function liveTranscriptKey('),
+    extractFunction(memoryCenter, 'function liveFinalizationKey('),
+    extractFunction(memoryCenter, 'function liveTranscriptItemId('),
     extractFunction(memoryCenter, 'function chatIsNearBottom('),
     extractFunction(memoryCenter, 'function pruneFinalizedLiveKeys('),
     extractFunction(memoryCenter, 'function ensureLiveTranscriptDraft('),
@@ -140,7 +152,7 @@ function createLiveHarness(mode = 'normal') {
   ];
   const build = new Function('window', 'document', 'interactionMode', 'dayKey', 'dayLabel', 'renderTimelineItem', 'normalizeTimelineItem', 'persistTimelineMessage', 'timeLabel', parts.join('\n'));
   const api = build({}, documentMock, () => mode, () => '2026-11-09', () => 'Hoy', renderTimelineItem, normalizeTimelineItem, persistTimelineMessage, () => 'ahora');
-  return { api, normalBox, trainingBox, persisted, renders };
+  return { api, normalBox, trainingBox, persisted, renders, state };
 }
 
 test('Etapa 1.1.2: Gemini Live muestra un borrador transitorio y finaliza una sola vez por el renderer canónico', () => {
@@ -194,8 +206,64 @@ test('Etapa 1.1.2: una finalización sin borrador tras reconexión conserva rol 
   assert.equal(harness.renders[0].validation.truncated, true);
 });
 
-test('Etapa 1.1.2: la implementación normal descarta el draft antes de invocar el renderer canónico', () => {
+test('Etapa 1.1.2: turnos iguales no se fusionan entre sesiones o turnos distintos aunque coincidan texto y timestamp', () => {
+  const harness = createLiveHarness();
+  const priorNow = Date.now;
+  Date.now = () => 1794355200000;
+  try {
+    assert.equal(harness.api.finalize('assistant', 'Mensaje igual', 'turn-1', { channel:'voice', liveSessionId:'live-A' }), true);
+    assert.equal(harness.api.finalize('assistant', 'Mensaje igual', 'turn-2', { channel:'voice', liveSessionId:'live-A' }), true);
+    assert.equal(harness.api.finalize('assistant', 'Mensaje igual', 'turn-1', { channel:'voice', liveSessionId:'live-B' }), true);
+  } finally { Date.now = priorNow; }
+  assert.equal(harness.persisted.length, 3);
+  assert.equal(new Set(harness.persisted.map(item => item.id)).size, 3);
+  assert.equal(harness.renders.length, 3);
+  assert.equal(harness.api.finalize('assistant', 'Mensaje igual', 'turn-1', { channel:'voice', liveSessionId:'live-A' }), true);
+  assert.equal(harness.persisted.length, 3);
+  assert.equal(harness.renders.length, 3);
+});
+
+test('Etapa 1.1.2: un nuevo turno puede finalizar antes del anterior sin cruzar borradores ni mensajes', () => {
+  const harness = createLiveHarness();
+  const first = harness.api.begin('user', 'turn-earlier', 'Escuchando…');
+  const later = harness.api.begin('assistant', 'turn-later', 'Yarbi está respondiendo…');
+  harness.api.update('user', 'Primera consulta', 'turn-earlier');
+  harness.api.update('assistant', 'Respuesta del turno posterior', 'turn-later');
+  assert.equal(harness.api.finalize('assistant', 'Respuesta del turno posterior', 'turn-later', { channel:'voice', liveSessionId:'live-order' }), true);
+  assert.equal(harness.api.finalize('user', 'Primera consulta', 'turn-earlier', { channel:'voice', liveSessionId:'live-order' }), true);
+  assert.equal(first.wrap.isConnected, false);
+  assert.equal(later.wrap.isConnected, false);
+  assert.equal(harness.persisted.length, 2);
+  assert.equal(harness.renders.length, 2);
+  assert.notEqual(harness.persisted[0].id, harness.persisted[1].id);
+});
+
+test('Etapa 1.1.2: un fallo de persistencia o render no confirma el turno y permite recuperación sin duplicarlo', () => {
+  const harness = createLiveHarness();
+  const draft = harness.api.begin('user', 'turn-retry', 'Escuchando…');
+  harness.api.update('user', 'Cliente sintético', 'turn-retry');
+  harness.state.failPersistence = true;
+  assert.equal(harness.api.finalize('user', 'Cliente sintético', 'turn-retry', { channel:'voice', liveSessionId:'live-retry' }), false);
+  assert.equal(draft.wrap.isConnected, true);
+  assert.equal(harness.persisted.length, 0);
+
+  harness.state.failPersistence = false;
+  harness.state.failRenderer = true;
+  assert.equal(harness.api.finalize('user', 'Cliente sintético', 'turn-retry', { channel:'voice', liveSessionId:'live-retry' }), false);
+  assert.equal(draft.wrap.isConnected, true);
+  assert.equal(harness.persisted.length, 1);
+  assert.equal(harness.renders.length, 0);
+
+  harness.state.failRenderer = false;
+  assert.equal(harness.api.finalize('user', 'Cliente sintético', 'turn-retry', { channel:'voice', liveSessionId:'live-retry' }), true);
+  assert.equal(draft.wrap.isConnected, false);
+  assert.equal(harness.persisted.length, 1);
+  assert.equal(harness.renders.length, 1);
+});
+
+test('Etapa 1.1.2: la implementación normal confirma el renderer canónico antes de retirar el draft', () => {
   const finalizer = extractFunction(memoryCenter, 'window.gfcFinalizeLiveTranscriptDraft = function');
-  assert.match(finalizer, /if \(!training\) \{[\s\S]*draft\?\.wrap\?\.isConnected\) draft\.wrap\.remove\(\);[\s\S]*renderTimelineItem\(item\)/);
+  assert.match(finalizer, /if \(!training\) \{[\s\S]*renderTimelineItem\(item\)[\s\S]*if \(!rendered\) return false;[\s\S]*draft\?\.wrap\?\.isConnected\) draft\.wrap\.remove\(\)/);
   assert.match(finalizer, /else if \(draft\?\.wrap\?\.isConnected\)/);
+  assert.match(finalizer, /if \(!rendered\) return false/);
 });

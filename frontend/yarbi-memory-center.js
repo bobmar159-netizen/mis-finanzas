@@ -179,12 +179,17 @@
       return saveTimeline([...merged.values()]);
     } catch (_) { return loadTimeline(); }
   }
-  function persistTimelineMessage(role, text, at, channel) {
-    const normalized = normalizeTimelineItem({ role, text, at:at || Date.now(), channel:channel || 'chat' });
+  function persistTimelineMessage(role, text, at, channel, id) {
+    const explicitId = typeof id === 'string' && id.trim() ? id.trim() : '';
+    const normalized = normalizeTimelineItem({ id:explicitId || undefined, role, text, at:at || Date.now(), channel:channel || 'chat' });
     if (!normalized) return null;
     const list = loadTimeline();
+    if (explicitId) {
+      const existing = list.find(item => item.id === normalized.id);
+      if (existing) return existing;
+    }
     const last = list[list.length - 1];
-    if (last && last.role === normalized.role && last.text === normalized.text && Math.abs(last.at - normalized.at) < 2500) return last;
+    if (!explicitId && last && last.role === normalized.role && last.text === normalized.text && Math.abs(last.at - normalized.at) < 2500) return last;
     saveTimeline([...list, normalized]);
     queueTimeline(normalized);
     postTimeline([normalized]).then(() => {
@@ -366,6 +371,21 @@
   function liveTranscriptKey(role, turnId) {
     return (role === 'user' ? 'user' : 'assistant') + ':' + String(turnId || 'current');
   }
+  function liveFinalizationKey(role, turnId, options) {
+    const sessionId = String(options?.liveSessionId || '').trim();
+    return sessionId
+      ? (role === 'user' ? 'user' : 'assistant') + ':' + sessionId + ':' + String(turnId || 'current')
+      : liveTranscriptKey(role, turnId);
+  }
+  function liveTranscriptItemId(role, turnId, options) {
+    const sessionId = String(options?.liveSessionId || '').trim();
+    const stableTurn = String(turnId || '').trim();
+    if (!sessionId || !stableTurn) return '';
+    const safeSession = sessionId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 96);
+    const safeTurn = stableTurn.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
+    if (!safeSession || !safeTurn) return '';
+    return 'yl_' + safeSession + '_' + (role === 'user' ? 'user' : 'assistant') + '_' + safeTurn;
+  }
   function chatIsNearBottom(box) {
     return !box || (box.scrollHeight - box.scrollTop - box.clientHeight) < 110;
   }
@@ -424,27 +444,37 @@
   };
   window.gfcFinalizeLiveTranscriptDraft = function(role, text, turnId, options) {
     const value = String(text || '').trim();
-    const key = liveTranscriptKey(role, turnId);
-    const draft = liveTranscriptDrafts.get(key);
+    const draftKey = liveTranscriptKey(role, turnId);
+    const draft = liveTranscriptDrafts.get(draftKey);
     if (!value) {
       if (draft?.wrap?.isConnected) draft.wrap.remove();
-      liveTranscriptDrafts.delete(key);
+      liveTranscriptDrafts.delete(draftKey);
       return false;
     }
-    if (finalizedLiveTranscriptKeys.has(key)) return true;
     const opts = options || {};
+    const finalizationKey = liveFinalizationKey(role, turnId, opts);
+    if (finalizedLiveTranscriptKeys.has(finalizationKey)) return true;
+    const itemId = liveTranscriptItemId(role, turnId, opts);
     const item = opts.persist === false
-      ? normalizeTimelineItem({ role, text:value, at:Date.now(), channel:opts.channel || 'voice' })
-      : persistTimelineMessage(role, value, Date.now(), opts.channel || 'voice');
+      ? normalizeTimelineItem({ id:itemId || undefined, role, text:value, at:Date.now(), channel:opts.channel || 'voice' })
+      : persistTimelineMessage(role, value, Date.now(), opts.channel || 'voice', itemId || undefined);
     if (!item) return false;
     const training = interactionMode() === 'training';
     const box = training ? document.getElementById('gfc-yarbi-training-chat') : document.getElementById('gfc-copilot-chat-messages');
     if (!training) {
       // El borrador Live nunca se convierte directamente en un mensaje final del
-      // chat normal: se descarta y el mensaje persistido recorre el renderer
-      // canónico, que aplica validación, Markdown seguro y deduplicación visual.
+      // chat normal: confirmamos primero la representación del mensaje persistido
+      // con el renderer canónico y recién entonces retiramos el borrador.
+      let rendered = !!box?.querySelector('[data-message-id="' + item.id + '"]');
+      if (!rendered && box) {
+        try { renderTimelineItem(item); } catch (_) {}
+        rendered = !!box.querySelector('[data-message-id="' + item.id + '"]');
+      }
+      // Si la persistencia funcionó pero la presentación no, dejamos el
+      // borrador y permitimos un callback posterior; nunca confirmamos una
+      // finalización invisible como si hubiera terminado correctamente.
+      if (!rendered) return false;
       if (draft?.wrap?.isConnected) draft.wrap.remove();
-      if (box && !box.querySelector('[data-message-id="' + item.id + '"]')) renderTimelineItem(item);
     } else if (draft?.wrap?.isConnected) {
       // El simulador de entrenamiento conserva su superficie independiente;
       // el historial conversacional normal siempre usa el renderer canónico.
@@ -457,8 +487,8 @@
     } else {
       if (box && !box.querySelector('[data-message-id="' + item.id + '"]')) renderTimelineItem(item);
     }
-    liveTranscriptDrafts.delete(key);
-    finalizedLiveTranscriptKeys.set(key, item.id);
+    liveTranscriptDrafts.delete(draftKey);
+    finalizedLiveTranscriptKeys.set(finalizationKey, item.id);
     pruneFinalizedLiveKeys();
     if (box && chatIsNearBottom(box)) box.scrollTop = box.scrollHeight;
     return true;

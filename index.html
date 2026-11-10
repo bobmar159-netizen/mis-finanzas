@@ -12943,7 +12943,7 @@ function gfcCommitLiveTurn(session) {
   if (session.modeGreetingTurn) {
     session.modeGreetingTurn = false;
     if (output) {
-      const finalized = typeof gfcFinalizeLiveTranscriptDraft === 'function' && gfcFinalizeLiveTranscriptDraft('assistant', output, committedTurnId, { channel:'voice' });
+      const finalized = typeof gfcFinalizeLiveTranscriptDraft === 'function' && gfcFinalizeLiveTranscriptDraft('assistant', output, committedTurnId, { channel:'voice', liveSessionId:session.liveSessionId });
       if (!finalized) gfcAppendCopilotChatMessage('assistant', output);
     }
     if (output && window._gfcMascot) window._gfcMascot.setState('reposo', output);
@@ -12961,11 +12961,11 @@ function gfcCommitLiveTurn(session) {
   const ownerInstructionIntent = input && Boolean(gfcOwnerInstructionCandidate(input));
   const localIntent = input && (gfcIsTodayBoardRequest(input) || Boolean(gfcYarbiFastAgendaStatusIntent(input)) || Boolean(gfcYarbiLocalResolutionIntent(input)) || ownerInstructionIntent);
   if (input) {
-    const finalizedInput = typeof gfcFinalizeLiveTranscriptDraft === 'function' && gfcFinalizeLiveTranscriptDraft('user', input, committedTurnId, { channel:'voice' });
+    const finalizedInput = typeof gfcFinalizeLiveTranscriptDraft === 'function' && gfcFinalizeLiveTranscriptDraft('user', input, committedTurnId, { channel:'voice', liveSessionId:session.liveSessionId });
     if (!finalizedInput) gfcAppendCopilotChatMessage('user', input);
   } else if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId, 'user');
   if (output && !localIntent) {
-    const finalizedOutput = typeof gfcFinalizeLiveTranscriptDraft === 'function' && gfcFinalizeLiveTranscriptDraft('assistant', output, committedTurnId, { channel:'voice' });
+    const finalizedOutput = typeof gfcFinalizeLiveTranscriptDraft === 'function' && gfcFinalizeLiveTranscriptDraft('assistant', output, committedTurnId, { channel:'voice', liveSessionId:session.liveSessionId });
     if (!finalizedOutput) gfcAppendCopilotChatMessage('assistant', output);
   } else if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId, 'assistant');
   if (output && !localIntent && window._gfcMascot) window._gfcMascot.setState('reposo', output);
