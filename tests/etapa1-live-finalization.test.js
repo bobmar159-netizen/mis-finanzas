@@ -139,6 +139,10 @@ function createLiveHarness(mode = 'normal') {
     'let renderedDay = \"\";',
     'const liveTranscriptDrafts = new Map();',
     'const finalizedLiveTranscriptKeys = new Map();',
+    extractFunction(memoryCenter, 'function liveIdentityComponent('),
+    extractFunction(memoryCenter, 'function liveIdentityValue('),
+    extractFunction(memoryCenter, 'function liveIdentityOptions('),
+    extractFunction(memoryCenter, 'function liveIdentityTuple('),
     extractFunction(memoryCenter, 'function liveTranscriptKey('),
     extractFunction(memoryCenter, 'function liveFinalizationKey('),
     extractFunction(memoryCenter, 'function liveTranscriptItemId('),
@@ -148,7 +152,7 @@ function createLiveHarness(mode = 'normal') {
     extractFunction(memoryCenter, 'window.gfcUpdateLiveTranscriptDraft = function'),
     extractFunction(memoryCenter, 'window.gfcFinalizeLiveTranscriptDraft = function'),
     extractFunction(memoryCenter, 'window.gfcDiscardLiveTranscriptDraft = function'),
-    'return { begin:ensureLiveTranscriptDraft, update:window.gfcUpdateLiveTranscriptDraft, finalize:window.gfcFinalizeLiveTranscriptDraft, discard:window.gfcDiscardLiveTranscriptDraft, drafts:liveTranscriptDrafts, finalized:finalizedLiveTranscriptKeys };'
+    'return { begin:ensureLiveTranscriptDraft, update:window.gfcUpdateLiveTranscriptDraft, finalize:window.gfcFinalizeLiveTranscriptDraft, discard:window.gfcDiscardLiveTranscriptDraft, drafts:liveTranscriptDrafts, finalized:finalizedLiveTranscriptKeys, draftKey:liveTranscriptKey, finalKey:liveFinalizationKey, itemId:liveTranscriptItemId };'
   ];
   const build = new Function('window', 'document', 'interactionMode', 'dayKey', 'dayLabel', 'renderTimelineItem', 'normalizeTimelineItem', 'persistTimelineMessage', 'timeLabel', parts.join('\n'));
   const api = build({}, documentMock, () => mode, () => '2026-11-09', () => 'Hoy', renderTimelineItem, normalizeTimelineItem, persistTimelineMessage, () => 'ahora');
@@ -223,12 +227,67 @@ test('Etapa 1.1.2: turnos iguales no se fusionan entre sesiones o turnos distint
   assert.equal(harness.renders.length, 3);
 });
 
+test('Hardening Live: la identidad v2 conserva cada componente sin sanitización ni truncamiento', () => {
+  const harness = createLiveHarness();
+  const turn = 'turn/uno:dos con espacio_😀';
+  const slash = harness.api.itemId('assistant', turn, { liveSessionId:'sesion/123' });
+  const underscore = harness.api.itemId('assistant', turn, { liveSessionId:'sesion_123' });
+  assert.notEqual(slash, underscore);
+  assert.match(slash, /^yl_v2_[a-z0-9_]+$/);
+
+  const sharedSessionPrefix = 's'.repeat(96);
+  const sharedTurnPrefix = 't'.repeat(40);
+  assert.notEqual(
+    harness.api.itemId('assistant', sharedTurnPrefix + '-A', { liveSessionId:sharedSessionPrefix + '-A' }),
+    harness.api.itemId('assistant', sharedTurnPrefix + '-B', { liveSessionId:sharedSessionPrefix + '-B' })
+  );
+  assert.notEqual(
+    harness.api.itemId('assistant', 'Turno', { liveSessionId:'Sesión Única' }),
+    harness.api.itemId('assistant', 'turno', { liveSessionId:'sesión única' })
+  );
+  assert.notEqual(
+    harness.api.itemId('assistant', 'x_y:z', { liveSessionId:'a_b:c' }),
+    harness.api.itemId('assistant', 'y:z', { liveSessionId:'a_b:c_x' })
+  );
+  assert.notEqual(harness.api.itemId('user', turn, { liveSessionId:'sesion/123' }), slash);
+});
+
+test('Hardening Live: ausente, null y vacío son distintos; sesiones distintas no cruzan borradores', () => {
+  const harness = createLiveHarness();
+  const undefinedId = harness.api.itemId('user', undefined, {});
+  const nullId = harness.api.itemId('user', null, { liveSessionId:null });
+  const emptyId = harness.api.itemId('user', '', { liveSessionId:'' });
+  assert.notEqual(undefinedId, nullId);
+  assert.notEqual(undefinedId, emptyId);
+  assert.notEqual(nullId, emptyId);
+
+  const first = harness.api.begin('assistant', 'same-turn', 'Preparando respuesta…', { liveSessionId:'A/B' });
+  const second = harness.api.begin('assistant', 'same-turn', 'Preparando respuesta…', { liveSessionId:'A_B' });
+  assert.notEqual(first.key, second.key);
+  assert.equal(harness.api.finalize('assistant', 'Mismo texto', 'same-turn', { channel:'voice', liveSessionId:'A/B' }), true);
+  assert.equal(harness.api.finalize('assistant', 'Mismo texto', 'same-turn', { channel:'voice', liveSessionId:'A_B' }), true);
+  assert.equal(harness.persisted.length, 2);
+});
+
+test('Hardening Live: callback repetido y reconexión conservan una entrada por tupla exacta', () => {
+  const harness = createLiveHarness();
+  const options = { channel:'voice', liveSessionId:'reconnect/live' };
+  assert.equal(harness.api.finalize('user', 'Mensaje estable', 'turn-7', options), true);
+  assert.equal(harness.api.finalize('user', 'Mensaje estable', 'turn-7', options), true);
+  assert.equal(harness.persisted.length, 1);
+  assert.equal(harness.renders.length, 1);
+  assert.equal(harness.api.finalize('user', 'Mensaje estable', 'turn-8', options), true);
+  assert.equal(harness.persisted.length, 2);
+  assert.equal(new Set(harness.persisted.map(item => item.id)).size, 2);
+});
+
 test('Etapa 1.1.2: un nuevo turno puede finalizar antes del anterior sin cruzar borradores ni mensajes', () => {
   const harness = createLiveHarness();
-  const first = harness.api.begin('user', 'turn-earlier', 'Escuchando…');
-  const later = harness.api.begin('assistant', 'turn-later', 'Yarbi está respondiendo…');
-  harness.api.update('user', 'Primera consulta', 'turn-earlier');
-  harness.api.update('assistant', 'Respuesta del turno posterior', 'turn-later');
+  const options = { liveSessionId:'live-order' };
+  const first = harness.api.begin('user', 'turn-earlier', 'Escuchando…', options);
+  const later = harness.api.begin('assistant', 'turn-later', 'Yarbi está respondiendo…', options);
+  harness.api.update('user', 'Primera consulta', 'turn-earlier', options);
+  harness.api.update('assistant', 'Respuesta del turno posterior', 'turn-later', options);
   assert.equal(harness.api.finalize('assistant', 'Respuesta del turno posterior', 'turn-later', { channel:'voice', liveSessionId:'live-order' }), true);
   assert.equal(harness.api.finalize('user', 'Primera consulta', 'turn-earlier', { channel:'voice', liveSessionId:'live-order' }), true);
   assert.equal(first.wrap.isConnected, false);
@@ -240,8 +299,9 @@ test('Etapa 1.1.2: un nuevo turno puede finalizar antes del anterior sin cruzar 
 
 test('Etapa 1.1.2: un fallo de persistencia o render no confirma el turno y permite recuperación sin duplicarlo', () => {
   const harness = createLiveHarness();
-  const draft = harness.api.begin('user', 'turn-retry', 'Escuchando…');
-  harness.api.update('user', 'Cliente sintético', 'turn-retry');
+  const options = { liveSessionId:'live-retry' };
+  const draft = harness.api.begin('user', 'turn-retry', 'Escuchando…', options);
+  harness.api.update('user', 'Cliente sintético', 'turn-retry', options);
   harness.state.failPersistence = true;
   assert.equal(harness.api.finalize('user', 'Cliente sintético', 'turn-retry', { channel:'voice', liveSessionId:'live-retry' }), false);
   assert.equal(draft.wrap.isConnected, true);

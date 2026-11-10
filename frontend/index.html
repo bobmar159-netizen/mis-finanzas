@@ -11756,7 +11756,7 @@ function gfcLiveAdvanceTurn(session, reason = 'user-speech') {
 
 function gfcLiveInvalidateTurn(session, reason = 'cancel') {
   gfcLiveTrace(session, 'invalidated', { reason });
-  if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(session.liveTurnId);
+  if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(session.liveTurnId, undefined, { liveSessionId:session.liveSessionId });
   const turnId = gfcLiveAdvanceTurn(session, reason);
   session.liveTurnNeedsSpeech = true;
   session.liveIgnoreServerContentUntilSpeech = true;
@@ -12921,7 +12921,7 @@ function gfcCommitLiveTurn(session) {
   const output = String(session.outputBuffer || '').trim();
   if (session.suppressCurrentLiveTurnCommit) {
     session.suppressCurrentLiveTurnCommit = false;
-    if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId);
+    if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId, undefined, { liveSessionId:session.liveSessionId });
     session.inputBuffer = '';
     session.outputBuffer = '';
     session.transcript = '';
@@ -12932,7 +12932,7 @@ function gfcCommitLiveTurn(session) {
   if (session.trainingMode) {
     session.modeGreetingTurn = false;
     if (typeof gfcHandleYarbiTrainingLiveTurn === 'function') void gfcHandleYarbiTrainingLiveTurn(input, output);
-    if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId);
+    if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId, undefined, { liveSessionId:session.liveSessionId });
     session.inputBuffer = '';
     session.outputBuffer = '';
     session.transcript = '';
@@ -12963,11 +12963,11 @@ function gfcCommitLiveTurn(session) {
   if (input) {
     const finalizedInput = typeof gfcFinalizeLiveTranscriptDraft === 'function' && gfcFinalizeLiveTranscriptDraft('user', input, committedTurnId, { channel:'voice', liveSessionId:session.liveSessionId });
     if (!finalizedInput) gfcAppendCopilotChatMessage('user', input);
-  } else if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId, 'user');
+  } else if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId, 'user', { liveSessionId:session.liveSessionId });
   if (output && !localIntent) {
     const finalizedOutput = typeof gfcFinalizeLiveTranscriptDraft === 'function' && gfcFinalizeLiveTranscriptDraft('assistant', output, committedTurnId, { channel:'voice', liveSessionId:session.liveSessionId });
     if (!finalizedOutput) gfcAppendCopilotChatMessage('assistant', output);
-  } else if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId, 'assistant');
+  } else if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId, 'assistant', { liveSessionId:session.liveSessionId });
   if (output && !localIntent && window._gfcMascot) window._gfcMascot.setState('reposo', output);
   const isFarewell = /\b(chau|chao|ad[ií]os|hasta luego|nos vemos)\b/i.test(input);
   if (isFarewell) {

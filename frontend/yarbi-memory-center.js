@@ -191,6 +191,11 @@
     const last = list[list.length - 1];
     if (!explicitId && last && last.role === normalized.role && last.text === normalized.text && Math.abs(last.at - normalized.at) < 2500) return last;
     saveTimeline([...list, normalized]);
+    // writeJson falla de forma segura ante cuota o almacenamiento inaccesible.
+    // Confirmamos la lectura antes de anunciar una finalización: sin esta
+    // comprobación un callback Live podía ocultar un fallo de persistencia.
+    const saved = loadTimeline().find(item => item.id === normalized.id);
+    if (!saved) return null;
     queueTimeline(normalized);
     postTimeline([normalized]).then(() => {
       const queue = readJson(TIMELINE_OUTBOX_KEY, []);
@@ -368,23 +373,44 @@
   // palabra al llegar sin llenar Supabase/localStorage con fragmentos.
   const liveTranscriptDrafts = new Map();
   const finalizedLiveTranscriptKeys = new Map();
-  function liveTranscriptKey(role, turnId) {
-    return (role === 'user' ? 'user' : 'assistant') + ':' + String(turnId || 'current');
+  function liveIdentityComponent(value) {
+    // La marca de tipo evita confundir un valor ausente, null o la cadena
+    // literal "undefined". Codificamos unidades UTF-16 en hexadecimal para
+    // que la clave sea reversible, segura como atributo DOM y no pierda
+    // espacios, Unicode, mayúsculas ni separadores internos.
+    if (typeof value === 'undefined') return 'u';
+    if (value === null) return 'n';
+    const raw = String(value);
+    let hex = '';
+    for (let index = 0; index < raw.length; index += 1) hex += raw.charCodeAt(index).toString(16).padStart(4, '0');
+    return 's' + raw.length.toString(36) + '_' + hex;
+  }
+  function liveIdentityValue(options, name) {
+    return options && Object.prototype.hasOwnProperty.call(options, name) ? options[name] : undefined;
+  }
+  function liveIdentityOptions(options) {
+    if (options && Object.prototype.hasOwnProperty.call(options, 'liveSessionId')) return options;
+    const sessionId = window._gfcLiveSession?.liveSessionId;
+    return typeof sessionId === 'undefined' ? (options || {}) : { ...(options || {}), liveSessionId:sessionId };
+  }
+  function liveIdentityTuple(role, turnId, options) {
+    const safeRole = role === 'user' ? 'user' : 'assistant';
+    return 'r' + liveIdentityComponent(safeRole)
+      + '_s' + liveIdentityComponent(liveIdentityValue(options, 'liveSessionId'))
+      + '_t' + liveIdentityComponent(turnId);
+  }
+  function liveTranscriptKey(role, turnId, options) {
+    return 'live-draft-v2_' + liveIdentityTuple(role, turnId, options);
   }
   function liveFinalizationKey(role, turnId, options) {
-    const sessionId = String(options?.liveSessionId || '').trim();
-    return sessionId
-      ? (role === 'user' ? 'user' : 'assistant') + ':' + sessionId + ':' + String(turnId || 'current')
-      : liveTranscriptKey(role, turnId);
+    return 'live-final-v2_' + liveIdentityTuple(role, turnId, options);
   }
   function liveTranscriptItemId(role, turnId, options) {
-    const sessionId = String(options?.liveSessionId || '').trim();
-    const stableTurn = String(turnId || '').trim();
-    if (!sessionId || !stableTurn) return '';
-    const safeSession = sessionId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 96);
-    const safeTurn = stableTurn.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
-    if (!safeSession || !safeTurn) return '';
-    return 'yl_' + safeSession + '_' + (role === 'user' ? 'user' : 'assistant') + '_' + safeTurn;
+    // No hay límite propio para id en el almacenamiento local ni en el
+    // atributo data-* usado aquí. Por eso no se recortan componentes: si el
+    // navegador no puede persistir una entrada excepcionalmente grande, la
+    // finalización queda pendiente de recuperación, sin degradarla a otro id.
+    return 'yl_v2_' + liveIdentityTuple(role, turnId, options);
   }
   function chatIsNearBottom(box) {
     return !box || (box.scrollHeight - box.scrollTop - box.clientHeight) < 110;
@@ -393,11 +419,11 @@
     if (finalizedLiveTranscriptKeys.size <= 80) return;
     [...finalizedLiveTranscriptKeys.keys()].slice(0, finalizedLiveTranscriptKeys.size - 60).forEach(key => finalizedLiveTranscriptKeys.delete(key));
   }
-  function ensureLiveTranscriptDraft(role, turnId, placeholder) {
+  function ensureLiveTranscriptDraft(role, turnId, placeholder, options) {
     const training = interactionMode() === 'training';
     const box = training ? document.getElementById('gfc-yarbi-training-chat') : document.getElementById('gfc-copilot-chat-messages');
     if (!box) return null;
-    const key = liveTranscriptKey(role, turnId);
+    const key = liveTranscriptKey(role, turnId, liveIdentityOptions(options));
     let draft = liveTranscriptDrafts.get(key);
     if (draft?.wrap?.isConnected) return draft;
     const shouldScroll = chatIsNearBottom(box);
@@ -423,17 +449,17 @@
     time.textContent = 'ahora · en vivo';
     wrap.append(label, body, time);
     box.appendChild(wrap);
-    draft = { key, role:role === 'user' ? 'user' : 'assistant', turnId:String(turnId || 'current'), wrap, label, body, time, text:'' };
+    draft = { key, role:role === 'user' ? 'user' : 'assistant', turnId:String(turnId ?? ''), wrap, label, body, time, text:'' };
     liveTranscriptDrafts.set(key, draft);
     if (shouldScroll) box.scrollTop = box.scrollHeight;
     return draft;
   }
-  window.gfcBeginLiveTranscriptDraft = function(role, turnId, placeholder) {
-    return ensureLiveTranscriptDraft(role, turnId, placeholder);
+  window.gfcBeginLiveTranscriptDraft = function(role, turnId, placeholder, options) {
+    return ensureLiveTranscriptDraft(role, turnId, placeholder, options);
   };
-  window.gfcUpdateLiveTranscriptDraft = function(role, text, turnId) {
+  window.gfcUpdateLiveTranscriptDraft = function(role, text, turnId, options) {
     const value = String(text || '').trim();
-    const draft = ensureLiveTranscriptDraft(role, turnId, value || undefined);
+    const draft = ensureLiveTranscriptDraft(role, turnId, value || undefined, options);
     if (!draft || !value) return false;
     const box = draft.wrap.parentElement;
     const shouldScroll = chatIsNearBottom(box);
@@ -444,14 +470,14 @@
   };
   window.gfcFinalizeLiveTranscriptDraft = function(role, text, turnId, options) {
     const value = String(text || '').trim();
-    const draftKey = liveTranscriptKey(role, turnId);
+    const opts = liveIdentityOptions(options);
+    const draftKey = liveTranscriptKey(role, turnId, opts);
     const draft = liveTranscriptDrafts.get(draftKey);
     if (!value) {
       if (draft?.wrap?.isConnected) draft.wrap.remove();
       liveTranscriptDrafts.delete(draftKey);
       return false;
     }
-    const opts = options || {};
     const finalizationKey = liveFinalizationKey(role, turnId, opts);
     if (finalizedLiveTranscriptKeys.has(finalizationKey)) return true;
     const itemId = liveTranscriptItemId(role, turnId, opts);
@@ -493,11 +519,13 @@
     if (box && chatIsNearBottom(box)) box.scrollTop = box.scrollHeight;
     return true;
   };
-  window.gfcDiscardLiveTranscriptDraft = function(turnId, role) {
-    const suffix = ':' + String(turnId || 'current');
-    [...liveTranscriptDrafts.entries()].forEach(([key, draft]) => {
-      if (!key.endsWith(suffix)) return;
-      if (role && draft.role !== role) return;
+  window.gfcDiscardLiveTranscriptDraft = function(turnId, role, options) {
+    const identityOptions = liveIdentityOptions(options);
+    const roles = role ? [role] : ['user', 'assistant'];
+    roles.forEach(candidateRole => {
+      const key = liveTranscriptKey(candidateRole, turnId, identityOptions);
+      const draft = liveTranscriptDrafts.get(key);
+      if (!draft) return;
       if (draft?.wrap?.isConnected) draft.wrap.remove();
       liveTranscriptDrafts.delete(key);
     });
