@@ -76,6 +76,32 @@ test('P0.2I: Android output refuses an absent API origin and the service worker 
   assert.match(serviceWorker, /yarbi-static-__YARBI_RELEASE_ID__/);
 });
 
+test('Etapa 1.2C: Android offline build explicitly blocks remote operations without a fallback origin', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'yarbi-android-offline-'));
+  const offline = path.join(temp, 'android');
+  run('android', offline, {
+    YARBI_ANDROID_OFFLINE_ONLY: 'true',
+    YARBI_ANDROID_AUTH_CALLBACK_SCHEME: 'com.misfinanzas.app.yarbitest.etapa12c'
+  });
+  const runtime = fs.readFileSync(path.join(offline, 'runtime-config.js'), 'utf8');
+  const manifest = JSON.parse(fs.readFileSync(path.join(offline, 'BUILD_MANIFEST.json'), 'utf8'));
+  assert.match(runtime, /apiOrigin: 'offline:\/\/remote-disabled'/);
+  assert.match(runtime, /remoteEnabled: 'false' === 'true'/);
+  assert.match(runtime, /com\.misfinanzas\.app\.yarbitest\.etapa12c/);
+  assert.equal(runtime.includes(productionOrigin), false);
+  assert.equal(manifest.api_origin_mode, 'remote_disabled');
+});
+
+test('Etapa 1.2C: Android offline mode defers remote endpoint resolution until a remote action is requested', () => {
+  const html = fs.readFileSync(path.join(frontend, 'index.html'), 'utf8');
+  assert.doesNotMatch(html, /const GFC_ACCOUNT_REDIRECT_URI\s*=\s*window\.gfcRuntimeApiOrigin\(/);
+  assert.doesNotMatch(html, /const GFC_YARBI_LOCAL_MIRROR_ENDPOINT\s*=\s*window\.gfcRuntimeApiOrigin\(/);
+  assert.doesNotMatch(html, /const GFC_YARBI_PROCESSING_STATUS_ENDPOINT\s*=\s*window\.gfcRuntimeApiOrigin\(/);
+  assert.match(html, /function gfcAccountRedirectUri\(\)/);
+  assert.match(html, /function gfcYarbiLocalMirrorEndpoint\(\)/);
+  assert.match(html, /function gfcYarbiProcessingStatusEndpoint\(\)/);
+});
+
 test('F00: the served web root is generated from the web build, not an older HTML copy', () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'yarbi-f00-root-'));
   const web = path.join(temp, 'web');

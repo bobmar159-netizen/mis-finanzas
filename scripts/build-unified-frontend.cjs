@@ -15,6 +15,7 @@ const out = args.get('--out') ? path.resolve(repo, args.get('--out')) : path.joi
 const replaceGenerated = args.has('--replace-generated');
 const publishRootArg = args.get('--publish-root');
 const publishRoot = publishRootArg === true ? repo : (publishRootArg ? path.resolve(repo, publishRootArg) : null);
+const androidOfflineOnly = target === 'android' && process.env.YARBI_ANDROID_OFFLINE_ONLY === 'true';
 
 function fail(message) { throw new Error(`P0.2I build: ${message}`); }
 function sha(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
@@ -42,6 +43,10 @@ function validateOrigin(value) {
     fail('YARBI_ANDROID_API_ORIGIN debe ser un origen HTTPS limpio, sin credenciales ni ruta.');
   }
   return parsed.origin;
+}
+function validateAuthScheme(value) {
+  if (!/^[a-z][a-z0-9+.-]*$/i.test(value)) fail('YARBI_ANDROID_AUTH_CALLBACK_SCHEME debe ser un esquema URI válido.');
+  return value;
 }
 function renderTemplate(file, replacements) {
   let value = fs.readFileSync(file, 'utf8');
@@ -75,13 +80,21 @@ if (fs.existsSync(out)) {
 
 const sourceHash = sourceDigest();
 const releaseId = `p02i-${sourceHash.slice(0, 16)}`;
-const apiOrigin = target === 'web' ? '__YARBI_SAME_ORIGIN__' : validateOrigin(process.env.YARBI_ANDROID_API_ORIGIN || '');
+const apiOrigin = target === 'web'
+  ? '__YARBI_SAME_ORIGIN__'
+  : (androidOfflineOnly ? 'offline://remote-disabled' : validateOrigin(process.env.YARBI_ANDROID_API_ORIGIN || ''));
+const remoteEnabled = target === 'web' || !androidOfflineOnly;
+const nativeAuthCallbackScheme = target === 'android'
+  ? validateAuthScheme(process.env.YARBI_ANDROID_AUTH_CALLBACK_SCHEME || 'com.misfinanzas.app')
+  : 'com.misfinanzas.app';
 fs.mkdirSync(out, { recursive: true });
 copyTree(frontend, out);
 renderTemplate(path.join(out, 'runtime-config.js'), {
   '__YARBI_API_ORIGIN__': apiOrigin,
   '__YARBI_ENVIRONMENT__': target,
   '__YARBI_RELEASE_ID__': releaseId,
+  '__YARBI_REMOTE_ENABLED__': String(remoteEnabled),
+  '__YARBI_NATIVE_AUTH_CALLBACK_SCHEME__': nativeAuthCallbackScheme,
   '__YARBI_SAME_ORIGIN__': '__YARBI_SAME_ORIGIN__'
 });
 renderTemplate(path.join(out, 'service-worker.js'), { '__YARBI_RELEASE_ID__': releaseId });
@@ -96,7 +109,7 @@ const manifest = {
   target,
   release_id: releaseId,
   source_sha256: sourceHash,
-  api_origin_mode: target === 'web' ? 'same_origin' : 'explicit_https',
+  api_origin_mode: target === 'web' ? 'same_origin' : (androidOfflineOnly ? 'remote_disabled' : 'explicit_https'),
   files: files.map(file => ({ path: path.relative(out, file).replace(/\\/g, '/'), sha256: sha(fs.readFileSync(file)), bytes: fs.statSync(file).size }))
 };
 fs.writeFileSync(path.join(out, 'BUILD_MANIFEST.json'), JSON.stringify(manifest, null, 2) + '\n');

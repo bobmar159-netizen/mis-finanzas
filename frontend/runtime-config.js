@@ -4,9 +4,14 @@
   const config = Object.freeze({
     apiOrigin: '__YARBI_API_ORIGIN__',
     environment: '__YARBI_ENVIRONMENT__',
-    releaseId: '__YARBI_RELEASE_ID__'
+    releaseId: '__YARBI_RELEASE_ID__',
+    remoteEnabled: '__YARBI_REMOTE_ENABLED__' === 'true',
+    nativeAuthCallbackScheme: '__YARBI_NATIVE_AUTH_CALLBACK_SCHEME__'
   });
   function apiOrigin() {
+    if (!config.remoteEnabled) {
+      throw new Error('Las operaciones remotas están deshabilitadas en esta compilación local de prueba. No se usó ningún destino alternativo.');
+    }
     if (config.apiOrigin === '__YARBI_SAME_ORIGIN__') return window.location.origin;
     try {
       const parsed = new URL(config.apiOrigin);
@@ -18,4 +23,6 @@
   }
   window.gfcRuntimeConfig = config;
   window.gfcRuntimeApiOrigin = apiOrigin;
+  window.gfcRuntimeRemoteEnabled = () => config.remoteEnabled;
+  window.gfcRuntimeNativeAuthCallbackPrefix = () => `${config.nativeAuthCallbackScheme}://auth/callback`;
 })();

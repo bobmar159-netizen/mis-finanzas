@@ -11964,7 +11964,9 @@ const GFC_ACCOUNT_ACCESS_KEY = 'gfc_supabase_access_token_v1';
 const GFC_ACCOUNT_REFRESH_KEY = 'gfc_supabase_refresh_token_v1';
 const GFC_ACCOUNT_EMAIL_KEY = 'gfc_supabase_email_v1';
 const GFC_ACCOUNT_USER_KEY = 'gfc_supabase_user_id_v1';
-const GFC_ACCOUNT_REDIRECT_URI = window.gfcRuntimeApiOrigin() + '/api/assistant/preferences?action=auth-callback';
+function gfcAccountRedirectUri() {
+  return window.gfcRuntimeApiOrigin() + '/api/assistant/preferences?action=auth-callback';
+}
 const GFC_ACCOUNT_STATUS_KEY = 'gfc_supabase_account_status_v1';
 async function gfcSupabaseAuthConfig() {
   const response = await fetch(window.gfcRuntimeApiOrigin() + '/api/assistant/preferences?action=auth-config', { cache: 'no-store' });
@@ -12261,7 +12263,7 @@ async function gfcAccountRequestCode() {
   const email = String(document.getElementById('yarbi-account-email')?.value || '').trim().toLowerCase();
   if (!/^\S+@\S+\.\S+$/.test(email)) return gfcAccountSetStatus('Escribe un correo válido.', 'error');
   try {
-    await gfcSupabaseAuthRequest('otp', { email, create_user: true, redirect_to: GFC_ACCOUNT_REDIRECT_URI });
+    await gfcSupabaseAuthRequest('otp', { email, create_user: true, redirect_to: gfcAccountRedirectUri() });
     localStorage.setItem(GFC_ACCOUNT_EMAIL_KEY, email);
     gfcAccountSetStatus('Enlace enviado. Ábrelo desde el mismo celular para activar Yarbi.', 'success');
   } catch (error) {
@@ -12309,7 +12311,10 @@ function gfcAccountHandleSupabaseDeepLink(rawUrl) {
 window.gfcHandleSupabaseDeepLink = gfcAccountHandleSupabaseDeepLink;
 function gfcAccountReceiveNativeDeepLink(rawUrl) {
   const url = String(rawUrl || '');
-  if (!url || !url.startsWith('com.misfinanzas.app://auth/callback')) return false;
+  const expectedPrefix = typeof window.gfcRuntimeNativeAuthCallbackPrefix === 'function'
+    ? window.gfcRuntimeNativeAuthCallbackPrefix()
+    : 'com.misfinanzas.app://auth/callback';
+  if (!url || !url.startsWith(expectedPrefix)) return false;
   if (window._gfcLastAccountDeepLink === url) return true;
   window._gfcLastAccountDeepLink = url;
   return gfcAccountHandleSupabaseDeepLink(url);
@@ -15705,8 +15710,12 @@ async function gfcFindWhatsappClient(args = {}) {
   return result;
 }
 // Réplica local privada de Yarbi: acelera lecturas, pero Supabase conserva la verdad.
-const GFC_YARBI_LOCAL_MIRROR_ENDPOINT = window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?action=local-sync';
-const GFC_YARBI_HABITS_ENDPOINT = window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?action=habits';
+function gfcYarbiLocalMirrorEndpoint() {
+  return window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?action=local-sync';
+}
+function gfcYarbiHabitsEndpoint() {
+  return window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?action=habits';
+}
 const GFC_YARBI_LOCAL_DB = 'gfc_yarbi_local_mirror_v1';
 // La nube es la verdad; 45 s evita que un mensaje reciente quede oculto detrás
 // de una réplica considerada "fresca" durante cinco minutos.
@@ -16113,7 +16122,7 @@ async function gfcSyncYarbiLocalMirror(options = {}) {
     const [entityCursor, messageCursor, deletionCursor, savedHistoryCursor] = await Promise.all([gfcYarbiLocalGetMeta('entity_cursor'), gfcYarbiLocalGetMeta('message_cursor'), gfcYarbiLocalGetMeta('deletion_cursor'), gfcYarbiLocalGetMeta('history_before')]);
     const body = { entity_cursor: entityCursor || null, message_cursor: messageCursor || null, deletion_cursor: deletionCursor || null, message_limit: 200, entity_limit: 400 };
     if (options.historyBefore) body.history_before = options.historyBefore;
-    const response = await fetch(GFC_YARBI_LOCAL_MIRROR_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token }, body: JSON.stringify(body) });
+    const response = await fetch(gfcYarbiLocalMirrorEndpoint(), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token }, body: JSON.stringify(body) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) { const message = data.detail || data.error || 'No se pudo sincronizar la réplica local'; gfcYarbiLocalStatusWrite({ status: 'error', reason: options.reason || 'background', http: response.status, last_error: message }); throw new Error(message); }
     await gfcYarbiLocalApply(data, options.reason || 'background');
@@ -19928,7 +19937,7 @@ function gfcYarbiHabitSuppressLocal(id) {
 async function gfcYarbiHabitCandidateResolve(id, operation) {
   const token = localStorage.getItem('fnz_assistant_token') || '';
   if (!token) throw new Error('token_missing');
-  const response = await fetch(GFC_YARBI_HABITS_ENDPOINT, {
+  const response = await fetch(gfcYarbiHabitsEndpoint(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },
     body: JSON.stringify({ confirm: true, id, operation })
@@ -19942,7 +19951,7 @@ async function gfcYarbiOfferHabitCandidate() {
   if (!document.getElementById('gfc-copilot-chat-messages') || gfcOwnerInstructionGetPending()) return null;
   const token = localStorage.getItem('fnz_assistant_token') || '';
   if (!token) return null;
-  const response = await fetch(GFC_YARBI_HABITS_ENDPOINT, { headers: { 'X-Assistant-Token': token }, cache: 'no-store' });
+  const response = await fetch(gfcYarbiHabitsEndpoint(), { headers: { 'X-Assistant-Token': token }, cache: 'no-store' });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !Array.isArray(data.candidates)) return null;
   const suppressed = gfcYarbiHabitSuppressedIds();
@@ -20720,7 +20729,9 @@ function gfcOpenAlertConversation(id) {
   gfcOpenCopilotModal('chat', suggestion.id);
 }
 
-const GFC_YARBI_PROCESSING_STATUS_ENDPOINT = window.gfcRuntimeApiOrigin() + '/api/ai/process';
+function gfcYarbiProcessingStatusEndpoint() {
+  return window.gfcRuntimeApiOrigin() + '/api/ai/process';
+}
 function gfcSetYarbiProcessingUi(data = {}) {
   const label = document.getElementById('gfc-ai-process-status'), detail = document.getElementById('gfc-ai-process-detail'), button = document.getElementById('gfc-ai-process-btn');
   if (!label || !button) return;
@@ -20788,7 +20799,7 @@ function gfcMaybeRecoverYarbiFailures(data = {}) {
   window._gfcYarbiAutoRecoveryRunning = true;
   gfcSetYarbiProcessingUi(data);
   localStorage.setItem(GFC_YARBI_AUTO_RECOVERY_KEY, String(Date.now()));
-  fetch(GFC_YARBI_PROCESSING_STATUS_ENDPOINT, {
+  fetch(gfcYarbiProcessingStatusEndpoint(), {
     method:'POST',
     headers:{ 'Content-Type':'application/json', 'X-Assistant-Token':token },
     body:JSON.stringify({ action:'recover', limit:25, requested_by:'yarbi-background-recovery' })
@@ -20810,7 +20821,7 @@ async function gfcRefreshYarbiProcessingStatus(options = {}) {
   const label = document.getElementById('gfc-ai-process-status'), token = localStorage.getItem('fnz_assistant_token') || '';
   if (!token) { if (label) { label.textContent = 'Configura el token para sincronizar.'; label.style.color = '#B45309'; } return null; }
   try {
-    const response = await fetch(GFC_YARBI_PROCESSING_STATUS_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token }, body: JSON.stringify({ action: 'status' }) });
+    const response = await fetch(gfcYarbiProcessingStatusEndpoint(), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token }, body: JSON.stringify({ action: 'status' }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const failure = new Error(data.detail || data.error || 'No se pudo verificar la memoria');
@@ -20839,7 +20850,7 @@ async function gfcLearnHistoricalReplyStyle() {
   if (!accepted) return;
   if (button) { button.disabled = true; button.textContent = '🧠 Aprendiendo…'; }
   try {
-    const response = await fetch(GFC_YARBI_PROCESSING_STATUS_ENDPOINT, {
+    const response = await fetch(gfcYarbiProcessingStatusEndpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },
       body: JSON.stringify({ action: 'bootstrap-reply-style', requested_by: 'yarbi-explicit-user-consent' })
@@ -20870,7 +20881,7 @@ async function gfcProcessYarbiInformation() {
     const before = await gfcRefreshYarbiProcessingStatus({ quiet: true });
     let recovery = null;
     if (before && before.status !== 'up_to_date') {
-      const recoveryResponse = await fetch(GFC_YARBI_PROCESSING_STATUS_ENDPOINT, {
+      const recoveryResponse = await fetch(gfcYarbiProcessingStatusEndpoint(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },
         body: JSON.stringify({ action: 'recover', limit: 25, requested_by: 'yarbi-manual-recovery' })

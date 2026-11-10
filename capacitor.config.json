@@ -1,0 +1,10 @@
+{
+  "appId": "com.misfinanzas.app",
+  "appName": "Mis Finanzas Pro",
+  "webDir": "dist/android-www",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}
