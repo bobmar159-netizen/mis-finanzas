@@ -10648,17 +10648,20 @@ function gfcRefreshVoicePipelinePanel() {
   wrapper.innerHTML = gfcVoicePipelinePanelHtml();
   root.replaceWith(wrapper.firstElementChild);
 }
-function gfcAppendCopilotChatMessage(role, text) {
+async function gfcAppendCopilotChatMessage(role, text) {
   if (typeof text !== 'string' || !text.trim()) return { ok:false, code:'content_empty' };
   const isUser = role === 'user';
   // Timeline persistence is registered by yarbi-memory-center.js. It is a hook,
   // not a replacement: this remains the only global chat entry point.
   if (typeof window.gfcAppendCopilotTimelineMessage === 'function') {
-    const timelineResult = window.gfcAppendCopilotTimelineMessage(isUser ? 'user' : 'assistant', text);
+    const timelineResult = await window.gfcAppendCopilotTimelineMessage(isUser ? 'user' : 'assistant', text);
     if (timelineResult && timelineResult.handled) {
       if (window._gfcMascot && typeof window._gfcMascot.syncDialogueMessage === 'function') window._gfcMascot.syncDialogueMessage(isUser ? 'user' : 'assistant', String(text));
       return timelineResult.result || { ok:true };
     }
+    // En el flujo canónico la ausencia del repositorio no habilita un fallback
+    // con escritura local no transaccional. El llamador conserva el borrador.
+    return { ok:false, code:'conversation_store_unavailable' };
   }
   const box = document.getElementById('gfc-copilot-chat-messages');
   if (!box) return { ok:false, code:'renderer_container_missing' };
@@ -12904,6 +12907,13 @@ async function gfcProcessLiveAppCommand(text, options = {}) {
   if (window._gfcMascot) window._gfcMascot.setState('reposo', reply);
   gfcChatDiag('live-command-result', { intent: result.action?.intent || 'general', applied: actionResult?.applied !== false });
 }
+function gfcPersistLiveFinal(role, text, turnId, options) {
+  const finalize = typeof gfcFinalizeLiveTranscriptDraft === 'function' ? gfcFinalizeLiveTranscriptDraft : null;
+  if (!finalize) { void gfcAppendCopilotChatMessage(role, text); return; }
+  // Un fallo conserva el borrador Live: no generamos un segundo ID ni
+  // reemplazamos el mensaje inmutable con un fallback fuera de transacción.
+  void Promise.resolve(finalize(role, text, turnId, options)).catch(() => {});
+}
 function gfcCommitLiveTurn(session) {
   if (!session) return;
   if (session.liveCommitTimer) {
@@ -12943,8 +12953,7 @@ function gfcCommitLiveTurn(session) {
   if (session.modeGreetingTurn) {
     session.modeGreetingTurn = false;
     if (output) {
-      const finalized = typeof gfcFinalizeLiveTranscriptDraft === 'function' && gfcFinalizeLiveTranscriptDraft('assistant', output, committedTurnId, { channel:'voice', liveSessionId:session.liveSessionId });
-      if (!finalized) gfcAppendCopilotChatMessage('assistant', output);
+      gfcPersistLiveFinal('assistant', output, committedTurnId, { channel:'voice', liveSessionId:session.liveSessionId });
     }
     if (output && window._gfcMascot) window._gfcMascot.setState('reposo', output);
     session.inputBuffer = '';
@@ -12961,12 +12970,10 @@ function gfcCommitLiveTurn(session) {
   const ownerInstructionIntent = input && Boolean(gfcOwnerInstructionCandidate(input));
   const localIntent = input && (gfcIsTodayBoardRequest(input) || Boolean(gfcYarbiFastAgendaStatusIntent(input)) || Boolean(gfcYarbiLocalResolutionIntent(input)) || ownerInstructionIntent);
   if (input) {
-    const finalizedInput = typeof gfcFinalizeLiveTranscriptDraft === 'function' && gfcFinalizeLiveTranscriptDraft('user', input, committedTurnId, { channel:'voice', liveSessionId:session.liveSessionId });
-    if (!finalizedInput) gfcAppendCopilotChatMessage('user', input);
+    gfcPersistLiveFinal('user', input, committedTurnId, { channel:'voice', liveSessionId:session.liveSessionId });
   } else if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId, 'user', { liveSessionId:session.liveSessionId });
   if (output && !localIntent) {
-    const finalizedOutput = typeof gfcFinalizeLiveTranscriptDraft === 'function' && gfcFinalizeLiveTranscriptDraft('assistant', output, committedTurnId, { channel:'voice', liveSessionId:session.liveSessionId });
-    if (!finalizedOutput) gfcAppendCopilotChatMessage('assistant', output);
+    gfcPersistLiveFinal('assistant', output, committedTurnId, { channel:'voice', liveSessionId:session.liveSessionId });
   } else if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId, 'assistant', { liveSessionId:session.liveSessionId });
   if (output && !localIntent && window._gfcMascot) window._gfcMascot.setState('reposo', output);
   const isFarewell = /\b(chau|chao|ad[ií]os|hasta luego|nos vemos)\b/i.test(input);
@@ -20482,12 +20489,17 @@ async function gfcSendCopilotChatMessage(promptText) {
     try { inputEl.focus({ preventScroll:true }); } catch (_) { inputEl.focus(); }
   }
   gfcChatDiag('input', { text });
-  gfcAppendCopilotChatMessage('user', text);
+  const persistedUser = await gfcAppendCopilotChatMessage('user', text);
+  if (!persistedUser?.ok) {
+    if (inputEl) inputEl.value = text;
+    if (typeof toast === 'function') toast('No se pudo guardar el mensaje. Se conserva para reintentar.', 'warning');
+    return;
+  }
 
   const localCommand = await gfcHandleYarbiLocalCommand(text, { source:'yarbi_chat', speak:true });
   if (localCommand?.handled) {
     if (localCommand.reply && !localCommand.record) {
-      gfcAppendCopilotChatMessage('assistant', localCommand.reply);
+      await gfcAppendCopilotChatMessage('assistant', localCommand.reply);
       gfcSpeakText(localCommand.reply);
     }
     return;
@@ -20495,7 +20507,7 @@ async function gfcSendCopilotChatMessage(promptText) {
 
   const ownerInstructionReply = await gfcHandleOwnerInstruction(text);
   if (ownerInstructionReply) {
-    gfcAppendCopilotChatMessage('assistant', ownerInstructionReply);
+    await gfcAppendCopilotChatMessage('assistant', ownerInstructionReply);
     if (window._gfcMascot) window._gfcMascot.setState('reposo', ownerInstructionReply);
     gfcSpeakText(ownerInstructionReply);
     return;
@@ -20504,7 +20516,7 @@ async function gfcSendCopilotChatMessage(promptText) {
   const historicalVisit = await gfcFastHistoricalVisitCommand(text);
   if (historicalVisit?.handled) {
     const reply = historicalVisit.reply || 'Procesé la visita registrada.';
-    gfcAppendCopilotChatMessage('assistant', reply);
+    await gfcAppendCopilotChatMessage('assistant', reply);
     if (window._gfcMascot) window._gfcMascot.setState(historicalVisit.saved ? 'reposo' : 'procesando', reply);
     gfcSpeakText(reply);
     return;
@@ -20512,7 +20524,7 @@ async function gfcSendCopilotChatMessage(promptText) {
   const fastAgenda = await gfcFastAgendaCommand(text);
   if (fastAgenda?.handled) {
     const reply = fastAgenda.reply || 'Abrí el formulario de agenda con los datos disponibles.';
-    gfcAppendCopilotChatMessage('assistant', reply);
+    await gfcAppendCopilotChatMessage('assistant', reply);
     if (window._gfcMascot) window._gfcMascot.setState('reposo', reply);
     gfcSpeakText(reply);
     return;
@@ -20520,7 +20532,7 @@ async function gfcSendCopilotChatMessage(promptText) {
 
   const textClientPrefetch = await gfcResolveTextClientQueryIntent(text);
   if (textClientPrefetch?.handled) {
-    gfcAppendCopilotChatMessage('assistant', textClientPrefetch.reply);
+    await gfcAppendCopilotChatMessage('assistant', textClientPrefetch.reply);
     if (window._gfcMascot) window._gfcMascot.setState('reposo', textClientPrefetch.reply);
     gfcSpeakText(textClientPrefetch.reply);
     return;
@@ -20531,7 +20543,7 @@ async function gfcSendCopilotChatMessage(promptText) {
     const actionResult = await gfcApplyYarbiCommandResult(commandResult);
     const commandReply = actionResult?.reply || String(commandResult.reply || 'Orden analizada.');
     if (typeof gfcAppendCopilotChatMessage === 'function') {
-      gfcAppendCopilotChatMessage('assistant', commandReply);
+      await gfcAppendCopilotChatMessage('assistant', commandReply);
     }
     if (window._gfcMascot) window._gfcMascot.setState('reposo', commandReply);
     gfcSpeakText(commandReply);
@@ -20546,7 +20558,7 @@ async function gfcSendCopilotChatMessage(promptText) {
       ? 'No pude preparar el formulario porque el servicio de IA está temporalmente saturado. No guardé nada. Inténtalo nuevamente en un momento.'
       : 'No pude preparar el formulario. No guardé ni modifiqué ningún dato; revisa la conexión e inténtalo otra vez.';
     gfcChatDiag('command-write-not-executed', { http: commandFailure.http || 0, detail: String(commandFailure.detail || '').slice(0, 240) });
-    if (typeof gfcAppendCopilotChatMessage === 'function') gfcAppendCopilotChatMessage('assistant', failureReply);
+    if (typeof gfcAppendCopilotChatMessage === 'function') await gfcAppendCopilotChatMessage('assistant', failureReply);
     if (window._gfcMascot) window._gfcMascot.setState('error', failureReply);
     gfcSpeakText(failureReply);
     return;
@@ -20691,7 +20703,7 @@ Mantén el cliente activo durante las preguntas siguientes. Si el contexto es ac
   }
 
   gfcChatDiag(geminiSuccess ? 'reply-ready' : 'reply-fallback', { chars: replyText.length });
-  gfcAppendCopilotChatMessage('assistant', replyText);
+  await gfcAppendCopilotChatMessage('assistant', replyText);
 
   // El flujo manual no agrega botones de confirmacion dentro del avatar.
   if (window._gfcMascot) window._gfcMascot.setState('reposo', replyText);
@@ -46811,6 +46823,7 @@ body.gfc-yarbi-screen #modal-box,.gfc-yarbi-shell{background:#FFFDF8 !important}
 .crm-quick-btn:active{opacity:.72;transform:scale(.97)}
 .crm-quick-btn.neutral{background:#fff;color:#64748B;border-color:var(--border)}
 </style>
+<script src="yarbi-conversation-store.js"></script>
 <script src="yarbi-memory-center.js"></script>
 <script>
 /* CRM_OPERATIVO_V1 — el CRM es la fuente de trabajo visual de Yarbi.

@@ -136,19 +136,35 @@
       channel: String(item.channel || 'chat').slice(0, 30)
     };
   }
-  function loadTimeline() {
-    const list = readJson(TIMELINE_KEY, []);
-    return (Array.isArray(list) ? list : []).map(normalizeTimelineItem).filter(Boolean).sort((a,b) => a.at - b.at).slice(-MAX_LOCAL_MESSAGES);
+  let conversationStoreReady = null;
+  let unsubscribeConversationStore = null;
+  function storageError(code) {
+    return Object.assign(new Error(code), { code });
   }
-  function saveTimeline(list) {
-    const safe = (Array.isArray(list) ? list : []).map(normalizeTimelineItem).filter(Boolean).sort((a,b) => a.at - b.at).slice(-MAX_LOCAL_MESSAGES);
-    writeJson(TIMELINE_KEY, safe);
-    return safe;
+  async function conversationStore() {
+    if (!window.YarbiConversationStore) throw storageError('storage_unavailable');
+    if (!conversationStoreReady) {
+      conversationStoreReady = window.YarbiConversationStore.initialize({ timelineKey:TIMELINE_KEY, outboxKey:TIMELINE_OUTBOX_KEY });
+    }
+    const initialized = await conversationStoreReady;
+    if (!initialized?.ok) throw storageError(initialized?.code || 'storage_initialization_failed');
+    return window.YarbiConversationStore;
   }
-  function queueTimeline(item) {
-    const queue = readJson(TIMELINE_OUTBOX_KEY, []);
-    if (!Array.isArray(queue)) return writeJson(TIMELINE_OUTBOX_KEY, [item]);
-    writeJson(TIMELINE_OUTBOX_KEY, [...queue.filter(x => x.id !== item.id), item].slice(-150));
+  async function loadTimeline() {
+    const store = await conversationStore();
+    return (await store.listTimeline()).map(normalizeTimelineItem).filter(Boolean).sort((a,b) => a.at - b.at).slice(-MAX_LOCAL_MESSAGES);
+  }
+  async function importTimeline(items) {
+    const store = await conversationStore();
+    const imported = [];
+    for (const candidate of (Array.isArray(items) ? items : [])) {
+      const item = normalizeTimelineItem(candidate);
+      if (!item) continue;
+      const result = await store.persist(item);
+      if (!result.ok && result.code !== 'identity_conflict') throw storageError(result.code || 'storage_import_failed');
+      if (result.ok) imported.push(result.item);
+    }
+    return imported;
   }
   async function postTimeline(items) {
     if (!token() || !items.length) return false;
@@ -161,9 +177,16 @@
     return true;
   }
   async function flushTimelineOutbox() {
-    const queue = readJson(TIMELINE_OUTBOX_KEY, []);
-    if (!Array.isArray(queue) || !queue.length || !token()) return;
-    try { await postTimeline(queue.slice(0, 100)); writeJson(TIMELINE_OUTBOX_KEY, queue.slice(100)); }
+    if (!token()) return;
+    const store = await conversationStore();
+    const queue = await store.listOutbox();
+    if (!queue.length) return;
+    const batch = queue.slice(0, 100).filter(row => row?.item);
+    if (!batch.length) return;
+    try {
+      await postTimeline(batch.map(row => row.item));
+      await store.acknowledgeOutbox(batch.map(row => row.id));
+    }
     catch (_) {}
   }
   async function syncTimelineFromCloud() {
@@ -174,9 +197,9 @@
       if (!response.ok) return loadTimeline();
       const data = await response.json().catch(() => ({}));
       const cloud = Array.isArray(data.messages) ? data.messages.map(normalizeTimelineItem).filter(Boolean) : [];
-      const merged = new Map();
-      [...loadTimeline(), ...cloud].forEach(item => merged.set(item.id, item));
-      return saveTimeline([...merged.values()]);
+      const store = await conversationStore();
+      await store.mergeCloud(cloud);
+      return loadTimeline();
     } catch (_) { return loadTimeline(); }
   }
   let lastTimelinePersistence = Object.freeze({ outcome:'idle' });
@@ -188,7 +211,7 @@
     return !!left && !!right && left.id === right.id && left.role === right.role
       && left.text === right.text && left.channel === right.channel;
   }
-  function persistTimelineMessage(role, text, at, channel, id) {
+  async function persistTimelineMessage(role, text, at, channel, id) {
     if (typeof id !== 'undefined' && (typeof id !== 'string' || !id.trim())) {
       setTimelinePersistence('identity_invalid');
       return null;
@@ -196,43 +219,21 @@
     const explicitId = typeof id === 'string' ? id.trim() : '';
     const normalized = normalizeTimelineItem({ id:explicitId || undefined, role, text, at:at || Date.now(), channel:channel || 'chat' });
     if (!normalized) { setTimelinePersistence('content_invalid'); return null; }
-    const list = loadTimeline();
-    if (explicitId) {
-      const existing = list.find(item => item.id === normalized.id);
-      if (existing) {
-        if (timelineImmutableMatch(existing, normalized)) {
-          setTimelinePersistence('idempotent', existing.id);
-          return existing;
-        }
-        setTimelinePersistence('identity_conflict', existing.id);
-        return null;
+    try {
+      const store = await conversationStore();
+      const result = await store.persist(normalized);
+      if (!result.ok) { setTimelinePersistence(result.code || 'storage_write_failed', normalized.id); return null; }
+      const saved = normalizeTimelineItem(result.item);
+      if (!timelineImmutableMatch(saved, normalized)) { setTimelinePersistence('storage_readback_failed', normalized.id); return null; }
+      setTimelinePersistence(result.code, saved.id);
+      if (result.code === 'persisted') {
+        postTimeline([saved]).then(() => store.acknowledgeOutbox([saved.id])).catch(() => {});
       }
-    }
-    const last = list[list.length - 1];
-    if (!explicitId && last && last.role === normalized.role && last.text === normalized.text && Math.abs(last.at - normalized.at) < 2500) {
-      setTimelinePersistence('idempotent', last.id);
-      return last;
-    }
-    const next = [...list, normalized].sort((a,b) => a.at - b.at).slice(-MAX_LOCAL_MESSAGES);
-    if (!writeJson(TIMELINE_KEY, next)) {
-      setTimelinePersistence('storage_write_failed', normalized.id);
+      return saved;
+    } catch (error) {
+      setTimelinePersistence(error?.code || 'storage_unavailable', normalized.id);
       return null;
     }
-    // writeJson falla de forma segura ante cuota o almacenamiento inaccesible.
-    // Confirmamos la lectura antes de anunciar una finalización: sin esta
-    // comprobación un callback Live podía ocultar un fallo de persistencia.
-    const saved = loadTimeline().find(item => item.id === normalized.id);
-    if (!timelineImmutableMatch(saved, normalized)) {
-      setTimelinePersistence('storage_readback_failed', normalized.id);
-      return null;
-    }
-    queueTimeline(saved);
-    postTimeline([normalized]).then(() => {
-      const queue = readJson(TIMELINE_OUTBOX_KEY, []);
-      if (Array.isArray(queue)) writeJson(TIMELINE_OUTBOX_KEY, queue.filter(x => x.id !== normalized.id));
-    }).catch(() => {});
-    setTimelinePersistence('persisted', saved.id);
-    return saved;
   }
   function dayKey(ms) {
     try { return new Intl.DateTimeFormat('en-CA', { timeZone:'America/Lima', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date(ms)); }
@@ -509,7 +510,7 @@
     if (shouldScroll && box) box.scrollTop = box.scrollHeight;
     return true;
   };
-  window.gfcFinalizeLiveTranscriptDraft = function(role, text, turnId, options) {
+  window.gfcFinalizeLiveTranscriptDraft = async function(role, text, turnId, options) {
     const value = String(text || '').trim();
     const opts = liveIdentityOptions(options);
     const draftKey = liveTranscriptKey(role, turnId, opts);
@@ -527,7 +528,7 @@
     if (!itemId) return false;
     const item = opts.persist === false
       ? normalizeTimelineItem({ id:itemId || undefined, role, text:value, at:Date.now(), channel:opts.channel || 'voice' })
-      : persistTimelineMessage(role, value, Date.now(), opts.channel || 'voice', itemId || undefined);
+      : await persistTimelineMessage(role, value, Date.now(), opts.channel || 'voice', itemId || undefined);
     if (!item) return false;
     const training = interactionMode() === 'training';
     const box = training ? document.getElementById('gfc-yarbi-training-chat') : document.getElementById('gfc-copilot-chat-messages');
@@ -576,12 +577,12 @@
     });
   };
 
-  window.gfcAppendCopilotTimelineMessage = function (role, text, at, options) {
+  window.gfcAppendCopilotTimelineMessage = async function (role, text, at, options) {
     if (typeof text !== 'string' || !text.trim()) return { handled:true, result:{ ok:false, code:'content_empty' } };
     const opts = options || {};
     const item = opts.persist === false
       ? normalizeTimelineItem({ id:opts.id, role, text, at:at || opts.at || Date.now(), channel:opts.channel || 'chat' })
-      : persistTimelineMessage(role, text, at || opts.at, opts.channel);
+      : await persistTimelineMessage(role, text, at || opts.at, opts.channel, opts.id);
     if (!item) return { handled:true, result:{ ok:false, code:'timeline_item_invalid' } };
     const box = document.getElementById('gfc-copilot-chat-messages');
     if (!box) return { handled:false };
@@ -589,11 +590,30 @@
     const rendered = renderTimelineItem(item);
     return { handled:true, result:{ ok:true, timelineId:item.id, rendered:!!rendered } };
   };
-  window.gfcRestoreCopilotChat = function () {
+  async function refreshConversationTimelineRenderer() {
+    const box = document.getElementById('gfc-copilot-chat-messages');
+    if (!box || box.dataset.gfcRestored !== '1') return;
+    let timeline;
+    try { timeline = await loadTimeline(); } catch (_) { return; }
+    timeline.forEach(item => {
+      if (!box.querySelector('[data-message-id="' + item.id + '"]')) renderTimelineItem(item);
+    });
+  }
+  function installConversationStoreSubscription() {
+    if (unsubscribeConversationStore) return;
+    conversationStore().then(store => {
+      if (unsubscribeConversationStore) return;
+      unsubscribeConversationStore = store.subscribe(() => { void refreshConversationTimelineRenderer(); });
+    }).catch(() => {});
+  }
+  window.gfcRestoreCopilotChat = async function () {
     const box = document.getElementById('gfc-copilot-chat-messages');
     if (!box || box.dataset.gfcRestored === '1') return;
     box.dataset.gfcRestored = '1';
-    let timeline = loadTimeline();
+    let timeline;
+    try { timeline = await loadTimeline(); }
+    catch (_) { box.dataset.gfcRestored = '0'; return; }
+    installConversationStoreSubscription();
     if (!timeline.length) {
       const migrated = [];
       try {
@@ -605,7 +625,10 @@
           if (turn.output) migrated.push(normalizeTimelineItem({ role:'assistant', text:turn.output, at:base+1, channel:'voice' }));
         });
       } catch (_) {}
-      timeline = saveTimeline(migrated.filter(Boolean));
+      try {
+        await importTimeline(migrated.filter(Boolean));
+        timeline = await loadTimeline();
+      } catch (_) { box.dataset.gfcRestored = '0'; return; }
     }
     renderedDay = '';
     timeline.forEach(renderTimelineItem);
@@ -615,7 +638,7 @@
       if (list.length !== timeline.length) {
         box.innerHTML = ''; renderedDay = ''; list.forEach(renderTimelineItem); box.scrollTop = box.scrollHeight;
       }
-    });
+    }).catch(() => {});
   };
 
   function activeMode() { return typeof gfcGetActiveYarbiMode === 'function' ? gfcGetActiveYarbiMode() : { id:'copilot', label:'Copiloto', voice:'Kore', icon:'🤖' }; }
@@ -2167,6 +2190,6 @@
   };
   [0, 700, 1700].forEach(delay => setTimeout(installPlainYarbiButton, delay));
 
-  window.addEventListener('online', () => { flushTimelineOutbox(); });
-  setTimeout(() => flushTimelineOutbox(), 1800);
+  window.addEventListener('online', () => { void flushTimelineOutbox().catch(() => {}); });
+  setTimeout(() => { void flushTimelineOutbox().catch(() => {}); }, 1800);
 })();

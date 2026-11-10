@@ -111,7 +111,7 @@ function createLiveHarness(mode = 'normal') {
     const role = item?.role === 'user' ? 'user' : item?.role === 'assistant' ? 'assistant' : '';
     return text && role ? { id:String(item.id || `timeline-${persisted.length + 1}`), role, text, at:Number(item.at) || Date.now(), channel:item.channel || 'voice' } : null;
   };
-  const persistTimelineMessage = (role, text, at, channel, id) => {
+  const persistTimelineMessage = async (role, text, at, channel, id) => {
     if (state.failPersistence) return null;
     const item = normalizeTimelineItem({ id:id || `timeline-${persisted.length + 1}`, role, text, at, channel });
     if (id) {
@@ -150,7 +150,7 @@ function createLiveHarness(mode = 'normal') {
     extractFunction(memoryCenter, 'function pruneFinalizedLiveKeys('),
     extractFunction(memoryCenter, 'function ensureLiveTranscriptDraft('),
     extractFunction(memoryCenter, 'window.gfcUpdateLiveTranscriptDraft = function'),
-    extractFunction(memoryCenter, 'window.gfcFinalizeLiveTranscriptDraft = function'),
+    extractFunction(memoryCenter, 'window.gfcFinalizeLiveTranscriptDraft = async function'),
     extractFunction(memoryCenter, 'window.gfcDiscardLiveTranscriptDraft = function'),
     'return { begin:ensureLiveTranscriptDraft, update:window.gfcUpdateLiveTranscriptDraft, finalize:window.gfcFinalizeLiveTranscriptDraft, discard:window.gfcDiscardLiveTranscriptDraft, drafts:liveTranscriptDrafts, finalized:finalizedLiveTranscriptKeys, draftKey:liveTranscriptKey, finalKey:liveFinalizationKey, itemId:liveTranscriptItemId };'
   ];
@@ -160,40 +160,36 @@ function createLiveHarness(mode = 'normal') {
 }
 
 function createTimelinePersistenceHarness() {
-  const storage = new Map();
+  const timeline = new Map();
   let failWrites = false;
-  const localStorage = {
-    getItem(key) { return storage.has(key) ? storage.get(key) : null; },
-    setItem(key, value) {
-      if (failWrites) throw new Error('synthetic storage quota');
-      storage.set(key, String(value));
+  const store = {
+    async persist(item) {
+      if (failWrites) throw Object.assign(new Error('synthetic storage quota'), { code:'storage_write_failed' });
+      const existing = timeline.get(item.id);
+      if (existing) {
+        if (existing.role === item.role && existing.text === item.text && existing.channel === item.channel) return { ok:true, code:'idempotent', item:existing };
+        return { ok:false, code:'identity_conflict', item:existing };
+      }
+      timeline.set(item.id, item);
+      return { ok:true, code:'persisted', item };
     },
-    setFailWrites(value) { failWrites = !!value; }
+    async acknowledgeOutbox() { return { ok:true }; }
   };
   const parts = [
-    "const TIMELINE_KEY = 'yarbi_timeline';",
-    "const TIMELINE_OUTBOX_KEY = 'yarbi_timeline_outbox';",
-    'const MAX_LOCAL_MESSAGES = 500;',
-    "const BACKEND = '';",
-    extractFunction(memoryCenter, 'function token('),
-    extractFunction(memoryCenter, 'function readJson('),
-    extractFunction(memoryCenter, 'function writeJson('),
     extractFunction(memoryCenter, 'function makeId('),
     extractFunction(memoryCenter, 'function normalizeTimelineItem('),
-    extractFunction(memoryCenter, 'function loadTimeline('),
-    extractFunction(memoryCenter, 'function queueTimeline('),
-    extractFunction(memoryCenter, 'async function postTimeline('),
     "let lastTimelinePersistence = Object.freeze({ outcome:'idle' });",
     extractFunction(memoryCenter, 'function setTimelinePersistence('),
     extractFunction(memoryCenter, 'function timelineImmutableMatch('),
-    extractFunction(memoryCenter, 'function persistTimelineMessage('),
-    'return { persist:persistTimelineMessage, status:() => lastTimelinePersistence, timeline:loadTimeline, raw:(key) => storage.get(key), setFailWrites:(value) => localStorage.setFailWrites(value) };'
+    extractFunction(memoryCenter, 'async function persistTimelineMessage('),
+    'return { persist:persistTimelineMessage, status:() => lastTimelinePersistence };'
   ];
-  const build = new Function('localStorage', 'fetch', parts.join('\n'));
-  return build(localStorage, async () => { throw new Error('network disabled'); });
+  const build = new Function('conversationStore', 'postTimeline', parts.join('\n'));
+  const api = build(async () => store, async () => true);
+  return { ...api, timeline:() => [...timeline.values()], setFailWrites:(value) => { failWrites = !!value; } };
 }
 
-test('Etapa 1.1.2: Gemini Live muestra un borrador transitorio y finaliza una sola vez por el renderer canónico', () => {
+test('Etapa 1.1.2: Gemini Live muestra un borrador transitorio y finaliza una sola vez por el renderer canónico', async () => {
   const harness = createLiveHarness();
   const draft = harness.api.begin('assistant', 'turn-1', 'Preparando respuesta…');
   assert.ok(draft?.wrap?.isConnected);
@@ -202,7 +198,7 @@ test('Etapa 1.1.2: Gemini Live muestra un borrador transitorio y finaliza una so
   assert.equal(harness.persisted.length, 0);
   assert.equal(harness.renders.length, 0);
 
-  assert.equal(harness.api.finalize('assistant', '<script>alert(1)</script>', 'turn-1', { channel:'voice' }), true);
+  assert.equal(await harness.api.finalize('assistant', '<script>alert(1)</script>', 'turn-1', { channel:'voice' }), true);
   assert.equal(draft.wrap.isConnected, false);
   assert.equal(harness.persisted.length, 1);
   assert.equal(harness.renders.length, 1);
@@ -212,16 +208,16 @@ test('Etapa 1.1.2: Gemini Live muestra un borrador transitorio y finaliza una so
   assert.equal(harness.renders[0].validation.status, 'partial');
   assert.equal(harness.normalBox.querySelector(`[data-message-id="${harness.persisted[0].id}"]`), harness.renders[0].element);
 
-  assert.equal(harness.api.finalize('assistant', 'respuesta repetida', 'turn-1', { channel:'voice' }), true);
+  assert.equal(await harness.api.finalize('assistant', 'respuesta repetida', 'turn-1', { channel:'voice' }), true);
   assert.equal(harness.persisted.length, 1);
   assert.equal(harness.renders.length, 1);
 });
 
-test('Etapa 1.1.2: vacío, cancelación o interrupción eliminan el borrador sin persistir ni presentar una respuesta falsa', () => {
+test('Etapa 1.1.2: vacío, cancelación o interrupción eliminan el borrador sin persistir ni presentar una respuesta falsa', async () => {
   const harness = createLiveHarness();
   const emptyDraft = harness.api.begin('user', 'turn-empty', 'Escuchando…');
   harness.api.update('user', 'fragmento sin cierre', 'turn-empty');
-  assert.equal(harness.api.finalize('user', '  ', 'turn-empty'), false);
+  assert.equal(await harness.api.finalize('user', '  ', 'turn-empty'), false);
   assert.equal(emptyDraft.wrap.isConnected, false);
 
   const interruptedDraft = harness.api.begin('assistant', 'turn-interrupted', 'Yarbi está respondiendo…');
@@ -232,10 +228,10 @@ test('Etapa 1.1.2: vacío, cancelación o interrupción eliminan el borrador sin
   assert.equal(harness.renders.length, 0);
 });
 
-test('Etapa 1.1.2: una finalización sin borrador tras reconexión conserva rol e id y no declara completo contenido truncado', () => {
+test('Etapa 1.1.2: una finalización sin borrador tras reconexión conserva rol e id y no declara completo contenido truncado', async () => {
   const harness = createLiveHarness();
   const oversized = '😀'.repeat(renderer.LIMITS.messageChars + 1);
-  assert.equal(harness.api.finalize('user', oversized, 'turn-reconnected', { channel:'voice' }), true);
+  assert.equal(await harness.api.finalize('user', oversized, 'turn-reconnected', { channel:'voice' }), true);
   assert.equal(harness.persisted.length, 1);
   assert.equal(harness.renders.length, 1);
   assert.equal(harness.renders[0].item.role, 'user');
@@ -244,19 +240,19 @@ test('Etapa 1.1.2: una finalización sin borrador tras reconexión conserva rol 
   assert.equal(harness.renders[0].validation.truncated, true);
 });
 
-test('Etapa 1.1.2: turnos iguales no se fusionan entre sesiones o turnos distintos aunque coincidan texto y timestamp', () => {
+test('Etapa 1.1.2: turnos iguales no se fusionan entre sesiones o turnos distintos aunque coincidan texto y timestamp', async () => {
   const harness = createLiveHarness();
   const priorNow = Date.now;
   Date.now = () => 1794355200000;
   try {
-    assert.equal(harness.api.finalize('assistant', 'Mensaje igual', 'turn-1', { channel:'voice', liveSessionId:'live-A' }), true);
-    assert.equal(harness.api.finalize('assistant', 'Mensaje igual', 'turn-2', { channel:'voice', liveSessionId:'live-A' }), true);
-    assert.equal(harness.api.finalize('assistant', 'Mensaje igual', 'turn-1', { channel:'voice', liveSessionId:'live-B' }), true);
+    assert.equal(await harness.api.finalize('assistant', 'Mensaje igual', 'turn-1', { channel:'voice', liveSessionId:'live-A' }), true);
+    assert.equal(await harness.api.finalize('assistant', 'Mensaje igual', 'turn-2', { channel:'voice', liveSessionId:'live-A' }), true);
+    assert.equal(await harness.api.finalize('assistant', 'Mensaje igual', 'turn-1', { channel:'voice', liveSessionId:'live-B' }), true);
   } finally { Date.now = priorNow; }
   assert.equal(harness.persisted.length, 3);
   assert.equal(new Set(harness.persisted.map(item => item.id)).size, 3);
   assert.equal(harness.renders.length, 3);
-  assert.equal(harness.api.finalize('assistant', 'Mensaje igual', 'turn-1', { channel:'voice', liveSessionId:'live-A' }), true);
+  assert.equal(await harness.api.finalize('assistant', 'Mensaje igual', 'turn-1', { channel:'voice', liveSessionId:'live-A' }), true);
   assert.equal(harness.persisted.length, 3);
   assert.equal(harness.renders.length, 3);
 });
@@ -290,31 +286,31 @@ test('Hardening Live: la identidad v2 conserva cada componente sin sanitización
   assert.equal(harness.api.itemId('operator', 'turn', { liveSessionId:'session' }), null);
 });
 
-test('Etapa 1.2A: la persistencia confirma lectura, conserva inmutabilidad y no oculta fallos de almacenamiento', () => {
+test('Etapa 1.2A: la persistencia confirma lectura, conserva inmutabilidad y no oculta fallos de almacenamiento', async () => {
   const harness = createTimelinePersistenceHarness();
-  const first = harness.persist('user', 'Mensaje sintético', 100, 'voice', 'turno-😀-muy-largo-' + 'x'.repeat(256));
+  const first = await harness.persist('user', 'Mensaje sintético', 100, 'voice', 'turno-😀-muy-largo-' + 'x'.repeat(256));
   assert.equal(first?.text, 'Mensaje sintético');
   assert.equal(harness.status().outcome, 'persisted');
   assert.equal(harness.timeline().length, 1);
 
-  const retry = harness.persist('user', 'Mensaje sintético', 200, 'voice', first.id);
+  const retry = await harness.persist('user', 'Mensaje sintético', 200, 'voice', first.id);
   assert.equal(retry?.id, first.id);
   assert.equal(harness.status().outcome, 'idempotent');
   assert.equal(harness.timeline().length, 1);
 
-  assert.equal(harness.persist('assistant', 'Mensaje sintético', 300, 'voice', first.id), null);
+  assert.equal(await harness.persist('assistant', 'Mensaje sintético', 300, 'voice', first.id), null);
   assert.equal(harness.status().outcome, 'identity_conflict');
   assert.deepEqual(harness.timeline(), [first]);
 
   harness.setFailWrites(true);
-  assert.equal(harness.persist('user', 'No debe persistir', 400, 'voice', 'turno-cuota'), null);
+  assert.equal(await harness.persist('user', 'No debe persistir', 400, 'voice', 'turno-cuota'), null);
   assert.equal(harness.status().outcome, 'storage_write_failed');
   assert.equal(harness.timeline().length, 1);
-  assert.equal(harness.persist('user', 'ID inválido', 500, 'voice', 1), null);
+  assert.equal(await harness.persist('user', 'ID inválido', 500, 'voice', 1), null);
   assert.equal(harness.status().outcome, 'identity_invalid');
 });
 
-test('Hardening Live: ausente, null y vacío son distintos; sesiones distintas no cruzan borradores', () => {
+test('Hardening Live: ausente, null y vacío son distintos; sesiones distintas no cruzan borradores', async () => {
   const harness = createLiveHarness();
   const undefinedId = harness.api.itemId('user', undefined, {});
   const nullId = harness.api.itemId('user', null, { liveSessionId:null });
@@ -326,32 +322,32 @@ test('Hardening Live: ausente, null y vacío son distintos; sesiones distintas n
   const first = harness.api.begin('assistant', 'same-turn', 'Preparando respuesta…', { liveSessionId:'A/B' });
   const second = harness.api.begin('assistant', 'same-turn', 'Preparando respuesta…', { liveSessionId:'A_B' });
   assert.notEqual(first.key, second.key);
-  assert.equal(harness.api.finalize('assistant', 'Mismo texto', 'same-turn', { channel:'voice', liveSessionId:'A/B' }), true);
-  assert.equal(harness.api.finalize('assistant', 'Mismo texto', 'same-turn', { channel:'voice', liveSessionId:'A_B' }), true);
+  assert.equal(await harness.api.finalize('assistant', 'Mismo texto', 'same-turn', { channel:'voice', liveSessionId:'A/B' }), true);
+  assert.equal(await harness.api.finalize('assistant', 'Mismo texto', 'same-turn', { channel:'voice', liveSessionId:'A_B' }), true);
   assert.equal(harness.persisted.length, 2);
 });
 
-test('Hardening Live: callback repetido y reconexión conservan una entrada por tupla exacta', () => {
+test('Hardening Live: callback repetido y reconexión conservan una entrada por tupla exacta', async () => {
   const harness = createLiveHarness();
   const options = { channel:'voice', liveSessionId:'reconnect/live' };
-  assert.equal(harness.api.finalize('user', 'Mensaje estable', 'turn-7', options), true);
-  assert.equal(harness.api.finalize('user', 'Mensaje estable', 'turn-7', options), true);
+  assert.equal(await harness.api.finalize('user', 'Mensaje estable', 'turn-7', options), true);
+  assert.equal(await harness.api.finalize('user', 'Mensaje estable', 'turn-7', options), true);
   assert.equal(harness.persisted.length, 1);
   assert.equal(harness.renders.length, 1);
-  assert.equal(harness.api.finalize('user', 'Mensaje estable', 'turn-8', options), true);
+  assert.equal(await harness.api.finalize('user', 'Mensaje estable', 'turn-8', options), true);
   assert.equal(harness.persisted.length, 2);
   assert.equal(new Set(harness.persisted.map(item => item.id)).size, 2);
 });
 
-test('Etapa 1.1.2: un nuevo turno puede finalizar antes del anterior sin cruzar borradores ni mensajes', () => {
+test('Etapa 1.1.2: un nuevo turno puede finalizar antes del anterior sin cruzar borradores ni mensajes', async () => {
   const harness = createLiveHarness();
   const options = { liveSessionId:'live-order' };
   const first = harness.api.begin('user', 'turn-earlier', 'Escuchando…', options);
   const later = harness.api.begin('assistant', 'turn-later', 'Yarbi está respondiendo…', options);
   harness.api.update('user', 'Primera consulta', 'turn-earlier', options);
   harness.api.update('assistant', 'Respuesta del turno posterior', 'turn-later', options);
-  assert.equal(harness.api.finalize('assistant', 'Respuesta del turno posterior', 'turn-later', { channel:'voice', liveSessionId:'live-order' }), true);
-  assert.equal(harness.api.finalize('user', 'Primera consulta', 'turn-earlier', { channel:'voice', liveSessionId:'live-order' }), true);
+  assert.equal(await harness.api.finalize('assistant', 'Respuesta del turno posterior', 'turn-later', { channel:'voice', liveSessionId:'live-order' }), true);
+  assert.equal(await harness.api.finalize('user', 'Primera consulta', 'turn-earlier', { channel:'voice', liveSessionId:'live-order' }), true);
   assert.equal(first.wrap.isConnected, false);
   assert.equal(later.wrap.isConnected, false);
   assert.equal(harness.persisted.length, 2);
@@ -359,32 +355,32 @@ test('Etapa 1.1.2: un nuevo turno puede finalizar antes del anterior sin cruzar 
   assert.notEqual(harness.persisted[0].id, harness.persisted[1].id);
 });
 
-test('Etapa 1.1.2: un fallo de persistencia o render no confirma el turno y permite recuperación sin duplicarlo', () => {
+test('Etapa 1.1.2: un fallo de persistencia o render no confirma el turno y permite recuperación sin duplicarlo', async () => {
   const harness = createLiveHarness();
   const options = { liveSessionId:'live-retry' };
   const draft = harness.api.begin('user', 'turn-retry', 'Escuchando…', options);
   harness.api.update('user', 'Cliente sintético', 'turn-retry', options);
   harness.state.failPersistence = true;
-  assert.equal(harness.api.finalize('user', 'Cliente sintético', 'turn-retry', { channel:'voice', liveSessionId:'live-retry' }), false);
+  assert.equal(await harness.api.finalize('user', 'Cliente sintético', 'turn-retry', { channel:'voice', liveSessionId:'live-retry' }), false);
   assert.equal(draft.wrap.isConnected, true);
   assert.equal(harness.persisted.length, 0);
 
   harness.state.failPersistence = false;
   harness.state.failRenderer = true;
-  assert.equal(harness.api.finalize('user', 'Cliente sintético', 'turn-retry', { channel:'voice', liveSessionId:'live-retry' }), false);
+  assert.equal(await harness.api.finalize('user', 'Cliente sintético', 'turn-retry', { channel:'voice', liveSessionId:'live-retry' }), false);
   assert.equal(draft.wrap.isConnected, true);
   assert.equal(harness.persisted.length, 1);
   assert.equal(harness.renders.length, 0);
 
   harness.state.failRenderer = false;
-  assert.equal(harness.api.finalize('user', 'Cliente sintético', 'turn-retry', { channel:'voice', liveSessionId:'live-retry' }), true);
+  assert.equal(await harness.api.finalize('user', 'Cliente sintético', 'turn-retry', { channel:'voice', liveSessionId:'live-retry' }), true);
   assert.equal(draft.wrap.isConnected, false);
   assert.equal(harness.persisted.length, 1);
   assert.equal(harness.renders.length, 1);
 });
 
 test('Etapa 1.1.2: la implementación normal confirma el renderer canónico antes de retirar el draft', () => {
-  const finalizer = extractFunction(memoryCenter, 'window.gfcFinalizeLiveTranscriptDraft = function');
+  const finalizer = extractFunction(memoryCenter, 'window.gfcFinalizeLiveTranscriptDraft = async function');
   assert.match(finalizer, /if \(!training\) \{[\s\S]*renderTimelineItem\(item\)[\s\S]*if \(!rendered\) return false;[\s\S]*draft\?\.wrap\?\.isConnected\) draft\.wrap\.remove\(\)/);
   assert.match(finalizer, /else if \(draft\?\.wrap\?\.isConnected\)/);
   assert.match(finalizer, /if \(!rendered\) return false/);

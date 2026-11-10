@@ -76,9 +76,9 @@ test('Etapa 1: el chat existente carga el renderer después de conservar su ruta
   assert.match(memoryCenter, /YarbiConversationRenderer\.appendMessage/);
 });
 
-test('Etapa 1.1: el punto de entrada real usa el renderer una sola vez para un mensaje del asistente', () => {
+test('Etapa 1.1: el punto de entrada real usa el renderer una sola vez para un mensaje del asistente', async () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
-  const start = html.indexOf('function gfcAppendCopilotChatMessage(role, text) {');
+  const start = html.indexOf('async function gfcAppendCopilotChatMessage(role, text) {');
   assert.ok(start >= 0);
   let depth = 0; let end = -1;
   for (let index = html.indexOf('{', start); index < html.length; index += 1) {
@@ -90,7 +90,7 @@ test('Etapa 1.1: el punto de entrada real usa el renderer una sola vez para un m
   const box = { appendChild() {}, scrollTop:0, scrollHeight:0 };
   const windowMock = { YarbiConversationRenderer:{ appendMessage(container, message) { calls.push({ container, message }); return { ok:true }; } } };
   const fn = new Function('window', 'document', source + '; return gfcAppendCopilotChatMessage;')(windowMock, { getElementById:id => id === 'gfc-copilot-chat-messages' ? box : null });
-  const result = fn('assistant', 'Respuesta real');
+  const result = await fn('assistant', 'Respuesta real');
   assert.equal(result.ok, true);
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].message, { role:'assistant', text:'Respuesta real', status:'complete' });
