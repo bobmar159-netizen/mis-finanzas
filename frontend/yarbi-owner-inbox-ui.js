@@ -54,6 +54,15 @@
       openChat();
     };
   };
-  function addEntry() { const tab = document.getElementById('tab-yarbi'); if (!tab || tab.dataset.ownerInboxReady) return; tab.dataset.ownerInboxReady = 'true'; tab.onclick = () => window.gfcOpenYarbiHub(); tab.title = 'Abrir opciones de Yarbi'; }
+  function addEntry() {
+    const tab = document.getElementById('tab-yarbi');
+    if (!tab || tab.dataset.ownerInboxReady) return;
+    tab.dataset.ownerInboxReady = 'true';
+    tab.onclick = () => {
+      if (typeof window.gfcOpenCopilotModal === 'function') return window.gfcOpenCopilotModal('chat');
+      if (typeof window.toast === 'function') window.toast('El chat de Yarbi todavía no está listo en esta compilación.', 'error');
+    };
+    tab.title = 'Abrir Chat con Yarbi';
+  }
   document.addEventListener('DOMContentLoaded', addEntry); if (document.readyState !== 'loading') addEntry();
 })();
