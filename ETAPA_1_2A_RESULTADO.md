@@ -4,6 +4,8 @@
 
 Implementación local completada en la rama aislada `etapa1-2a-identity-persistence`, creada desde `main` en `8e15319903c8d17bfe91e045c2c1b6e2fe14648b`. No se modificó `main`, ni se usaron servicios remotos, despliegues, migraciones o credenciales.
 
+Commit local de la etapa: `1ee599801a27a2fa12bd399aa8ef898a798ba239` (`fix: harden live identity and persistence`). El worktree de la etapa quedó limpio. `main` permanece en `8e15319903c8d17bfe91e045c2c1b6e2fe14648b` y conserva sus 59 archivos sin seguimiento registrados; F04.2 y F04.3 no pertenecen a la ascendencia de esta rama.
+
 La identidad de Gemini Live ahora conserva explícitamente el tipo de cada componente y la persistencia local confirma por lectura que el contenido inmutable fue escrito antes de declarar éxito.
 
 ## Cambios funcionales
