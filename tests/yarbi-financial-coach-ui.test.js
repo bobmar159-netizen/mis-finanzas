@@ -39,6 +39,17 @@ test('Financial Coach distinguishes an elapsed-days projection from a promised c
   assert.match(response.reply, /excluye/i);
 });
 
+test('Financial Coach reports a recorded upcoming commitment without inventing a payment', () => {
+  const window = uiWith({
+    now:Date.parse('2026-11-10T15:00:00Z'), transactions:[], receivables:[],
+    commitments:[{ id:'commitment', amount:400, next_due_amount:80, due_at:'2026-11-16' }]
+  });
+  const response = window.gfcTryFinancialCoachMessage('¿Cuál es mi próximo vencimiento?');
+  assert.equal(response.handled, true);
+  assert.match(response.reply, /2026-11-16/);
+  assert.match(response.reply, /80\.00/);
+});
+
 test('Financial Coach UI contains no network client or commercial write path', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-financial-coach-ui.js'), 'utf8');
   assert.equal(/fetch\s*\(|XMLHttpRequest|navigator\.sendBeacon|localStorage\.setItem|sessionStorage\.setItem/i.test(source), false);

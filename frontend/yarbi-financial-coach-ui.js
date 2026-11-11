@@ -14,11 +14,17 @@
   }
   function localReply(utterance) {
     const value = normalized(utterance);
-    if (!/\b(caja|meta|cobrar|cobro|compromiso|gasto|ingreso|finanzas?|dinero|proyeccion|proyecta|este mes|mensual)\b/.test(value)) return null;
+    if (!/\b(caja|meta|cobrar|cobro|compromiso|vencimiento|vence|debo|deuda|pagar|gasto|ingreso|finanzas?|dinero|proyeccion|proyecta|este mes|mensual)\b/.test(value)) return null;
     const result = currentSummary();
     if (!result) return { handled:true, reply:'No puedo leer el resumen financiero local ahora. No se realizó ninguna consulta externa.' };
     const summary = result.summary;
     if (/por cobrar|cobrar|cobro pendiente/.test(value)) return { handled:true, reply:`Tienes ${soles(summary.pending_receivables)} por cobrar registrado. Lo mantengo separado de la caja hasta que confirmes el cobro.` };
+    if (/vencimiento|vence|proximo|próximo/.test(value)) {
+      const next = summary.next_known_commitment;
+      if (!next) return { handled:true, reply:'No tengo un vencimiento con fecha registrada entre los compromisos locales. No voy a inventar una fecha.' };
+      const amount = next.scheduled_amount === null ? ' El monto de esa cuota no está confirmado en los registros locales.' : ` La cuota registrada es ${soles(next.scheduled_amount)}.`;
+      return { handled:true, reply:next.status === 'overdue' ? `Hay un compromiso vencido desde ${next.due_at}.${amount}` : next.status === 'due_today' ? `Tienes un compromiso que vence hoy.${amount}` : `El próximo compromiso con fecha registrada vence el ${next.due_at}.${amount}` };
+    }
     if (/compromiso|debo|deuda|pagar/.test(value)) return { handled:true, reply:`Hay ${soles(summary.known_commitments_due)} en compromisos locales pendientes. No lo confundí con gastos ya registrados.` };
     if (/proyeccion|proyecta|este mes|mensual/.test(value)) {
       if (summary.projected_free_cash_month === null) return { handled:true, reply:'No tengo movimientos locales suficientes para proyectar el mes. No convertiré cuentas por cobrar o cotizaciones en efectivo estimado.' };
@@ -43,6 +49,7 @@
       </div>
       <section class="gfc-fc-note"><b>Este mes</b><br>Caja libre registrada: <strong>${esc(soles(summary.free_cash_month))}</strong> · Fuente: ${esc(source)}.</section>
       <section class="gfc-fc-note"><b>Proyección conservadora</b><br>${summary.projected_free_cash_month === null ? 'Aún no hay movimientos suficientes para proyectar el mes.' : '<strong>'+esc(soles(summary.projected_free_cash_month))+'</strong> usando el promedio de caja libre por día transcurrido. Es una estimación y excluye cobros pendientes.'}</section>
+      <section class="gfc-fc-note"><b>Próximo compromiso</b><br>${!summary.next_known_commitment ? 'No hay una fecha de vencimiento registrada.' : summary.next_known_commitment.status === 'overdue' ? 'Vencido desde <strong>'+esc(summary.next_known_commitment.due_at)+'</strong>.' : summary.next_known_commitment.status === 'due_today' ? 'Vence <strong>hoy</strong>.' : 'Vence el <strong>'+esc(summary.next_known_commitment.due_at)+'</strong>.'}${summary.next_known_commitment?.scheduled_amount === null ? ' El monto de la cuota no está confirmado.' : summary.next_known_commitment ? ' Cuota registrada: <strong>'+esc(soles(summary.next_known_commitment.scheduled_amount))+'</strong>.' : ''}</section>
       <p class="gfc-fc-foot">Las cotizaciones y cuentas por cobrar no se presentan como ingresos. El resumen no sustituye la revisión de los comprobantes.</p>`;
   }
   function open() {

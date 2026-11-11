@@ -72,3 +72,17 @@ test('Financial Coach projects only from recorded cash and labels the elapsed-da
   assert.equal(result.summary.monthly_projection_excludes_receivables, true);
   assert.ok(result.recommendations.some(item => item.kind === 'monthly_projection'));
 });
+
+test('Financial Coach exposes only a dated and recorded upcoming commitment', () => {
+  const result = buildFinancialCoach({
+    now:NOW,
+    transactions:[], receivables:[],
+    commitments:[
+      { id:'later', amount:900, next_due_amount:100, due_at:'2026-11-28' },
+      { id:'first', amount:300, next_due_amount:75, due_at:'2026-11-13' },
+      { id:'no-date', amount:120 }
+    ]
+  });
+  assert.deepEqual(result.summary.next_known_commitment, { due_at:'2026-11-13', scheduled_amount:75, status:'scheduled' });
+  assert.equal(result.recommendations.some(row => row.kind === 'next_commitment'), true);
+});
