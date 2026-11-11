@@ -5134,6 +5134,24 @@ const motivationMsg=(r,n)=>r===0?`🎉 ¡Terminaste de pagar ${n}!`:r===1?'🏁 
 // Snapshot local para la lectura financiera de Yarbi. No es una sincronización,
 // no sale del dispositivo y no convierte cotizaciones o cuentas por cobrar en
 // caja. El modelo compartido decide qué registros son válidos para el resumen.
+const GFC_FINANCIAL_COACH_POLICY_KEY='fnz_financial_coach_policy_v1';
+function gfcFinancialCoachPolicy(){
+  let saved={};
+  try { saved=JSON.parse(localStorage.getItem(GFC_FINANCIAL_COACH_POLICY_KEY)||'{}')||{}; } catch (_) { saved={}; }
+  const raw=Number(saved.daily_free_cash_goal);
+  const dailyGoal=Number.isFinite(raw)&&raw>0&&raw<=1000000?Math.round(raw*100)/100:500;
+  return {currency:state.moneda||'PEN',daily_free_cash_goal:dailyGoal};
+}
+window.gfcSetFinancialCoachDailyGoal=function(value){
+  const raw=typeof value==='string'?value.trim().replace(',','.'):value;
+  const goal=Number(raw);
+  if(!Number.isFinite(goal)||goal<=0||goal>1000000) return {ok:false,code:'financial_goal_invalid'};
+  const rounded=Math.round(goal*100)/100;
+  if(!window.confirm('Cambiar la meta diaria de caja libre a S/ '+rounded.toFixed(2)+'? Esto no modifica movimientos, deudas ni cobros.')) return {ok:false,code:'financial_goal_cancelled'};
+  try { localStorage.setItem(GFC_FINANCIAL_COACH_POLICY_KEY,JSON.stringify({daily_free_cash_goal:rounded,updated_at:new Date().toISOString()})); }
+  catch (_) { return {ok:false,code:'financial_goal_storage_unavailable'}; }
+  return {ok:true,daily_free_cash_goal:rounded};
+};
 window.gfcGetFinancialCoachInput=function(){
   const businessKeys=getKeys('negocio');
   const transactions=state.modo==='negocio'?(state.transactions||[]):load(businessKeys.tx,[]);
@@ -5143,7 +5161,7 @@ window.gfcGetFinancialCoachInput=function(){
     transactions:transactions.map(row=>({...row,business:true,noCashFlow:!isCashFlowTx(row)})),
     receivables:debts.filter(deudaEsPorCobrar).map(row=>({id:row.id,name:row.nombre||row.name||row.cliente||'',balance_amount:remaining(row),status:row.estado||'pending'})),
     commitments:debts.filter(row=>!deudaEsPorCobrar(row)).map(row=>({id:row.id,amount:remaining(row),next_due_amount:row.cuotaMonto === undefined || row.cuotaMonto === null || row.cuotaMonto === '' ? null : moneyValue(row.cuotaMonto),due_at:row.proximoPago||row.proximo_pago||row.fechaVencimiento||row.vencimiento||null,paid:remaining(row)===0,status:row.estado||'pending'})),
-    policy:{currency:state.moneda||'PEN',daily_free_cash_goal:500}
+    policy:gfcFinancialCoachPolicy()
   };
 };
 

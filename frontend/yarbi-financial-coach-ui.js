@@ -65,7 +65,7 @@
       <p>Lectura local de tu negocio. No envía datos ni ejecuta cobros, pagos o mensajes.</p>
       <div class="gfc-fc-grid">
         <div class="gfc-fc-card"><b>Caja libre hoy</b><strong>${esc(soles(summary.free_cash_today))}</strong><small>Ingresos registrados menos egresos registrados.</small></div>
-        <div class="gfc-fc-card"><b>Meta diaria</b><strong>${esc(soles(summary.daily_free_cash_goal))}</strong><small>${esc(goal)}</small></div>
+        <div class="gfc-fc-card"><b>Meta diaria</b><strong>${esc(soles(summary.daily_free_cash_goal))}</strong><small>${esc(goal)}</small><label class="gfc-fc-goal-label">Nueva meta<input class="gfc-fc-goal-input" type="number" inputmode="decimal" min="0.01" max="1000000" step="0.01" value="${esc(summary.daily_free_cash_goal)}"></label><button class="gfc-fc-goal-button" type="button">Cambiar meta</button></div>
         <div class="gfc-fc-card"><b>Por cobrar</b><strong>${esc(soles(summary.pending_receivables))}</strong><small>No se cuenta como caja hasta registrar el cobro.</small></div>
         <div class="gfc-fc-card"><b>Compromisos conocidos</b><strong>${esc(soles(summary.known_commitments_due))}</strong><small>Se muestran aparte del dinero que ya salió.</small></div>
       </div>
@@ -81,12 +81,20 @@
     shell.innerHTML = `<section class="gfc-fc-panel" role="dialog" aria-label="Resumen financiero de Yarbi"><button class="gfc-fc-close" aria-label="Cerrar">×</button>${markup(currentSummary())}</section>`;
     document.body.appendChild(shell);
     shell.querySelector('.gfc-fc-close').onclick = () => shell.remove();
+    shell.querySelector('.gfc-fc-goal-button')?.addEventListener('click', () => {
+      const input = shell.querySelector('.gfc-fc-goal-input');
+      if (!input || typeof window.gfcSetFinancialCoachDailyGoal !== 'function') return;
+      const saved = window.gfcSetFinancialCoachDailyGoal(input.value);
+      if (saved?.ok) { shell.remove(); open(); }
+      else if (saved?.code === 'financial_goal_invalid') window.alert('Escribe una meta diaria válida.');
+      else if (saved?.code === 'financial_goal_storage_unavailable') window.alert('No se pudo guardar la meta en este dispositivo.');
+    });
     shell.addEventListener('click', event => { if (event.target === shell) shell.remove(); });
   }
   function style() {
     if (document.getElementById('gfc-financial-coach-style')) return;
     const node = document.createElement('style'); node.id = 'gfc-financial-coach-style';
-    node.textContent = '.gfc-fc-shade{position:fixed;inset:0;z-index:10055;background:rgba(15,23,42,.38);display:flex;align-items:flex-end}.gfc-fc-panel{position:relative;width:100%;max-width:560px;margin:auto;background:#fff;border-radius:20px 20px 0 0;padding:20px;box-sizing:border-box;color:#172033;font:14px Inter,Arial;max-height:88vh;overflow:auto}.gfc-fc-panel h2{margin:0 32px 6px 0;font-size:20px}.gfc-fc-panel p{line-height:1.45;color:#64748B}.gfc-fc-close{position:absolute;right:15px;top:13px;border:0;background:transparent;font-size:22px;cursor:pointer;color:#475569}.gfc-fc-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:17px 0}.gfc-fc-card{border:1px solid #D8E7DE;border-radius:13px;padding:12px;background:#F8FCF9}.gfc-fc-card b{display:block;font-size:11px;color:#416758}.gfc-fc-card strong{display:block;font-size:18px;margin:5px 0;color:#125D42}.gfc-fc-card small{display:block;color:#64748B;line-height:1.28}.gfc-fc-note{border-radius:12px;padding:12px;background:#F4F7FB;color:#344054;line-height:1.45}.gfc-fc-foot{font-size:12px;margin-bottom:0}@media(max-width:360px){.gfc-fc-grid{grid-template-columns:1fr}}';
+    node.textContent = '.gfc-fc-shade{position:fixed;inset:0;z-index:10055;background:rgba(15,23,42,.38);display:flex;align-items:flex-end}.gfc-fc-panel{position:relative;width:100%;max-width:560px;margin:auto;background:#fff;border-radius:20px 20px 0 0;padding:20px;box-sizing:border-box;color:#172033;font:14px Inter,Arial;max-height:88vh;overflow:auto}.gfc-fc-panel h2{margin:0 32px 6px 0;font-size:20px}.gfc-fc-panel p{line-height:1.45;color:#64748B}.gfc-fc-close{position:absolute;right:15px;top:13px;border:0;background:transparent;font-size:22px;cursor:pointer;color:#475569}.gfc-fc-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:17px 0}.gfc-fc-card{border:1px solid #D8E7DE;border-radius:13px;padding:12px;background:#F8FCF9}.gfc-fc-card b{display:block;font-size:11px;color:#416758}.gfc-fc-card strong{display:block;font-size:18px;margin:5px 0;color:#125D42}.gfc-fc-card small{display:block;color:#64748B;line-height:1.28}.gfc-fc-goal-label{display:block;margin-top:9px;color:#416758;font-size:10px;font-weight:800}.gfc-fc-goal-input{display:block;box-sizing:border-box;width:100%;margin-top:4px;border:1px solid #BFD8C9;border-radius:8px;padding:6px;background:#fff;color:#172033}.gfc-fc-goal-button{display:block;margin-top:7px;border:1px solid #9ACCB1;background:#fff;color:#125D42;border-radius:8px;padding:6px 8px;font-weight:800;font-size:11px}.gfc-fc-note{border-radius:12px;padding:12px;background:#F4F7FB;color:#344054;line-height:1.45}.gfc-fc-foot{font-size:12px;margin-bottom:0}@media(max-width:360px){.gfc-fc-grid{grid-template-columns:1fr}}';
     document.head.appendChild(node);
   }
   window.gfcOpenFinancialCoach = function () { style(); open(); };

@@ -76,6 +76,23 @@ test('Financial Coach names only structured pending receivables on request', () 
   assert.match(response.reply, /Bruno/);
 });
 
+test('Financial Coach daily goal changes only after an explicit local confirmation', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  const start = html.indexOf("const GFC_FINANCIAL_COACH_POLICY_KEY='fnz_financial_coach_policy_v1';");
+  const end = html.indexOf('window.gfcGetFinancialCoachInput=function()', start);
+  assert.ok(start >= 0 && end > start);
+  const rows = new Map(); let confirmations = 0;
+  const window = { confirm:() => { confirmations += 1; return true; } };
+  const localStorage = { getItem:key => rows.get(key) || null, setItem:(key, value) => rows.set(key, value) };
+  const api = new Function('window', 'localStorage', 'state', html.slice(start, end) + '; return { policy:gfcFinancialCoachPolicy, set:window.gfcSetFinancialCoachDailyGoal };')(window, localStorage, { moneda:'PEN' });
+  assert.equal(api.policy().daily_free_cash_goal, 500);
+  assert.deepEqual(api.set('725.50'), { ok:true, daily_free_cash_goal:725.5 });
+  assert.equal(confirmations, 1);
+  assert.equal(api.policy().daily_free_cash_goal, 725.5);
+  assert.deepEqual(api.set('0'), { ok:false, code:'financial_goal_invalid' });
+  assert.equal(confirmations, 1);
+});
+
 test('Financial Coach UI contains no network client or commercial write path', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-financial-coach-ui.js'), 'utf8');
   assert.equal(/fetch\s*\(|XMLHttpRequest|navigator\.sendBeacon|localStorage\.setItem|sessionStorage\.setItem/i.test(source), false);
