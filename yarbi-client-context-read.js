@@ -64,6 +64,22 @@
     }).filter(Boolean);
   }
 
+  function historicalObservationRows(profile) {
+    const labels = {
+      service_mentioned:'Servicio mencionado',
+      visit_mentioned:'Visita mencionada',
+      work_completion_reported:'Trabajo reportado por chat',
+      payment_reported:'Pago reportado por chat'
+    };
+    return (Array.isArray(profile?.observations) ? profile.observations : []).slice(-4).reverse().map(item => {
+      const label = labels[text(item?.type, 80)] || 'Observación histórica';
+      const service = text(item?.service, 120);
+      const rawTime = Number(item?.source_timestamp);
+      const date = Number.isFinite(rawTime) && rawTime > 0 ? new Date(rawTime).toISOString().slice(0, 10).split('-').reverse().join('/') : '';
+      return `- **${label}${date ? ` · ${date}` : ''}:**${service ? ` ${service}` : ''}`;
+    }).filter(Boolean);
+  }
+
   function heading(kind, name) {
     if (kind === 'history') return `## 🧾 Expediente de ${name}`;
     if (kind === 'activity') return `## 📅 Seguimiento de ${name}`;
@@ -100,6 +116,8 @@
     if (kind === 'history') {
       const rows = historyRows(context.timeline);
       if (rows.length) details.push(`### Últimos registros verificados\n${rows.join('\n')}`);
+      const historicalRows = historicalObservationRows(context.historical_context);
+      if (historicalRows.length) details.push(`### Contexto histórico revisado\n${historicalRows.join('\n')}\n\n_Estas son observaciones que el propietario aprobó como contexto. No confirman pagos, visitas ni cierres._`);
     }
 
     if (!details.length) {

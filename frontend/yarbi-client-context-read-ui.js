@@ -32,7 +32,12 @@
     if (context && !context.requires_disambiguation && requestedName && typeof root.gfcYarbiConversationFocusFromMemory === 'function') {
       root.gfcYarbiConversationFocusFromMemory(context, { client_name: requestedName }, 'client-context-local-read');
     }
-    return { context: context ? { ...context, focus } : null, explicit: Boolean(requestedName) };
+    if (!context) return { context:null, explicit:Boolean(requestedName) };
+    const contactId = context?.contact?.id || context?.contact?.contact_id || focus?.contact_id || '';
+    const historicalContext = contactId && typeof root.gfcYarbiHistoricalContactContext === 'function'
+      ? root.gfcYarbiHistoricalContactContext(contactId)
+      : null;
+    return { context:{ ...context, focus, historical_context:historicalContext || null }, explicit:Boolean(requestedName) };
   }
 
   root.gfcTryClientContextReadMessage = async function gfcTryClientContextReadMessage(text) {

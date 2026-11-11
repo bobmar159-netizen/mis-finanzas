@@ -55,7 +55,25 @@ test('requires clarification rather than selecting a homonym', () => {
   assert.match(result.reply, /más de un cliente/);
 });
 
+test('presents approved historical context as an observation, never as a commercial fact', () => {
+  const result = replyForContext({ utterance:'¿Qué pasó con Carlos?', context:{ ...base, historical_context:{
+    contact_id:'carlos-1', provenance:'owner_reviewed_historical_context', observations:[
+      { id:'observation-1', type:'payment_reported', service:'instalación nueva', source_timestamp:Date.parse('2026-11-04T12:00:00Z'), commercial_fact:false }
+    ]
+  } } });
+  assert.equal(result.outcome, 'client_context_found');
+  assert.match(result.reply, /Contexto histórico revisado/);
+  assert.match(result.reply, /Pago reportado por chat/);
+  assert.match(result.reply, /No confirman pagos, visitas ni cierres/);
+});
+
 test('browser adapter does not contain a network or commercial write path', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-client-context-read-ui.js'), 'utf8');
   assert.equal(/fetch\s*\(|XMLHttpRequest|navigator\.sendBeacon|send-whatsapp|gfcSyncYarbiLocalMirror|gfcSave/i.test(source), false);
+});
+
+test('browser adapter may attach only the locally approved historical context to an already resolved contact', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-client-context-read-ui.js'), 'utf8');
+  assert.match(source, /gfcYarbiHistoricalContactContext/);
+  assert.match(source, /historical_context/);
 });
