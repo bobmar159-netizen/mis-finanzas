@@ -2,10 +2,12 @@
   'use strict';
 
   const DB_NAME = 'gfc_yarbi_conversation_v2';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const TIMELINE = 'timeline';
   const OUTBOX = 'outbox';
   const META = 'metadata';
+  const CONVERSATIONS = 'conversations';
+  const DEFAULT_CONVERSATION_ID = 'default';
   const MIGRATION_KEY = 'migration';
   const SIGNAL_KEY = 'gfc_yarbi_conversation_change_v2';
   const CHANNEL_NAME = 'gfc_yarbi_conversation_v2';
@@ -15,9 +17,16 @@
   let channel = null;
   const listeners = new Set();
 
+  function normalizeConversationId(value) {
+    const id = typeof value === 'string' ? value.trim() : '';
+    return /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(id) ? id : DEFAULT_CONVERSATION_ID;
+  }
   function immutableMatch(left, right) {
-    return !!left && !!right && left.id === right.id && left.role === right.role
-      && left.text === right.text && left.channel === right.channel;
+    const normalizedLeft = normalize(left);
+    const normalizedRight = normalize(right);
+    return !!normalizedLeft && !!normalizedRight && normalizedLeft.id === normalizedRight.id && normalizedLeft.role === normalizedRight.role
+      && normalizedLeft.text === normalizedRight.text && normalizedLeft.channel === normalizedRight.channel
+      && normalizedLeft.conversation_id === normalizedRight.conversation_id;
   }
   function normalize(value) {
     const role = value && (value.role === 'user' ? 'user' : (value.role === 'assistant' || value.role === 'model' ? 'assistant' : ''));
@@ -25,7 +34,45 @@
     const id = typeof value?.id === 'string' ? value.id.trim() : '';
     if (!role || !text || !id) return null;
     const at = Number(value.at || value.message_at || Date.now());
-    return { id, role, text:text.slice(0, 8000), at:Number.isFinite(at) ? at : Date.now(), channel:String(value.channel || 'chat').slice(0, 30) };
+    return {
+      id,
+      role,
+      text:text.slice(0, 8000),
+      at:Number.isFinite(at) ? at : Date.now(),
+      channel:String(value.channel || 'chat').slice(0, 30),
+      // Las filas v1 no tenían conversación. Se conservan de forma explícita
+      // dentro de la conversación heredada, sin perder ni reescribir texto.
+      conversation_id:normalizeConversationId(value.conversation_id || value.conversationId)
+    };
+  }
+  function cleanTitle(value, fallback) {
+    const title = String(value || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+    return title || fallback || 'Nueva conversación';
+  }
+  function titleForMessage(item) {
+    return item?.role === 'user' ? cleanTitle(item.text, 'Nueva conversación') : 'Nueva conversación';
+  }
+  function normalizeConversation(value) {
+    const id = normalizeConversationId(value?.id || value?.conversation_id);
+    const createdAt = Number(value?.createdAt || value?.created_at || Date.now());
+    const updatedAt = Number(value?.updatedAt || value?.updated_at || createdAt);
+    return {
+      id,
+      title:cleanTitle(value?.title, id === DEFAULT_CONVERSATION_ID ? 'Conversación anterior' : 'Nueva conversación'),
+      createdAt:Number.isFinite(createdAt) ? createdAt : Date.now(),
+      updatedAt:Number.isFinite(updatedAt) ? updatedAt : Date.now()
+    };
+  }
+  function conversationForMessage(item, existing) {
+    const now = Date.now();
+    const base = existing ? normalizeConversation(existing) : normalizeConversation({
+      id:item.conversation_id,
+      title:item.conversation_id === DEFAULT_CONVERSATION_ID ? 'Conversación anterior' : titleForMessage(item),
+      createdAt:item.at || now,
+      updatedAt:item.at || now
+    });
+    const title = (base.title === 'Nueva conversación' && item.role === 'user') ? titleForMessage(item) : base.title;
+    return { ...base, title, updatedAt:Math.max(base.updatedAt, Number(item.at) || now) };
   }
   function requestValue(request) {
     return new Promise((resolve, reject) => {
@@ -55,6 +102,7 @@
         if (!db.objectStoreNames.contains(TIMELINE)) db.createObjectStore(TIMELINE, { keyPath:'id' });
         if (!db.objectStoreNames.contains(OUTBOX)) db.createObjectStore(OUTBOX, { keyPath:'id' });
         if (!db.objectStoreNames.contains(META)) db.createObjectStore(META, { keyPath:'key' });
+        if (!db.objectStoreNames.contains(CONVERSATIONS)) db.createObjectStore(CONVERSATIONS, { keyPath:'id' });
       };
       request.onblocked = () => reject(Object.assign(new Error('indexeddb_upgrade_blocked'), { code:'storage_blocked' }));
       request.onerror = () => reject(request.error || new Error('indexeddb_open_failed'));
@@ -102,7 +150,7 @@
     const snapshot = migrationSnapshot(timelineKey, outboxKey);
     if (!snapshot.ok) return Promise.resolve(snapshot);
     return new Promise((resolve, reject) => {
-      const tx = db.transaction([TIMELINE, OUTBOX, META], 'readwrite');
+      const tx = db.transaction([TIMELINE, OUTBOX, META, CONVERSATIONS], 'readwrite');
       const meta = tx.objectStore(META);
       let result = null;
       const migration = meta.get(MIGRATION_KEY);
@@ -110,8 +158,12 @@
         if (migration.result?.completed === true) { result = { ok:true, migrated:false, metadata:migration.result }; return; }
         const timeline = tx.objectStore(TIMELINE);
         const outbox = tx.objectStore(OUTBOX);
+        const conversations = tx.objectStore(CONVERSATIONS);
         snapshot.timeline.forEach(item => timeline.put(item));
         snapshot.outbox.forEach(entry => outbox.put(entry));
+        if (snapshot.timeline.length || snapshot.outbox.length) {
+          conversations.put(normalizeConversation({ id:DEFAULT_CONVERSATION_ID, title:'Conversación anterior', createdAt:Math.min(...snapshot.timeline.map(item => item.at), Date.now()), updatedAt:Math.max(...snapshot.timeline.map(item => item.at), Date.now()) }));
+        }
         const record = { key:MIGRATION_KEY, schemaVersion:DB_VERSION, sourceVersion:'localStorage-v1', state:'pending_verification', at:Date.now(), timelineImported:snapshot.timeline.length, outboxImported:snapshot.outbox.length, verified:false };
         meta.put(record);
         result = { ok:true, migrated:true, record };
@@ -161,13 +213,57 @@
     installSignals();
     return { ok:true, initialized:true, migrated:!!migrated.migrated };
   }
-  async function listTimeline() {
+  async function listTimeline(options) {
+    const requested = typeof options === 'string' ? options : options?.conversationId;
+    const conversationId = requested ? normalizeConversationId(requested) : null;
     const db = await open();
     const tx = db.transaction(TIMELINE, 'readonly');
     const completed = transactionResult(tx, () => null);
     const rows = await requestValue(tx.objectStore(TIMELINE).getAll());
     await completed;
-    return rows.map(normalize).filter(Boolean).sort((a,b) => a.at - b.at);
+    return rows.map(normalize).filter(Boolean).filter(item => !conversationId || item.conversation_id === conversationId).sort((a,b) => a.at - b.at);
+  }
+  async function listConversations() {
+    const db = await open();
+    const tx = db.transaction([CONVERSATIONS, TIMELINE], 'readonly');
+    const completed = transactionResult(tx, () => null);
+    const [stored, timeline] = await Promise.all([
+      requestValue(tx.objectStore(CONVERSATIONS).getAll()),
+      requestValue(tx.objectStore(TIMELINE).getAll())
+    ]);
+    await completed;
+    const messages = timeline.map(normalize).filter(Boolean);
+    const byId = new Map(stored.map(normalizeConversation).map(item => [item.id, item]));
+    messages.forEach(item => byId.set(item.conversation_id, conversationForMessage(item, byId.get(item.conversation_id))));
+    return [...byId.values()].map(conversation => {
+      const own = messages.filter(item => item.conversation_id === conversation.id);
+      return { ...conversation, messageCount:own.length, lastMessageAt:own.length ? own[own.length - 1].at : conversation.updatedAt };
+    }).sort((left, right) => right.updatedAt - left.updatedAt || left.id.localeCompare(right.id));
+  }
+  async function searchConversations(query) {
+    const needle = String(query || '').trim().toLocaleLowerCase('es-PE').slice(0, 120);
+    const conversations = await listConversations();
+    if (!needle) return conversations;
+    const timeline = await listTimeline();
+    const matchingIds = new Set(timeline.filter(item => item.text.toLocaleLowerCase('es-PE').includes(needle)).map(item => item.conversation_id));
+    return conversations.filter(item => matchingIds.has(item.id) || item.title.toLocaleLowerCase('es-PE').includes(needle));
+  }
+  async function createConversation(value) {
+    const candidate = value && typeof value === 'object' ? value : {};
+    const id = normalizeConversationId(candidate.id);
+    if (id === DEFAULT_CONVERSATION_ID && candidate.id && String(candidate.id).trim() !== DEFAULT_CONVERSATION_ID) return { ok:false, code:'conversation_identity_invalid' };
+    const normalized = normalizeConversation({ ...candidate, id, createdAt:Date.now(), updatedAt:Date.now() });
+    return withWriteLock(async () => {
+      const db = await open();
+      const tx = db.transaction(CONVERSATIONS, 'readwrite');
+      const store = tx.objectStore(CONVERSATIONS);
+      const existing = await requestValue(store.get(normalized.id));
+      if (existing) return { ok:true, code:'idempotent', conversation:normalizeConversation(existing) };
+      store.put(normalized);
+      await transactionResult(tx, () => null);
+      notify({ type:'conversation_created' });
+      return { ok:true, code:'created', conversation:normalized };
+    });
   }
   async function listOutbox() {
     const db = await open();
@@ -182,9 +278,10 @@
     if (!normalized) return { ok:false, code:'content_invalid' };
     const db = await open();
     const result = await new Promise((resolve, reject) => {
-      const tx = db.transaction([TIMELINE, OUTBOX], 'readwrite');
+      const tx = db.transaction([TIMELINE, OUTBOX, CONVERSATIONS], 'readwrite');
       const timeline = tx.objectStore(TIMELINE);
       const outbox = tx.objectStore(OUTBOX);
+      const conversations = tx.objectStore(CONVERSATIONS);
       let outcome = { ok:false, code:'transaction_unknown' };
       timeline.get(normalized.id).onsuccess = event => {
         const existing = event.target.result;
@@ -192,11 +289,14 @@
           if (immutableMatch(existing, normalized)) { outcome = { ok:true, code:'idempotent', item:existing }; return; }
           outcome = { ok:false, code:'identity_conflict', item:existing }; return;
         }
-        timeline.put(normalized);
-        outbox.get(normalized.id).onsuccess = outboxEvent => {
-          const prior = outboxEvent.target.result;
-          if (!prior) outbox.put({ id:normalized.id, messageId:normalized.id, item:normalized, state:'pending', attempts:0, operationId:'timeline:' + normalized.id, updatedAt:Date.now() });
-          outcome = { ok:true, code:'persisted', item:normalized };
+        conversations.get(normalized.conversation_id).onsuccess = conversationEvent => {
+          conversations.put(conversationForMessage(normalized, conversationEvent.target.result));
+          timeline.put(normalized);
+          outbox.get(normalized.id).onsuccess = outboxEvent => {
+            const prior = outboxEvent.target.result;
+            if (!prior) outbox.put({ id:normalized.id, messageId:normalized.id, item:normalized, state:'pending', attempts:0, operationId:'timeline:' + normalized.id, updatedAt:Date.now() });
+            outcome = { ok:true, code:'persisted', item:normalized };
+          };
         };
       };
       tx.oncomplete = () => resolve(outcome);
@@ -227,15 +327,19 @@
     return withWriteLock(async () => {
     const db = await open();
     const result = await new Promise((resolve, reject) => {
-      const tx = db.transaction(TIMELINE, 'readwrite');
+      const tx = db.transaction([TIMELINE, CONVERSATIONS], 'readwrite');
       const store = tx.objectStore(TIMELINE);
+      const conversations = tx.objectStore(CONVERSATIONS);
       let added = 0, conflicts = 0;
       let pending = incoming.length;
       incoming.forEach(item => {
         const get = store.get(item.id);
         get.onsuccess = () => {
           const existing = get.result;
-          if (!existing) { store.put(item); added += 1; }
+          if (!existing) {
+            conversations.get(item.conversation_id).onsuccess = conversationEvent => conversations.put(conversationForMessage(item, conversationEvent.target.result));
+            store.put(item); added += 1;
+          }
           else if (!immutableMatch(existing, item)) conflicts += 1;
           pending -= 1;
         };
@@ -248,5 +352,5 @@
     return result;
     });
   }
-  window.YarbiConversationStore = Object.freeze({ initialize, persist, listTimeline, listOutbox, acknowledgeOutbox, mergeCloud, subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); }, immutableMatch, normalize });
+  window.YarbiConversationStore = Object.freeze({ initialize, persist, listTimeline, listConversations, searchConversations, createConversation, listOutbox, acknowledgeOutbox, mergeCloud, subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); }, immutableMatch, normalize, normalizeConversation, normalizeConversationId });
 }());

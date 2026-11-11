@@ -12,6 +12,8 @@
   const TRAINING_PENDING_INSTRUCTION_KEY = 'gfc_yarbi_client_simulator_pending_instruction_v1';
   const INTERACTION_MODE_KEY = 'gfc_yarbi_interaction_mode_v1';
   const AUTONOMY_KEY = 'gfc_yarbi_autonomy_v1';
+  const ACTIVE_CONVERSATION_KEY = 'gfc_yarbi_active_conversation_v1';
+  const DEFAULT_CONVERSATION_ID = 'default';
   const MAX_TRAINING_EXAMPLES = 80;
   const MAX_LOCAL_MESSAGES = 600;
   const LEARNING_INTENTS = ['cotizacion','ubicacion','agenda','reprogramacion','pago','postventa','consulta_general'];
@@ -50,6 +52,21 @@
     const source = String(seed || (Date.now() + ':' + Math.random()));
     for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
     return prefix + '_' + (hash >>> 0).toString(36);
+  }
+  function safeConversationId(value) {
+    const id = typeof value === 'string' ? value.trim() : '';
+    return /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(id) ? id : DEFAULT_CONVERSATION_ID;
+  }
+  function activeConversationId() {
+    return safeConversationId(localStorage.getItem(ACTIVE_CONVERSATION_KEY));
+  }
+  function setActiveConversationId(value) {
+    const id = safeConversationId(value);
+    localStorage.setItem(ACTIVE_CONVERSATION_KEY, id);
+    return id;
+  }
+  function newConversationId() {
+    return 'conversation_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
   }
   function autonomyConfig() {
     const saved = readJson(AUTONOMY_KEY, {});
@@ -133,7 +150,8 @@
       id: String(item.id || makeId('yt', role + ':' + at + ':' + text)),
       role, text: text.slice(0, 8000),
       at: Number.isFinite(at) ? at : Date.now(),
-      channel: String(item.channel || 'chat').slice(0, 30)
+      channel: String(item.channel || 'chat').slice(0, 30),
+      conversation_id:safeConversationId(item.conversation_id || item.conversationId || activeConversationId())
     };
   }
   let conversationStoreReady = null;
@@ -150,15 +168,15 @@
     if (!initialized?.ok) throw storageError(initialized?.code || 'storage_initialization_failed');
     return window.YarbiConversationStore;
   }
-  async function loadTimeline() {
+  async function loadTimeline(conversationId) {
     const store = await conversationStore();
-    return (await store.listTimeline()).map(normalizeTimelineItem).filter(Boolean).sort((a,b) => a.at - b.at).slice(-MAX_LOCAL_MESSAGES);
+    return (await store.listTimeline(conversationId || activeConversationId())).map(normalizeTimelineItem).filter(Boolean).sort((a,b) => a.at - b.at).slice(-MAX_LOCAL_MESSAGES);
   }
   async function importTimeline(items) {
     const store = await conversationStore();
     const imported = [];
     for (const candidate of (Array.isArray(items) ? items : [])) {
-      const item = normalizeTimelineItem(candidate);
+      const item = normalizeTimelineItem({ ...candidate, conversation_id:candidate?.conversation_id || candidate?.conversationId || activeConversationId() });
       if (!item) continue;
       const result = await store.persist(item);
       if (!result.ok && result.code !== 'identity_conflict') throw storageError(result.code || 'storage_import_failed');
@@ -196,7 +214,10 @@
       const response = await fetch(BACKEND + '/api/assistant/preferences?action=conversation&limit=500', { headers:{ 'X-Assistant-Token':token() }, cache:'no-store' });
       if (!response.ok) return loadTimeline();
       const data = await response.json().catch(() => ({}));
-      const cloud = Array.isArray(data.messages) ? data.messages.map(normalizeTimelineItem).filter(Boolean) : [];
+      // El contrato remoto legado es plano: una fila sin conversation_id se
+      // conserva en el historial anterior, nunca se inserta en la conversación
+      // local actualmente abierta por accidente.
+      const cloud = Array.isArray(data.messages) ? data.messages.map(item => normalizeTimelineItem({ ...item, conversation_id:item?.conversation_id || item?.conversationId || DEFAULT_CONVERSATION_ID })).filter(Boolean) : [];
       const store = await conversationStore();
       await store.mergeCloud(cloud);
       return loadTimeline();
@@ -209,15 +230,15 @@
   }
   function timelineImmutableMatch(left, right) {
     return !!left && !!right && left.id === right.id && left.role === right.role
-      && left.text === right.text && left.channel === right.channel;
+      && left.text === right.text && left.channel === right.channel && left.conversation_id === right.conversation_id;
   }
-  async function persistTimelineMessage(role, text, at, channel, id) {
+  async function persistTimelineMessage(role, text, at, channel, id, conversationId) {
     if (typeof id !== 'undefined' && (typeof id !== 'string' || !id.trim())) {
       setTimelinePersistence('identity_invalid');
       return null;
     }
     const explicitId = typeof id === 'string' ? id.trim() : '';
-    const normalized = normalizeTimelineItem({ id:explicitId || undefined, role, text, at:at || Date.now(), channel:channel || 'chat' });
+    const normalized = normalizeTimelineItem({ id:explicitId || undefined, role, text, at:at || Date.now(), channel:channel || 'chat', conversation_id:conversationId || activeConversationId() });
     if (!normalized) { setTimelinePersistence('content_invalid'); return null; }
     try {
       const store = await conversationStore();
@@ -581,8 +602,8 @@
     if (typeof text !== 'string' || !text.trim()) return { handled:true, result:{ ok:false, code:'content_empty' } };
     const opts = options || {};
     const item = opts.persist === false
-      ? normalizeTimelineItem({ id:opts.id, role, text, at:at || opts.at || Date.now(), channel:opts.channel || 'chat' })
-      : await persistTimelineMessage(role, text, at || opts.at, opts.channel, opts.id);
+      ? normalizeTimelineItem({ id:opts.id, role, text, at:at || opts.at || Date.now(), channel:opts.channel || 'chat', conversation_id:opts.conversationId || opts.conversation_id || activeConversationId() })
+      : await persistTimelineMessage(role, text, at || opts.at, opts.channel, opts.id, opts.conversationId || opts.conversation_id);
     if (!item) return { handled:true, result:{ ok:false, code:'timeline_item_invalid' } };
     const box = document.getElementById('gfc-copilot-chat-messages');
     if (!box) return { handled:false };
@@ -614,7 +635,9 @@
     try { timeline = await loadTimeline(); }
     catch (_) { box.dataset.gfcRestored = '0'; return; }
     installConversationStoreSubscription();
-    if (!timeline.length) {
+    // El antiguo localStorage solo se importa una vez, dentro del historial
+    // heredado. Una conversación nueva debe empezar realmente vacía.
+    if (!timeline.length && activeConversationId() === DEFAULT_CONVERSATION_ID) {
       const migrated = [];
       try {
         (typeof gfcLoadCopilotHistory === 'function' ? gfcLoadCopilotHistory() : []).forEach((item, i) => migrated.push(normalizeTimelineItem({ role:item.role === 'user' ? 'user' : 'assistant', text:item.parts?.[0]?.text, at:Date.now() - (40-i)*1000, channel:'migrated' })));
@@ -641,6 +664,74 @@
     }).catch(() => {});
   };
 
+  function conversationDateLabel(value) {
+    try { return new Intl.DateTimeFormat('es-PE', { timeZone:'America/Lima', day:'numeric', month:'short' }).format(new Date(value)); }
+    catch (_) { return ''; }
+  }
+  function conversationHistoryHtml() {
+    return '<main class="gfc-yarbi-tool-page"><section class="gfc-yarbi-tool-card">' +
+      '<div class="gfc-yarbi-tool-title">Conversaciones</div>' +
+      '<div class="gfc-yarbi-tool-copy">Tu historial permanece en este dispositivo. Abrir o crear una conversación no envía mensajes ni modifica datos comerciales.</div>' +
+      '<div class="gfc-yarbi-conversation-actions"><button class="gfc-yarbi-primary" onclick="gfcStartNewYarbiConversation()">＋ Nueva conversación</button><input id="gfc-yarbi-conversation-search" type="search" placeholder="Buscar en tus conversaciones" oninput="gfcRenderYarbiConversationHistory(this.value)"></div>' +
+      '<div id="gfc-yarbi-conversation-history" class="gfc-yarbi-conversation-history" aria-live="polite">Cargando conversaciones…</div>' +
+      '</section></main>';
+  }
+  window.gfcRenderYarbiConversationHistory = async function(query) {
+    const target = document.getElementById('gfc-yarbi-conversation-history');
+    if (!target) return;
+    target.textContent = 'Cargando conversaciones…';
+    try {
+      const store = await conversationStore();
+      const conversations = await store.searchConversations(query || '');
+      const active = activeConversationId();
+      if (!conversations.length) {
+        target.innerHTML = '<p class="gfc-yarbi-empty-copy">No hay conversaciones que coincidan. Puedes empezar una nueva.</p>';
+        return;
+      }
+      target.innerHTML = conversations.slice(0, 80).map(item => {
+        const id = safeConversationId(item.id);
+        const current = id === active;
+        const detail = (Number(item.messageCount) || 0) + ' mensaje' + ((Number(item.messageCount) || 0) === 1 ? '' : 's') + ' · ' + conversationDateLabel(item.lastMessageAt || item.updatedAt);
+        return '<button type="button" class="gfc-yarbi-conversation-row' + (current ? ' active' : '') + '" onclick="gfcOpenYarbiConversation(\'' + id + '\')"><span><b>' + esc(item.title || 'Nueva conversación') + '</b><small>' + esc(detail) + '</small></span><em>' + (current ? 'Abierta' : 'Abrir') + '</em></button>';
+      }).join('');
+    } catch (_) {
+      target.innerHTML = '<p class="gfc-yarbi-empty-copy">El historial local no está disponible ahora. Tus conversaciones existentes no se han borrado.</p>';
+    }
+  };
+  window.gfcOpenYarbiConversation = async function(conversationId) {
+    const id = safeConversationId(conversationId);
+    try {
+      const store = await conversationStore();
+      const known = (await store.listConversations()).some(item => item.id === id);
+      if (!known) { if (typeof toast === 'function') toast('Esa conversación ya no está disponible en esta copia local.', 'warning'); return false; }
+      setActiveConversationId(id);
+      window.gfcOpenCopilotModal('chat');
+      return true;
+    } catch (_) {
+      if (typeof toast === 'function') toast('No pude abrir la conversación local.', 'warning');
+      return false;
+    }
+  };
+  window.gfcStartNewYarbiConversation = async function() {
+    try {
+      const store = await conversationStore();
+      const id = newConversationId();
+      const result = await store.createConversation({ id, title:'Nueva conversación' });
+      if (!result?.ok) throw storageError(result?.code || 'conversation_creation_failed');
+      setActiveConversationId(result.conversation.id);
+      window.gfcToggleYarbiMainMenu(false);
+      window.gfcOpenCopilotModal('chat');
+      window.setTimeout(() => {
+        if (activeConversationId() !== result.conversation.id) return;
+        window.gfcAppendCopilotTimelineMessage('assistant', 'Hola, estoy listo para ayudarte. ¿Qué quieres revisar?', Date.now(), { channel:'session', conversationId:result.conversation.id });
+      }, 0);
+      return true;
+    } catch (_) {
+      if (typeof toast === 'function') toast('No pude crear una conversación local segura.', 'warning');
+      return false;
+    }
+  };
+
   function activeMode() { return typeof gfcGetActiveYarbiMode === 'function' ? gfcGetActiveYarbiMode() : { id:'copilot', label:'Copiloto', voice:'Kore', icon:'🤖' }; }
   function allModes() {
     try { return typeof GFC_YARBI_MODE_CONFIG !== 'undefined' ? Object.values(GFC_YARBI_MODE_CONFIG) : [activeMode()]; }
@@ -660,6 +751,8 @@
         allModes().map(m => '<button onclick="gfcSetYarbiMode(\'' + m.id + '\');gfcToggleYarbiModeMenu(false)">' + esc(m.icon + ' ' + m.label + ' · ' + m.voice) + '</button>').join('') +
       '</div>' +
       '<div id="gfc-yarbi-main-menu" class="gfc-yarbi-popover gfc-yarbi-hidden">' +
+        '<button onclick="gfcOpenCopilotModal(\'conversations\')">💬 Historial de conversaciones</button>' +
+        '<button onclick="gfcStartNewYarbiConversation()">＋ Nueva conversación</button>' +
         '<button onclick="gfcOpenCopilotModal(\'learning\')">📊 Aprendizaje y autonomía</button>' +
         '<button onclick="gfcOpenCopilotModal(\'tools\')">🧠 Memoria y aprendizaje</button>' +
         '<button onclick="gfcOpenCopilotModal(\'status\')">✅ Estado y diagnóstico</button>' +
@@ -703,13 +796,9 @@
     return true;
   };
   window.gfcConfirmRestartYarbiConversation = async function() {
-    if (!confirm('Esto limpia únicamente el contexto activo para que Yarbi empiece de cero. El historial visible, clientes, WhatsApp, agenda, instrucciones y memoria comercial se conservan. ¿Continuar?')) return;
-    localStorage.removeItem('gfc_copilot_history_v1');
-    localStorage.removeItem('gfc_gemini_live_memory_v1');
+    if (!confirm('Se abrirá una conversación nueva. Las conversaciones anteriores, clientes, WhatsApp, agenda e instrucciones se conservan. ¿Continuar?')) return;
     if (typeof gfcYarbiConversationFocusClear === 'function') gfcYarbiConversationFocusClear('restart-conversation');
-    window._gfcCopilotHistory = [];
-    window.gfcAppendCopilotChatMessage('assistant', 'Hola, Omar. Contexto reiniciado; tu historial y memorias siguen guardados.', Date.now(), { channel:'session' });
-    window.gfcToggleYarbiMainMenu(false);
+    await window.gfcStartNewYarbiConversation();
   };
 
   function chatHtml() {
@@ -1751,9 +1840,9 @@
     }
     const content = document.getElementById('modal-content');
     if (!content) return;
-    const title = tab === 'chat' ? 'Yarbi' : ({ tools:'Memoria y aprendizaje', masivo:'Importar chats', memoria:'Fotos y videos', ordenes:'Instrucciones', practice:'Cliente simulado', learning:'Aprendizaje y autonomía', status:'Estado y diagnóstico' }[tab] || 'Yarbi');
+    const title = tab === 'chat' ? 'Yarbi' : ({ conversations:'Conversaciones', tools:'Memoria y aprendizaje', masivo:'Importar chats', memoria:'Fotos y videos', ordenes:'Instrucciones', practice:'Cliente simulado', learning:'Aprendizaje y autonomía', status:'Estado y diagnóstico' }[tab] || 'Yarbi');
     content.innerHTML = '<section class="gfc-yarbi-shell">' + headerHtml(title, tab) +
-      (tab === 'chat' ? chatHtml() : tab === 'tools' ? hubHtml() : tab === 'masivo' ? importHtml() : tab === 'memoria' ? mediaHtml() : tab === 'ordenes' ? ordersHtml() : tab === 'practice' ? trainingHtml() : tab === 'learning' ? learningHtml() : statusHtml()) + '</section>';
+      (tab === 'chat' ? chatHtml() : tab === 'conversations' ? conversationHistoryHtml() : tab === 'tools' ? hubHtml() : tab === 'masivo' ? importHtml() : tab === 'memoria' ? mediaHtml() : tab === 'ordenes' ? ordersHtml() : tab === 'practice' ? trainingHtml() : tab === 'learning' ? learningHtml() : statusHtml()) + '</section>';
     document.body.classList.add('gfc-yarbi-screen');
     document.getElementById('modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -1778,6 +1867,7 @@
         }, 1200);
       }
     }
+    if (tab === 'conversations') setTimeout(() => window.gfcRenderYarbiConversationHistory(), 0);
     if (tab === 'memoria') setTimeout(() => window.gfcRefreshYarbiMediaLibrary(), 0);
     if (tab === 'ordenes') loadInstructionViewInBackground(viewGeneration);
     if (tab === 'practice') setTimeout(() => {

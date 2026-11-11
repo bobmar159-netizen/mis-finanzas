@@ -144,3 +144,31 @@ test('1.2B: una migración legacy conflictiva no marca completada ni borra el or
   assert.match(shared.localStorage.getItem('legacy-conflict'), /"uno"/);
   assert.match(shared.localStorage.getItem('legacy-conflict'), /"dos"/);
 });
+
+test('historial: conserva la conversación heredada y separa mensajes de conversaciones nuevas', async () => {
+  const shared = createSharedBrowser();
+  shared.localStorage.setItem('legacy-timeline', JSON.stringify([message('legacy-history', 'historial anterior')]));
+  const store = createTab(shared);
+  await store.initialize({ timelineKey:'legacy-timeline' });
+  const created = await store.createConversation({ id:'conversation_20261111_a', title:'Visita en Surco' });
+  assert.equal(created.code, 'created');
+  await store.persist({ ...message('new-history', 'coordinar visita'), conversation_id:'conversation_20261111_a', role:'user' });
+  assert.deepEqual((await store.listTimeline('default')).map(item => item.id), ['legacy-history']);
+  assert.deepEqual((await store.listTimeline({ conversationId:'conversation_20261111_a' })).map(item => item.id), ['new-history']);
+  const conversations = await store.listConversations();
+  assert.deepEqual(conversations.map(item => item.id), ['conversation_20261111_a', 'default']);
+  assert.equal(conversations.find(item => item.id === 'default').title, 'Conversación anterior');
+  assert.equal(conversations.find(item => item.id === 'conversation_20261111_a').messageCount, 1);
+  assert.deepEqual((await store.searchConversations('coordinar')).map(item => item.id), ['conversation_20261111_a']);
+});
+
+test('historial: la identidad inmutable no puede mover un mensaje a otra conversación', async () => {
+  const shared = createSharedBrowser();
+  const store = createTab(shared);
+  await store.initialize({});
+  await store.persist({ ...message('fixed-message', 'original'), conversation_id:'conversation_a' });
+  const conflict = await store.persist({ ...message('fixed-message', 'original'), conversation_id:'conversation_b' });
+  assert.equal(conflict.code, 'identity_conflict');
+  assert.equal((await store.listTimeline('conversation_a')).length, 1);
+  assert.equal((await store.listTimeline('conversation_b')).length, 0);
+});
