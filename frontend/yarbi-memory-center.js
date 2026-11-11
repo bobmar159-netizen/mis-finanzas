@@ -60,9 +60,13 @@
   function activeConversationId() {
     return safeConversationId(localStorage.getItem(ACTIVE_CONVERSATION_KEY));
   }
+  window.gfcYarbiActiveConversationId = activeConversationId;
   function setActiveConversationId(value) {
     const id = safeConversationId(value);
     localStorage.setItem(ACTIVE_CONVERSATION_KEY, id);
+    // El contexto breve que usa el cerebro debe cambiar junto con la pantalla.
+    // Así una nueva conversación no hereda referencias de la anterior.
+    if (typeof window.gfcLoadCopilotHistory === 'function') window._gfcCopilotHistory = window.gfcLoadCopilotHistory();
     return id;
   }
   function newConversationId() {

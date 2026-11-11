@@ -19151,6 +19151,12 @@ function gfcStopCopilotVoiceInput() {
 const GFC_COPILOT_HISTORY_KEY = 'gfc_copilot_history_v1';
 const GFC_YARBI_USAGE_KEY = 'gfc_yarbi_usage_v1';
 
+function gfcCopilotHistoryStorageKey() {
+  const id = typeof window.gfcYarbiActiveConversationId === 'function' ? String(window.gfcYarbiActiveConversationId() || 'default') : 'default';
+  // La clave histórica se conserva íntegra para la conversación heredada.
+  return id === 'default' ? GFC_COPILOT_HISTORY_KEY : GFC_COPILOT_HISTORY_KEY + ':' + id;
+}
+
 function gfcLoadYarbiUsage() {
   const empty = { requests: 0, totalPromptTokens: 0, totalResponseTokens: 0, totalThoughtsTokens: 0, totalTokens: 0, byModel: {}, last: null };
   if (window._gfcYarbiUsage) return window._gfcYarbiUsage;
@@ -19182,7 +19188,7 @@ function gfcRecordYarbiUsage(payload, source) {
 
 function gfcLoadCopilotHistory() {
   try {
-    const saved = JSON.parse(localStorage.getItem(GFC_COPILOT_HISTORY_KEY) || '[]');
+    const saved = JSON.parse(localStorage.getItem(gfcCopilotHistoryStorageKey()) || '[]');
     if (!Array.isArray(saved)) return [];
     return saved.filter(item => (item?.role === 'user' || item?.role === 'model') && item?.parts?.[0]?.text).slice(-20);
   } catch (_) {
@@ -19193,7 +19199,7 @@ function gfcLoadCopilotHistory() {
 function gfcPersistCopilotHistory(history = window._gfcCopilotHistory) {
   try {
     const safe = (Array.isArray(history) ? history : []).filter(item => (item?.role === 'user' || item?.role === 'model') && item?.parts?.[0]?.text).slice(-20);
-    localStorage.setItem(GFC_COPILOT_HISTORY_KEY, JSON.stringify(safe));
+    localStorage.setItem(gfcCopilotHistoryStorageKey(), JSON.stringify(safe));
   } catch (error) {
     console.warn('[Yarbi memoria] No se pudo guardar la conversación:', error);
   }
