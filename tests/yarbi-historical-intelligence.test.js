@@ -1,7 +1,9 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { planHistoricalIntelligence } = require('../lib/yarbi-historical-intelligence');
+const { createHistoricalOwnerScopeResolver, planHistoricalIntelligence } = require('../lib/yarbi-historical-intelligence');
+
+const OWNER = '11111111-1111-4111-8111-111111111111';
 
 test('plans historical messages once per contact without commercial effects', () => {
   const plan = planHistoricalIntelligence({ messages:[
@@ -20,4 +22,35 @@ test('does not repeat an already processed historical batch', () => {
   const first = planHistoricalIntelligence({ messages:[{ id:'h1', contact_id:'c1', text:'Hola', metadata:{historical:true} }] });
   const second = planHistoricalIntelligence({ messages:[{ id:'h1', contact_id:'c1', text:'Hola', metadata:{historical:true} }], processed_keys:[first.tasks[0].idempotency_key] });
   assert.equal(second.tasks.length, 0);
+});
+
+test('reads every historical contact scope page instead of silently stopping at 96', async () => {
+  const all = Array.from({ length: 2000 }, (_, index) => ({ contact_id: index + 1 }));
+  const calls = [];
+  const resolve = createHistoricalOwnerScopeResolver({
+    pageSize: 97,
+    supabase: async path => {
+      calls.push(path);
+      const offset = Number(new URLSearchParams(path.split('?')[1]).get('offset'));
+      const limit = Number(new URLSearchParams(path.split('?')[1]).get('limit'));
+      return { response: { ok: true }, data: all.slice(offset, offset + limit) };
+    }
+  });
+  const scope = await resolve({ kind: 'validated_auth_identity', subject: OWNER });
+  assert.equal(scope.contact_ids.length, 2000);
+  assert.equal(scope.contact_ids.at(-1), 2000);
+  assert.ok(calls.length > 1);
+  assert.equal(scope.verification, 'canonical_owner_contact_scope_paged');
+});
+
+test('historical scope fails explicitly beyond its documented maximum', async () => {
+  const resolve = createHistoricalOwnerScopeResolver({
+    pageSize: 100,
+    maxContacts: 100,
+    supabase: async path => {
+      const offset = Number(new URLSearchParams(path.split('?')[1]).get('offset'));
+      return { response: { ok: true }, data: Array.from({ length: 100 }, (_, index) => ({ contact_id: offset + index + 1 })) };
+    }
+  });
+  await assert.rejects(() => resolve({ kind: 'validated_auth_identity', subject: OWNER }), /historical_owner_scope_limit_exceeded/);
 });
