@@ -265,6 +265,53 @@
       return { ok:true, code:'created', conversation:normalized };
     });
   }
+  async function renameConversation(conversationId, title) {
+    const id = normalizeConversationId(conversationId);
+    const safeTitle = cleanTitle(title, '');
+    if (!safeTitle || safeTitle === 'Nueva conversación' && !String(title || '').trim()) return { ok:false, code:'conversation_title_invalid' };
+    return withWriteLock(async () => {
+      const db = await open();
+      const tx = db.transaction(CONVERSATIONS, 'readwrite');
+      const store = tx.objectStore(CONVERSATIONS);
+      const existing = await requestValue(store.get(id));
+      if (!existing) return { ok:false, code:'conversation_not_found' };
+      const conversation = { ...normalizeConversation(existing), title:safeTitle, updatedAt:Date.now() };
+      store.put(conversation);
+      await transactionResult(tx, () => null);
+      notify({ type:'conversation_renamed' });
+      return { ok:true, conversation };
+    });
+  }
+  async function deleteConversation(conversationId) {
+    const id = normalizeConversationId(conversationId);
+    return withWriteLock(async () => {
+      const db = await open();
+      const result = await new Promise((resolve, reject) => {
+        const tx = db.transaction([CONVERSATIONS, TIMELINE, OUTBOX], 'readwrite');
+        const conversations = tx.objectStore(CONVERSATIONS);
+        const timeline = tx.objectStore(TIMELINE);
+        const outbox = tx.objectStore(OUTBOX);
+        let rows = null;
+        let queued = null;
+        let outcome = { ok:false, code:'conversation_delete_unknown' };
+        const removeMatches = () => {
+          if (!rows || !queued) return;
+          const messages = rows.map(normalize).filter(Boolean).filter(item => item.conversation_id === id);
+          messages.forEach(item => timeline.delete(item.id));
+          queued.filter(item => normalize(item?.item)?.conversation_id === id).forEach(item => outbox.delete(item.id));
+          conversations.delete(id);
+          outcome = { ok:true, deletedMessages:messages.length, deletedOutbox:queued.filter(item => normalize(item?.item)?.conversation_id === id).length };
+        };
+        timeline.getAll().onsuccess = event => { rows = event.target.result || []; removeMatches(); };
+        outbox.getAll().onsuccess = event => { queued = event.target.result || []; removeMatches(); };
+        tx.oncomplete = () => resolve(outcome);
+        tx.onerror = () => reject(tx.error || new Error('indexeddb_delete_failed'));
+        tx.onabort = () => reject(tx.error || new Error('indexeddb_delete_aborted'));
+      });
+      if (result.ok) notify({ type:'conversation_deleted' });
+      return result;
+    });
+  }
   async function listOutbox() {
     const db = await open();
     const tx = db.transaction(OUTBOX, 'readonly');
@@ -352,5 +399,5 @@
     return result;
     });
   }
-  window.YarbiConversationStore = Object.freeze({ initialize, persist, listTimeline, listConversations, searchConversations, createConversation, listOutbox, acknowledgeOutbox, mergeCloud, subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); }, immutableMatch, normalize, normalizeConversation, normalizeConversationId });
+  window.YarbiConversationStore = Object.freeze({ initialize, persist, listTimeline, listConversations, searchConversations, createConversation, renameConversation, deleteConversation, listOutbox, acknowledgeOutbox, mergeCloud, subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); }, immutableMatch, normalize, normalizeConversation, normalizeConversationId });
 }());

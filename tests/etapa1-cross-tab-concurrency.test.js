@@ -172,3 +172,21 @@ test('historial: la identidad inmutable no puede mover un mensaje a otra convers
   assert.equal((await store.listTimeline('conversation_a')).length, 1);
   assert.equal((await store.listTimeline('conversation_b')).length, 0);
 });
+
+test('historial: editar y eliminar una conversación afecta solo sus filas y outbox locales', async () => {
+  const shared = createSharedBrowser();
+  const store = createTab(shared);
+  await store.initialize({});
+  await store.createConversation({ id:'conversation_remove', title:'Eliminar localmente' });
+  await store.createConversation({ id:'conversation_keep', title:'Conservar' });
+  await store.persist({ ...message('remove-message', 'solo en esta conversación'), conversation_id:'conversation_remove' });
+  await store.persist({ ...message('keep-message', 'mensaje preservado'), conversation_id:'conversation_keep' });
+  const renamed = await store.renameConversation('conversation_keep', 'Título confirmado');
+  assert.equal(renamed.ok, true);
+  assert.equal((await store.listConversations()).find(item => item.id === 'conversation_keep').title, 'Título confirmado');
+  const deleted = await store.deleteConversation('conversation_remove');
+  assert.deepEqual(deleted, { ok:true, deletedMessages:1, deletedOutbox:1 });
+  assert.equal((await store.listTimeline('conversation_remove')).length, 0);
+  assert.deepEqual((await store.listTimeline('conversation_keep')).map(item => item.id), ['keep-message']);
+  assert.deepEqual((await store.listOutbox()).map(item => item.id), ['keep-message']);
+});

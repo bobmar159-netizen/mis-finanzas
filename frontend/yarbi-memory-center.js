@@ -696,7 +696,7 @@
         const id = safeConversationId(item.id);
         const current = id === active;
         const detail = (Number(item.messageCount) || 0) + ' mensaje' + ((Number(item.messageCount) || 0) === 1 ? '' : 's') + ' · ' + conversationDateLabel(item.lastMessageAt || item.updatedAt);
-        return '<button type="button" class="gfc-yarbi-conversation-row' + (current ? ' active' : '') + '" onclick="gfcOpenYarbiConversation(\'' + id + '\')"><span><b>' + esc(item.title || 'Nueva conversación') + '</b><small>' + esc(detail) + '</small></span><em>' + (current ? 'Abierta' : 'Abrir') + '</em></button>';
+        return '<article class="gfc-yarbi-conversation-row' + (current ? ' active' : '') + '"><button type="button" class="gfc-yarbi-conversation-open" onclick="gfcOpenYarbiConversation(\'' + id + '\')"><span><b>' + esc(item.title || 'Nueva conversación') + '</b><small>' + esc(detail) + '</small></span><em>' + (current ? 'Abierta' : 'Abrir') + '</em></button><span class="gfc-yarbi-conversation-controls"><button type="button" aria-label="Editar título" onclick="gfcRenameYarbiConversation(\'' + id + '\')">✎</button><button type="button" aria-label="Eliminar conversación" onclick="gfcDeleteYarbiConversation(\'' + id + '\')">⌫</button></span></article>';
       }).join('');
     } catch (_) {
       target.innerHTML = '<p class="gfc-yarbi-empty-copy">El historial local no está disponible ahora. Tus conversaciones existentes no se han borrado.</p>';
@@ -713,6 +713,39 @@
       return true;
     } catch (_) {
       if (typeof toast === 'function') toast('No pude abrir la conversación local.', 'warning');
+      return false;
+    }
+  };
+  window.gfcRenameYarbiConversation = async function(conversationId) {
+    const id = safeConversationId(conversationId);
+    try {
+      const store = await conversationStore();
+      const current = (await store.listConversations()).find(item => item.id === id);
+      if (!current) return false;
+      const next = prompt('Nombre de la conversación:', current.title || 'Nueva conversación');
+      if (next === null) return false;
+      const result = await store.renameConversation(id, next);
+      if (!result.ok) { if (typeof toast === 'function') toast('El título no se pudo guardar.', 'warning'); return false; }
+      await window.gfcRenderYarbiConversationHistory(document.getElementById('gfc-yarbi-conversation-search')?.value || '');
+      return true;
+    } catch (_) {
+      if (typeof toast === 'function') toast('No pude editar el título local.', 'warning');
+      return false;
+    }
+  };
+  window.gfcDeleteYarbiConversation = async function(conversationId) {
+    const id = safeConversationId(conversationId);
+    if (!confirm('¿Eliminar esta conversación de este dispositivo? Esta acción no cambia clientes, agenda, memoria empresarial ni mensajes enviados.')) return false;
+    try {
+      const store = await conversationStore();
+      const result = await store.deleteConversation(id);
+      if (!result.ok) { if (typeof toast === 'function') toast('No pude eliminar esa conversación local.', 'warning'); return false; }
+      if (activeConversationId() === id) return window.gfcStartNewYarbiConversation();
+      await window.gfcRenderYarbiConversationHistory(document.getElementById('gfc-yarbi-conversation-search')?.value || '');
+      if (typeof toast === 'function') toast('Conversación eliminada de este dispositivo.', 'success');
+      return true;
+    } catch (_) {
+      if (typeof toast === 'function') toast('No pude eliminar esa conversación local.', 'warning');
       return false;
     }
   };
