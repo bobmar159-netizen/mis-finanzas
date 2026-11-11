@@ -39,4 +39,6 @@ test('the final local chat dispatcher preserves the Financial Coach fast read', 
   assert.match(finalDispatcher, /kind:'financial_coach'/);
   assert.match(finalDispatcher, /gfcTryAgendaReadMessage/);
   assert.match(finalDispatcher, /kind:'agenda_read'/);
+  assert.match(finalDispatcher, /gfcTryClientContextReadMessage/);
+  assert.match(finalDispatcher, /kind:'client_context_read'/);
 });
