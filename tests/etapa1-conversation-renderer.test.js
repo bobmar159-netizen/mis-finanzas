@@ -166,7 +166,10 @@ test('chat: el compositor admite varias líneas y conserva Enter para enviar', (
   assert.match(memoryCenter, /gfcSaveYarbiConversationDraft/);
   assert.match(memoryCenter, /restoreYarbiConversationDraft/);
   assert.match(memoryCenter, /forgetConversationDraft\(id\)/);
+  assert.match(memoryCenter, /gfcYarbiAskQuickRead/);
+  assert.match(memoryCenter, /¿Qué tengo hoy\?/);
   assert.match(html, /\.gfc-yarbi-composer textarea/);
+  assert.match(html, /\.gfc-yarbi-quick-reads/);
   assert.match(html, /typeof window\.gfcResizeYarbiComposer === 'function'/);
   assert.match(html, /typeof window\.gfcClearYarbiConversationDraft === 'function'/);
 });

@@ -1011,11 +1011,12 @@
     const trainingTools = training ?
       '<div class="gfc-yarbi-training-unified-banner"><b>🔒 Entrenamiento seguro</b><span>Usa la misma voz Live, pero no envía WhatsApp ni modifica clientes, agenda o dinero.</span></div>' +
       '<div class="gfc-yarbi-training-quick"><button onclick="gfcYarbiUnifiedQuick(\'¿Cómo responderías a un cliente que pide precio?\')">Pedir una respuesta</button><button onclick="gfcYarbiUnifiedQuick(\'Deberías responder más corto y natural\')">Corregir a Yarbi</button><button onclick="gfcYarbiUnifiedQuick(\'Guarda eso como instrucción\')">Guardar aprendizaje</button></div>' : '';
+    const quickReads = training ? '' : '<div class="gfc-yarbi-quick-reads" aria-label="Consultas rápidas"><button type="button" onclick="gfcYarbiAskQuickRead(\'¿Qué tengo hoy?\')">📅 Hoy</button><button type="button" onclick="gfcYarbiAskQuickRead(\'¿Qué visitas siguen pendientes?\')">📍 Pendientes</button><button type="button" onclick="gfcYarbiAskQuickRead(\'¿Qué clientes tengo que llamar?\')">👥 Clientes</button><button type="button" onclick="gfcYarbiAskQuickRead(\'¿Cuánto hemos cobrado este mes?\')">💰 Cobros</button></div>';
     const conversation = training
       ? '<main id="gfc-yarbi-training-chat" class="gfc-yarbi-chat gfc-yarbi-training-chat gfc-yarbi-training-unified"></main>'
       : '<main id="gfc-copilot-chat-messages" class="gfc-yarbi-chat"></main>';
     const hiddenTrainingFields = training ? '<div class="gfc-yarbi-training-support" hidden><textarea id="gfc-yarbi-training-input"></textarea><textarea id="gfc-yarbi-training-client"></textarea><textarea id="gfc-yarbi-training-response"></textarea><textarea id="gfc-yarbi-training-correction"></textarea><div id="gfc-yarbi-training-status"></div><div id="gfc-yarbi-training-evidence"></div><div id="gfc-yarbi-training-learning"></div><div id="gfc-yarbi-training-tip"><span></span></div></div>' : '';
-    return switcher + (training ? trainingTools : learningChipHtml() + '<div class="gfc-yarbi-alert">' + proactive + '</div>') +
+    return switcher + (training ? trainingTools : learningChipHtml() + '<div class="gfc-yarbi-alert">' + proactive + '</div>' + quickReads) +
       '<div id="gfc-yarbi-conversation-focus" class="gfc-yarbi-focus" hidden></div>' + conversation + hiddenTrainingFields +
       '<footer class="gfc-yarbi-composer-wrap">' +
         '<div class="gfc-yarbi-live-state"><span id="gfc-live-status">Gemini Live listo.</span><span id="gfc-ai-process-status">' + (training ? 'Práctica separada de tus datos reales.' : 'Verificando memoria…') + '</span><button id="gfc-ai-process-btn" hidden></button></div>' +
@@ -1464,6 +1465,14 @@
   window.gfcYarbiUnifiedQuick = function(text) {
     const field = document.getElementById('gfc-copilot-input-text');
     if (field) { field.value = String(text || ''); window.gfcSaveYarbiConversationDraft(field.value); window.gfcResizeYarbiComposer(field); field.focus(); }
+  };
+  window.gfcYarbiAskQuickRead = function(text) {
+    const value = String(text || '').trim();
+    if (!value) return false;
+    const field = document.getElementById('gfc-copilot-input-text');
+    if (field) { field.value = value; window.gfcSaveYarbiConversationDraft(value); window.gfcResizeYarbiComposer(field); }
+    if (typeof window.gfcSendCopilotChatMessage === 'function') return window.gfcSendCopilotChatMessage(value);
+    return false;
   };
 
   window.gfcSaveYarbiConversationDraft = function(text) {
