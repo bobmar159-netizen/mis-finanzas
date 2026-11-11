@@ -190,3 +190,12 @@ test('historial: editar y eliminar una conversación afecta solo sus filas y out
   assert.deepEqual((await store.listTimeline('conversation_keep')).map(item => item.id), ['keep-message']);
   assert.deepEqual((await store.listOutbox()).map(item => item.id), ['keep-message']);
 });
+
+test('historial: la exportación visual se mantiene local y no modifica la persistencia', () => {
+  const centerSource = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-memory-center.js'), 'utf8');
+  assert.match(centerSource, /gfcExportYarbiConversationImage/);
+  assert.match(centerSource, /store\.listTimeline\(id\)/);
+  assert.match(centerSource, /image\/jpeg/);
+  assert.match(centerSource, /Exportación local: no se envió información a ningún servicio/);
+  assert.doesNotMatch(centerSource, /gfcExportYarbiConversationImage[\s\S]{0,5000}fetch\(/);
+});

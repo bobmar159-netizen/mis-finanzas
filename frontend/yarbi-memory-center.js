@@ -729,7 +729,7 @@
         const id = safeConversationId(item.id);
         const current = id === active;
         const detail = (Number(item.messageCount) || 0) + ' mensaje' + ((Number(item.messageCount) || 0) === 1 ? '' : 's') + ' · ' + conversationDateLabel(item.lastMessageAt || item.updatedAt);
-        return '<article class="gfc-yarbi-conversation-row' + (current ? ' active' : '') + '"><button type="button" class="gfc-yarbi-conversation-open" onclick="gfcOpenYarbiConversation(\'' + id + '\')"><span><b>' + esc(item.title || 'Nueva conversación') + '</b><small>' + esc(detail) + '</small></span><em>' + (current ? 'Abierta' : 'Abrir') + '</em></button><span class="gfc-yarbi-conversation-controls"><button type="button" aria-label="Editar título" onclick="gfcRenameYarbiConversation(\'' + id + '\')">✎</button><button type="button" aria-label="Eliminar conversación" onclick="gfcDeleteYarbiConversation(\'' + id + '\')">⌫</button></span></article>';
+        return '<article class="gfc-yarbi-conversation-row' + (current ? ' active' : '') + '"><button type="button" class="gfc-yarbi-conversation-open" onclick="gfcOpenYarbiConversation(\'' + id + '\')"><span><b>' + esc(item.title || 'Nueva conversación') + '</b><small>' + esc(detail) + '</small></span><em>' + (current ? 'Abierta' : 'Abrir') + '</em></button><span class="gfc-yarbi-conversation-controls"><button type="button" aria-label="Exportar como imagen" onclick="gfcExportYarbiConversationImage(\'' + id + '\')">▧</button><button type="button" aria-label="Editar título" onclick="gfcRenameYarbiConversation(\'' + id + '\')">✎</button><button type="button" aria-label="Eliminar conversación" onclick="gfcDeleteYarbiConversation(\'' + id + '\')">⌫</button></span></article>';
       }).join('');
     } catch (_) {
       target.innerHTML = '<p class="gfc-yarbi-empty-copy">El historial local no está disponible ahora. Tus conversaciones existentes no se han borrado.</p>';
@@ -783,6 +783,111 @@
       return false;
     }
   };
+  function conversationExportFileName(title) {
+    const normalized = String(title || 'conversacion-yarbi')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 54);
+    return (normalized || 'conversacion-yarbi') + '.jpg';
+  }
+  function conversationExportDate(value) {
+    try {
+      return new Intl.DateTimeFormat('es-PE', {
+        timeZone:'America/Lima', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'
+      }).format(new Date(value));
+    } catch (_) { return ''; }
+  }
+  function wrapConversationExportText(context, text, maxWidth) {
+    const lines = [];
+    String(text || '').replace(/\r/g, '').split('\n').forEach(paragraph => {
+      const words = paragraph.split(/\s+/).filter(Boolean);
+      if (!words.length) { lines.push(''); return; }
+      let line = '';
+      words.forEach(word => {
+        const proposal = line ? line + ' ' + word : word;
+        if (line && context.measureText(proposal).width > maxWidth) { lines.push(line); line = word; }
+        else line = proposal;
+      });
+      if (line) lines.push(line);
+    });
+    return lines.length ? lines : [''];
+  }
+  function drawConversationExportCard(context, x, y, width, height) {
+    context.beginPath();
+    if (typeof context.roundRect === 'function') context.roundRect(x, y, width, height, 22);
+    else context.rect(x, y, width, height);
+  }
+  window.gfcExportYarbiConversationImage = async function(conversationId) {
+    const id = safeConversationId(conversationId || activeConversationId());
+    try {
+      const store = await conversationStore();
+      const conversation = (await store.listConversations()).find(item => item.id === id);
+      const timeline = await store.listTimeline(id);
+      if (!conversation) throw storageError('conversation_not_found');
+      if (!timeline.length) { if (typeof toast === 'function') toast('Esta conversación todavía no tiene mensajes para exportar.', 'warning'); return false; }
+      if (!document.createElement || !URL?.createObjectURL) throw storageError('image_export_unavailable');
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext?.('2d');
+      if (!context || typeof canvas.toBlob !== 'function') throw storageError('image_export_unavailable');
+      // La imagen no se sube. El límite solo protege al dispositivo: la conversación completa queda intacta en IndexedDB.
+      const visible = timeline.slice(-100).map(item => ({
+        ...item,
+        text:String(item.text || '').slice(0, 1400) + (String(item.text || '').length > 1400 ? '…' : '')
+      }));
+      const width = 1200;
+      const padding = 64;
+      const contentWidth = width - padding * 2;
+      const prepared = visible.map(item => {
+        context.font = '400 29px system-ui, -apple-system, Segoe UI, sans-serif';
+        const lines = wrapConversationExportText(context, item.text, contentWidth - 54);
+        return { item, lines, height:76 + lines.length * 41 };
+      });
+      const contentHeight = prepared.reduce((total, entry) => total + entry.height + 22, 0);
+      const note = timeline.length > visible.length ? 'Incluye los últimos ' + visible.length + ' mensajes de esta conversación.' : 'Exportación local: no se envió información a ningún servicio.';
+      const height = Math.max(460, Math.min(16384, 210 + contentHeight + 116));
+      canvas.width = width;
+      canvas.height = height;
+      context.fillStyle = '#f8fafc';
+      context.fillRect(0, 0, width, height);
+      context.fillStyle = '#0f172a';
+      context.font = '700 42px system-ui, -apple-system, Segoe UI, sans-serif';
+      context.fillText(String(conversation.title || 'Conversación con Yarbi').slice(0, 74), padding, 76);
+      context.fillStyle = '#64748b';
+      context.font = '500 22px system-ui, -apple-system, Segoe UI, sans-serif';
+      context.fillText('Yarbi · historial local · ' + conversationExportDate(Date.now()), padding, 116);
+      let y = 158;
+      prepared.forEach(({ item, lines, height:cardHeight }) => {
+        if (y + cardHeight > height - 78) return;
+        const isUser = item.role === 'user';
+        context.fillStyle = isUser ? '#e0f2fe' : '#ffffff';
+        context.strokeStyle = isUser ? '#7dd3fc' : '#e2e8f0';
+        context.lineWidth = 2;
+        drawConversationExportCard(context, padding, y, contentWidth, cardHeight);
+        context.fill(); context.stroke();
+        context.fillStyle = isUser ? '#0369a1' : '#0f766e';
+        context.font = '700 21px system-ui, -apple-system, Segoe UI, sans-serif';
+        context.fillText(isUser ? 'Tú' : 'Yarbi', padding + 28, y + 35);
+        context.fillStyle = '#0f172a';
+        context.font = '400 29px system-ui, -apple-system, Segoe UI, sans-serif';
+        lines.forEach((line, index) => context.fillText(line, padding + 28, y + 76 + index * 41));
+        y += cardHeight + 22;
+      });
+      context.fillStyle = '#64748b';
+      context.font = '500 19px system-ui, -apple-system, Segoe UI, sans-serif';
+      context.fillText(note, padding, height - 36);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+      if (!blob) throw storageError('image_export_failed');
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url; link.download = conversationExportFileName(conversation.title); link.style.display = 'none';
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (typeof toast === 'function') toast('Imagen de conversación guardada en este dispositivo.', 'success');
+      return true;
+    } catch (_) {
+      if (typeof toast === 'function') toast('No pude crear la imagen local de esta conversación.', 'warning');
+      return false;
+    }
+  };
   window.gfcStartNewYarbiConversation = async function() {
     try {
       const store = await conversationStore();
@@ -824,6 +929,7 @@
       '<div id="gfc-yarbi-main-menu" class="gfc-yarbi-popover gfc-yarbi-hidden">' +
         '<button onclick="gfcOpenCopilotModal(\'conversations\')">💬 Historial de conversaciones</button>' +
         '<button onclick="gfcStartNewYarbiConversation()">＋ Nueva conversación</button>' +
+        '<button onclick="gfcExportYarbiConversationImage()">▧ Guardar conversación como imagen</button>' +
         '<button onclick="gfcOpenCopilotModal(\'learning\')">📊 Aprendizaje y autonomía</button>' +
         '<button onclick="gfcOpenCopilotModal(\'tools\')">🧠 Memoria y aprendizaje</button>' +
         '<button onclick="gfcOpenCopilotModal(\'status\')">✅ Estado y diagnóstico</button>' +
