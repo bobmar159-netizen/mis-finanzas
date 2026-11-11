@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { runOwnerConversation, summarizePerformance } = require('../lib/yarbi-conversation-runtime');
 const { createConversationToken, readConversationToken } = require('../lib/yarbi-conversation-continuity');
@@ -88,4 +90,15 @@ test('F05 métricas separan CPU local de Preview, Android y Gemini aún no medid
   assert.deepEqual(summary.local_cpu, { p50_ms: 5, p95_ms: 7 });
   assert.equal(summary.preview_http, 'not_measured');
   assert.equal(summary.android_device, 'not_measured');
+});
+
+test('chat local no intenta el cerebro remoto cuando el runtime declara modo offline', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  const start = source.indexOf('async function gfcSendCopilotChatMessage(promptText) {');
+  assert.ok(start >= 0);
+  const offline = source.indexOf('const remoteEnabled = typeof window.gfcRuntimeRemoteEnabled', start);
+  const remoteCommand = source.indexOf('const commandResult = await gfcTryYarbiCommand(text);', start);
+  assert.ok(offline > start && remoteCommand > offline);
+  assert.match(source.slice(offline, remoteCommand), /Yarbi está en modo local/);
+  assert.match(source.slice(offline, remoteCommand), /no inventaré una respuesta/i);
 });

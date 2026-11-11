@@ -20615,6 +20615,20 @@ async function gfcSendCopilotChatMessage(promptText) {
     return;
   }
 
+  // Una compilación local/offline no debe intentar llegar a una URL inventada
+  // ni aparentar que el cerebro remoto está disponible. Las lecturas FAST que
+  // sí cuentan con una copia local ya retornaron antes de este punto.
+  const remoteEnabled = typeof window.gfcRuntimeRemoteEnabled === 'function'
+    ? window.gfcRuntimeRemoteEnabled()
+    : true;
+  if (!remoteEnabled) {
+    const offlineReply = '## 📡 Yarbi está en modo local\n\nPuedo responder con los datos que ya están guardados en este dispositivo, por ejemplo **agenda de mañana**, **caja libre** o el **expediente de un cliente seleccionado**. Esta pregunta necesita la conexión segura de Yarbi, así que no inventaré una respuesta ni usaré otro entorno.';
+    await gfcAppendCopilotChatMessage('assistant', offlineReply);
+    if (window._gfcMascot) window._gfcMascot.setState('reposo', offlineReply);
+    gfcSpeakText(offlineReply);
+    return;
+  }
+
   const commandResult = await gfcTryYarbiCommand(text);
   if (commandResult) {
     const actionResult = await gfcApplyYarbiCommandResult(commandResult);
