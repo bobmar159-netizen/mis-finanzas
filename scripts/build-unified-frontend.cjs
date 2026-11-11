@@ -8,6 +8,7 @@ const repo = path.resolve(__dirname, '..');
 const frontend = path.join(repo, 'frontend');
 const financialCoach = path.join(repo, 'lib', 'yarbi-financial-coach.js');
 const financeContext = path.join(repo, 'lib', 'yarbi-finance-context.js');
+const businessTimeline = path.join(repo, 'lib', 'yarbi-business-timeline.js');
 const agendaReadModel = path.join(repo, 'lib', 'yarbi-agenda-intelligence.js');
 const clientContextReadModel = path.join(repo, 'lib', 'yarbi-client-context-read.js');
 const args = new Map(process.argv.slice(2).map(value => {
@@ -41,9 +42,10 @@ function sourceDigest() {
   const frontendFiles = walk(frontend).sort().map(file => `frontend/${path.relative(frontend, file).replace(/\\/g, '/')}` + '\t' + sha(fs.readFileSync(file)));
   if (!fs.existsSync(financialCoach)) fail('falta el módulo compartido yarbi-financial-coach.js.');
   if (!fs.existsSync(financeContext)) fail('falta el módulo compartido yarbi-finance-context.js.');
+  if (!fs.existsSync(businessTimeline)) fail('falta el módulo compartido yarbi-business-timeline.js.');
   if (!fs.existsSync(agendaReadModel)) fail('falta el módulo compartido yarbi-agenda-intelligence.js.');
   if (!fs.existsSync(clientContextReadModel)) fail('falta el módulo compartido yarbi-client-context-read.js.');
-  return sha([...frontendFiles, 'lib/yarbi-financial-coach.js\t' + sha(fs.readFileSync(financialCoach)), 'lib/yarbi-finance-context.js\t' + sha(fs.readFileSync(financeContext)), 'lib/yarbi-agenda-intelligence.js\t' + sha(fs.readFileSync(agendaReadModel)), 'lib/yarbi-client-context-read.js\t' + sha(fs.readFileSync(clientContextReadModel))].join('\n'));
+  return sha([...frontendFiles, 'lib/yarbi-financial-coach.js\t' + sha(fs.readFileSync(financialCoach)), 'lib/yarbi-finance-context.js\t' + sha(fs.readFileSync(financeContext)), 'lib/yarbi-business-timeline.js\t' + sha(fs.readFileSync(businessTimeline)), 'lib/yarbi-agenda-intelligence.js\t' + sha(fs.readFileSync(agendaReadModel)), 'lib/yarbi-client-context-read.js\t' + sha(fs.readFileSync(clientContextReadModel))].join('\n'));
 }
 function validateOrigin(value) {
   let parsed;
@@ -102,6 +104,7 @@ copyTree(frontend, out);
 // for the browser rather than duplicated in the frontend source tree.
 fs.copyFileSync(financialCoach, path.join(out, 'yarbi-financial-coach.js'));
 fs.copyFileSync(financeContext, path.join(out, 'yarbi-finance-context.js'));
+fs.copyFileSync(businessTimeline, path.join(out, 'yarbi-business-timeline.js'));
 fs.copyFileSync(agendaReadModel, path.join(out, 'yarbi-agenda-intelligence.js'));
 fs.copyFileSync(clientContextReadModel, path.join(out, 'yarbi-client-context-read.js'));
 renderTemplate(path.join(out, 'runtime-config.js'), {

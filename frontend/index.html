@@ -17174,6 +17174,22 @@ async function gfcYarbiLocalFindMemory(args = {}) {
     ? window.YarbiFinanceContext.buildFinanceContext({ contactId: Number(contactId), analyses: contactAnalyses, receivables, movements: null })
     : null;
   const contactMessages = messages.filter(row => gfcYarbiAgendaPhone(row.phone) === gfcYarbiAgendaPhone(resolvedPhone)).slice(0, 120);
+  // whatsapp_messages predates contact_id in the local mirror. At this point
+  // the phone was resolved through the canonical identifier, so the temporary
+  // association is safe for this read-only timeline and never persisted.
+  const timeline = typeof window.YarbiBusinessTimeline?.buildBusinessTimeline === 'function'
+    ? window.YarbiBusinessTimeline.buildBusinessTimeline({
+      contactId: Number(contactId),
+      sources: {
+        messages: contactMessages.map(row => ({ ...row, contact_id: Number(contactId) })),
+        analyses: contactAnalyses,
+        agenda: contactAgenda,
+        receivables,
+        observations: contactObservations
+      },
+      limit: 12
+    })
+    : null;
   const dossier = gfcBuildLocalClientDossier({ contact, phone: resolvedPhone, memory: contactMemory, agenda: contactAgenda, observations: contactObservations, analyses: contactAnalyses, messages: contactMessages });
   const phonebookName = gfcYarbiPhonebookName(resolvedPhone);
   if (phonebookName) dossier.client_name = phonebookName;
@@ -17190,7 +17206,7 @@ async function gfcYarbiLocalFindMemory(args = {}) {
       audio_summary_status:String(row?.metadata?.audio_summary_status || ''),
       timestamp:Number(row.timestamp || 0)
     }));
-  return { phone: resolvedPhone, contact:phonebookName ? { ...contact, display_name:phonebookName, phonebook_display_name:phonebookName } : contact, memory: contactMemory, dossier, finance, agenda: contactAgenda, recent_messages:recentMessages, alerts: alerts.filter(row => String(row.contact_id || '') === contactId).slice(0, 10), observations: observations.filter(row => String(row.contact_id || '') === contactId && String(row.status || 'active') === 'active').sort((a, b) => String(b.observed_at || b.updated_at || '').localeCompare(String(a.observed_at || a.updated_at || ''))).slice(0, 80), reply_style_profile: replyStyles.filter(row => String(row.status || '') === 'active').sort((a, b) => Number(b.evidence_count || 0) - Number(a.evidence_count || 0)).slice(0, 24), source, local_snapshot_at: freshness.at, local_cache_age_ms: freshness.ageMs, local_snapshot_stale: !freshness.fresh };
+  return { phone: resolvedPhone, contact:phonebookName ? { ...contact, display_name:phonebookName, phonebook_display_name:phonebookName } : contact, memory: contactMemory, dossier, finance, timeline: timeline?.events || [], timeline_meta: timeline ? { schema: timeline.schema, outcome: timeline.outcome, source_status: timeline.source_status } : null, agenda: contactAgenda, recent_messages:recentMessages, alerts: alerts.filter(row => String(row.contact_id || '') === contactId).slice(0, 10), observations: observations.filter(row => String(row.contact_id || '') === contactId && String(row.status || 'active') === 'active').sort((a, b) => String(b.observed_at || b.updated_at || '').localeCompare(String(a.observed_at || a.updated_at || ''))).slice(0, 80), reply_style_profile: replyStyles.filter(row => String(row.status || '') === 'active').sort((a, b) => Number(b.evidence_count || 0) - Number(a.evidence_count || 0)).slice(0, 24), source, local_snapshot_at: freshness.at, local_cache_age_ms: freshness.ageMs, local_snapshot_stale: !freshness.fresh };
 }
 
 const GFC_YARBI_HISTORY_STOP_WORDS = new Set('a al algo algun alguna algunos ante antes asi aunque bajo bien cada cliente como con contra cual cuando de del desde donde dos el ella en entre era ese esa es esta estaba este esto fue habia hacia hasta la las le les lo los mas me mi mientras muy no nos o para pero por porque que quien se si sin sobre su sus te tenia tiene todo tu un una uno unos ya yo'.split(' '));
@@ -47952,6 +47968,7 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
 <script src="./yarbi-financial-coach.js"></script>
 <script src="./yarbi-financial-coach-ui.js"></script>
 <script src="./yarbi-finance-context.js"></script>
+<script src="./yarbi-business-timeline.js"></script>
 <script src="./yarbi-agenda-intelligence.js"></script>
 <script src="./yarbi-agenda-read-ui.js"></script>
 <script src="./yarbi-client-context-read.js"></script>

@@ -22,12 +22,18 @@ test('classifies only deterministic client-read questions', () => {
 });
 
 test('summarizes a verified local client dossier without inventing facts', () => {
-  const result = replyForContext({ utterance: '¿Qué pasó con Carlos?', context: base });
+  const result = replyForContext({ utterance: '¿Qué pasó con Carlos?', context: { ...base, timeline: [
+    { id: 'agenda-1', kind: 'agenda', at: '2026-11-12T15:00:00Z', title: 'Visita de evaluación', detail: 'Surco' },
+    { id: 'receivable-1', kind: 'receivable', at: '2026-11-10T15:00:00Z', title: 'Cobranza', detail: 'partial · Confirmar abono' }
+  ] } });
   assert.equal(result.outcome, 'client_context_found');
   assert.match(result.reply, /## 🧾 Expediente de Carlos/);
   assert.match(result.reply, /Carlos/);
   assert.match(result.reply, /instalación nueva/);
   assert.match(result.reply, /\*\*Estado comercial:\*\* tibio/);
+  assert.match(result.reply, /### Últimos registros verificados/);
+  assert.match(result.reply, /Agenda · 12\/11\/2026/);
+  assert.match(result.reply, /Cobranza/);
   assert.equal(result.execute, false);
 });
 
