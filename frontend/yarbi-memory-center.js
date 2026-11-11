@@ -13,6 +13,7 @@
   const INTERACTION_MODE_KEY = 'gfc_yarbi_interaction_mode_v1';
   const AUTONOMY_KEY = 'gfc_yarbi_autonomy_v1';
   const ACTIVE_CONVERSATION_KEY = 'gfc_yarbi_active_conversation_v1';
+  const CONVERSATION_VIEW_KEY = 'gfc_yarbi_conversation_view_v1';
   const DEFAULT_CONVERSATION_ID = 'default';
   const MAX_TRAINING_EXAMPLES = 80;
   const MAX_LOCAL_MESSAGES = 600;
@@ -71,6 +72,28 @@
   }
   function newConversationId() {
     return 'conversation_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
+  }
+  function conversationViewMap() {
+    const saved = readJson(CONVERSATION_VIEW_KEY, {});
+    return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+  }
+  function conversationScrollTop(id) {
+    const top = Number(conversationViewMap()[safeConversationId(id)]?.scrollTop);
+    return Number.isFinite(top) && top >= 0 ? top : null;
+  }
+  function saveConversationScrollTop(id, scrollTop) {
+    const conversationId = safeConversationId(id);
+    const top = Number(scrollTop);
+    if (!Number.isFinite(top) || top < 0) return;
+    const next = conversationViewMap();
+    next[conversationId] = { scrollTop:Math.round(top), updatedAt:Date.now() };
+    const trimmed = Object.entries(next).sort((left, right) => Number(right[1]?.updatedAt || 0) - Number(left[1]?.updatedAt || 0)).slice(0, 60);
+    writeJson(CONVERSATION_VIEW_KEY, Object.fromEntries(trimmed));
+  }
+  function forgetConversationView(id) {
+    const next = conversationViewMap();
+    delete next[safeConversationId(id)];
+    writeJson(CONVERSATION_VIEW_KEY, next);
   }
   function autonomyConfig() {
     const saved = readJson(AUTONOMY_KEY, {});
@@ -624,6 +647,15 @@
       if (!box.querySelector('[data-message-id="' + item.id + '"]')) renderTimelineItem(item);
     });
   }
+  function restoreConversationScroll(box) {
+    const saved = conversationScrollTop(activeConversationId());
+    box.scrollTop = saved === null ? box.scrollHeight : Math.min(saved, Math.max(0, box.scrollHeight - box.clientHeight));
+  }
+  function watchConversationScroll(box) {
+    if (!box || box.dataset.gfcConversationScrollBound === '1') return;
+    box.dataset.gfcConversationScrollBound = '1';
+    box.addEventListener('scroll', () => saveConversationScrollTop(activeConversationId(), box.scrollTop), { passive:true });
+  }
   function installConversationStoreSubscription() {
     if (unsubscribeConversationStore) return;
     conversationStore().then(store => {
@@ -659,11 +691,12 @@
     }
     renderedDay = '';
     timeline.forEach(renderTimelineItem);
-    box.scrollTop = box.scrollHeight;
+    restoreConversationScroll(box);
+    watchConversationScroll(box);
     syncTimelineFromCloud().then(list => {
       if (!document.getElementById('gfc-copilot-chat-messages')) return;
       if (list.length !== timeline.length) {
-        box.innerHTML = ''; renderedDay = ''; list.forEach(renderTimelineItem); box.scrollTop = box.scrollHeight;
+        box.innerHTML = ''; renderedDay = ''; list.forEach(renderTimelineItem); restoreConversationScroll(box);
       }
     }).catch(() => {});
   };
@@ -740,6 +773,7 @@
       const store = await conversationStore();
       const result = await store.deleteConversation(id);
       if (!result.ok) { if (typeof toast === 'function') toast('No pude eliminar esa conversación local.', 'warning'); return false; }
+      forgetConversationView(id);
       if (activeConversationId() === id) return window.gfcStartNewYarbiConversation();
       await window.gfcRenderYarbiConversationHistory(document.getElementById('gfc-yarbi-conversation-search')?.value || '');
       if (typeof toast === 'function') toast('Conversación eliminada de este dispositivo.', 'success');
