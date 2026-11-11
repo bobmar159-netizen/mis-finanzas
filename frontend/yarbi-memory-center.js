@@ -2362,6 +2362,14 @@
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
     return new Uint8Array(await new Response(stream).arrayBuffer());
   }
+  function historicalMediaKind(name) {
+    const lower = String(name || '').toLowerCase();
+    if (/\.(opus|ogg|m4a|mp3|aac|wav|webm)$/.test(lower)) return 'voice_note';
+    if (/\.(jpg|jpeg|png|webp|heic)$/.test(lower)) return 'image';
+    if (/\.(mp4|3gp|mov|mkv)$/.test(lower)) return 'video';
+    if (/\.(pdf|docx?|xlsx?)$/.test(lower)) return 'document';
+    return '';
+  }
   async function zipTextEntries(file) {
     const buffer = await file.arrayBuffer();
     const view = new DataView(buffer);
@@ -2370,7 +2378,7 @@
       if (u32(view, i) === 0x06054b50) eocd = i;
     }
     if (eocd < 0) throw new Error('ZIP inválido o protegido con contraseña.');
-    const entries = [];
+    const entries = [], media = [];
     const decoder = new TextDecoder('utf-8');
     let offset = u32(view, eocd + 16);
     const total = u16(view, eocd + 10);
@@ -2383,6 +2391,8 @@
       const commentLen = u16(view, offset + 32);
       const localOffset = u32(view, offset + 42);
       const name = decoder.decode(new Uint8Array(buffer, offset + 46, nameLen));
+      const mediaKind = historicalMediaKind(name);
+      if (mediaKind) media.push({ name:String(name).slice(0, 260), kind:mediaKind, size:u32(view, offset + 24) });
       if (/\.txt$/i.test(name) && u32(view, localOffset) === 0x04034b50) {
         const localNameLen = u16(view, localOffset + 26);
         const localExtraLen = u16(view, localOffset + 28);
@@ -2393,15 +2403,18 @@
       }
       offset += 46 + nameLen + extraLen + commentLen;
     }
-    return entries;
+    return { entries, media:media.slice(0, 2000) };
   }
   async function readImportFiles(files) {
-    const entries = [];
+    const entries = [], media = [];
     for (const file of Array.from(files || [])) {
-      if (/\.zip$/i.test(file.name)) entries.push(...await zipTextEntries(file));
+      if (/\.zip$/i.test(file.name)) {
+        const parsed = await zipTextEntries(file);
+        entries.push(...parsed.entries); media.push(...parsed.media);
+      }
       else if (/\.txt$/i.test(file.name) || String(file.type).includes('text')) entries.push({ name:file.name, text:await file.text() });
     }
-    return entries;
+    return { entries, media:media.slice(0, 2000) };
   }
   function importStatus(text, percent) {
     const status = document.getElementById('gfc-yarbi-import-status');
@@ -2409,7 +2422,7 @@
     if (status) status.textContent = text;
     if (bar) bar.style.width = Math.max(0, Math.min(100, Number(percent) || 0)) + '%';
   }
-  function prepareImportEntries(entries) {
+  function prepareImportEntries(entries, media = []) {
     const conversations = [];
     const totalParticipants = new Map();
     (entries || []).forEach(entry => {
@@ -2422,9 +2435,14 @@
     const participants = [...totalParticipants.entries()].sort((a,b) => b[1]-a[1]);
     const preferredName = String(window.state?.nombreUsuario || localStorage.getItem('fnz_nombre') || 'Omar');
     const defaultOwner = participants.find(([name]) => normalizePerson(name).includes(normalizePerson(preferredName)))?.[0] || '';
-    window._gfcYarbiImportDraft = { conversations, participants, owner:defaultOwner, review:null };
+    const mediaCounts = media.reduce((counts, item) => { counts[item.kind] = (counts[item.kind] || 0) + 1; return counts; }, {});
+    window._gfcYarbiImportDraft = { conversations, participants, owner:defaultOwner, review:null, media_inventory:media, media_counts:mediaCounts };
     const preview = document.getElementById('gfc-yarbi-import-preview');
-    if (preview) preview.innerHTML = '<div class="gfc-yarbi-import-summary"><b>Encontré ' + conversations.length + ' chat(s) y ' + conversations.reduce((sum,c) => sum+c.messages.length,0) + ' mensajes.</b><br>Indica cuál participante eres tú. Sin esta selección Yarbi no aprenderá ni importará nada.</div>' +
+    const voiceNotes = Number(mediaCounts.voice_note || 0);
+    const mediaNotice = media.length
+      ? '<br><small>También detecté ' + voiceNotes + ' nota(s) de voz y ' + (media.length - voiceNotes) + ' otro(s) archivo(s) adjunto(s). Permanecen locales: Yarbi no los sube ni los transcribe todavía.</small>'
+      : '';
+    if (preview) preview.innerHTML = '<div class="gfc-yarbi-import-summary"><b>Encontré ' + conversations.length + ' chat(s) y ' + conversations.reduce((sum,c) => sum+c.messages.length,0) + ' mensajes.</b><br>Indica cuál participante eres tú. Sin esta selección Yarbi no aprenderá ni importará nada.' + mediaNotice + '</div>' +
       '<label style="display:block;font-size:11px;font-weight:900;color:#334155;margin:10px 0 5px">Yo soy:</label><select id="gfc-yarbi-import-owner" onchange="gfcRefreshHistoricalImportReview()" style="width:100%;padding:10px;border:1px solid #CBD5E1;border-radius:10px;background:#fff"><option value="">Selecciona tu nombre…</option>' +
       participants.map(([name,count]) => '<option value="' + esc(name) + '"' + (name === defaultOwner ? ' selected' : '') + '>' + esc(name) + ' · ' + count + ' mensajes</option>').join('') + '</select>' +
       '<div id="gfc-yarbi-import-review" class="gfc-yarbi-import-summary" style="margin-top:10px"></div>' +
@@ -2476,15 +2494,15 @@
   window.gfcParsePastedWhatsappConversation = function() {
     const text = String(document.getElementById('gfc-yarbi-import-paste')?.value || '').trim();
     if (text.length < 10) return importStatus('Pega primero una conversación completa.', 0);
-    try { prepareImportEntries([{ name:'Conversación pegada.txt', text }]); }
+    try { prepareImportEntries([{ name:'Conversación pegada.txt', text }], []); }
     catch (error) { importStatus(error?.message || 'No pude separar la conversación.', 0); }
   };
   window.gfcBatchImportWhatsappFiles = async function(files) {
     if (!files || !files.length) return;
     importStatus('Leyendo exportaciones sin subir archivos…', 8);
     try {
-      const entries = await readImportFiles(files);
-      prepareImportEntries(entries);
+      const imported = await readImportFiles(files);
+      prepareImportEntries(imported.entries, imported.media);
     } catch (error) {
       importStatus(error?.message || 'No se pudo leer la exportación.', 0);
       if (typeof toast === 'function') toast(error?.message || 'No se pudo leer la exportación.', 'error');

@@ -60,3 +60,10 @@ test('the active client chip distinguishes reviewed historical observations from
   assert.match(indexHtml, /No confirman pagos, visitas ni cierres/);
   assert.match(indexHtml, /gfc-yarbi-focus-history/);
 });
+
+test('WhatsApp ZIP media is inventory-only until an approved transcription flow exists', () => {
+  assert.match(memoryCenter, /historicalMediaKind/);
+  assert.match(memoryCenter, /voice_note/);
+  assert.match(memoryCenter, /Permanecen locales: Yarbi no los sube ni los transcribe todavía/);
+  assert.match(memoryCenter, /media_inventory/);
+});
