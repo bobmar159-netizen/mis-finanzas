@@ -27,6 +27,18 @@ test('Financial Coach chat replies locally without treating receivables as cash'
   assert.equal(window.gfcTryFinancialCoachMessage('¿Qué pasó con Carlos?'), null);
 });
 
+test('Financial Coach distinguishes an elapsed-days projection from a promised collection', () => {
+  const window = uiWith({
+    now:Date.parse('2026-11-10T15:00:00Z'),
+    transactions:[{ id:'income', type:'ingreso', amount:1000, date:'2026-11-01' }],
+    receivables:[{ id:'receivable', balance_amount:220 }], commitments:[]
+  });
+  const response = window.gfcTryFinancialCoachMessage('¿Cuál es la proyección para este mes?');
+  assert.equal(response.handled, true);
+  assert.match(response.reply, /estimación/i);
+  assert.match(response.reply, /excluye/i);
+});
+
 test('Financial Coach UI contains no network client or commercial write path', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-financial-coach-ui.js'), 'utf8');
   assert.equal(/fetch\s*\(|XMLHttpRequest|navigator\.sendBeacon|localStorage\.setItem|sessionStorage\.setItem/i.test(source), false);

@@ -14,12 +14,16 @@
   }
   function localReply(utterance) {
     const value = normalized(utterance);
-    if (!/\b(caja|meta|cobrar|cobro|compromiso|gasto|ingreso|finanzas?|dinero)\b/.test(value)) return null;
+    if (!/\b(caja|meta|cobrar|cobro|compromiso|gasto|ingreso|finanzas?|dinero|proyeccion|proyecta|este mes|mensual)\b/.test(value)) return null;
     const result = currentSummary();
     if (!result) return { handled:true, reply:'No puedo leer el resumen financiero local ahora. No se realizó ninguna consulta externa.' };
     const summary = result.summary;
     if (/por cobrar|cobrar|cobro pendiente/.test(value)) return { handled:true, reply:`Tienes ${soles(summary.pending_receivables)} por cobrar registrado. Lo mantengo separado de la caja hasta que confirmes el cobro.` };
     if (/compromiso|debo|deuda|pagar/.test(value)) return { handled:true, reply:`Hay ${soles(summary.known_commitments_due)} en compromisos locales pendientes. No lo confundí con gastos ya registrados.` };
+    if (/proyeccion|proyecta|este mes|mensual/.test(value)) {
+      if (summary.projected_free_cash_month === null) return { handled:true, reply:'No tengo movimientos locales suficientes para proyectar el mes. No convertiré cuentas por cobrar o cotizaciones en efectivo estimado.' };
+      return { handled:true, reply:`Con el promedio registrado por día transcurrido, la proyección de caja libre del mes es ${soles(summary.projected_free_cash_month)}. Es una estimación, no una garantía, y excluye ${soles(summary.pending_receivables)} por cobrar.` };
+    }
     if (/meta|falta|faltan/.test(value)) return { handled:true, reply:summary.remaining_to_daily_goal > 0 ? `Faltan ${soles(summary.remaining_to_daily_goal)} para la meta diaria de caja libre. Hoy llevas ${soles(summary.free_cash_today)} registrados.` : `La meta diaria de caja libre está cubierta: hoy llevas ${soles(summary.free_cash_today)} registrados.` };
     return { handled:true, reply:`La caja libre registrada hoy es ${soles(summary.free_cash_today)}. Hay ${soles(summary.pending_receivables)} por cobrar, que no cuento como efectivo hasta registrarlo.` };
   }
@@ -38,6 +42,7 @@
         <div class="gfc-fc-card"><b>Compromisos conocidos</b><strong>${esc(soles(summary.known_commitments_due))}</strong><small>Se muestran aparte del dinero que ya salió.</small></div>
       </div>
       <section class="gfc-fc-note"><b>Este mes</b><br>Caja libre registrada: <strong>${esc(soles(summary.free_cash_month))}</strong> · Fuente: ${esc(source)}.</section>
+      <section class="gfc-fc-note"><b>Proyección conservadora</b><br>${summary.projected_free_cash_month === null ? 'Aún no hay movimientos suficientes para proyectar el mes.' : '<strong>'+esc(soles(summary.projected_free_cash_month))+'</strong> usando el promedio de caja libre por día transcurrido. Es una estimación y excluye cobros pendientes.'}</section>
       <p class="gfc-fc-foot">Las cotizaciones y cuentas por cobrar no se presentan como ingresos. El resumen no sustituye la revisión de los comprobantes.</p>`;
   }
   function open() {

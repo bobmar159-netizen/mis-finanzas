@@ -56,3 +56,19 @@ test('Financial Coach is deterministic, read-only and performs no network or com
   const fs = require('node:fs');
   assert.equal(/fetch\s*\(|supabase|whatsapp|gemini|notion|calendar/i.test(fs.readFileSync(require.resolve('../lib/yarbi-financial-coach'), 'utf8')), false);
 });
+
+test('Financial Coach projects only from recorded cash and labels the elapsed-days basis', () => {
+  const result = buildFinancialCoach({
+    now:Date.parse('2026-11-10T15:00:00Z'),
+    transactions:[
+      { id:'income-1', type:'ingreso', amount:1000, date:'2026-11-01' },
+      { id:'expense-1', type:'egreso', amount:200, date:'2026-11-03' }
+    ],
+    receivables:[{ id:'pending', balance_amount:900 }], commitments:[]
+  });
+  assert.equal(result.summary.average_free_cash_per_elapsed_day, 80);
+  assert.equal(result.summary.projected_free_cash_month, 2400);
+  assert.equal(result.summary.monthly_projection_status, 'estimated_elapsed_days');
+  assert.equal(result.summary.monthly_projection_excludes_receivables, true);
+  assert.ok(result.recommendations.some(item => item.kind === 'monthly_projection'));
+});
