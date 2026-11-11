@@ -341,7 +341,11 @@
           timeline.put(normalized);
           outbox.get(normalized.id).onsuccess = outboxEvent => {
             const prior = outboxEvent.target.result;
-            if (!prior) outbox.put({ id:normalized.id, messageId:normalized.id, item:normalized, state:'pending', attempts:0, operationId:'timeline:' + normalized.id, updatedAt:Date.now() });
+            // El endpoint remoto de timeline es anterior a las conversaciones
+            // separadas. Solo la conversación heredada puede entrar a su outbox;
+            // las nuevas quedan íntegras y locales hasta que exista una API
+            // remota que preserve conversation_id.
+            if (!prior && normalized.conversation_id === DEFAULT_CONVERSATION_ID) outbox.put({ id:normalized.id, messageId:normalized.id, item:normalized, state:'pending', attempts:0, operationId:'timeline:' + normalized.id, updatedAt:Date.now() });
             outcome = { ok:true, code:'persisted', item:normalized };
           };
         };

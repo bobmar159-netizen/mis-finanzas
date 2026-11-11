@@ -42,7 +42,24 @@
     if (typeof window.gfcEscHtml === 'function') return window.gfcEscHtml(String(value == null ? '' : value));
     return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
   }
-  function token() { return localStorage.getItem('fnz_assistant_token') || ''; }
+  // El endpoint histórico de preferencias almacena un timeline plano: no tiene
+  // conversation_id. Por eso solo puede transportar la conversación heredada
+  // `default`. Las conversaciones creadas en el nuevo historial permanecen
+  // deliberadamente locales hasta contar con un contrato remoto versionado.
+  // Nunca se reutiliza el token legado del navegador para sincronizarlas.
+  function remoteTimelineEnabled() {
+    return typeof window.gfcRuntimeRemoteEnabled === 'function' && window.gfcRuntimeRemoteEnabled() === true;
+  }
+  async function ownerSessionToken() {
+    if (!remoteTimelineEnabled() || typeof window.gfcAccountFreshAccessToken !== 'function') return '';
+    try {
+      const value = await window.gfcAccountFreshAccessToken();
+      return typeof value === 'string' && value.trim() ? value.trim() : '';
+    } catch (_) { return ''; }
+  }
+  function isLegacyRemoteTimelineItem(item) {
+    return safeConversationId(item?.conversation_id || item?.conversationId) === DEFAULT_CONVERSATION_ID;
+  }
   function readJson(key, fallback) {
     try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return value == null ? fallback : value; } catch (_) { return fallback; }
   }
@@ -235,33 +252,40 @@
     return imported;
   }
   async function postTimeline(items) {
-    if (!token() || !items.length) return false;
+    const outgoing = (Array.isArray(items) ? items : []).filter(isLegacyRemoteTimelineItem);
+    if (!outgoing.length) return false;
+    const accessToken = await ownerSessionToken();
+    if (!accessToken) return false;
     const response = await fetch(BACKEND + '/api/assistant/preferences?action=conversation', {
       method:'POST',
-      headers:{ 'Content-Type':'application/json', 'X-Assistant-Token':token() },
-      body:JSON.stringify({ messages:items })
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + accessToken },
+      body:JSON.stringify({ messages:outgoing })
     });
     if (!response.ok) throw new Error('HTTP ' + response.status);
     return true;
   }
   async function flushTimelineOutbox() {
-    if (!token()) return;
+    if (!remoteTimelineEnabled()) return;
     const store = await conversationStore();
     const queue = await store.listOutbox();
     if (!queue.length) return;
-    const batch = queue.slice(0, 100).filter(row => row?.item);
+    const batch = queue.filter(row => row?.item && isLegacyRemoteTimelineItem(row.item)).slice(0, 100);
     if (!batch.length) return;
     try {
-      await postTimeline(batch.map(row => row.item));
-      await store.acknowledgeOutbox(batch.map(row => row.id));
+      const sent = await postTimeline(batch.map(row => row.item));
+      if (sent) await store.acknowledgeOutbox(batch.map(row => row.id));
     }
     catch (_) {}
   }
   async function syncTimelineFromCloud() {
-    if (!token()) return loadTimeline();
+    // Evita una lectura/escritura plana al abrir una conversación nueva: no
+    // existe forma segura de reconstruir su partición desde el endpoint legado.
+    if (activeConversationId() !== DEFAULT_CONVERSATION_ID) return loadTimeline();
+    const accessToken = await ownerSessionToken();
+    if (!accessToken) return loadTimeline();
     try {
       await flushTimelineOutbox();
-      const response = await fetch(BACKEND + '/api/assistant/preferences?action=conversation&limit=500', { headers:{ 'X-Assistant-Token':token() }, cache:'no-store' });
+      const response = await fetch(BACKEND + '/api/assistant/preferences?action=conversation&limit=500', { headers:{ Authorization:'Bearer ' + accessToken }, cache:'no-store' });
       if (!response.ok) return loadTimeline();
       const data = await response.json().catch(() => ({}));
       // El contrato remoto legado es plano: una fila sin conversation_id se
@@ -297,7 +321,7 @@
       const saved = normalizeTimelineItem(result.item);
       if (!timelineImmutableMatch(saved, normalized)) { setTimelinePersistence('storage_readback_failed', normalized.id); return null; }
       setTimelinePersistence(result.code, saved.id);
-      if (result.code === 'persisted') {
+      if (result.code === 'persisted' && isLegacyRemoteTimelineItem(saved)) {
         postTimeline([saved]).then(() => store.acknowledgeOutbox([saved.id])).catch(() => {});
       }
       return saved;

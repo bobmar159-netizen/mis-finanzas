@@ -173,7 +173,7 @@ test('historial: la identidad inmutable no puede mover un mensaje a otra convers
   assert.equal((await store.listTimeline('conversation_b')).length, 0);
 });
 
-test('historial: editar y eliminar una conversación afecta solo sus filas y outbox locales', async () => {
+test('historial: editar y eliminar una conversación nueva afecta solo sus filas locales', async () => {
   const shared = createSharedBrowser();
   const store = createTab(shared);
   await store.initialize({});
@@ -185,10 +185,19 @@ test('historial: editar y eliminar una conversación afecta solo sus filas y out
   assert.equal(renamed.ok, true);
   assert.equal((await store.listConversations()).find(item => item.id === 'conversation_keep').title, 'Título confirmado');
   const deleted = await store.deleteConversation('conversation_remove');
-  assert.deepEqual(deleted, { ok:true, deletedMessages:1, deletedOutbox:1 });
+  assert.deepEqual(deleted, { ok:true, deletedMessages:1, deletedOutbox:0 });
   assert.equal((await store.listTimeline('conversation_remove')).length, 0);
   assert.deepEqual((await store.listTimeline('conversation_keep')).map(item => item.id), ['keep-message']);
-  assert.deepEqual((await store.listOutbox()).map(item => item.id), ['keep-message']);
+  assert.deepEqual((await store.listOutbox()).map(item => item.id), []);
+});
+
+test('historial: solo la conversación heredada entra al outbox remoto legado', async () => {
+  const shared = createSharedBrowser();
+  const store = createTab(shared);
+  await store.initialize({});
+  await store.persist(message('legacy-sync', 'historial heredado'));
+  await store.persist({ ...message('new-local-only', 'historial separado'), conversation_id:'conversation_local' });
+  assert.deepEqual((await store.listOutbox()).map(item => item.id), ['legacy-sync']);
 });
 
 test('historial: la exportación visual se mantiene local y no modifica la persistencia', () => {
@@ -198,4 +207,16 @@ test('historial: la exportación visual se mantiene local y no modifica la persi
   assert.match(centerSource, /image\/jpeg/);
   assert.match(centerSource, /Exportación local: no se envió información a ningún servicio/);
   assert.doesNotMatch(centerSource, /gfcExportYarbiConversationImage[\s\S]{0,5000}fetch\(/);
+});
+
+test('historial: la sincronización remota legado usa sesión autenticada y nunca mezcla conversaciones nuevas', () => {
+  const centerSource = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-memory-center.js'), 'utf8');
+  const timelineSync = centerSource.slice(centerSource.indexOf('function remoteTimelineEnabled()'), centerSource.indexOf('function dayKey(ms)'));
+  assert.match(timelineSync, /function ownerSessionToken\(\)/);
+  assert.match(timelineSync, /gfcAccountFreshAccessToken/);
+  assert.match(timelineSync, /Authorization:'Bearer ' \+ accessToken/);
+  assert.match(timelineSync, /activeConversationId\(\) !== DEFAULT_CONVERSATION_ID/);
+  assert.match(timelineSync, /filter\(isLegacyRemoteTimelineItem\)/);
+  assert.doesNotMatch(timelineSync, /X-Assistant-Token/);
+  assert.doesNotMatch(timelineSync, /fnz_assistant_token/);
 });
