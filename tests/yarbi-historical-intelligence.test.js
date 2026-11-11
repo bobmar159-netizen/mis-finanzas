@@ -24,6 +24,21 @@ test('does not repeat an already processed historical batch', () => {
   assert.equal(second.tasks.length, 0);
 });
 
+test('splits a complete historic conversation into chronological resumable segments', () => {
+  const messages = Array.from({ length: 121 }, (_, index) => ({
+    id: `h${index + 1}`, contact_id: 'c1', text: `mensaje ${index + 1}`,
+    timestamp: index + 1, metadata: { historical: true, direction: index % 2 ? 'outgoing' : 'incoming' }
+  }));
+  const plan = planHistoricalIntelligence({ messages, limit: 10 });
+  assert.equal(plan.tasks.length, 3);
+  assert.deepEqual(plan.tasks.map(task => task.message_ids.length), [60, 60, 1]);
+  assert.deepEqual(plan.tasks.map(task => task.segment_index), [0, 1, 2]);
+  assert.ok(plan.tasks.every(task => task.segment_count === 3));
+  assert.equal(plan.tasks[0].occurred_from, 1);
+  assert.equal(plan.tasks[2].occurred_to, 121);
+  assert.equal(new Set(plan.tasks.flatMap(task => task.message_ids)).size, 121);
+});
+
 test('reads every historical contact scope page instead of silently stopping at 96', async () => {
   const all = Array.from({ length: 2000 }, (_, index) => ({ contact_id: index + 1 }));
   const calls = [];
