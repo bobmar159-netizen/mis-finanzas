@@ -86,3 +86,16 @@ test('Financial Coach exposes only a dated and recorded upcoming commitment', ()
   assert.deepEqual(result.summary.next_known_commitment, { due_at:'2026-11-13', scheduled_amount:75, status:'scheduled' });
   assert.equal(result.recommendations.some(row => row.kind === 'next_commitment'), true);
 });
+
+test('Financial Coach aggregates a service only from structured service-linked collections', () => {
+  const result = buildFinancialCoach({
+    now:NOW,
+    transactions:[
+      { id:'linked-1', type:'ingreso', amount:400, date:'2026-11-06', vinculadoServicioId:'svc-1', category:'Instalación nueva' },
+      { id:'linked-2', type:'ingreso', amount:200, date:'2026-11-07', service:'Instalación nueva' },
+      { id:'text-only', type:'ingreso', amount:999, date:'2026-11-08', description:'instalación' },
+      { id:'other-month', type:'ingreso', amount:500, date:'2026-10-30', service:'Instalación nueva' }
+    ], receivables:[], commitments:[]
+  });
+  assert.deepEqual(result.summary.collected_by_service_month, [{ service:'Instalación nueva', collected:600 }]);
+});

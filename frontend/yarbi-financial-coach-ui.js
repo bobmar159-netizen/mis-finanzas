@@ -12,12 +12,24 @@
   function normalized(value) {
     return String(value || '').toLocaleLowerCase('es-PE').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
+  function matchingService(summary, utterance) {
+    const requested = normalized(utterance);
+    const rows = Array.isArray(summary?.collected_by_service_month) ? summary.collected_by_service_month : [];
+    if (/\binstalacion(?:es)?\b/.test(requested)) return rows.filter(row => /instalacion/.test(normalized(row.service)));
+    return [];
+  }
   function localReply(utterance) {
     const value = normalized(utterance);
     if (!/\b(caja|meta|cobrar|cobro|compromiso|vencimiento|vence|debo|deuda|pagar|gasto|ingreso|finanzas?|dinero|proyeccion|proyecta|este mes|mensual)\b/.test(value)) return null;
     const result = currentSummary();
     if (!result) return { handled:true, reply:'No puedo leer el resumen financiero local ahora. No se realizó ninguna consulta externa.' };
     const summary = result.summary;
+    if (/\b(cobrado|cobramos|ingreso|ingresos)\b/.test(value) && /\binstalacion(?:es)?\b/.test(value)) {
+      const matches = matchingService(summary, value);
+      if (!matches.length) return { handled:true, reply:'No tengo cobros de instalaciones vinculados de forma estructurada en los movimientos locales de este mes.' };
+      const total = matches.reduce((sum, row) => sum + Number(row.collected || 0), 0);
+      return { handled:true, reply:`Este mes hay ${soles(total)} cobrados por instalaciones con vínculo de servicio registrado. No incluí cotizaciones ni cuentas por cobrar.` };
+    }
     if (/por cobrar|cobrar|cobro pendiente/.test(value)) return { handled:true, reply:`Tienes ${soles(summary.pending_receivables)} por cobrar registrado. Lo mantengo separado de la caja hasta que confirmes el cobro.` };
     if (/vencimiento|vence|proximo|próximo/.test(value)) {
       const next = summary.next_known_commitment;

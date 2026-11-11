@@ -50,6 +50,20 @@ test('Financial Coach reports a recorded upcoming commitment without inventing a
   assert.match(response.reply, /80\.00/);
 });
 
+test('Financial Coach answers structured installation collections without reading text-only rows', () => {
+  const window = uiWith({
+    now:Date.parse('2026-11-10T15:00:00Z'),
+    transactions:[
+      { id:'linked', type:'ingreso', amount:450, date:'2026-11-06', service:'Instalación nueva' },
+      { id:'text', type:'ingreso', amount:900, date:'2026-11-07', description:'instalación' }
+    ], receivables:[], commitments:[]
+  });
+  const response = window.gfcTryFinancialCoachMessage('¿Cuánto hemos cobrado por instalaciones este mes?');
+  assert.equal(response.handled, true);
+  assert.match(response.reply, /450\.00/);
+  assert.doesNotMatch(response.reply, /900\.00/);
+});
+
 test('Financial Coach UI contains no network client or commercial write path', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-financial-coach-ui.js'), 'utf8');
   assert.equal(/fetch\s*\(|XMLHttpRequest|navigator\.sendBeacon|localStorage\.setItem|sessionStorage\.setItem/i.test(source), false);
