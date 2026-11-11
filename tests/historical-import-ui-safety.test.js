@@ -39,3 +39,10 @@ test('historical review hands confirmed closures to the existing Movement-to-CRM
   assert.match(memoryCenter, /gfcOpenHistoricalServiceImport/);
   assert.match(memoryCenter, /cierres ya confirmados en Movimientos/i);
 });
+
+test('historical reconciliation can only compare local Agenda and Movements; it cannot apply commercial changes', () => {
+  assert.match(memoryCenter, /gfcYarbiRefreshHistoricalReconciliation/);
+  assert.match(memoryCenter, /reconcileHistoricalCandidates/);
+  assert.match(memoryCenter, /gfcYarbiLocalRows\('agenda'\)/);
+  assert.match(memoryCenter, /Ningún dato comercial fue modificado/);
+});

@@ -1084,13 +1084,26 @@
     const pending = items.filter(item => item.status === 'needs_reconciliation');
     const unmatched = items.filter(item => item.status === 'needs_contact_match');
     const reviewed = items.filter(item => item.status === 'reviewed');
+    const analysis = window._gfcYarbiHistoricalReconciliation || { results:[], totals:{} };
+    const resultsById = new Map((analysis.results || []).map(result => [String(result.id || ''), result]));
+    const evidence = analysis.totals || {};
     const labels = { service_mentioned:'Servicio', visit_mentioned:'Visita', work_completion_reported:'Trabajo reportado', payment_reported:'Pago reportado' };
-    const cards = pending.slice(-8).reverse().map(item => '<div class="gfc-yarbi-learning-evidence"><b>' + esc(labels[item.type] || 'Dato histórico') + '</b><span>' + (item.service ? esc(item.service) + ' · ' : '') + 'Contacto CRM ' + esc(item.contact_id || 'por vincular') + '</span><small>Importado como evidencia; no modifica Agenda, CRM ni Movimientos.</small><button class="gfc-yarbi-secondary" onclick="gfcYarbiHistoricalCandidateReviewed(\'' + esc(item.id) + '\')">Marcar revisado</button></div>').join('');
+    const evidenceCopy = 'Coincidencias locales: ' + Number(evidence.movement_match_review || 0) + ' movimiento(s) · ' + Number(evidence.agenda_match_review || 0) + ' actividad(es) de Agenda · ' + Number(evidence.ambiguous_evidence || 0) + ' ambiguas · ' + Number(evidence.needs_evidence || 0) + ' sin evidencia suficiente.';
+    const cards = pending.slice(-8).reverse().map(item => {
+      const result = resultsById.get(String(item.id || ''));
+      const matchCopy = result?.outcome === 'movement_match_review' ? 'Coincide con un movimiento local. Revisa el importe y confirma desde el cierre comercial.'
+        : result?.outcome === 'agenda_match_review' ? 'Coincide con una actividad de Agenda. Revisa el estado antes de confirmarlo.'
+        : result?.outcome === 'ambiguous_evidence' ? 'Hay más de una coincidencia posible. Yarbi no elegirá por ti.'
+        : result?.outcome === 'needs_contact_match' ? 'Falta vincular el chat con un contacto CRM.'
+        : 'Aún no hay evidencia suficiente en Agenda o Movimientos.';
+      return '<div class="gfc-yarbi-learning-evidence"><b>' + esc(labels[item.type] || 'Dato histórico') + '</b><span>' + (item.service ? esc(item.service) + ' · ' : '') + 'Contacto CRM ' + esc(item.contact_id || 'por vincular') + '</span><small>' + esc(matchCopy) + '</small><button class="gfc-yarbi-secondary" onclick="gfcYarbiHistoricalCandidateReviewed(\'' + esc(item.id) + '\')">Marcar revisado</button></div>';
+    }).join('');
     return '<div class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Conciliación del historial</div>' +
       '<div class="gfc-yarbi-tool-copy">' + pending.length + ' propuesta(s) por conciliar · ' + unmatched.length + ' requieren vincular un contacto CRM · ' + reviewed.length + ' revisada(s). Un mensaje histórico nunca marca por sí solo un pago completo, una visita realizada ni un trabajo terminado.</div>' +
       (cards || '<div class="gfc-yarbi-learning-evidence"><span>Aún no hay propuestas históricas pendientes.</span></div>') +
+      '<div class="gfc-yarbi-tool-copy" style="margin-top:9px">' + esc(evidenceCopy) + '</div>' +
       '<div class="gfc-yarbi-safety">Para confirmar un pago se requerirá contrastar Movimientos; para una visita o trabajo, tu confirmación explícita. Los cierres ya confirmados en Movimientos usan el flujo histórico existente del CRM, con deduplicación.</div>' +
-      '<div class="gfc-yarbi-training-actions"><button class="gfc-yarbi-secondary" onclick="if(typeof gfcOpenHistoricalServiceImport===\'function\')gfcOpenHistoricalServiceImport();else if(typeof toast===\'function\')toast(\'La integración histórica de Movimientos todavía no está disponible en esta copia.\',\'warning\')">Ver cierres confirmados en Movimientos</button></div></div>';
+      '<div class="gfc-yarbi-training-actions"><button class="gfc-yarbi-secondary" onclick="gfcYarbiRefreshHistoricalReconciliation()">Actualizar coincidencias</button><button class="gfc-yarbi-secondary" onclick="if(typeof gfcOpenHistoricalServiceImport===\'function\')gfcOpenHistoricalServiceImport();else if(typeof toast===\'function\')toast(\'La integración histórica de Movimientos todavía no está disponible en esta copia.\',\'warning\')">Ver cierres confirmados en Movimientos</button></div></div>';
   }
   function learningHtml() {
     const metrics = learningSnapshot();
@@ -1132,6 +1145,26 @@
     historicalReconciliationSave(next);
     if (typeof toast === 'function') toast('Marcado como revisado. No se realizó ningún cambio comercial.', 'success');
     if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+  };
+  window.gfcYarbiRefreshHistoricalReconciliation = async function() {
+    const api = window.gfcYarbiHistoricalLearning;
+    if (!api?.reconcileHistoricalCandidates) return;
+    const candidates = historicalReconciliationItems().filter(item => item.status !== 'reviewed');
+    if (!candidates.length) {
+      if (typeof toast === 'function') toast('No hay propuestas históricas pendientes por contrastar.', 'info');
+      return;
+    }
+    try {
+      const [agenda, contacts] = typeof gfcYarbiLocalRows === 'function'
+        ? await Promise.all([gfcYarbiLocalRows('agenda').catch(() => []), gfcYarbiLocalRows('contact').catch(() => [])])
+        : [[], []];
+      const movements = Array.isArray(window.state?.transactions) ? window.state.transactions : [];
+      window._gfcYarbiHistoricalReconciliation = api.reconcileHistoricalCandidates({ candidates, agenda, contacts, movements });
+      if (typeof toast === 'function') toast('Coincidencias locales actualizadas. Ningún dato comercial fue modificado.', 'success');
+      if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+    } catch (error) {
+      if (typeof toast === 'function') toast('No se pudieron contrastar las propuestas: ' + (error?.message || 'datos locales no disponibles'), 'warning');
+    }
   };
   window.gfcYarbiSetAutonomyMode = function(mode) {
     const safe = ['observe','suggest','approval'].includes(String(mode)) ? String(mode) : 'observe';
@@ -2466,6 +2499,8 @@
         contact_id:contactId || null,
         source_name:conversationReview.source_name || conversation.name,
         source_message_index:Number(candidate.source_message_index || 0),
+        source_timestamp:Number(conversation.messages[Number(candidate.source_message_index || 0)]?.timestamp || 0) || null,
+        phone:phone || null,
         type:String(candidate.type || ''),
         service:candidate.service || null,
         status:contactId ? 'needs_reconciliation' : 'needs_contact_match',

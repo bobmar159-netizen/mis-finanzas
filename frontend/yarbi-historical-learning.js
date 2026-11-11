@@ -21,6 +21,18 @@
     const digits = clean(value).replace(/\D/g, '');
     return digits.length >= 8 && digits.length <= 15 ? digits : '';
   }
+  function comparablePhone(value) {
+    return normalizePhone(value).replace(/^51(?=9\d{8}$)/, '');
+  }
+  function comparableText(value) {
+    return clean(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function timestamp(value) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number > 0) return number;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
   function phoneIn(values) {
     for (const value of values || []) {
       const match = clean(value).match(/\+?\d[\d\s().-]{6,}\d/);
@@ -111,5 +123,58 @@
     };
   }
 
-  return { reviewHistoricalConversations, normalizePhone, personKey };
+  function serviceMatches(left, right) {
+    const a = comparableText(left), b = comparableText(right);
+    return !a || !b || a === b || a.includes(b) || b.includes(a);
+  }
+  function candidateContact(candidate, contacts) {
+    return (contacts || []).find(contact => String(contact?.id || '') === String(candidate?.contact_id || '')) || null;
+  }
+  function movementMatchesCandidate(candidate, movement, contact) {
+    const amount = Number(movement?.amount ?? movement?.monto ?? 0);
+    if (!(amount > 0)) return false;
+    const kind = comparableText(movement?.type || movement?.tipo || movement?.kind || '');
+    if (kind && !/(ingreso|income|cobro|pago|abono)/.test(kind)) return false;
+    const candidatePhone = comparablePhone(candidate?.phone);
+    const movementPhone = comparablePhone(movement?.phone || movement?.telefono || movement?.contact_phone);
+    if (candidatePhone && movementPhone) return candidatePhone === movementPhone;
+    if (String(movement?.contact_id || '') && String(movement.contact_id) === String(candidate?.contact_id || '')) return true;
+    const contactName = comparableText(contact?.display_name || contact?.full_name || '');
+    const movementName = comparableText(movement?.cliente || movement?.contacto || movement?.client_name || '');
+    return Boolean(contactName && movementName && (movementName === contactName || movementName.includes(contactName) || contactName.includes(movementName)));
+  }
+  function withinDays(left, right, days) {
+    const a = timestamp(left), b = timestamp(right);
+    if (!a || !b) return true;
+    return Math.abs(a - b) <= Number(days || 45) * 86400000;
+  }
+  function reconcileHistoricalCandidates(input = {}) {
+    const candidates = Array.isArray(input.candidates) ? input.candidates : [];
+    const agenda = Array.isArray(input.agenda) ? input.agenda : [];
+    const movements = Array.isArray(input.movements) ? input.movements : [];
+    const contacts = Array.isArray(input.contacts) ? input.contacts : [];
+    const results = candidates.map(candidate => {
+      if (!candidate?.contact_id) return { id:String(candidate?.id || ''), outcome:'needs_contact_match', agenda_matches:[], movement_matches:[] };
+      const contact = candidateContact(candidate, contacts);
+      const relatedAgenda = agenda.filter(event => String(event?.contact_id || '') === String(candidate.contact_id) && serviceMatches(candidate.service, event?.service || event?.title) && withinDays(candidate.source_timestamp, event?.starts_at || event?.updated_at, 45));
+      const relatedMovements = movements.filter(movement => movementMatchesCandidate(candidate, movement, contact) && withinDays(candidate.source_timestamp, movement?.date || movement?.created_at || movement?.updated_at, 45));
+      const agendaMatches = relatedAgenda.slice(0, 4).map(event => ({ id:String(event?.id || ''), status:String(event?.status || event?.estado || ''), event_type:String(event?.event_type || event?.tipo || ''), service:String(event?.service || '') }));
+      const movementMatches = relatedMovements.slice(0, 4).map(movement => ({ id:String(movement?.id || ''), amount:Number(movement?.amount ?? movement?.monto ?? 0), date:String(movement?.date || movement?.created_at || ''), status:String(movement?.status || movement?.estado || '') }));
+      const ambiguous = relatedAgenda.length > 1 || relatedMovements.length > 1;
+      let outcome = 'needs_evidence';
+      if (ambiguous) outcome = 'ambiguous_evidence';
+      else if (candidate.type === 'payment_reported' && relatedMovements.length === 1) outcome = 'movement_match_review';
+      else if ((candidate.type === 'visit_mentioned' || candidate.type === 'work_completion_reported') && relatedAgenda.length === 1) outcome = 'agenda_match_review';
+      else if (candidate.type === 'service_mentioned' && relatedAgenda.length === 1) outcome = 'agenda_match_review';
+      return { id:String(candidate.id || ''), outcome, agenda_matches:agendaMatches, movement_matches:movementMatches, automatic_change:false };
+    });
+    return {
+      schema:'yarbi.historical-reconciliation.v1',
+      results,
+      totals:results.reduce((counts, result) => { counts[result.outcome] = (counts[result.outcome] || 0) + 1; return counts; }, {}),
+      safety:{ automatic_change:false, payment_requires_confirmed_movement:true, agenda_requires_owner_confirmation:true }
+    };
+  }
+
+  return { reviewHistoricalConversations, reconcileHistoricalCandidates, normalizePhone, personKey };
 });
