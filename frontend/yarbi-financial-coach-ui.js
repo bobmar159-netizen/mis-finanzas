@@ -12,6 +12,10 @@
   function normalized(value) {
     return String(value || '').toLocaleLowerCase('es-PE').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
+  function richReply(title, highlight, details) {
+    const rows = Array.isArray(details) ? details.filter(Boolean) : [];
+    return `## ${title}\n\n**${highlight}**${rows.length ? '\n\n' + rows.map(row => '- ' + row).join('\n') : ''}`;
+  }
   function matchingService(summary, utterance) {
     const requested = normalized(utterance);
     const rows = Array.isArray(summary?.collected_by_service_month) ? summary.collected_by_service_month : [];
@@ -26,30 +30,30 @@
     const summary = result.summary;
     if (/\b(cobrado|cobramos|ingreso|ingresos)\b/.test(value) && /\binstalacion(?:es)?\b/.test(value)) {
       const matches = matchingService(summary, value);
-      if (!matches.length) return { handled:true, reply:'No tengo cobros de instalaciones vinculados de forma estructurada en los movimientos locales de este mes.' };
+      if (!matches.length) return { handled:true, reply:richReply('🔧 Cobros por instalaciones', 'No hay cobros vinculados de forma estructurada este mes.', ['No usaré una descripción libre como prueba de servicio.']) };
       const total = matches.reduce((sum, row) => sum + Number(row.collected || 0), 0);
-      return { handled:true, reply:`Este mes hay ${soles(total)} cobrados por instalaciones con vínculo de servicio registrado. No incluí cotizaciones ni cuentas por cobrar.` };
+      return { handled:true, reply:richReply('🔧 Cobros por instalaciones', `${soles(total)} cobrados este mes.`, ['Solo se incluyeron movimientos vinculados al servicio.', 'No se incluyeron cotizaciones ni cuentas por cobrar.']) };
     }
     if (/quien me debe|quién me debe|deudores|quienes deben|quiénes deben/.test(value)) {
       const people = Array.isArray(summary.top_named_receivables) ? summary.top_named_receivables : [];
-      if (!people.length) return { handled:true, reply:'No tengo nombres verificados asociados a los cobros pendientes locales. El total sigue separado de la caja.' };
-      const entries = people.map(row => `${row.name}: ${soles(row.balance_amount)}`).join('; ');
-      return { handled:true, reply:`Cobros pendientes con nombre registrado: ${entries}. En total son ${soles(summary.pending_receivables)} y no los cuento como efectivo hasta registrar el cobro.` };
+      if (!people.length) return { handled:true, reply:richReply('📥 Cobros pendientes', 'No hay nombres verificados asociados a los cobros pendientes locales.', ['El total continúa separado de la caja.']) };
+      const entries = people.map(row => `${row.name}: ${soles(row.balance_amount)}`);
+      return { handled:true, reply:richReply('📥 Cobros pendientes', `${soles(summary.pending_receivables)} por cobrar en total.`, [...entries, 'No se cuenta como efectivo hasta registrar el cobro.']) };
     }
-    if (/por cobrar|cobrar|cobro pendiente/.test(value)) return { handled:true, reply:`Tienes ${soles(summary.pending_receivables)} por cobrar registrado. Lo mantengo separado de la caja hasta que confirmes el cobro.` };
+    if (/por cobrar|cobrar|cobro pendiente/.test(value)) return { handled:true, reply:richReply('📥 Cobros pendientes', `${soles(summary.pending_receivables)} por cobrar registrado.`, ['Lo mantengo separado de la caja hasta que confirmes el cobro.']) };
     if (/vencimiento|vence|proximo|próximo/.test(value)) {
       const next = summary.next_known_commitment;
-      if (!next) return { handled:true, reply:'No tengo un vencimiento con fecha registrada entre los compromisos locales. No voy a inventar una fecha.' };
+      if (!next) return { handled:true, reply:richReply('📅 Próximo compromiso', 'No hay un vencimiento con fecha registrada.', ['No voy a inventar una fecha.']) };
       const amount = next.scheduled_amount === null ? ' El monto de esa cuota no está confirmado en los registros locales.' : ` La cuota registrada es ${soles(next.scheduled_amount)}.`;
-      return { handled:true, reply:next.status === 'overdue' ? `Hay un compromiso vencido desde ${next.due_at}.${amount}` : next.status === 'due_today' ? `Tienes un compromiso que vence hoy.${amount}` : `El próximo compromiso con fecha registrada vence el ${next.due_at}.${amount}` };
+      return { handled:true, reply:next.status === 'overdue' ? richReply('⚠️ Compromiso vencido', `Vencido desde ${next.due_at}.`, [amount.trim()]) : next.status === 'due_today' ? richReply('📅 Compromiso de hoy', 'Tienes un compromiso que vence hoy.', [amount.trim()]) : richReply('📅 Próximo compromiso', `Vence el ${next.due_at}.`, [amount.trim()]) };
     }
-    if (/compromiso|debo|deuda|pagar/.test(value)) return { handled:true, reply:`Hay ${soles(summary.known_commitments_due)} en compromisos locales pendientes. No lo confundí con gastos ya registrados.` };
+    if (/compromiso|debo|deuda|pagar/.test(value)) return { handled:true, reply:richReply('📌 Compromisos', `${soles(summary.known_commitments_due)} en compromisos locales pendientes.`, ['No lo confundí con gastos ya registrados.']) };
     if (/proyeccion|proyecta|este mes|mensual/.test(value)) {
-      if (summary.projected_free_cash_month === null) return { handled:true, reply:'No tengo movimientos locales suficientes para proyectar el mes. No convertiré cuentas por cobrar o cotizaciones en efectivo estimado.' };
-      return { handled:true, reply:`Con el promedio registrado por día transcurrido, la proyección de caja libre del mes es ${soles(summary.projected_free_cash_month)}. Es una estimación, no una garantía, y excluye ${soles(summary.pending_receivables)} por cobrar.` };
+      if (summary.projected_free_cash_month === null) return { handled:true, reply:richReply('📈 Proyección del mes', 'No hay movimientos locales suficientes para proyectar el mes.', ['No convertiré cuentas por cobrar ni cotizaciones en efectivo estimado.']) };
+      return { handled:true, reply:richReply('📈 Proyección del mes', `${soles(summary.projected_free_cash_month)} de caja libre estimada.`, ['Se calcula con el promedio registrado por día transcurrido.', 'Es una estimación, no una garantía.', `Excluye ${soles(summary.pending_receivables)} por cobrar.`]) };
     }
-    if (/meta|falta|faltan/.test(value)) return { handled:true, reply:summary.remaining_to_daily_goal > 0 ? `Faltan ${soles(summary.remaining_to_daily_goal)} para la meta diaria de caja libre. Hoy llevas ${soles(summary.free_cash_today)} registrados.` : `La meta diaria de caja libre está cubierta: hoy llevas ${soles(summary.free_cash_today)} registrados.` };
-    return { handled:true, reply:`La caja libre registrada hoy es ${soles(summary.free_cash_today)}. Hay ${soles(summary.pending_receivables)} por cobrar, que no cuento como efectivo hasta registrarlo.` };
+    if (/meta|falta|faltan/.test(value)) return { handled:true, reply:summary.remaining_to_daily_goal > 0 ? richReply('🎯 Meta diaria', `Faltan ${soles(summary.remaining_to_daily_goal)} para la meta de caja libre.`, [`Hoy llevas ${soles(summary.free_cash_today)} registrados.`]) : richReply('🎯 Meta diaria', 'La meta de caja libre está cubierta.', [`Hoy llevas ${soles(summary.free_cash_today)} registrados.`]) };
+    return { handled:true, reply:richReply('💰 Caja libre', `${soles(summary.free_cash_today)} registrados hoy.`, [`${soles(summary.pending_receivables)} por cobrar no se cuentan como efectivo hasta registrar el cobro.`]) };
   }
   function markup(result) {
     if (!result) return '<p>No pude preparar el resumen financiero local. No se realizó ninguna consulta externa.</p>';

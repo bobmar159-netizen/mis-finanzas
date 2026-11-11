@@ -35,6 +35,7 @@ test('Financial Coach distinguishes an elapsed-days projection from a promised c
   });
   const response = window.gfcTryFinancialCoachMessage('¿Cuál es la proyección para este mes?');
   assert.equal(response.handled, true);
+  assert.match(response.reply, /^## 📈 Proyección del mes/);
   assert.match(response.reply, /estimación/i);
   assert.match(response.reply, /excluye/i);
 });
