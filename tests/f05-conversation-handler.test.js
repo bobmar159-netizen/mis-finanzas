@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createConversationHandler } = require('../api_handlers/assistant/conversation');
+const { createConversationToken } = require('../lib/yarbi-conversation-continuity');
 
 const OWNER = '00000000-0000-4000-8000-0000000000a1';
 const ENV_KEYS = ['VERCEL_ENV', 'YARBI_PREVIEW_OWNER_REFERENCES_ONLY', 'YARBI_PREVIEW_SUPABASE_PROJECT_REF', 'SUPABASE_URL', 'SUPABASE_SECRET_KEY', 'SUPABASE_PUBLISHABLE_KEY', 'YARBI_TRACE_HMAC_KEY', 'YARBI_PREVIEW_OWNER_GEMINI_UNDERSTANDING', 'GEMINI_API_KEY', 'GEMINI_KEY'];
@@ -56,4 +57,29 @@ test('F05 handler rechaza ausencia de Bearer y scope declarado por navegador ant
   const injected = responseBox();
   await handler({ method: 'POST', url: '/api/assistant/conversation', headers: { authorization: 'Bearer synthetic' }, body: { utterance: '¿Qué tengo mañana?', owner_id: OWNER } }, injected);
   assert.equal(injected.state.status, 400); assert.equal(injected.state.body.error, 'owner_scope_client_input_forbidden'); assert.equal(calls, 0);
+}));
+
+test('F05 handler answers a selected synthetic contact from scoped data without initializing Gemini', async () => withPreviewEnv(async () => {
+  const token = createConversationToken({ ownerId: OWNER, secret: process.env.YARBI_TRACE_HMAC_KEY, now: NOW, state: { selected_entity: { contact_id: 17, display_name: 'F05-Synthetic' } }, candidateIds: [17] });
+  let providerCalls = 0;
+  const fetchImpl = async (raw, options = {}) => {
+    const url = new URL(String(raw));
+    assert.equal(url.hostname, 'uevilhbstnmmdlgyshlv.supabase.co');
+    if (url.pathname === '/auth/v1/user') return json({ id: OWNER });
+    if (url.pathname === '/rest/v1/yarbi_owner_contact_scope') return json([{ contact_id: 17 }]);
+    if (url.pathname === '/rest/v1/yarbi_agent_actions') return json([JSON.parse(options.body)[0]], 201);
+    if (url.pathname === '/rest/v1/crm_contacts') return json([{ id: 17, display_name: 'F05-Synthetic', latest_service: 'instalacion_nueva' }]);
+    if (url.pathname === '/rest/v1/yarbi_receivables') return json([{ id: 4, contact_id: 17, agreed_amount: 500, paid_amount: 200, balance_amount: 300, status: 'partial', updated_at: '2026-11-05T16:00:00Z' }]);
+    if (['/rest/v1/contact_identifiers', '/rest/v1/yarbi_contact_operational_memory', '/rest/v1/whatsapp_messages', '/rest/v1/ai_message_analysis', '/rest/v1/agenda_events'].includes(url.pathname)) return json([]);
+    throw new Error('unexpected_synthetic_request');
+  };
+  const handler = createConversationHandler({ fetchImpl, now: () => NOW, providerFactory: () => { providerCalls += 1; throw new Error('gemini_must_not_initialize'); } });
+  const res = responseBox();
+  await handler({ method: 'POST', url: '/api/assistant/conversation', headers: { authorization: 'Bearer synthetic-owner-session' }, body: { utterance: '¿Cuánto debe?', conversation_token: token } }, res);
+  assert.equal(res.state.status, 200, JSON.stringify(res.state.body));
+  assert.equal(res.state.body.outcome, 'fast_local_contact_context');
+  assert.match(res.state.body.reply, /S\/ 300\.00/);
+  assert.equal(res.state.body.intelligence.tier, 'FAST');
+  assert.equal(res.state.body.execute, false);
+  assert.equal(providerCalls, 0);
 }));

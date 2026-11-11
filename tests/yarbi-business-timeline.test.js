@@ -20,6 +20,8 @@ test('business timeline combines only one contact and keeps each source immutabl
   assert.deepEqual(timeline.events.map(item => item.id), ['agenda:3', 'observation:5', 'receivable:4', 'analysis:2', 'message:m-1']);
   assert.ok(timeline.events.every(item => item.contact_id === 7));
   assert.ok(timeline.events.every(item => !Object.hasOwn(item, 'owner_id')));
+  assert.equal(timeline.events[0].label, timeline.events[0].title);
+  assert.equal(timeline.events[0].source_id, timeline.events[0].source.id);
 });
 
 test('business timeline deduplicates a repeated source ID but never merges unidentified events', () => {

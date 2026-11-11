@@ -59,10 +59,11 @@ test('F05 conserva corrección V4, no promueve la mención negada y no ejecuta a
 });
 
 test('F05 continuidad es firmada, aislada por owner y no convierte ordinales en ejecución', async () => {
-  const token = createConversationToken({ ownerId: OWNER_A, state: { active_constraints: { district: { value: 'Surco' } } }, candidateIds: [71, 72], secret: SECRET, now: NOW });
+  const token = createConversationToken({ ownerId: OWNER_A, state: { active_constraints: { district: { value: 'Surco' } }, selected_entity: { contact_id: 72, display_name: 'No se serializa' } }, candidateIds: [71, 72], secret: SECRET, now: NOW });
   const valid = readConversationToken({ token, ownerId: OWNER_A, secret: SECRET, now: NOW + 1 });
   assert.equal(valid.ok, true);
   assert.deepEqual(valid.candidate_ids, [71, 72]);
+  assert.deepEqual(valid.state.selected_entity, { contact_id: 72 });
   assert.equal(readConversationToken({ token, ownerId: OWNER_B, secret: SECRET, now: NOW + 1 }).ok, false);
   assert.equal(readConversationToken({ token: token + 'x', ownerId: OWNER_A, secret: SECRET, now: NOW + 1 }).ok, false);
   const selected = await runOwnerConversation({ utterance: 'El segundo cliente', candidates: valid.candidate_ids, now: NOW });

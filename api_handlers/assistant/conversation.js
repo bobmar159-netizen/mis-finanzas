@@ -8,6 +8,7 @@ const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 const { createCanonicalOwnerScopeResolver, verifiedOwnerId } = require('../../lib/yarbi-owner-scope');
 const { loadScopedCrmSources, recordsFromRows, searchScopedCrm, normalizeScope } = require('../../lib/yarbi-crm-search-runtime');
 const { buildFinanceContext } = require('../../lib/yarbi-finance-context');
+const { buildBusinessTimeline } = require('../../lib/yarbi-business-timeline');
 const { runOwnerConversation } = require('../../lib/yarbi-conversation-runtime');
 const { createConversationToken, readConversationToken } = require('../../lib/yarbi-conversation-continuity');
 const { createGeminiV4OwnerUnderstandingProvider } = require('../../lib/yarbi-v4-provider');
@@ -23,7 +24,21 @@ function serviceClient(config, fetchImpl) { return async path => { const respons
 function traceEvent({ operationId, secret, startedAt, stage, outcome, eventKey, counts = {}, error = null }) {
   return { operation_id: operationId, event_id: eventIdFor(operationId, stage, eventKey, secret), operation_type: 'authenticated_owner_conversation', stage, outcome, started_at: startedAt, ended_at: new Date().toISOString(), component: 'owner_conversation', component_version: traceVersion(), counts, contact_refs: [], error_code: error ? errorCode(error) : null, provider_diagnostic: error?.provider_diagnostic || null };
 }
-function needsVerifiedFacts(utterance) { return /\b(agenda|mañana|manana|visitas?|seguimiento|llamar|cobrad|instalaciones?)\b/i.test(String(utterance || '')); }
+function positiveId(value) { const parsed = Number(value); return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null; }
+function focusedDossierFrom({ state, scope, sources } = {}) {
+  const contactId = positiveId(state?.selected_entity?.contact_id || state?.active_entity?.contact_id);
+  if (!contactId || !scope?.ids?.includes(contactId)) return null;
+  const contact = (Array.isArray(sources?.contacts) ? sources.contacts : []).find(row => positiveId(row?.id) === contactId);
+  if (!contact) return null;
+  const timeline = buildBusinessTimeline({ sources, contactId, limit: 24 });
+  return {
+    contact_id: contactId,
+    dossier: { client_name: text(contact.display_name || contact.full_name, 160) || null },
+    finance: buildFinanceContext({ contactId, analyses: sources.analyses, receivables: sources.receivables, movements: null }),
+    timeline: timeline.events
+  };
+}
+function needsVerifiedFacts(utterance) { return /\b(agenda|mañana|manana|visitas?|seguimiento|llamar|cobrad|instalaciones?|debe|deuda|saldo|historial|que\s+pas[oó])\b/i.test(String(utterance || '')); }
 function financeRowsFrom(sources) {
   const byContact = new Map((Array.isArray(sources.contacts) ? sources.contacts : []).map(row => [Number(row.id), row]));
   return [...byContact.keys()].map(contactId => {
@@ -71,7 +86,8 @@ function createConversationHandler({ fetchImpl = fetch, providerFactory = create
       const sources = needsVerifiedFacts(utterance) && scope.ok ? await loadScopedCrmSources({ supabase, contactIds: scope.ids, metrics: { query_count: 0, sources: {} } }) : { contacts: [], agenda: [], analyses: [], receivables: [] };
       const provider = config.gemini.enabled ? providerFactory({ apiKey: config.gemini.apiKey, model: config.gemini.model, timeoutMs: config.gemini.timeoutMs, fetchImpl }) : null;
       const state = continuity.state || undefined;
-      const result = await runOwnerConversation({ utterance, state, provider, candidates: continuity.candidate_ids, agendaEvents: sources.agenda, financeRows: financeRowsFrom(sources), now: now(), ownerId, deepIdempotencyKey: operationId });
+      const dossier = focusedDossierFrom({ state, scope, sources });
+      const result = await runOwnerConversation({ utterance, state, provider, candidates: continuity.candidate_ids, agendaEvents: sources.agenda, financeRows: financeRowsFrom(sources), dossier, now: now(), ownerId, deepIdempotencyKey: operationId });
       let candidateIds = continuity.candidate_ids;
       let search = null;
       if (result.crm_search?.outcome === 'crm_search_ready') {
@@ -96,3 +112,4 @@ module.exports = createConversationHandler();
 module.exports.createConversationHandler = createConversationHandler;
 module.exports.containsBlocked = containsBlocked;
 module.exports.safeIntelligence = safeIntelligence;
+module.exports.focusedDossierFrom = focusedDossierFrom;
