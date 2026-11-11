@@ -6,6 +6,7 @@
   const TIMELINE_OUTBOX_KEY = 'gfc_yarbi_chat_outbox_v1';
   const IMPORT_STATE_KEY = 'gfc_yarbi_mass_import_v2';
   const HISTORICAL_RECONCILIATION_KEY = 'gfc_yarbi_historical_reconciliation_v1';
+  const HISTORICAL_CONTEXT_KEY = 'gfc_yarbi_historical_contact_context_v1';
   const TRAINING_HISTORY_KEY = 'gfc_yarbi_client_simulator_v1';
   const TRAINING_OUTBOX_KEY = 'gfc_yarbi_client_simulator_outbox_v1';
   const TRAINING_ROLE_KEY = 'gfc_yarbi_client_simulator_role_v1';
@@ -1079,11 +1080,26 @@
   function historicalReconciliationSave(items) {
     return writeJson(HISTORICAL_RECONCILIATION_KEY, (Array.isArray(items) ? items : []).filter(item => item && typeof item === 'object' && String(item.id || '')).slice(-600));
   }
+  function historicalContactContext() {
+    const stored = readJson(HISTORICAL_CONTEXT_KEY, { profiles:[] });
+    return stored && typeof stored === 'object' ? stored : { profiles:[] };
+  }
+  function refreshHistoricalContactContext(items) {
+    const api = window.gfcYarbiHistoricalLearning;
+    const context = api?.buildHistoricalContactProfiles
+      ? api.buildHistoricalContactProfiles({ candidates:items })
+      : { schema:'yarbi.historical-contact-profiles.v1', profiles:[], safety:{ automatic_change:false } };
+    writeJson(HISTORICAL_CONTEXT_KEY, context);
+    window._gfcYarbiHistoricalContactContext = context;
+    return context;
+  }
   function historicalReconciliationHtml() {
     const items = historicalReconciliationItems();
     const pending = items.filter(item => item.status === 'needs_reconciliation');
     const unmatched = items.filter(item => item.status === 'needs_contact_match');
     const reviewed = items.filter(item => item.status === 'reviewed');
+    const contextApproved = items.filter(item => item.status === 'context_approved');
+    const context = historicalContactContext();
     const analysis = window._gfcYarbiHistoricalReconciliation || { results:[], totals:{} };
     const resultsById = new Map((analysis.results || []).map(result => [String(result.id || ''), result]));
     const evidence = analysis.totals || {};
@@ -1096,10 +1112,13 @@
         : result?.outcome === 'ambiguous_evidence' ? 'Hay más de una coincidencia posible. Yarbi no elegirá por ti.'
         : result?.outcome === 'needs_contact_match' ? 'Falta vincular el chat con un contacto CRM.'
         : 'Aún no hay evidencia suficiente en Agenda o Movimientos.';
-      return '<div class="gfc-yarbi-learning-evidence"><b>' + esc(labels[item.type] || 'Dato histórico') + '</b><span>' + (item.service ? esc(item.service) + ' · ' : '') + 'Contacto CRM ' + esc(item.contact_id || 'por vincular') + '</span><small>' + esc(matchCopy) + '</small><button class="gfc-yarbi-secondary" onclick="gfcYarbiHistoricalCandidateReviewed(\'' + esc(item.id) + '\')">Marcar revisado</button></div>';
+      const contextAction = item.contact_id
+        ? '<button class="gfc-yarbi-secondary" onclick="gfcYarbiHistoricalCandidateUseAsContext(\'' + esc(item.id) + '\')">Usar como contexto</button>'
+        : '';
+      return '<div class="gfc-yarbi-learning-evidence"><b>' + esc(labels[item.type] || 'Dato histórico') + '</b><span>' + (item.service ? esc(item.service) + ' · ' : '') + 'Contacto CRM ' + esc(item.contact_id || 'por vincular') + '</span><small>' + esc(matchCopy) + '</small><button class="gfc-yarbi-secondary" onclick="gfcYarbiHistoricalCandidateReviewed(\'' + esc(item.id) + '\')">Marcar revisado</button>' + contextAction + '</div>';
     }).join('');
     return '<div class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Conciliación del historial</div>' +
-      '<div class="gfc-yarbi-tool-copy">' + pending.length + ' propuesta(s) por conciliar · ' + unmatched.length + ' requieren vincular un contacto CRM · ' + reviewed.length + ' revisada(s). Un mensaje histórico nunca marca por sí solo un pago completo, una visita realizada ni un trabajo terminado.</div>' +
+      '<div class="gfc-yarbi-tool-copy">' + pending.length + ' propuesta(s) por conciliar · ' + unmatched.length + ' requieren vincular un contacto CRM · ' + reviewed.length + ' revisada(s) · ' + contextApproved.length + ' aprobada(s) como contexto de ' + Number(context.profiles?.length || 0) + ' contacto(s). Un mensaje histórico nunca marca por sí solo un pago completo, una visita realizada ni un trabajo terminado.</div>' +
       (cards || '<div class="gfc-yarbi-learning-evidence"><span>Aún no hay propuestas históricas pendientes.</span></div>') +
       '<div class="gfc-yarbi-tool-copy" style="margin-top:9px">' + esc(evidenceCopy) + '</div>' +
       '<div class="gfc-yarbi-safety">Para confirmar un pago se requerirá contrastar Movimientos; para una visita o trabajo, tu confirmación explícita. Los cierres ya confirmados en Movimientos usan el flujo histórico existente del CRM, con deduplicación.</div>' +
@@ -1145,6 +1164,25 @@
     historicalReconciliationSave(next);
     if (typeof toast === 'function') toast('Marcado como revisado. No se realizó ningún cambio comercial.', 'success');
     if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+  };
+  window.gfcYarbiHistoricalCandidateUseAsContext = function(id) {
+    const items = historicalReconciliationItems();
+    const target = items.find(item => String(item.id) === String(id));
+    if (!target?.contact_id) {
+      if (typeof toast === 'function') toast('Primero vincula esta señal a un contacto CRM verificado.', 'warning');
+      return;
+    }
+    const next = items.map(item => String(item.id) === String(id)
+      ? { ...item, status:'context_approved', context_approved_at:Date.now(), commercial_fact:false }
+      : item);
+    historicalReconciliationSave(next);
+    refreshHistoricalContactContext(next);
+    if (typeof toast === 'function') toast('Contexto histórico guardado para este contacto. No se modificó ningún dato comercial.', 'success');
+    if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+  };
+  window.gfcYarbiHistoricalContactContext = function(contactId) {
+    const context = historicalContactContext();
+    return (context.profiles || []).find(profile => String(profile.contact_id) === String(contactId || '')) || null;
   };
   window.gfcYarbiRefreshHistoricalReconciliation = async function() {
     const api = window.gfcYarbiHistoricalLearning;

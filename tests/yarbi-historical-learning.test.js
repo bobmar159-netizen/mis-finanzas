@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { reviewHistoricalConversations, reconcileHistoricalCandidates } = require('../frontend/yarbi-historical-learning');
+const { reviewHistoricalConversations, reconcileHistoricalCandidates, buildHistoricalContactProfiles } = require('../frontend/yarbi-historical-learning');
 
 function conversation(name, messages) { return { name, messages }; }
 function message(sender, text) { return { sender, text, timestamp: 1 }; }
@@ -63,4 +63,16 @@ test('historical reconciliation reports ambiguity instead of choosing between tw
   });
   assert.equal(result.results[0].outcome, 'ambiguous_evidence');
   assert.equal(result.results[0].automatic_change, false);
+});
+
+test('historical profiles contain only explicitly owner-approved context and never commercial facts', () => {
+  const result = buildHistoricalContactProfiles({ candidates:[
+    { id:'approved-1', status:'context_approved', contact_id:'12', type:'service_mentioned', service:'terma', source_timestamp:100 },
+    { id:'pending-1', status:'needs_reconciliation', contact_id:'12', type:'payment_reported', source_timestamp:200 }
+  ] });
+  assert.equal(result.profiles.length, 1);
+  assert.equal(result.profiles[0].observation_count, 1);
+  assert.equal(result.profiles[0].observations[0].id, 'approved-1');
+  assert.equal(result.profiles[0].observations[0].commercial_fact, false);
+  assert.equal(result.safety.automatic_change, false);
 });

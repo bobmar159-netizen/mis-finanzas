@@ -46,3 +46,10 @@ test('historical reconciliation can only compare local Agenda and Movements; it 
   assert.match(memoryCenter, /gfcYarbiLocalRows\('agenda'\)/);
   assert.match(memoryCenter, /Ningún dato comercial fue modificado/);
 });
+
+test('historical context requires an explicit owner action and remains separate from commercial facts', () => {
+  assert.match(memoryCenter, /gfcYarbiHistoricalCandidateUseAsContext/);
+  assert.match(memoryCenter, /context_approved/);
+  assert.match(memoryCenter, /commercial_fact:false/);
+  assert.match(memoryCenter, /No se modificó ningún dato comercial/);
+});

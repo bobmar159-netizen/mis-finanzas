@@ -176,5 +176,44 @@
     };
   }
 
-  return { reviewHistoricalConversations, reconcileHistoricalCandidates, normalizePhone, personKey };
+  // Estas fichas son contexto revisado por el propietario, no hechos
+  // comerciales. Mantener esta proyección separada evita que una frase de un
+  // chat histórico se convierta por accidente en un cobro, visita o cierre.
+  function buildHistoricalContactProfiles(input = {}) {
+    const candidates = Array.isArray(input.candidates) ? input.candidates : [];
+    const byContact = new Map();
+    candidates.filter(candidate => candidate && candidate.status === 'context_approved' && candidate.contact_id).forEach(candidate => {
+      const contactId = String(candidate.contact_id);
+      const profile = byContact.get(contactId) || {
+        contact_id:contactId,
+        schema:'yarbi.historical-contact-context.v1',
+        provenance:'owner_reviewed_historical_context',
+        observations:[],
+        latest_observation_at:0
+      };
+      const observation = {
+        id:String(candidate.id || ''),
+        type:String(candidate.type || 'historical_observation'),
+        service:candidate.service ? String(candidate.service) : null,
+        source_timestamp:timestamp(candidate.source_timestamp) || null,
+        provenance:'owner_reviewed_historical_context',
+        commercial_fact:false
+      };
+      if (!profile.observations.some(item => item.id === observation.id)) profile.observations.push(observation);
+      profile.latest_observation_at = Math.max(profile.latest_observation_at, observation.source_timestamp || 0);
+      byContact.set(contactId, profile);
+    });
+    const profiles = [...byContact.values()].map(profile => ({
+      ...profile,
+      observations:profile.observations.slice(-24),
+      observation_count:profile.observations.length
+    }));
+    return {
+      schema:'yarbi.historical-contact-profiles.v1',
+      profiles,
+      safety:{ requires_owner_review:true, commercial_fact:false, automatic_change:false }
+    };
+  }
+
+  return { reviewHistoricalConversations, reconcileHistoricalCandidates, buildHistoricalContactProfiles, normalizePhone, personKey };
 });
