@@ -34,3 +34,8 @@ test('historical signals are persisted as a local reconciliation queue, never as
   assert.match(memoryCenter, /payment complete|pago completo/i);
   assert.doesNotMatch(memoryCenter, /commercial_status:\s*['"]cerrado/);
 });
+
+test('historical review hands confirmed closures to the existing Movement-to-CRM reconciliation flow', () => {
+  assert.match(memoryCenter, /gfcOpenHistoricalServiceImport/);
+  assert.match(memoryCenter, /cierres ya confirmados en Movimientos/i);
+});

@@ -1089,7 +1089,8 @@
     return '<div class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Conciliación del historial</div>' +
       '<div class="gfc-yarbi-tool-copy">' + pending.length + ' propuesta(s) por conciliar · ' + unmatched.length + ' requieren vincular un contacto CRM · ' + reviewed.length + ' revisada(s). Un mensaje histórico nunca marca por sí solo un pago completo, una visita realizada ni un trabajo terminado.</div>' +
       (cards || '<div class="gfc-yarbi-learning-evidence"><span>Aún no hay propuestas históricas pendientes.</span></div>') +
-      '<div class="gfc-yarbi-safety">Para confirmar un pago se requerirá contrastar Movimientos; para una visita o trabajo, tu confirmación explícita. Esa aplicación comercial se implementará como un paso separado y auditable.</div></div>';
+      '<div class="gfc-yarbi-safety">Para confirmar un pago se requerirá contrastar Movimientos; para una visita o trabajo, tu confirmación explícita. Los cierres ya confirmados en Movimientos usan el flujo histórico existente del CRM, con deduplicación.</div>' +
+      '<div class="gfc-yarbi-training-actions"><button class="gfc-yarbi-secondary" onclick="if(typeof gfcOpenHistoricalServiceImport===\'function\')gfcOpenHistoricalServiceImport();else if(typeof toast===\'function\')toast(\'La integración histórica de Movimientos todavía no está disponible en esta copia.\',\'warning\')">Ver cierres confirmados en Movimientos</button></div></div>';
   }
   function learningHtml() {
     const metrics = learningSnapshot();
