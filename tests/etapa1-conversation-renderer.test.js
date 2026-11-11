@@ -173,3 +173,13 @@ test('chat: el compositor admite varias líneas y conserva Enter para enviar', (
   assert.match(html, /typeof window\.gfcResizeYarbiComposer === 'function'/);
   assert.match(html, /typeof window\.gfcClearYarbiConversationDraft === 'function'/);
 });
+
+test('chat contextual: reutiliza la superficie canónica y no crea un segundo recorrido', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  const start = html.indexOf('const legacyOpen = window.gfcOpenCopilotModal;');
+  const canonical = html.indexOf("legacyOpen('chat', suggestionId);", start);
+  const legacyTemplate = html.indexOf("root.innerHTML='<main class=\"gfc-yarbi-shell\"", start);
+  assert.ok(start >= 0 && canonical > start);
+  assert.ok(legacyTemplate > canonical, 'la plantilla histórica solo queda como fallback sin centro canónico');
+  assert.match(html.slice(start, canonical + 120), /historial,\r?\n    \/\/ borrador, teclado multilínea y el renderer canónico/);
+});

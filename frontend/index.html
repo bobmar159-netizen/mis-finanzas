@@ -47544,6 +47544,32 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
       window._gfcActiveClientName=cleanName(suggestion._geminiNombre || suggestion._contactName || suggestion.title) || '';
     }
     if (tab !== 'chat') return typeof legacyOpen === 'function' ? legacyOpen(tab,suggestionId) : undefined;
+    // El centro de memoria es la única superficie de chat: mantiene historial,
+    // borrador, teclado multilínea y el renderer canónico. Esta capa solo aporta
+    // el contexto CRM y la tarjeta de propuesta cuando corresponde.
+    if (typeof legacyOpen === 'function') {
+      const draft = currentDraft();
+      legacyOpen('chat', suggestionId);
+      window.setTimeout(() => {
+        const chat = document.getElementById('gfc-copilot-chat-messages');
+        const focus = typeof gfcYarbiConversationFocusRead === 'function' ? gfcYarbiConversationFocusRead({allowStale:true}) : null;
+        const focusName = cleanName(focus?.client_name || window._gfcActiveClientName || '');
+        if (draft?.startFresh) {
+          if (chat) chat.dataset.gfcRestored = '1';
+          window.gfcAppendCopilotChatMessage('assistant','Tengo lista una propuesta para '+(draft.clientName || focusName || 'este cliente')+'. Dime cómo quieres mejorarla o pulsa Live para indicármelo por voz.');
+        }
+        if (chat && !chat.children.length) window.gfcAppendCopilotChatMessage('assistant','Hola, ¿en qué te ayudo?');
+        renderDraftCard();
+        if (typeof gfcRefreshYarbiModeUi === 'function') gfcRefreshYarbiModeUi();
+        if (typeof gfcYarbiRefreshClientResolutions === 'function') void gfcYarbiRefreshClientResolutions().catch(()=>{});
+        if (typeof gfcScheduleYarbiOpenRefresh === 'function') gfcScheduleYarbiOpenRefresh();
+        if (draft?.openLive) {
+          draft.openLive = false;
+          window.setTimeout(()=>{ if (!(window._gfcLiveSession?.active || window._gfcLiveSession?.connecting)) gfcStartCopilotVoiceInput(); },180);
+        }
+      }, 0);
+      return;
+    }
     const focus=typeof gfcYarbiConversationFocusRead==='function' ? gfcYarbiConversationFocusRead({allowStale:true}) : null;
     const focusName=cleanName(focus?.client_name || window._gfcActiveClientName || '');
     const focusService=String(focus?.service || currentDraft()?.service || '').trim();
