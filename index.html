@@ -16744,10 +16744,17 @@ function gfcRefreshYarbiConversationFocusUi() {
   const parts = [focus.client_name || ('•••' + focus.phone_last3)];
   if (focus.agenda_kind) parts.push(focus.agenda_kind);
   if (focus.agenda_status) parts.push(focus.agenda_status);
+  const historicalContext = focus.contact_id && typeof window.gfcYarbiHistoricalContactContext === 'function'
+    ? window.gfcYarbiHistoricalContactContext(focus.contact_id)
+    : null;
+  const historicalCount = Array.isArray(historicalContext?.observations) ? historicalContext.observations.length : 0;
+  const historicalHint = historicalCount
+    ? '<small class="gfc-yarbi-focus-history" title="Observaciones históricas aprobadas por ti. No confirman pagos, visitas ni cierres.">🧠 ' + historicalCount + ' observación' + (historicalCount === 1 ? '' : 'es') + ' histórica' + (historicalCount === 1 ? '' : 's') + ' revisada' + (historicalCount === 1 ? '' : 's') + '</small>'
+    : '';
   const prefix = focus.actionable ? 'Hablando de' : 'Contexto anterior';
   root.hidden = false;
-  root.title = [focus.conversation_brief, focus.district, focus.service, focus.operational_status].filter(Boolean).join(' · ');
-  root.innerHTML = '<span><b>' + gfcEscHtml(prefix + ': ') + '</b>' + gfcEscHtml(parts.filter(Boolean).join(' · ')) + '</span><button type="button" onclick="gfcYarbiConversationFocusClear(\'manual\')" aria-label="Dejar este contexto">×</button>';
+  root.title = [focus.conversation_brief, focus.district, focus.service, focus.operational_status, historicalCount ? historicalCount + ' observaciones históricas revisadas' : ''].filter(Boolean).join(' · ');
+  root.innerHTML = '<span><b>' + gfcEscHtml(prefix + ': ') + '</b>' + gfcEscHtml(parts.filter(Boolean).join(' · ')) + historicalHint + '</span><button type="button" onclick="gfcYarbiConversationFocusClear(\'manual\')" aria-label="Dejar este contexto">×</button>';
 }
 
 function gfcYarbiConversationFocusSet(value = {}, source = '') {
@@ -46716,6 +46723,7 @@ body.gfc-agenda-form-screen .gfc-agenda-form-actions{
 .gfc-yarbi-focus{flex:0 0 auto;margin:7px 10px 0;padding:7px 9px;border:1px solid #BAE6FD;border-radius:10px;background:#F0F9FF;color:#075985;font-size:10.5px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .gfc-yarbi-focus[hidden]{display:none}
 .gfc-yarbi-focus button{width:24px;height:24px;flex:0 0 24px;border:0;border-radius:50%;background:#E0F2FE;color:#0369A1;font-weight:900;font-size:16px;line-height:1;cursor:pointer}
+.gfc-yarbi-focus-history{display:inline-block;margin:4px 0 0 5px;padding:3px 6px;border-radius:999px;background:#E0F2FE;color:#0369A1;font-size:9px;font-weight:850;line-height:1.15}
 .gfc-yarbi-day{align-self:center;background:#E2E8F0;color:#64748B;border-radius:999px;padding:4px 11px;font-size:10px;font-weight:800;margin:5px 0 12px}
 .gfc-yarbi-message{max-width:86%;padding:9px 11px 7px;margin-bottom:8px;word-break:break-word;white-space:pre-wrap;box-shadow:0 2px 8px rgba(15,23,42,.06)}
 .gfc-yarbi-message.user{align-self:flex-end;background:#2563EB;color:#fff;border-radius:14px 14px 3px 14px}

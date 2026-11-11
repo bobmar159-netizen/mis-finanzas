@@ -53,3 +53,10 @@ test('historical context requires an explicit owner action and remains separate 
   assert.match(memoryCenter, /commercial_fact:false/);
   assert.match(memoryCenter, /No se modificó ningún dato comercial/);
 });
+
+test('the active client chip distinguishes reviewed historical observations from verified commercial state', () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  assert.match(indexHtml, /gfcYarbiHistoricalContactContext/);
+  assert.match(indexHtml, /No confirman pagos, visitas ni cierres/);
+  assert.match(indexHtml, /gfc-yarbi-focus-history/);
+});

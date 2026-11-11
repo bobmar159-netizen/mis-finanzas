@@ -1177,6 +1177,7 @@
       : item);
     historicalReconciliationSave(next);
     refreshHistoricalContactContext(next);
+    if (typeof window.gfcRefreshYarbiConversationFocusUi === 'function') window.gfcRefreshYarbiConversationFocusUi();
     if (typeof toast === 'function') toast('Contexto histórico guardado para este contacto. No se modificó ningún dato comercial.', 'success');
     if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
   };

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yarbi-static-p02i-5151d01f345c9223';
+const CACHE_NAME = 'yarbi-static-p02i-ef934751fbe783f9';
 const ASSETS = ['./', './index.html', './manifest.json', './runtime-config.js', './yarbi-assistant.js', './yarbi-memory-center.js', './yarbi-owner-inbox-ui.js', './yarbi-avatar-motion.js', './avatar.png', './avatar_circle.png', './mascota.png'];
 const assetUrls = () => new Set(ASSETS.map(asset => new URL(asset, self.registration.scope).href));
 
