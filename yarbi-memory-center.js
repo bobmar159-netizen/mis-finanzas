@@ -2321,15 +2321,57 @@
     const participants = [...totalParticipants.entries()].sort((a,b) => b[1]-a[1]);
     const preferredName = String(window.state?.nombreUsuario || localStorage.getItem('fnz_nombre') || 'Omar');
     const defaultOwner = participants.find(([name]) => normalizePerson(name).includes(normalizePerson(preferredName)))?.[0] || '';
-    window._gfcYarbiImportDraft = { conversations, participants, owner:defaultOwner };
+    window._gfcYarbiImportDraft = { conversations, participants, owner:defaultOwner, review:null };
     const preview = document.getElementById('gfc-yarbi-import-preview');
     if (preview) preview.innerHTML = '<div class="gfc-yarbi-import-summary"><b>Encontré ' + conversations.length + ' chat(s) y ' + conversations.reduce((sum,c) => sum+c.messages.length,0) + ' mensajes.</b><br>Indica cuál participante eres tú. Sin esta selección Yarbi no aprenderá ni importará nada.</div>' +
-      '<label style="display:block;font-size:11px;font-weight:900;color:#334155;margin:10px 0 5px">Yo soy:</label><select id="gfc-yarbi-import-owner" style="width:100%;padding:10px;border:1px solid #CBD5E1;border-radius:10px;background:#fff"><option value="">Selecciona tu nombre…</option>' +
+      '<label style="display:block;font-size:11px;font-weight:900;color:#334155;margin:10px 0 5px">Yo soy:</label><select id="gfc-yarbi-import-owner" onchange="gfcRefreshHistoricalImportReview()" style="width:100%;padding:10px;border:1px solid #CBD5E1;border-radius:10px;background:#fff"><option value="">Selecciona tu nombre…</option>' +
       participants.map(([name,count]) => '<option value="' + esc(name) + '"' + (name === defaultOwner ? ' selected' : '') + '>' + esc(name) + ' · ' + count + ' mensajes</option>').join('') + '</select>' +
-      '<button class="gfc-yarbi-primary" style="width:100%;margin-top:10px" onclick="gfcConfirmMassImport()">Importar y aprender mi estilo</button>';
+      '<div id="gfc-yarbi-import-review" class="gfc-yarbi-import-summary" style="margin-top:10px"></div>' +
+      '<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:#334155;margin-top:10px"><input id="gfc-yarbi-import-review-confirmed" type="checkbox"> <span>Entiendo que Yarbi solo importará chats que coincidan con un contacto CRM ya verificado. Las visitas, trabajos y pagos detectados quedarán como propuestas para revisar: no se modificarán automáticamente CRM, Agenda ni Movimientos.</span></label>' +
+      '<button class="gfc-yarbi-primary" style="width:100%;margin-top:10px" onclick="gfcConfirmMassImport()">Importar chats verificados para revisión</button>';
+    window.gfcRefreshHistoricalImportReview();
     importStatus('Revisión lista. Aún no se subió nada.', 25);
     return { conversations, participants };
   }
+  function historicalImportReviewHtml(review) {
+    const totals = review?.totals || {};
+    const identities = totals.identity || {};
+    const eventTypes = (review?.conversations || []).flatMap(item => item.event_candidates || []).reduce((counts, item) => {
+      counts[item.type] = (counts[item.type] || 0) + 1;
+      return counts;
+    }, {});
+    const labels = { service_mentioned:'servicios mencionados', visit_mentioned:'visitas mencionadas', work_completion_reported:'trabajos reportados como terminados', payment_reported:'pagos o abonos mencionados' };
+    const eventText = Object.entries(eventTypes).map(([type,count]) => count + ' ' + (labels[type] || type)).join(' · ') || 'sin señales comerciales detectadas';
+    return '<b>Revisión histórica antes de importar</b><br>' +
+      '<span>' + Number(totals.owner_messages || 0) + ' mensajes tuyos · ' + Number(totals.reply_pairs || 0) + ' pares posibles para aprender estilo.</span><br>' +
+      '<span>Identidad: ' + Number(identities.candidate_phone_match || 0) + ' con teléfono candidato · ' + Number(identities.needs_contact_match || 0) + ' sin contacto verificable · ' + Number(identities.ambiguous_participants || 0) + ' chats ambiguos.</span><br>' +
+      '<span>Señales a conciliar: ' + esc(eventText) + '.</span><br><small>Estas señales no cambian estados. Un pago debe coincidir con Movimientos y una visita/trabajo requiere confirmación tuya.</small>';
+  }
+  window.gfcRefreshHistoricalImportReview = function() {
+    const draft = window._gfcYarbiImportDraft;
+    const selected = document.getElementById('gfc-yarbi-import-owner')?.value || draft?.owner || '';
+    const target = document.getElementById('gfc-yarbi-import-review');
+    if (!draft?.conversations?.length || !target) return null;
+    if (!selected) {
+      target.textContent = 'Selecciona primero cuál participante eres tú para revisar identidad y aprendizaje.';
+      return null;
+    }
+    const reviewApi = window.gfcYarbiHistoricalLearning;
+    if (!reviewApi?.reviewHistoricalConversations) {
+      target.textContent = 'La revisión local del histórico no está disponible en esta copia.';
+      return null;
+    }
+    try {
+      const review = reviewApi.reviewHistoricalConversations({ conversations:draft.conversations, owner:selected });
+      draft.owner = selected;
+      draft.review = review;
+      target.innerHTML = historicalImportReviewHtml(review);
+      return review;
+    } catch (error) {
+      target.textContent = 'No se pudo preparar la revisión: ' + (error?.message || 'datos incompletos');
+      return null;
+    }
+  };
   window.gfcParsePastedWhatsappConversation = function() {
     const text = String(document.getElementById('gfc-yarbi-import-paste')?.value || '').trim();
     if (text.length < 10) return importStatus('Pega primero una conversación completa.', 0);
@@ -2356,18 +2398,40 @@
       if (typeof toast === 'function') toast('Falta indicar cuál nombre eres tú.', 'warning');
       return;
     }
+    if (!document.getElementById('gfc-yarbi-import-review-confirmed')?.checked) {
+      importStatus('Confirma primero que revisarás las propuestas antes de cambiar datos comerciales.', 25);
+      if (typeof toast === 'function') toast('Falta confirmar la revisión comercial del histórico.', 'warning');
+      return;
+    }
+    const review = window.gfcRefreshHistoricalImportReview();
+    if (!review) return;
     const ownerNorm = normalizePerson(selected);
     const batchId = 'import_' + Date.now().toString(36);
     const records = [];
     let outgoing = 0;
     let incoming = 0;
     let unresolved = 0;
-    draft.conversations.forEach(conversation => {
+    let deferred = 0;
+    const phoneKey = value => String(value || '').replace(/\D/g,'').replace(/^51(?=9\d{8}$)/, '');
+    const [identifiers, contacts] = typeof gfcYarbiLocalRows === 'function'
+      ? await Promise.all([gfcYarbiLocalRows('identifier').catch(() => []), gfcYarbiLocalRows('contact').catch(() => [])])
+      : [[], []];
+    const contactById = new Map((contacts || []).map(row => [String(row.id || ''), row]));
+    const contactByPhone = new Map();
+    (identifiers || []).forEach(row => {
+      if (String(row?.identifier_type || '') !== 'phone') return;
+      const phone = phoneKey(row.normalized_value || row.identifier_value);
+      const contactId = String(row.contact_id || '');
+      if (phone && contactId && contactById.has(contactId) && !contactByPhone.has(phone)) contactByPhone.set(phone, contactId);
+    });
+    draft.conversations.forEach((conversation, conversationIndex) => {
+      const conversationReview = review.conversations[conversationIndex] || {};
       const people = [...new Set(conversation.messages.map(m => m.sender))];
-      const contact = people.find(name => normalizePerson(name) !== ownerNorm) || conversation.name.replace(/\.txt$/i,'').replace(/^Chat de WhatsApp con /i,'').trim();
-      const phoneFrom = [conversation.name, contact, ...people].map(value => (String(value).match(/\+?\d[\d\s-]{7,}/) || [])[0]).find(Boolean);
-      const phone = phoneFrom ? phoneFrom.replace(/\D/g,'').slice(-15) : 'HIST_' + makeId('c', conversation.name + ':' + contact).slice(-10);
-      if (!phoneFrom) unresolved += 1;
+      const contact = conversationReview.counterparty_names?.[0] || people.find(name => normalizePerson(name) !== ownerNorm) || '';
+      const phone = phoneKey(conversationReview.phone_candidate || '');
+      const contactId = conversationReview.identity_state === 'candidate_phone_match' ? contactByPhone.get(phone) : '';
+      if (!contactId) { unresolved += 1; deferred += 1; return; }
+      const crmContact = contactById.get(contactId) || {};
       conversation.messages.forEach(message => {
         const direction = normalizePerson(message.sender) === ownerNorm ? 'outgoing' : 'incoming';
         direction === 'outgoing' ? outgoing += 1 : incoming += 1;
@@ -2375,7 +2439,8 @@
         records.push({
           id:'wa_hist_' + makeId('m', seed).slice(-12),
           phone,
-          title:contact || message.sender || 'Cliente histórico',
+          contact_id:contactId,
+          title:crmContact.display_name || crmContact.full_name || contact || message.sender || 'Cliente histórico',
           text:message.text,
           maps_url:typeof gfcExtractMapsLink === 'function' ? (gfcExtractMapsLink(message.text) || null) : null,
           app_name:'WhatsApp Business',
@@ -2388,12 +2453,20 @@
             conversation_name:conversation.name,
             sender_name:message.sender,
             original_timestamp:new Date(message.timestamp).toISOString(),
-            unresolved_identity:!phoneFrom
+            identity_state:'crm_phone_verified',
+            participant_role:direction === 'outgoing' ? 'owner' : 'customer',
+            historical_review_only:true
           }
         });
       });
     });
-    if (!records.length) return;
+    const eventCandidates = Number(review.totals?.event_candidates || 0);
+    if (!records.length) {
+      writeJson(IMPORT_STATE_KEY, { batchId, imported:0, deferredConversations:deferred, outgoing, incoming, unresolvedConversations:unresolved, eventCandidates, at:Date.now(), owner:selected, status:'needs_contact_matching' });
+      importStatus('No importé chats todavía: ' + deferred + ' conversación(es) requieren coincidir primero con un contacto CRM verificable. No se creó ni modificó ningún contacto.', 100);
+      if (typeof toast === 'function') toast('Historial revisado. Vincula los chats con CRM antes de importarlos.', 'warning');
+      return;
+    }
     importStatus('Importando 0 de ' + records.length + '…', 30);
     let imported = 0;
     try {
@@ -2409,14 +2482,12 @@
         imported += chunk.length;
         importStatus('Importando ' + imported + ' de ' + records.length + '…', 30 + Math.round(imported / records.length * 55));
       }
-      writeJson(IMPORT_STATE_KEY, { batchId, imported, outgoing, incoming, unresolvedConversations:unresolved, at:Date.now(), owner:selected });
-      importStatus('Importados ' + imported + '. Actualizando memoria y estilo…', 90);
-      if (typeof gfcProcessYarbiInformation === 'function') await Promise.resolve(gfcProcessYarbiInformation()).catch(() => {});
-      if (typeof gfcLearnHistoricalReplyStyle === 'function') await Promise.resolve(gfcLearnHistoricalReplyStyle()).catch(() => {});
+      writeJson(IMPORT_STATE_KEY, { batchId, imported, deferredConversations:deferred, outgoing, incoming, unresolvedConversations:unresolved, eventCandidates, at:Date.now(), owner:selected, status:'imported_for_review' });
+      importStatus('Importados ' + imported + ' mensajes de chats CRM verificados. Preparando la copia local…', 90);
       if (typeof gfcSyncYarbiLocalMirror === 'function') await Promise.resolve(gfcSyncYarbiLocalMirror({ reason:'mass-import', backfill:true })).catch(() => {});
       await refreshLearningEvidence().catch(() => {});
-      importStatus('100% · ' + imported + ' mensajes: ' + outgoing + ' tuyos y ' + incoming + ' de clientes. ' + (unresolved ? unresolved + ' chat(s) quedaron sin teléfono verificable.' : 'Todos los chats tienen identidad verificable.'), 100);
-      if (typeof toast === 'function') toast('Historial importado y aprendizaje iniciado.', 'success');
+      importStatus('100% · ' + imported + ' mensajes importados para revisión. ' + eventCandidates + ' señal(es) comercial(es) quedan como propuestas; ' + deferred + ' conversación(es) siguen sin vincular a CRM. El aprendizaje de estilo requiere tu acción explícita.', 100);
+      if (typeof toast === 'function') toast('Historial importado para revisión. No se cambiaron cobros, visitas ni servicios.', 'success');
     } catch (error) {
       importStatus('Se detuvo en ' + imported + ' de ' + records.length + ': ' + (error?.message || 'error desconocido'), Math.round(imported / records.length * 100));
       if (typeof toast === 'function') toast('Importación incompleta. No se reportó éxito falso.', 'error');
