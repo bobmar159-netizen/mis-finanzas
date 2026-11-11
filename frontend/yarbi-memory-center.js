@@ -995,7 +995,7 @@
       '<div id="gfc-yarbi-conversation-focus" class="gfc-yarbi-focus" hidden></div>' + conversation + hiddenTrainingFields +
       '<footer class="gfc-yarbi-composer-wrap">' +
         '<div class="gfc-yarbi-live-state"><span id="gfc-live-status">Gemini Live listo.</span><span id="gfc-ai-process-status">' + (training ? 'Práctica separada de tus datos reales.' : 'Verificando memoria…') + '</span><button id="gfc-ai-process-btn" hidden></button></div>' +
-        '<div class="gfc-yarbi-composer"><input id="gfc-copilot-input-text" type="text" placeholder="' + (training ? 'Habla como cliente, corrige o enseña a Yarbi' : 'Escribe un mensaje…') + '" onkeydown="if(event.key===\'Enter\')gfcSendYarbiUnifiedMessage()">' +
+        '<div class="gfc-yarbi-composer"><textarea id="gfc-copilot-input-text" rows="1" enterkeyhint="send" autocapitalize="sentences" aria-label="Mensaje para Yarbi" placeholder="' + (training ? 'Habla como cliente, corrige o enseña a Yarbi' : 'Escribe un mensaje…') + '" onkeydown="gfcHandleYarbiComposerKeydown(event)" oninput="gfcResizeYarbiComposer(this)"></textarea>' +
         '<button id="gfc-mic-input-btn" class="gfc-yarbi-live-btn" data-live-phase="off" onclick="gfcStartCopilotVoiceInput()" aria-label="Activar conversación por voz"><span class="gfc-live-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="gfc-live-button-label">Live</span></button>' +
         '<button class="gfc-yarbi-send-btn" onclick="gfcSendYarbiUnifiedMessage()">➤</button></div>' +
       '</footer>';
@@ -1439,7 +1439,20 @@
 
   window.gfcYarbiUnifiedQuick = function(text) {
     const field = document.getElementById('gfc-copilot-input-text');
-    if (field) { field.value = String(text || ''); field.focus(); }
+    if (field) { field.value = String(text || ''); window.gfcResizeYarbiComposer(field); field.focus(); }
+  };
+
+  window.gfcResizeYarbiComposer = function(field) {
+    const input = field || document.getElementById('gfc-copilot-input-text');
+    if (!input || String(input.tagName || '').toLowerCase() !== 'textarea') return;
+    input.style.setProperty('height', 'auto', 'important');
+    input.style.setProperty('height', Math.min(Math.max(input.scrollHeight, 46), 132) + 'px', 'important');
+    input.classList.toggle('is-multiline', input.scrollHeight > 50);
+  };
+  window.gfcHandleYarbiComposerKeydown = function(event) {
+    if (!event || event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+    event.preventDefault();
+    window.gfcSendYarbiUnifiedMessage();
   };
 
   window.gfcSendYarbiUnifiedMessage = async function(promptText) {
@@ -1447,7 +1460,7 @@
     const input = document.getElementById('gfc-copilot-input-text');
     const text = String(promptText || input?.value || '').trim();
     if (!text) return;
-    if (input) { input.value = ''; input.focus(); }
+    if (input) { input.value = ''; window.gfcResizeYarbiComposer(input); input.focus(); }
     const session = window._gfcLiveSession || {};
     if (session.active && session.liveReady && session.trainingMode && session.socket?.readyState === WebSocket.OPEN) {
       if (typeof gfcLiveAdvanceTurn === 'function') gfcLiveAdvanceTurn(session, 'training-text');

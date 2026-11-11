@@ -154,3 +154,14 @@ test('Etapa 1.1: conserva la lectura al no estar cerca del final y sigue mensaje
     assert.equal(nearResult.followed, true); assert.equal(near.scrollTop, near.scrollHeight); assert.equal(near.appended, 1);
   } finally { global.document = priorDocument; }
 });
+
+test('chat: el compositor admite varias líneas y conserva Enter para enviar', () => {
+  const memoryCenter = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-memory-center.js'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  assert.match(memoryCenter, /<textarea id="gfc-copilot-input-text"/);
+  assert.match(memoryCenter, /onkeydown="gfcHandleYarbiComposerKeydown\(event\)"/);
+  assert.match(memoryCenter, /event\.key !== 'Enter' \|\| event\.shiftKey \|\| event\.isComposing/);
+  assert.match(memoryCenter, /gfcResizeYarbiComposer/);
+  assert.match(html, /\.gfc-yarbi-composer textarea/);
+  assert.match(html, /typeof window\.gfcResizeYarbiComposer === 'function'/);
+});
