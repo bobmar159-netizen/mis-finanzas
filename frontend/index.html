@@ -10690,6 +10690,19 @@ async function gfcAppendCopilotChatMessage(role, text) {
   return { ok:true, legacy:true };
 }
 const GFC_OWNER_CONVERSATION_TOKEN_KEY = 'gfc_owner_conversation_token_v1';
+function gfcOwnerConversationToken() {
+  try { return localStorage.getItem(GFC_OWNER_CONVERSATION_TOKEN_KEY) || ''; } catch (_) { return ''; }
+}
+function gfcSetOwnerConversationToken(token) {
+  if (typeof token !== 'string' || !token.trim() || token.length > 4096) return false;
+  try { localStorage.setItem(GFC_OWNER_CONVERSATION_TOKEN_KEY, token.trim()); return true; } catch (_) { return false; }
+}
+function gfcClearOwnerConversationToken() {
+  try { localStorage.removeItem(GFC_OWNER_CONVERSATION_TOKEN_KEY); } catch (_) {}
+}
+window.gfcOwnerConversationToken = gfcOwnerConversationToken;
+window.gfcSetOwnerConversationToken = gfcSetOwnerConversationToken;
+window.gfcClearOwnerConversationToken = gfcClearOwnerConversationToken;
 async function gfcCallAuthenticatedOwnerConversation(payload) {
   const contents = payload?.contents || [];
   const current = contents.filter(x => x?.role === 'user').pop()?.parts?.[0]?.text || '';
@@ -10697,11 +10710,11 @@ async function gfcCallAuthenticatedOwnerConversation(payload) {
   if (!token) return { ok:false, status:401, message:'Inicia sesión con el propietario autorizado para conversar con Yarbi.' };
   const response = await fetch(window.gfcRuntimeApiOrigin() + '/api/assistant/conversation', {
     method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
-    body:JSON.stringify({ utterance:current, conversation_token:localStorage.getItem(GFC_OWNER_CONVERSATION_TOKEN_KEY) || '' })
+    body:JSON.stringify({ utterance:current, conversation_token:gfcOwnerConversationToken() })
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok !== true) return { ok:false, status:response.status, message:data.error || 'No se pudo consultar el contexto de Yarbi.' };
-  if (data.conversation_token) localStorage.setItem(GFC_OWNER_CONVERSATION_TOKEN_KEY, data.conversation_token);
+  if (data.conversation_token) gfcSetOwnerConversationToken(data.conversation_token);
   return { ok:true, text:data.reply || 'No tengo una respuesta verificable todavía.', conversation:data };
 }
 async function gfcCallGeminiAPI(_apiKey, payload) {

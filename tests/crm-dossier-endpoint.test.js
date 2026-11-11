@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { readConversationToken } = require('../lib/yarbi-conversation-continuity');
 
 const OWNER_A = '00000000-0000-4000-8000-0000000000a1';
 const ENV = { VERCEL_ENV: 'preview', YARBI_PREVIEW_OWNER_REFERENCES_ONLY: 'true', YARBI_PREVIEW_SUPABASE_PROJECT_REF: 'uevilhbstnmmdlgyshlv', SUPABASE_URL: 'https://uevilhbstnmmdlgyshlv.supabase.co', SUPABASE_SECRET_KEY: 'isolated-service-key-only-for-local-tests-1234567890', YARBI_TRACE_HMAC_KEY: 'trace-hmac-only-for-local-tests-1234567890' };
@@ -29,6 +30,12 @@ test('F02 dossier endpoint authenticates, uses only isolated Supabase reads and 
     const handler = require('../api_handlers/assistant/crm-dossier'); const res = responseBox();
     await handler({ method: 'POST', url: '/api/assistant/crm-dossier', headers: { authorization: 'Bearer local-owner-token' }, body: { contact_id: 101 } }, res);
     assert.equal(res.value.statusCode, 200); assert.equal(res.value.body.ok, true); assert.equal(res.value.body.outcome, 'dossier_found'); assert.equal(res.value.body.execute, false);
+    assert.equal(typeof res.value.body.conversation_token, 'string');
+    const continuity = readConversationToken({ token:res.value.body.conversation_token, ownerId:OWNER_A, secret:ENV.YARBI_TRACE_HMAC_KEY });
+    assert.equal(continuity.ok, true);
+    assert.deepEqual(continuity.state.selected_entity, { contact_id:101 });
+    assert.deepEqual(continuity.candidate_ids, [101]);
+    assert.equal(readConversationToken({ token:res.value.body.conversation_token, ownerId:'00000000-0000-4000-8000-0000000000b2', secret:ENV.YARBI_TRACE_HMAC_KEY }).ok, false);
     assert.equal(calls.every(call => new URL(call.url).hostname === 'uevilhbstnmmdlgyshlv.supabase.co'), true);
     const writes = calls.filter(call => call.method !== 'GET' && !call.url.includes('yarbi_agent_actions'));
     assert.deepEqual(writes, []);

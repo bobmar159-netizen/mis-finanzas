@@ -99,7 +99,7 @@
       const payload=await response.json().catch(()=>({}));
       if(!response.ok||payload.ok!==true) return {reason:payload.error==='owner_reference_unauthorized'?'session_required':'crm_unavailable'};
       if(payload.outcome!=='dossier_found'||!payload.dossier) return {reason:payload.outcome||'crm_unavailable'};
-      return {reason:'ok',dossier:payload.dossier,activities:payload.activities||null,finance:payload.finance||null,timeline:Array.isArray(payload.timeline)?payload.timeline:[]};
+      return {reason:'ok',dossier:payload.dossier,activities:payload.activities||null,finance:payload.finance||null,timeline:Array.isArray(payload.timeline)?payload.timeline:[],conversationToken:typeof payload.conversation_token==='string'?payload.conversation_token:''};
     } catch (_) { return {reason:'crm_unavailable'}; }
   }
   function style() {
@@ -161,6 +161,10 @@
     root.querySelector('.gfc-pc-close').onclick=()=>root.remove(); root.addEventListener('click',event=>{if(event.target===root)root.remove();});
     loadDossier(id).then(result=>{
       const panel=root.querySelector('.gfc-pc-panel'); if(!panel||result.reason!=='ok'){ if(panel) panel.innerHTML='<button class="gfc-pc-close" aria-label="Cerrar">×</button><p>'+(result.reason==='session_required'?'Inicia sesión con el propietario autorizado para abrir el expediente.':'No se pudo abrir el expediente CRM. No se utilizó otro entorno.')+'</p>'; panel?.querySelector('.gfc-pc-close')?.addEventListener('click',()=>root.remove()); return; }
+      // El token solo procede de un expediente que el servidor ya autorizó para
+      // este propietario. No se construye a partir del contacto del DOM.
+      if(result.conversationToken&&typeof window.gfcSetOwnerConversationToken==='function') window.gfcSetOwnerConversationToken(result.conversationToken);
+      if(typeof window.gfcYarbiConversationFocusSet==='function') window.gfcYarbiConversationFocusSet({contact_id:id,client_name:result.dossier.client_name||'',confirmed:true},'crm-dossier-authorized');
       panel.innerHTML='<button class="gfc-pc-close" aria-label="Cerrar">×</button>'+dossierMarkup(result); panel.querySelector('.gfc-pc-close').onclick=()=>root.remove(); panel.querySelector('.gfc-pc-dossier-back').onclick=()=>{root.remove();open();};
     });
   };

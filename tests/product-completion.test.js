@@ -104,6 +104,9 @@ test('product: visible UI reuses instruction/training entrypoints and uses the a
   assert.match(ui,/\/api\/assistant\/crm-search/);
   assert.match(ui,/\/api\/assistant\/crm-dossier/);
   assert.match(ui,/gfcOpenYarbiCrmDossier/);
+  assert.match(ui,/conversationToken/);
+  assert.match(ui,/gfcSetOwnerConversationToken/);
+  assert.match(ui,/crm-dossier-authorized/);
   assert.match(ui,/gfcAccountAccessToken/);
   assert.doesNotMatch(ui,/misfinanzas-backend\.vercel\.app/);
 });
