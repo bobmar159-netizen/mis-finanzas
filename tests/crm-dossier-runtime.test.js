@@ -33,6 +33,8 @@ test('F02 dossier is built from canonical owner scope with a bounded chronologic
   assert.equal(result.dossier.client_name, 'F02 Cliente Sintético');
   assert.equal(result.dossier.phone, '900000101');
   assert.equal(result.timeline.length, 4);
+  assert.equal(result.timeline_meta.schema, 'yarbi.business-timeline.v1');
+  assert.ok(result.timeline.every(event => event.source?.id));
   assert.equal(result.activities.schema, 'yarbi.agenda-summary.v1');
   assert.equal(result.activities.activities.length, 1);
   assert.equal(result.finance.schema, 'yarbi.finance-context.v1');
