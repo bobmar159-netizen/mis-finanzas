@@ -20602,6 +20602,18 @@ async function gfcSendCopilotChatMessage(promptText) {
   }
   if (typeof window.gfcClearYarbiConversationDraft === 'function') window.gfcClearYarbiConversationDraft();
 
+  // Solo una solicitud explícita a la biblioteca usa citas locales aprobadas.
+  // No requieren Gemini ni activan ninguna acción comercial.
+  const knowledgeReply = typeof window.gfcYarbiKnowledgeAnswer === 'function'
+    ? await window.gfcYarbiKnowledgeAnswer(text)
+    : null;
+  if (knowledgeReply?.handled) {
+    await gfcAppendCopilotChatMessage('assistant', knowledgeReply.reply);
+    if (window._gfcMascot) window._gfcMascot.setState('reposo', knowledgeReply.reply);
+    gfcSpeakText(knowledgeReply.reply);
+    return;
+  }
+
   const localCommand = await gfcHandleYarbiLocalCommand(text, { source:'yarbi_chat', speak:true });
   if (localCommand?.handled) {
     if (localCommand.reply && !localCommand.record) {

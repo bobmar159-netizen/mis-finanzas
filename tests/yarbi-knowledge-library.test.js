@@ -26,6 +26,23 @@ test('BKE local: devuelve solo citas de fuentes aprobadas y no inventa coinciden
   assert.deepEqual(library.searchSources(sources, 'norma inexistente'), []);
 });
 
+test('BKE local: solo intercepta una petición explícita a la biblioteca', () => {
+  assert.equal(library.requestedLibraryQuery('¿Qué tengo mañana?'), '');
+  assert.equal(library.requestedLibraryQuery('Busca en mi biblioteca confirmar visita'), 'confirmar visita');
+  assert.equal(library.requestedLibraryQuery('Según mis fuentes guardadas, ¿qué dice sobre pagos?'), 'pagos?');
+});
+
+test('BKE local: responde con citas literales y procedencia, no con una conclusión inventada', () => {
+  const reply = library.answerFromResults('confirmar visita', [{
+    sourceTitle:'Procedimiento de visitas', sectionLabel:'Fragmento 1', sourceHash:'a'.repeat(64),
+    excerpt:'Confirmar la visita antes de salir.', hits:['confirmar', 'visita']
+  }]);
+  assert.match(reply, /coincidencias literales/i);
+  assert.match(reply, /Procedimiento de visitas/);
+  assert.match(reply, /Fragmento 1/);
+  assert.match(reply, /No son una interpretación automática/i);
+});
+
 test('BKE local: la interfaz exige revisión y no anuncia procesamiento de formatos no soportados', () => {
   assert.match(library.html(), /Revisa el contenido antes de aprobarlo/i);
   assert.match(source, /Borrador: requiere aprobación explícita/);
@@ -40,4 +57,10 @@ test('BKE local: el centro de Yarbi abre la biblioteca sin convertirla en una ru
   assert.match(center, /gfcOpenCopilotModal\([^\n]{0,12}knowledge/);
   assert.match(center, /gfcYarbiKnowledgeHtml/);
   assert.match(center, /gfcYarbiKnowledgeAttach/);
+});
+
+test('BKE local: el chat solo conecta la biblioteca de forma explícita y sin Gemini', () => {
+  const frontend = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  assert.match(frontend, /gfcYarbiKnowledgeAnswer/);
+  assert.match(frontend, /No requieren Gemini ni activan ninguna acción comercial/);
 });

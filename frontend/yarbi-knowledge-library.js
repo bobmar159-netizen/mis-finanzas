@@ -11,6 +11,7 @@
     root.gfcYarbiKnowledgeSearch = api.searchFromUi;
     root.gfcYarbiKnowledgeSetStatus = api.setStatus;
     root.gfcYarbiKnowledgeDelete = api.remove;
+    root.gfcYarbiKnowledgeAnswer = api.answer;
   }
 }(typeof window === 'undefined' ? null : window, function () {
   'use strict';
@@ -78,6 +79,25 @@
       });
     });
     return rows.sort((left, right) => right.score - left.score || left.sourceTitle.localeCompare(right.sourceTitle, 'es-PE')).slice(0, 12);
+  }
+  function requestedLibraryQuery(value) {
+    const text = cleanText(value);
+    const folded = normalized(text);
+    if (!/\b(?:(?:mi|mis)\s+)?(?:biblioteca|fuentes?\s+guardadas?|documentos?\s+guardados?)\b/.test(folded)) return '';
+    const query = text
+      .replace(/^(?:por favor\s+)?(?:busca|buscar|consulta|revisa|dime|muestrame|muéstrame|que dice|qué dice)\s+(?:en\s+)?(?:(?:mi|mis)\s+)?(?:biblioteca|fuentes?|documentos?)(?:\s+(?:guardadas?|guardados?))?(?:\s+(?:sobre|de))?\s*/i, '')
+      .replace(/^(?:segun|según)\s+(?:(?:mi|mis)\s+)?(?:biblioteca|fuentes?|documentos?)(?:\s+(?:guardadas?|guardados?))?\s*,?\s*(?:¿?qué\s+dice\s+)?(?:sobre|de)?\s*/i, '')
+      .trim();
+    return tokens(query).length ? query : '';
+  }
+  function answerFromResults(query, results) {
+    const rows = Array.isArray(results) ? results.slice(0, 3) : [];
+    if (!rows.length) {
+      return '## 📚 Biblioteca local\n\nNo encontré una cita aprobada sobre **' + cleanText(query) + '**. No inventaré una norma, una página ni una conclusión documental. Puedes revisar o aprobar una fuente en **Funciones de Yarbi → Conocimiento**.';
+    }
+    return '## 📚 Citas de tu biblioteca\n\nEstas son **coincidencias literales** de fuentes locales aprobadas; no son una interpretación automática.\n\n' + rows.map(row =>
+      '**' + cleanText(row.sourceTitle) + ' · ' + cleanText(row.sectionLabel) + '**\n> ' + cleanText(row.excerpt) + '\n\n_Coincidencias: ' + (Array.isArray(row.hits) ? row.hits.join(', ') : '') + ' · SHA-256 ' + cleanText(String(row.sourceHash || '').slice(0, 12)) + '…_'
+    ).join('\n\n');
   }
   async function sha256(text) {
     if (!root?.crypto?.subtle || typeof TextEncoder === 'undefined') throw new Error('hashing_unavailable');
@@ -227,10 +247,22 @@
       return results;
     } catch (_) { target.innerHTML = '<p>No pude consultar la biblioteca local.</p>'; return []; }
   }
+  async function answer(value) {
+    const query = requestedLibraryQuery(value);
+    if (!query) {
+      const askedForLibrary = /\b(?:(?:mi|mis)\s+)?(?:biblioteca|fuentes?\s+guardadas?|documentos?\s+guardados?)\b/.test(normalized(value));
+      return askedForLibrary ? { handled:true, reply:'## 📚 Biblioteca local\n\nDime qué tema quieres buscar en tus fuentes aprobadas. Por ejemplo: **“Busca en mi biblioteca el procedimiento de visitas”**.' } : { handled:false };
+    }
+    try {
+      return { handled:true, reply:answerFromResults(query, searchSources(await list(), query)) };
+    } catch (_) {
+      return { handled:true, reply:'## 📚 Biblioteca local\n\nNo puedo abrir la biblioteca local en este dispositivo. No consulté ningún servicio externo ni inventé una respuesta documental.' };
+    }
+  }
   function attach() {
     renderList();
     const query = root?.document?.getElementById('gfc-knowledge-query');
     query?.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); searchFromUi(); } });
   }
-  return Object.freeze({ normalize:normalized, extractSections, searchSources, createTextSource, html, attach, importText, importFile, setStatus, remove, searchFromUi, list });
+  return Object.freeze({ normalize:normalized, extractSections, searchSources, requestedLibraryQuery, answerFromResults, createTextSource, html, attach, importText, importFile, setStatus, remove, searchFromUi, answer, list });
 }));
