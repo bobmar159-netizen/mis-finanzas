@@ -130,7 +130,7 @@
   function open() {
     style(); document.querySelector('.gfc-pc-shade')?.remove();
     const root=document.createElement('div'); root.className='gfc-pc-shade';
-    root.innerHTML='<section class="gfc-pc-panel" role="dialog" aria-label="Funciones de Yarbi"><button class="gfc-pc-close" aria-label="Cerrar">×</button><h2>Funciones de Yarbi</h2><p>Consulta CRM con tu sesión autenticada y accede a herramientas ya disponibles. Esta pantalla no envía mensajes ni ejecuta acciones comerciales.</p><div class="gfc-pc-grid"><button data-open="orders">Instrucciones guardadas</button><button data-open="learning">Entrenar Yarbi</button><button data-open="memory">Memoria operativa</button><button data-open="personal">WhatsApp personal · prueba</button></div><label><b>Buscar clientes</b><span style="display:block;color:#667085;font-size:12px;margin-top:3px">Nombre, teléfono, distrito, servicio, historial o estado.</span></label><div class="gfc-pc-search"><input data-query autocomplete="off" placeholder="Ej. reparación en Comas"><button data-search>Buscar</button></div><div data-results><p>La búsqueda respeta el propietario autenticado y nunca usa un fallback de producción.</p></div></section>';
+    root.innerHTML='<section class="gfc-pc-panel" role="dialog" aria-label="Funciones de Yarbi"><button class="gfc-pc-close" aria-label="Cerrar">×</button><h2>Funciones de Yarbi</h2><p>Consulta CRM con tu sesión autenticada y accede a herramientas ya disponibles. Esta pantalla no envía mensajes ni ejecuta acciones comerciales.</p><div class="gfc-pc-grid"><button data-open="finance">Resumen financiero</button><button data-open="orders">Instrucciones guardadas</button><button data-open="learning">Entrenar Yarbi</button><button data-open="memory">Memoria operativa</button><button data-open="personal">WhatsApp personal · prueba</button></div><label><b>Buscar clientes</b><span style="display:block;color:#667085;font-size:12px;margin-top:3px">Nombre, teléfono, distrito, servicio, historial o estado.</span></label><div class="gfc-pc-search"><input data-query autocomplete="off" placeholder="Ej. reparación en Comas"><button data-search>Buscar</button></div><div data-results><p>La búsqueda respeta el propietario autenticado y nunca usa un fallback de producción.</p></div></section>';
     document.body.appendChild(root);
     root.querySelector('.gfc-pc-close').onclick=()=>root.remove();
     root.addEventListener('click', event=>{ if(event.target===root) root.remove(); });
@@ -139,6 +139,7 @@
     root.querySelector('[data-query]').addEventListener('keydown', event=>{ if(event.key==='Enter') runSearch(); });
     root.querySelectorAll('[data-open]').forEach(button=>button.onclick=()=>{
       const target=button.dataset.open; root.remove();
+      if(target==='finance') return window.gfcOpenFinancialCoach?.();
       if(target==='orders') return window.gfcOpenCopilotModal?.('ordenes');
       if(target==='learning') return window.gfcOpenCopilotModal?.('learning');
       if(target==='memory') return window.gfcOpenCopilotModal?.('tools');

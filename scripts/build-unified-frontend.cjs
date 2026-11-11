@@ -6,6 +6,7 @@ const path = require('path');
 
 const repo = path.resolve(__dirname, '..');
 const frontend = path.join(repo, 'frontend');
+const financialCoach = path.join(repo, 'lib', 'yarbi-financial-coach.js');
 const args = new Map(process.argv.slice(2).map(value => {
   const [key, ...rest] = value.split('=');
   return [key, rest.join('=') || true];
@@ -34,7 +35,9 @@ function copyTree(from, to) {
   }
 }
 function sourceDigest() {
-  return sha(walk(frontend).sort().map(file => `${path.relative(frontend, file).replace(/\\/g, '/')}\t${sha(fs.readFileSync(file))}`).join('\n'));
+  const frontendFiles = walk(frontend).sort().map(file => `frontend/${path.relative(frontend, file).replace(/\\/g, '/')}` + '\t' + sha(fs.readFileSync(file)));
+  if (!fs.existsSync(financialCoach)) fail('falta el módulo compartido yarbi-financial-coach.js.');
+  return sha([...frontendFiles, 'lib/yarbi-financial-coach.js\t' + sha(fs.readFileSync(financialCoach))].join('\n'));
 }
 function validateOrigin(value) {
   let parsed;
@@ -89,6 +92,9 @@ const nativeAuthCallbackScheme = target === 'android'
   : 'com.misfinanzas.app';
 fs.mkdirSync(out, { recursive: true });
 copyTree(frontend, out);
+// Financial Coach is a shared deterministic domain module, emitted verbatim
+// for the browser rather than duplicated in the frontend source tree.
+fs.copyFileSync(financialCoach, path.join(out, 'yarbi-financial-coach.js'));
 renderTemplate(path.join(out, 'runtime-config.js'), {
   '__YARBI_API_ORIGIN__': apiOrigin,
   '__YARBI_ENVIRONMENT__': target,
