@@ -5131,6 +5131,55 @@ const pendingServices=()=>state.servicios.filter(s=>!s.pagado);
 const totalPendingServices=()=>pendingServices().reduce((s,sv)=>s+sv.monto,0);
 const motivationMsg=(r,n)=>r===0?`🎉 ¡Terminaste de pagar ${n}!`:r===1?'🏁 ¡Una cuota más y listo!':r<=3?`🔥 ¡Solo ${r} cuotas más!`:r<=6?`💪 ¡Vas muy bien! Menos de ${r} meses.`:null;
 
+// Snapshot local para la lectura financiera de Yarbi. No es una sincronización,
+// no sale del dispositivo y no convierte cotizaciones o cuentas por cobrar en
+// caja. El modelo compartido decide qué registros son válidos para el resumen.
+const GFC_FINANCIAL_COACH_POLICY_KEY='fnz_financial_coach_policy_v1';
+function gfcFinancialCoachPolicy(){
+  let saved={};
+  try { saved=JSON.parse(localStorage.getItem(GFC_FINANCIAL_COACH_POLICY_KEY)||'{}')||{}; } catch (_) { saved={}; }
+  const raw=Number(saved.daily_free_cash_goal);
+  const dailyGoal=Number.isFinite(raw)&&raw>0&&raw<=1000000?Math.round(raw*100)/100:500;
+  return {currency:state.moneda||'PEN',daily_free_cash_goal:dailyGoal};
+}
+window.gfcSetFinancialCoachDailyGoal=function(value){
+  const raw=typeof value==='string'?value.trim().replace(',','.'):value;
+  const goal=Number(raw);
+  if(!Number.isFinite(goal)||goal<=0||goal>1000000) return {ok:false,code:'financial_goal_invalid'};
+  const rounded=Math.round(goal*100)/100;
+  if(!window.confirm('Cambiar la meta diaria de caja libre a S/ '+rounded.toFixed(2)+'? Esto no modifica movimientos, deudas ni cobros.')) return {ok:false,code:'financial_goal_cancelled'};
+  try { localStorage.setItem(GFC_FINANCIAL_COACH_POLICY_KEY,JSON.stringify({daily_free_cash_goal:rounded,updated_at:new Date().toISOString()})); }
+  catch (_) { return {ok:false,code:'financial_goal_storage_unavailable'}; }
+  return {ok:true,daily_free_cash_goal:rounded};
+};
+window.gfcGetFinancialCoachInput=function(){
+  const businessKeys=getKeys('negocio');
+  const transactions=state.modo==='negocio'?(state.transactions||[]):load(businessKeys.tx,[]);
+  const debts=state.modo==='negocio'?(state.deudas||[]):load(businessKeys.deudas,[]);
+  const remaining=row=>Math.max(0,(Number(row?.cuotasTotales)||0)-(Number(row?.cuotasPagadas)||0))*Math.max(0,moneyValue(row?.cuotaMonto));
+  return {
+    transactions:transactions.map(row=>({...row,business:true,noCashFlow:!isCashFlowTx(row)})),
+    receivables:debts.filter(deudaEsPorCobrar).map(row=>({id:row.id,name:row.nombre||row.name||row.cliente||'',balance_amount:remaining(row),status:row.estado||'pending'})),
+    commitments:debts.filter(row=>!deudaEsPorCobrar(row)).map(row=>({id:row.id,amount:remaining(row),next_due_amount:row.cuotaMonto === undefined || row.cuotaMonto === null || row.cuotaMonto === '' ? null : moneyValue(row.cuotaMonto),due_at:row.proximoPago||row.proximo_pago||row.fechaVencimiento||row.vencimiento||null,paid:remaining(row)===0,status:row.estado||'pending'})),
+    policy:gfcFinancialCoachPolicy()
+  };
+};
+
+// Agenda local entregada como una instantánea de solo lectura. Las consultas
+// conversacionales no crean, reprograman ni cierran actividades.
+window.gfcGetAgendaReadInput=function(){
+  const toStartAt=row=>{
+    const day=String(row?.fecha||row?.date||'').trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+    const time=/^\d{2}:\d{2}$/.test(String(row?.hora||row?.time||''))?String(row.hora||row.time):'09:00';
+    return day+'T'+time+':00-05:00';
+  };
+  return { now:Date.now(), events:(state.agenda||[]).map(row=>({
+    id:row.id,contact_id:row.contact_id||null,client_name:row.cliente||row.client||'',event_type:row.tipo||row.type||'visita',service:row.servicio||row.service||'',
+    status:row.estado||row.status||'',starts_at:toStartAt(row),location:row.ubicacion||row.location||'',source:row.source||'local_agenda',dedupe_key:row.dedupe_key||null
+  })) };
+};
+
 function circleProgress(pct,size,stroke,color,labelHtml){
   const r=(size-stroke*2)/2,circ=2*Math.PI*r,offset=circ*(1-pct/100);
   return `<div class="circle-wrap" style="width:${size}px;height:${size}px">
@@ -10690,6 +10739,19 @@ async function gfcAppendCopilotChatMessage(role, text) {
   return { ok:true, legacy:true };
 }
 const GFC_OWNER_CONVERSATION_TOKEN_KEY = 'gfc_owner_conversation_token_v1';
+function gfcOwnerConversationToken() {
+  try { return localStorage.getItem(GFC_OWNER_CONVERSATION_TOKEN_KEY) || ''; } catch (_) { return ''; }
+}
+function gfcSetOwnerConversationToken(token) {
+  if (typeof token !== 'string' || !token.trim() || token.length > 4096) return false;
+  try { localStorage.setItem(GFC_OWNER_CONVERSATION_TOKEN_KEY, token.trim()); return true; } catch (_) { return false; }
+}
+function gfcClearOwnerConversationToken() {
+  try { localStorage.removeItem(GFC_OWNER_CONVERSATION_TOKEN_KEY); } catch (_) {}
+}
+window.gfcOwnerConversationToken = gfcOwnerConversationToken;
+window.gfcSetOwnerConversationToken = gfcSetOwnerConversationToken;
+window.gfcClearOwnerConversationToken = gfcClearOwnerConversationToken;
 async function gfcCallAuthenticatedOwnerConversation(payload) {
   const contents = payload?.contents || [];
   const current = contents.filter(x => x?.role === 'user').pop()?.parts?.[0]?.text || '';
@@ -10697,11 +10759,11 @@ async function gfcCallAuthenticatedOwnerConversation(payload) {
   if (!token) return { ok:false, status:401, message:'Inicia sesión con el propietario autorizado para conversar con Yarbi.' };
   const response = await fetch(window.gfcRuntimeApiOrigin() + '/api/assistant/conversation', {
     method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
-    body:JSON.stringify({ utterance:current, conversation_token:localStorage.getItem(GFC_OWNER_CONVERSATION_TOKEN_KEY) || '' })
+    body:JSON.stringify({ utterance:current, conversation_token:gfcOwnerConversationToken() })
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok !== true) return { ok:false, status:response.status, message:data.error || 'No se pudo consultar el contexto de Yarbi.' };
-  if (data.conversation_token) localStorage.setItem(GFC_OWNER_CONVERSATION_TOKEN_KEY, data.conversation_token);
+  if (data.conversation_token) gfcSetOwnerConversationToken(data.conversation_token);
   return { ok:true, text:data.reply || 'No tengo una respuesta verificable todavía.', conversation:data };
 }
 async function gfcCallGeminiAPI(_apiKey, payload) {
@@ -11964,7 +12026,9 @@ const GFC_ACCOUNT_ACCESS_KEY = 'gfc_supabase_access_token_v1';
 const GFC_ACCOUNT_REFRESH_KEY = 'gfc_supabase_refresh_token_v1';
 const GFC_ACCOUNT_EMAIL_KEY = 'gfc_supabase_email_v1';
 const GFC_ACCOUNT_USER_KEY = 'gfc_supabase_user_id_v1';
-const GFC_ACCOUNT_REDIRECT_URI = window.gfcRuntimeApiOrigin() + '/api/assistant/preferences?action=auth-callback';
+function gfcAccountRedirectUri() {
+  return window.gfcRuntimeApiOrigin() + '/api/assistant/preferences?action=auth-callback';
+}
 const GFC_ACCOUNT_STATUS_KEY = 'gfc_supabase_account_status_v1';
 async function gfcSupabaseAuthConfig() {
   const response = await fetch(window.gfcRuntimeApiOrigin() + '/api/assistant/preferences?action=auth-config', { cache: 'no-store' });
@@ -12261,7 +12325,7 @@ async function gfcAccountRequestCode() {
   const email = String(document.getElementById('yarbi-account-email')?.value || '').trim().toLowerCase();
   if (!/^\S+@\S+\.\S+$/.test(email)) return gfcAccountSetStatus('Escribe un correo válido.', 'error');
   try {
-    await gfcSupabaseAuthRequest('otp', { email, create_user: true, redirect_to: GFC_ACCOUNT_REDIRECT_URI });
+    await gfcSupabaseAuthRequest('otp', { email, create_user: true, redirect_to: gfcAccountRedirectUri() });
     localStorage.setItem(GFC_ACCOUNT_EMAIL_KEY, email);
     gfcAccountSetStatus('Enlace enviado. Ábrelo desde el mismo celular para activar Yarbi.', 'success');
   } catch (error) {
@@ -12309,7 +12373,10 @@ function gfcAccountHandleSupabaseDeepLink(rawUrl) {
 window.gfcHandleSupabaseDeepLink = gfcAccountHandleSupabaseDeepLink;
 function gfcAccountReceiveNativeDeepLink(rawUrl) {
   const url = String(rawUrl || '');
-  if (!url || !url.startsWith('com.misfinanzas.app://auth/callback')) return false;
+  const expectedPrefix = typeof window.gfcRuntimeNativeAuthCallbackPrefix === 'function'
+    ? window.gfcRuntimeNativeAuthCallbackPrefix()
+    : 'com.misfinanzas.app://auth/callback';
+  if (!url || !url.startsWith(expectedPrefix)) return false;
   if (window._gfcLastAccountDeepLink === url) return true;
   window._gfcLastAccountDeepLink = url;
   return gfcAccountHandleSupabaseDeepLink(url);
@@ -15705,8 +15772,12 @@ async function gfcFindWhatsappClient(args = {}) {
   return result;
 }
 // Réplica local privada de Yarbi: acelera lecturas, pero Supabase conserva la verdad.
-const GFC_YARBI_LOCAL_MIRROR_ENDPOINT = window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?action=local-sync';
-const GFC_YARBI_HABITS_ENDPOINT = window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?action=habits';
+function gfcYarbiLocalMirrorEndpoint() {
+  return window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?action=local-sync';
+}
+function gfcYarbiHabitsEndpoint() {
+  return window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?action=habits';
+}
 const GFC_YARBI_LOCAL_DB = 'gfc_yarbi_local_mirror_v1';
 // La nube es la verdad; 45 s evita que un mensaje reciente quede oculto detrás
 // de una réplica considerada "fresca" durante cinco minutos.
@@ -16073,6 +16144,7 @@ async function gfcYarbiLocalApply(payload, reason) {
     ['memory', entities.memories || [], row => row.contact_id], ['agenda', entities.agenda || [], row => row.id],
     ['alert', entities.alerts || [], row => row.id], ['analysis', entities.analyses || [], row => row.id],
     ['observation', entities.observations || [], row => row.id],
+    ['receivable', entities.receivables || [], row => row.id],
     ['habit', entities.habits || [], row => row.id],
     ['reply_style', entities.reply_styles || [], row => row.id],
     ['message', payload?.messages || [], row => row.id]
@@ -16088,7 +16160,7 @@ async function gfcYarbiLocalApply(payload, reason) {
     else if (reason === 'history-backfill') meta.put({ key: 'history_before', value: null });
     tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error || new Error('No se pudo guardar la réplica local'));
   });
-  window._gfcYarbiLocalMirrorDiagnostic = { at: new Date().toISOString(), reason: reason || 'background', contacts: (entities.contacts || []).length, memories: (entities.memories || []).length, agenda: (entities.agenda || []).length, observations: (entities.observations || []).length, habits: (entities.habits || []).length, replyStyles: (entities.reply_styles || []).length, messages: (payload?.messages || []).length, deletedMessages: (payload?.deleted_message_ids || []).length, cursors: payload?.cursors || {} };
+  window._gfcYarbiLocalMirrorDiagnostic = { at: new Date().toISOString(), reason: reason || 'background', contacts: (entities.contacts || []).length, memories: (entities.memories || []).length, agenda: (entities.agenda || []).length, observations: (entities.observations || []).length, receivables: (entities.receivables || []).length, habits: (entities.habits || []).length, replyStyles: (entities.reply_styles || []).length, messages: (payload?.messages || []).length, deletedMessages: (payload?.deleted_message_ids || []).length, cursors: payload?.cursors || {} };
 }
 async function gfcYarbiLocalFresh() {
   const at = await gfcYarbiLocalGetMeta('last_sync_at');
@@ -16113,14 +16185,14 @@ async function gfcSyncYarbiLocalMirror(options = {}) {
     const [entityCursor, messageCursor, deletionCursor, savedHistoryCursor] = await Promise.all([gfcYarbiLocalGetMeta('entity_cursor'), gfcYarbiLocalGetMeta('message_cursor'), gfcYarbiLocalGetMeta('deletion_cursor'), gfcYarbiLocalGetMeta('history_before')]);
     const body = { entity_cursor: entityCursor || null, message_cursor: messageCursor || null, deletion_cursor: deletionCursor || null, message_limit: 200, entity_limit: 400 };
     if (options.historyBefore) body.history_before = options.historyBefore;
-    const response = await fetch(GFC_YARBI_LOCAL_MIRROR_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token }, body: JSON.stringify(body) });
+    const response = await fetch(gfcYarbiLocalMirrorEndpoint(), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token }, body: JSON.stringify(body) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) { const message = data.detail || data.error || 'No se pudo sincronizar la réplica local'; gfcYarbiLocalStatusWrite({ status: 'error', reason: options.reason || 'background', http: response.status, last_error: message }); throw new Error(message); }
     await gfcYarbiLocalApply(data, options.reason || 'background');
-    const stored = await Promise.all(['message', 'contact', 'memory', 'agenda', 'analysis', 'observation', 'habit', 'reply_style'].map(async kind => [kind, (await gfcYarbiLocalRows(kind)).length]));
+    const stored = await Promise.all(['message', 'contact', 'memory', 'agenda', 'analysis', 'observation', 'receivable', 'habit', 'reply_style'].map(async kind => [kind, (await gfcYarbiLocalRows(kind)).length]));
     const storedCounts = Object.fromEntries(stored);
-    gfcYarbiLocalStatusWrite({ status: data.has_more_history ? 'backfilling' : 'synced', reason: options.reason || 'background', http: response.status, last_sync_at: data.server_time || new Date().toISOString(), last_error: '', received: { messages: (data.messages || []).length, contacts: (data.entities?.contacts || []).length, memories: (data.entities?.memories || []).length, observations: (data.entities?.observations || []).length, reply_styles: (data.entities?.reply_styles || []).length }, stored: storedCounts, has_more_history: !!data.has_more_history });
-    gfcChatDiag('yarbi-local-mirror-sync', { reason: options.reason || 'background', messages: (data.messages || []).length, contacts: (data.entities?.contacts || []).length, memories: (data.entities?.memories || []).length, stored: storedCounts, hasMoreHistory: !!data.has_more_history });
+    gfcYarbiLocalStatusWrite({ status: data.has_more_history ? 'backfilling' : 'synced', reason: options.reason || 'background', http: response.status, last_sync_at: data.server_time || new Date().toISOString(), last_error: '', received: { messages: (data.messages || []).length, contacts: (data.entities?.contacts || []).length, memories: (data.entities?.memories || []).length, observations: (data.entities?.observations || []).length, receivables: (data.entities?.receivables || []).length, reply_styles: (data.entities?.reply_styles || []).length }, stored: storedCounts, has_more_history: !!data.has_more_history });
+    gfcChatDiag('yarbi-local-mirror-sync', { reason: options.reason || 'background', messages: (data.messages || []).length, contacts: (data.entities?.contacts || []).length, memories: (data.entities?.memories || []).length, receivables: (data.entities?.receivables || []).length, stored: storedCounts, hasMoreHistory: !!data.has_more_history });
     await gfcYarbiApplyCanonicalInsights().catch(error => gfcChatDiag('yarbi-local-insights-error', { message: error?.message || String(error) }));
     await gfcRefreshConversationInbox({ reason: options.reason || 'background' }).catch(error => gfcChatDiag('yarbi-conversation-inbox-error', { message: error?.message || String(error) }));
     if (window._gfcPendingYarbiForm && document.getElementById('ag-cliente')) {
@@ -17040,7 +17112,7 @@ async function gfcYarbiLocalFindMemory(args = {}) {
     void gfcYarbiLocalEnsureFresh('memory-query-background').catch(() => null);
   }
   if (!freshness.fresh && !freshness.at) return null;
-  const [contacts, identifiers, memories, agenda, alerts, observations, replyStyles, analyses, messages] = await Promise.all(['contact', 'identifier', 'memory', 'agenda', 'alert', 'observation', 'reply_style', 'analysis', 'message'].map(gfcYarbiLocalRows));
+  const [contacts, identifiers, memories, agenda, alerts, observations, replyStyles, analyses, receivables, messages] = await Promise.all(['contact', 'identifier', 'memory', 'agenda', 'alert', 'observation', 'reply_style', 'analysis', 'receivable', 'message'].map(gfcYarbiLocalRows));
   const phone = String(args.phone || '').replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '');
   const name = gfcYarbiLocalNormalize(args.client_name);
   let ids = phone ? identifiers.filter(row => String(row.normalized_value || row.identifier_value || '').replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '') === phone).map(row => String(row.contact_id)) : [];
@@ -17098,7 +17170,26 @@ async function gfcYarbiLocalFindMemory(args = {}) {
   const contactAgenda = agenda.filter(row => String(row.contact_id) === contactId).slice(0, 20);
   const contactObservations = observations.filter(row => String(row.contact_id) === contactId && String(row.status || 'active') === 'active').sort((a, b) => String(b.observed_at || b.updated_at || '').localeCompare(String(a.observed_at || a.updated_at || ''))).slice(0, 80);
   const contactAnalyses = analyses.filter(row => String(row.contact_id) === contactId).slice(0, 30);
+  const finance = typeof window.YarbiFinanceContext?.buildFinanceContext === 'function'
+    ? window.YarbiFinanceContext.buildFinanceContext({ contactId: Number(contactId), analyses: contactAnalyses, receivables, movements: null })
+    : null;
   const contactMessages = messages.filter(row => gfcYarbiAgendaPhone(row.phone) === gfcYarbiAgendaPhone(resolvedPhone)).slice(0, 120);
+  // whatsapp_messages predates contact_id in the local mirror. At this point
+  // the phone was resolved through the canonical identifier, so the temporary
+  // association is safe for this read-only timeline and never persisted.
+  const timeline = typeof window.YarbiBusinessTimeline?.buildBusinessTimeline === 'function'
+    ? window.YarbiBusinessTimeline.buildBusinessTimeline({
+      contactId: Number(contactId),
+      sources: {
+        messages: contactMessages.map(row => ({ ...row, contact_id: Number(contactId) })),
+        analyses: contactAnalyses,
+        agenda: contactAgenda,
+        receivables,
+        observations: contactObservations
+      },
+      limit: 12
+    })
+    : null;
   const dossier = gfcBuildLocalClientDossier({ contact, phone: resolvedPhone, memory: contactMemory, agenda: contactAgenda, observations: contactObservations, analyses: contactAnalyses, messages: contactMessages });
   const phonebookName = gfcYarbiPhonebookName(resolvedPhone);
   if (phonebookName) dossier.client_name = phonebookName;
@@ -17115,7 +17206,7 @@ async function gfcYarbiLocalFindMemory(args = {}) {
       audio_summary_status:String(row?.metadata?.audio_summary_status || ''),
       timestamp:Number(row.timestamp || 0)
     }));
-  return { phone: resolvedPhone, contact:phonebookName ? { ...contact, display_name:phonebookName, phonebook_display_name:phonebookName } : contact, memory: contactMemory, dossier, agenda: contactAgenda, recent_messages:recentMessages, alerts: alerts.filter(row => String(row.contact_id || '') === contactId).slice(0, 10), observations: observations.filter(row => String(row.contact_id || '') === contactId && String(row.status || 'active') === 'active').sort((a, b) => String(b.observed_at || b.updated_at || '').localeCompare(String(a.observed_at || a.updated_at || ''))).slice(0, 80), reply_style_profile: replyStyles.filter(row => String(row.status || '') === 'active').sort((a, b) => Number(b.evidence_count || 0) - Number(a.evidence_count || 0)).slice(0, 24), source, local_snapshot_at: freshness.at, local_cache_age_ms: freshness.ageMs, local_snapshot_stale: !freshness.fresh };
+  return { phone: resolvedPhone, contact:phonebookName ? { ...contact, display_name:phonebookName, phonebook_display_name:phonebookName } : contact, memory: contactMemory, dossier, finance, timeline: timeline?.events || [], timeline_meta: timeline ? { schema: timeline.schema, outcome: timeline.outcome, source_status: timeline.source_status } : null, agenda: contactAgenda, recent_messages:recentMessages, alerts: alerts.filter(row => String(row.contact_id || '') === contactId).slice(0, 10), observations: observations.filter(row => String(row.contact_id || '') === contactId && String(row.status || 'active') === 'active').sort((a, b) => String(b.observed_at || b.updated_at || '').localeCompare(String(a.observed_at || a.updated_at || ''))).slice(0, 80), reply_style_profile: replyStyles.filter(row => String(row.status || '') === 'active').sort((a, b) => Number(b.evidence_count || 0) - Number(a.evidence_count || 0)).slice(0, 24), source, local_snapshot_at: freshness.at, local_cache_age_ms: freshness.ageMs, local_snapshot_stale: !freshness.fresh };
 }
 
 const GFC_YARBI_HISTORY_STOP_WORDS = new Set('a al algo algun alguna algunos ante antes asi aunque bajo bien cada cliente como con contra cual cuando de del desde donde dos el ella en entre era ese esa es esta estaba este esto fue habia hacia hasta la las le les lo los mas me mi mientras muy no nos o para pero por porque que quien se si sin sobre su sus te tenia tiene todo tu un una uno unos ya yo'.split(' '));
@@ -19060,6 +19151,12 @@ function gfcStopCopilotVoiceInput() {
 const GFC_COPILOT_HISTORY_KEY = 'gfc_copilot_history_v1';
 const GFC_YARBI_USAGE_KEY = 'gfc_yarbi_usage_v1';
 
+function gfcCopilotHistoryStorageKey() {
+  const id = typeof window.gfcYarbiActiveConversationId === 'function' ? String(window.gfcYarbiActiveConversationId() || 'default') : 'default';
+  // La clave histórica se conserva íntegra para la conversación heredada.
+  return id === 'default' ? GFC_COPILOT_HISTORY_KEY : GFC_COPILOT_HISTORY_KEY + ':' + id;
+}
+
 function gfcLoadYarbiUsage() {
   const empty = { requests: 0, totalPromptTokens: 0, totalResponseTokens: 0, totalThoughtsTokens: 0, totalTokens: 0, byModel: {}, last: null };
   if (window._gfcYarbiUsage) return window._gfcYarbiUsage;
@@ -19091,7 +19188,7 @@ function gfcRecordYarbiUsage(payload, source) {
 
 function gfcLoadCopilotHistory() {
   try {
-    const saved = JSON.parse(localStorage.getItem(GFC_COPILOT_HISTORY_KEY) || '[]');
+    const saved = JSON.parse(localStorage.getItem(gfcCopilotHistoryStorageKey()) || '[]');
     if (!Array.isArray(saved)) return [];
     return saved.filter(item => (item?.role === 'user' || item?.role === 'model') && item?.parts?.[0]?.text).slice(-20);
   } catch (_) {
@@ -19102,7 +19199,7 @@ function gfcLoadCopilotHistory() {
 function gfcPersistCopilotHistory(history = window._gfcCopilotHistory) {
   try {
     const safe = (Array.isArray(history) ? history : []).filter(item => (item?.role === 'user' || item?.role === 'model') && item?.parts?.[0]?.text).slice(-20);
-    localStorage.setItem(GFC_COPILOT_HISTORY_KEY, JSON.stringify(safe));
+    localStorage.setItem(gfcCopilotHistoryStorageKey(), JSON.stringify(safe));
   } catch (error) {
     console.warn('[Yarbi memoria] No se pudo guardar la conversación:', error);
   }
@@ -19928,7 +20025,7 @@ function gfcYarbiHabitSuppressLocal(id) {
 async function gfcYarbiHabitCandidateResolve(id, operation) {
   const token = localStorage.getItem('fnz_assistant_token') || '';
   if (!token) throw new Error('token_missing');
-  const response = await fetch(GFC_YARBI_HABITS_ENDPOINT, {
+  const response = await fetch(gfcYarbiHabitsEndpoint(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },
     body: JSON.stringify({ confirm: true, id, operation })
@@ -19942,7 +20039,7 @@ async function gfcYarbiOfferHabitCandidate() {
   if (!document.getElementById('gfc-copilot-chat-messages') || gfcOwnerInstructionGetPending()) return null;
   const token = localStorage.getItem('fnz_assistant_token') || '';
   if (!token) return null;
-  const response = await fetch(GFC_YARBI_HABITS_ENDPOINT, { headers: { 'X-Assistant-Token': token }, cache: 'no-store' });
+  const response = await fetch(gfcYarbiHabitsEndpoint(), { headers: { 'X-Assistant-Token': token }, cache: 'no-store' });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !Array.isArray(data.candidates)) return null;
   const suppressed = gfcYarbiHabitSuppressedIds();
@@ -20378,6 +20475,12 @@ function gfcYarbiTargetFromFocus() {
 }
 async function gfcHandleYarbiLocalCommand(text, options = {}) {
   gfcYarbiConversationFocusTouchFromText(text, options.source || 'yarbi-follow-up');
+  const financial = typeof window.gfcTryFinancialCoachMessage === 'function' ? window.gfcTryFinancialCoachMessage(text) : null;
+  if (financial?.handled) return { handled:true, kind:'financial_coach', reply:financial.reply };
+  const agendaRead = typeof window.gfcTryAgendaReadMessage === 'function' ? window.gfcTryAgendaReadMessage(text) : null;
+  if (agendaRead?.handled) return { handled:true, kind:'agenda_read', reply:agendaRead.reply };
+  const clientContextRead = typeof window.gfcTryClientContextReadMessage === 'function' ? await window.gfcTryClientContextReadMessage(text) : null;
+  if (clientContextRead?.handled) return { handled:true, kind:'client_context_read', reply:clientContextRead.reply, facts:clientContextRead.facts || null };
   if (gfcIsTodayBoardRequest(text)) { const board = gfcShowYarbiTodayBoard({ speak:options.speak !== false }); return { handled:true, kind:'board', board }; }
   const quickAgendaStatus = gfcYarbiFastAgendaStatusIntent(text);
   if (quickAgendaStatus) return gfcYarbiApplyQuickAgendaStatus(quickAgendaStatus, text, options);
@@ -20486,15 +20589,18 @@ async function gfcSendCopilotChatMessage(promptText) {
   if (!text) return;
   if (inputEl) {
     inputEl.value = '';
+    if (typeof window.gfcResizeYarbiComposer === 'function') window.gfcResizeYarbiComposer(inputEl);
     try { inputEl.focus({ preventScroll:true }); } catch (_) { inputEl.focus(); }
   }
   gfcChatDiag('input', { text });
   const persistedUser = await gfcAppendCopilotChatMessage('user', text);
   if (!persistedUser?.ok) {
     if (inputEl) inputEl.value = text;
+    if (typeof window.gfcSaveYarbiConversationDraft === 'function') window.gfcSaveYarbiConversationDraft(text);
     if (typeof toast === 'function') toast('No se pudo guardar el mensaje. Se conserva para reintentar.', 'warning');
     return;
   }
+  if (typeof window.gfcClearYarbiConversationDraft === 'function') window.gfcClearYarbiConversationDraft();
 
   const localCommand = await gfcHandleYarbiLocalCommand(text, { source:'yarbi_chat', speak:true });
   if (localCommand?.handled) {
@@ -20535,6 +20641,20 @@ async function gfcSendCopilotChatMessage(promptText) {
     await gfcAppendCopilotChatMessage('assistant', textClientPrefetch.reply);
     if (window._gfcMascot) window._gfcMascot.setState('reposo', textClientPrefetch.reply);
     gfcSpeakText(textClientPrefetch.reply);
+    return;
+  }
+
+  // Una compilación local/offline no debe intentar llegar a una URL inventada
+  // ni aparentar que el cerebro remoto está disponible. Las lecturas FAST que
+  // sí cuentan con una copia local ya retornaron antes de este punto.
+  const remoteEnabled = typeof window.gfcRuntimeRemoteEnabled === 'function'
+    ? window.gfcRuntimeRemoteEnabled()
+    : true;
+  if (!remoteEnabled) {
+    const offlineReply = '## 📡 Yarbi está en modo local\n\nPuedo responder con los datos que ya están guardados en este dispositivo, por ejemplo **agenda de mañana**, **caja libre** o el **expediente de un cliente seleccionado**. Esta pregunta necesita la conexión segura de Yarbi, así que no inventaré una respuesta ni usaré otro entorno.';
+    await gfcAppendCopilotChatMessage('assistant', offlineReply);
+    if (window._gfcMascot) window._gfcMascot.setState('reposo', offlineReply);
+    gfcSpeakText(offlineReply);
     return;
   }
 
@@ -20720,7 +20840,9 @@ function gfcOpenAlertConversation(id) {
   gfcOpenCopilotModal('chat', suggestion.id);
 }
 
-const GFC_YARBI_PROCESSING_STATUS_ENDPOINT = window.gfcRuntimeApiOrigin() + '/api/ai/process';
+function gfcYarbiProcessingStatusEndpoint() {
+  return window.gfcRuntimeApiOrigin() + '/api/ai/process';
+}
 function gfcSetYarbiProcessingUi(data = {}) {
   const label = document.getElementById('gfc-ai-process-status'), detail = document.getElementById('gfc-ai-process-detail'), button = document.getElementById('gfc-ai-process-btn');
   if (!label || !button) return;
@@ -20788,7 +20910,7 @@ function gfcMaybeRecoverYarbiFailures(data = {}) {
   window._gfcYarbiAutoRecoveryRunning = true;
   gfcSetYarbiProcessingUi(data);
   localStorage.setItem(GFC_YARBI_AUTO_RECOVERY_KEY, String(Date.now()));
-  fetch(GFC_YARBI_PROCESSING_STATUS_ENDPOINT, {
+  fetch(gfcYarbiProcessingStatusEndpoint(), {
     method:'POST',
     headers:{ 'Content-Type':'application/json', 'X-Assistant-Token':token },
     body:JSON.stringify({ action:'recover', limit:25, requested_by:'yarbi-background-recovery' })
@@ -20810,7 +20932,7 @@ async function gfcRefreshYarbiProcessingStatus(options = {}) {
   const label = document.getElementById('gfc-ai-process-status'), token = localStorage.getItem('fnz_assistant_token') || '';
   if (!token) { if (label) { label.textContent = 'Configura el token para sincronizar.'; label.style.color = '#B45309'; } return null; }
   try {
-    const response = await fetch(GFC_YARBI_PROCESSING_STATUS_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token }, body: JSON.stringify({ action: 'status' }) });
+    const response = await fetch(gfcYarbiProcessingStatusEndpoint(), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token }, body: JSON.stringify({ action: 'status' }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const failure = new Error(data.detail || data.error || 'No se pudo verificar la memoria');
@@ -20839,7 +20961,7 @@ async function gfcLearnHistoricalReplyStyle() {
   if (!accepted) return;
   if (button) { button.disabled = true; button.textContent = '🧠 Aprendiendo…'; }
   try {
-    const response = await fetch(GFC_YARBI_PROCESSING_STATUS_ENDPOINT, {
+    const response = await fetch(gfcYarbiProcessingStatusEndpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },
       body: JSON.stringify({ action: 'bootstrap-reply-style', requested_by: 'yarbi-explicit-user-consent' })
@@ -20870,7 +20992,7 @@ async function gfcProcessYarbiInformation() {
     const before = await gfcRefreshYarbiProcessingStatus({ quiet: true });
     let recovery = null;
     if (before && before.status !== 'up_to_date') {
-      const recoveryResponse = await fetch(GFC_YARBI_PROCESSING_STATUS_ENDPOINT, {
+      const recoveryResponse = await fetch(gfcYarbiProcessingStatusEndpoint(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },
         body: JSON.stringify({ action: 'recover', limit: 25, requested_by: 'yarbi-manual-recovery' })
@@ -46619,7 +46741,7 @@ body.gfc-agenda-form-screen .gfc-agenda-form-actions{
 .gfc-yarbi-composer-wrap{width:100%;max-width:100%;box-sizing:border-box;flex:0 0 auto;background:#fff;border-top:1px solid #E2E8F0;padding:7px 9px calc(8px + env(safe-area-inset-bottom));overflow:hidden}
 .gfc-yarbi-live-state{font-size:10px;font-weight:800;color:#64748B;padding:0 4px 5px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .gfc-yarbi-composer{display:flex;width:100%;max-width:100%;box-sizing:border-box;gap:6px;align-items:center;overflow:hidden}
-.gfc-yarbi-composer input{height:44px !important;width:auto !important;min-width:0;flex:1 1 0 !important;box-sizing:border-box;background:#F8FAFC !important;border:1px solid #CBD5E1 !important;border-radius:14px !important;padding:10px 12px !important;font-size:13px !important}
+.gfc-yarbi-composer input,.gfc-yarbi-composer textarea{height:44px !important;width:auto !important;min-width:0;flex:1 1 0 !important;box-sizing:border-box;background:#F8FAFC !important;border:1px solid #CBD5E1 !important;border-radius:14px !important;padding:10px 12px !important;font:inherit;font-size:13px !important;line-height:1.35;resize:none;overflow-y:auto}
 .gfc-yarbi-composer button{height:44px;border:0;border-radius:13px;font-weight:900;cursor:pointer}
 .gfc-yarbi-live-btn{background:#0EA5E9;color:#fff;padding:0 13px;font-size:12px;flex:0 0 auto}
 .gfc-yarbi-send-btn{background:#0F172A;color:#fff;width:46px;font-size:18px;flex:0 0 46px}
@@ -46629,6 +46751,13 @@ body.gfc-agenda-form-screen .gfc-agenda-form-actions{
 .gfc-yarbi-tool-copy{font-size:12px;line-height:1.45;color:#64748B;margin-bottom:11px}
 .gfc-yarbi-primary{border:0;background:#0F766E;color:#fff;border-radius:11px;padding:10px 13px;font-size:12px;font-weight:900;cursor:pointer}
 .gfc-yarbi-secondary{border:1px solid #CBD5E1;background:#fff;color:#334155;border-radius:11px;padding:9px 12px;font-size:12px;font-weight:850;cursor:pointer}
+.gfc-yarbi-conversation-actions{display:flex;gap:8px;align-items:center;margin:12px 0}
+.gfc-yarbi-conversation-actions input{min-width:0;flex:1;border:1px solid #CBD5E1;border-radius:11px;padding:10px 12px;font:inherit;color:#0F172A;background:#fff}
+.gfc-yarbi-conversation-history{display:flex;flex-direction:column;gap:8px}
+.gfc-yarbi-quick-reads{display:flex;gap:7px;overflow-x:auto;padding:8px 10px 2px;scrollbar-width:none}.gfc-yarbi-quick-reads::-webkit-scrollbar{display:none}.gfc-yarbi-quick-reads button{flex:0 0 auto;border:1px solid #D7E5E2;border-radius:999px;background:#F5FBF9;color:#235E58;padding:7px 10px;font-size:10.5px;font-weight:850;cursor:pointer}.gfc-yarbi-quick-reads button:active{background:#E2F3EE;transform:translateY(1px)}
+.gfc-yarbi-conversation-row{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;border:1px solid #E2E8F0;background:#fff;border-radius:12px;padding:4px;color:#0F172A}
+.gfc-yarbi-conversation-row:hover,.gfc-yarbi-conversation-row.active{border-color:#0F766E;background:#F0FDFA}
+.gfc-yarbi-conversation-open{min-width:0;flex:1;display:flex;align-items:center;justify-content:space-between;gap:12px;border:0;background:transparent;padding:8px;text-align:left;color:inherit;cursor:pointer}.gfc-yarbi-conversation-open>span{min-width:0;display:flex;flex-direction:column;gap:3px}.gfc-yarbi-conversation-row b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.gfc-yarbi-conversation-row small{color:#64748B;font-size:11px}.gfc-yarbi-conversation-row em{font-style:normal;font-size:11px;font-weight:800;color:#0F766E;white-space:nowrap}.gfc-yarbi-conversation-controls{display:flex;gap:2px}.gfc-yarbi-conversation-controls button{width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:#475569;font-weight:900;cursor:pointer}.gfc-yarbi-conversation-controls button:hover{background:#CCFBF1;color:#0F766E}.gfc-yarbi-empty-copy{margin:12px 0;color:#64748B;font-size:12px;line-height:1.5}
 .gfc-yarbi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .gfc-yarbi-hub-button{border:1px solid #E2E8F0;background:#fff;border-radius:14px;padding:13px;text-align:left;cursor:pointer;min-height:92px}
 .gfc-yarbi-hub-button b{display:block;font-size:12.5px;color:#0F172A;margin:6px 0 3px}
@@ -46719,8 +46848,8 @@ body.gfc-yarbi-screen #modal-box{background:#fff !important}
 .gfc-yarbi-composer-wrap{padding:7px 9px calc(9px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #E9E9E7;box-shadow:0 -5px 18px rgba(15,23,42,.035)}
 .gfc-yarbi-live-state{min-height:18px;padding:0 3px 5px;color:#787774;font-size:9px;font-weight:680}
 .gfc-yarbi-composer{gap:7px}
-.gfc-yarbi-composer input{height:46px !important;background:#F7F7F5 !important;border-color:#E3E3E0 !important;border-radius:10px !important;padding:10px 12px !important;color:#191919 !important;font-size:13px !important}
-.gfc-yarbi-composer input:focus{background:#fff !important;border-color:#A9A9A5 !important;box-shadow:0 0 0 2px rgba(55,53,47,.08) !important}
+.gfc-yarbi-composer input,.gfc-yarbi-composer textarea{height:46px !important;background:#F7F7F5 !important;border-color:#E3E3E0 !important;border-radius:10px !important;padding:10px 12px !important;color:#191919 !important;font-size:13px !important}
+.gfc-yarbi-composer input:focus,.gfc-yarbi-composer textarea:focus{background:#fff !important;border-color:#A9A9A5 !important;box-shadow:0 0 0 2px rgba(55,53,47,.08) !important}
 .gfc-yarbi-live-btn{height:46px !important;min-width:74px;padding:0 9px !important;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:10px !important;background:#191919 !important;color:#fff;font-size:9.5px !important;transition:background .16s ease,box-shadow .16s ease,transform .12s ease}
 .gfc-yarbi-live-btn:active{transform:scale(.98)}
 .gfc-yarbi-live-btn[data-live-phase="preparing"]{background:#6B6B68 !important}
@@ -46768,11 +46897,12 @@ body.gfc-yarbi-screen #modal-box,.gfc-yarbi-shell{background:#FFFDF8 !important}
 .gfc-yarbi-message.is-live .gfc-yarbi-message-label{color:#557F9F}
 .gfc-yarbi-message.is-live .gfc-yarbi-message-body::after{background:#6D9EBF}
 .gfc-yarbi-composer-wrap{background:#FFFEFC;border-top-color:#EEE4D6;box-shadow:0 -5px 18px rgba(93,75,48,.04)}
-.gfc-yarbi-composer input{background:#FFF9EE !important;border-color:#E7DCCB !important}
-.gfc-yarbi-composer input:focus{background:#FFFDF8 !important;border-color:#B9DCCB !important;box-shadow:0 0 0 2px rgba(110,169,141,.12) !important}
+.gfc-yarbi-composer input,.gfc-yarbi-composer textarea{background:#FFF9EE !important;border-color:#E7DCCB !important}
+.gfc-yarbi-composer input:focus,.gfc-yarbi-composer textarea:focus{background:#FFFDF8 !important;border-color:#B9DCCB !important;box-shadow:0 0 0 2px rgba(110,169,141,.12) !important}
 .gfc-yarbi-live-btn{background:#6EA98D !important;color:#fff}
 .gfc-yarbi-send-btn{background:#5B4774;color:#fff}
 .gfc-yarbi-training-unified-banner{background:#F4EEFB;border-color:#DED2EE;color:#624A7A}
+.gfc-yarbi-quick-reads{padding-top:9px}.gfc-yarbi-quick-reads button{border-color:#E7DCCB;background:#FFF9EE;color:#5A4A39}
 .gfc-yarbi-training-quick button{background:#F4EEFB;border-color:#DED2EE;color:#624A7A}
 .gfc-yarbi-training-page{background:#FFFDF8}
 .gfc-yarbi-training-compact{background:#FFFEFC;border-color:#EEE4D6;color:#4E816B}
@@ -47298,7 +47428,7 @@ body.gfc-yarbi-screen #modal-box,.gfc-yarbi-shell{background:#FFFDF8 !important}
     sheet.querySelector('#gfc-historical-import-confirm').onclick = async () => { sheet.remove(); await window.gfcImportHistoricalServices(); };
   };
   window.gfcShowYarbiTodayBoard = function(){ const board=gfcYarbiTodayBoard(); if(typeof switchPage==='function') switchPage('crm'); if(typeof toast==='function') toast('Abrí el CRM con las prioridades actuales.','info'); if(typeof gfcRefreshConversationInbox==='function') Promise.resolve(gfcRefreshConversationInbox({reason:'crm-overview-background'})).catch(()=>{}); return {summary:board.summary}; };
-  window.gfcHandleYarbiLocalCommand = async function(text, options={}) { gfcYarbiConversationFocusTouchFromText(text,options.source||'yarbi-follow-up'); if(gfcIsTodayBoardRequest(text)){const board=gfcShowYarbiTodayBoard();return {handled:true,kind:'crm_overview',reply:board.summary};} const intent=gfcYarbiFastAgendaStatusIntent(text); if(intent)return gfcYarbiApplyQuickAgendaStatus(intent,text,options); const status=gfcYarbiLocalResolutionIntent(text); if(!status)return null; const target=gfcYarbiTargetFromFocus(); if(!target)return {handled:true,kind:'resolution',reply:'¿De qué cliente hablamos? Dime su nombre o una pista reciente y lo clasifico sin borrar su historial.'}; return {handled:true,kind:'resolution',...(await gfcYarbiSaveClientResolution(target,status,{source:options.source||'yarbi_chat',days:status==='no_response'?30:0}))}; };
+  window.gfcHandleYarbiLocalCommand = async function(text, options={}) { gfcYarbiConversationFocusTouchFromText(text,options.source||'yarbi-follow-up'); const financial=typeof window.gfcTryFinancialCoachMessage==='function'?window.gfcTryFinancialCoachMessage(text):null; if(financial?.handled)return {handled:true,kind:'financial_coach',reply:financial.reply}; const agendaRead=typeof window.gfcTryAgendaReadMessage==='function'?window.gfcTryAgendaReadMessage(text):null; if(agendaRead?.handled)return {handled:true,kind:'agenda_read',reply:agendaRead.reply}; const clientContextRead=typeof window.gfcTryClientContextReadMessage==='function'?await window.gfcTryClientContextReadMessage(text):null; if(clientContextRead?.handled)return {handled:true,kind:'client_context_read',reply:clientContextRead.reply,facts:clientContextRead.facts||null}; if(gfcIsTodayBoardRequest(text)){const board=gfcShowYarbiTodayBoard();return {handled:true,kind:'crm_overview',reply:board.summary};} const intent=gfcYarbiFastAgendaStatusIntent(text); if(intent)return gfcYarbiApplyQuickAgendaStatus(intent,text,options); const status=gfcYarbiLocalResolutionIntent(text); if(!status)return null; const target=gfcYarbiTargetFromFocus(); if(!target)return {handled:true,kind:'resolution',reply:'¿De qué cliente hablamos? Dime su nombre o una pista reciente y lo clasifico sin borrar su historial.'}; return {handled:true,kind:'resolution',...(await gfcYarbiSaveClientResolution(target,status,{source:options.source||'yarbi_chat',days:status==='no_response'?30:0}))}; };
 })();
 </script>
 <style>
@@ -47852,6 +47982,14 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
 <script src="./yarbi-owner-memory-ui.js"></script>
 <script src="./yarbi-conversation-renderer.js"></script>
 <script src="./yarbi-app-voice.js"></script>
+<script src="./yarbi-financial-coach.js"></script>
+<script src="./yarbi-financial-coach-ui.js"></script>
+<script src="./yarbi-finance-context.js"></script>
+<script src="./yarbi-business-timeline.js"></script>
+<script src="./yarbi-agenda-intelligence.js"></script>
+<script src="./yarbi-agenda-read-ui.js"></script>
+<script src="./yarbi-client-context-read.js"></script>
+<script src="./yarbi-client-context-read-ui.js"></script>
 <script src="./yarbi-product-completion-ui.js"></script>
 <script src="./yarbi-owner-inbox-ui.js"></script>
 </body>

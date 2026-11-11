@@ -27,7 +27,42 @@
   window.gfcYarbiOwnerDismiss = function (id,index) { if (window.confirm('¿Descartar esta recomendación? Se conservará su historial.')) window.gfcYarbiOwnerDecision(id,index,'dismiss'); };
   window.gfcYarbiOwnerPostpone = function (id,index) { const options = [['1 hora',1],['3 horas',3],['Mañana',24],['Elegir fecha y hora',0]]; const answer = window.prompt('Posponer: 1 = 1 hora · 2 = 3 horas · 3 = mañana · 4 = elegir fecha/hora','1'); const choice = Number(answer); if (!choice || !options[choice - 1]) return; let until; if (choice === 4) { const value = window.prompt('Fecha y hora (YYYY-MM-DDTHH:mm)'); until = new Date(value); } else until = new Date(Date.now() + options[choice - 1][1] * 3600000); if (!until || !Number.isFinite(until.getTime()) || until <= new Date()) { if (typeof window.toast === 'function') window.toast('Elige una fecha futura.','error'); return; } window.gfcYarbiOwnerDecision(id,index,'postpone',until.toISOString()); };
   window.gfcOpenYarbiPending = function () { if (typeof window.switchPage === 'function') { window.switchPage('yarbi-pendientes'); setTimeout(() => { if (!state.loaded && !state.loading) window.gfcYarbiOwnerRefresh(); }, 0); } };
-  window.gfcOpenYarbiHub = function () { const existing=document.getElementById('yarbi-owner-hub'); if(existing){existing.remove();return;} const hub=document.createElement('div'); hub.id='yarbi-owner-hub'; hub.style.cssText='position:fixed;z-index:900;left:16px;right:16px;bottom:82px;background:#FFFDF9;border:1px solid #E2DDD4;box-shadow:0 18px 48px rgba(15,23,42,.18);border-radius:18px;padding:13px'; hub.innerHTML='<div style="font-size:11px;font-weight:950;color:#172033">Yarbi</div><div style="font-size:10px;color:#64748B;margin:3px 0 10px">Elige cómo quieres trabajar ahora.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button id="yarbi-owner-pending" style="border:0;border-radius:11px;background:#1D3557;color:#fff;padding:11px;font-size:11px;font-weight:950">Para ti'+(activeItems().length?` · ${activeItems().length}`:'')+'</button><button id="yarbi-owner-voice" style="border:1px solid #D7DCE5;border-radius:11px;background:#FFFDF9;color:#185FA5;padding:11px;font-size:11px;font-weight:950">Hablar con Yarbi</button></div>'; document.body.appendChild(hub); document.getElementById('yarbi-owner-pending').onclick=()=>{hub.remove();window.gfcOpenYarbiPending();}; document.getElementById('yarbi-owner-voice').onclick=()=>{hub.remove();if(typeof window.gfcOpenYarbiVoice==='function')window.gfcOpenYarbiVoice();else if(typeof window.gfcOpenCopilotModal==='function')window.gfcOpenCopilotModal('chat');}; };
-  function addEntry() { const tab = document.getElementById('tab-yarbi'); if (!tab || tab.dataset.ownerInboxReady) return; tab.dataset.ownerInboxReady = 'true'; tab.onclick = () => window.gfcOpenYarbiHub(); tab.title = 'Abrir opciones de Yarbi'; }
+  window.gfcOpenYarbiHub = function () {
+    const existing = document.getElementById('yarbi-owner-hub');
+    if (existing) { existing.remove(); return; }
+    const hub = document.createElement('div');
+    hub.id = 'yarbi-owner-hub';
+    hub.style.cssText = 'position:fixed;z-index:900;left:16px;right:16px;bottom:82px;background:#FFFDF9;border:1px solid #E2DDD4;box-shadow:0 18px 48px rgba(15,23,42,.18);border-radius:18px;padding:13px';
+    hub.innerHTML = '<div style="font-size:11px;font-weight:950;color:#172033">Yarbi</div><div style="font-size:10px;color:#64748B;margin:3px 0 10px">Elige cómo quieres trabajar ahora.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button id="yarbi-owner-pending" style="grid-column:1 / -1;border:0;border-radius:11px;background:#1D3557;color:#fff;padding:11px;font-size:11px;font-weight:950">Para ti' + (activeItems().length ? ` · ${activeItems().length}` : '') + '</button><button id="yarbi-owner-chat" style="border:1px solid #BFD9CE;border-radius:11px;background:#F0FAF5;color:#15684A;padding:11px;font-size:11px;font-weight:950">Chat con Yarbi</button><button id="yarbi-owner-voice" style="border:1px solid #D7DCE5;border-radius:11px;background:#FFFDF9;color:#185FA5;padding:11px;font-size:11px;font-weight:950">Voz en vivo</button></div>';
+    document.body.appendChild(hub);
+
+    const openChat = () => {
+      hub.remove();
+      if (typeof window.gfcOpenCopilotModal === 'function') return window.gfcOpenCopilotModal('chat');
+      if (typeof window.toast === 'function') window.toast('El chat de Yarbi todavía no está listo en esta compilación.', 'error');
+    };
+    document.getElementById('yarbi-owner-pending').onclick = () => { hub.remove(); window.gfcOpenYarbiPending(); };
+    document.getElementById('yarbi-owner-chat').onclick = openChat;
+    document.getElementById('yarbi-owner-voice').onclick = () => {
+      if (typeof window.gfcRuntimeRemoteEnabled === 'function' && !window.gfcRuntimeRemoteEnabled()) {
+        openChat();
+        if (typeof window.toast === 'function') window.toast('El chat está disponible. La voz en vivo requiere un endpoint de prueba autorizado.', 'info');
+        return;
+      }
+      hub.remove();
+      if (typeof window.gfcOpenYarbiVoice === 'function') return window.gfcOpenYarbiVoice();
+      openChat();
+    };
+  };
+  function addEntry() {
+    const tab = document.getElementById('tab-yarbi');
+    if (!tab || tab.dataset.ownerInboxReady) return;
+    tab.dataset.ownerInboxReady = 'true';
+    tab.onclick = () => {
+      if (typeof window.gfcOpenCopilotModal === 'function') return window.gfcOpenCopilotModal('chat');
+      if (typeof window.toast === 'function') window.toast('El chat de Yarbi todavía no está listo en esta compilación.', 'error');
+    };
+    tab.title = 'Abrir Chat con Yarbi';
+  }
   document.addEventListener('DOMContentLoaded', addEntry); if (document.readyState !== 'loading') addEntry();
 })();

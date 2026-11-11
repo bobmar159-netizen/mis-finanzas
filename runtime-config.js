@@ -4,9 +4,14 @@
   const config = Object.freeze({
     apiOrigin: '__YARBI_SAME_ORIGIN__',
     environment: 'web',
-    releaseId: 'p02i-9618023af2e94686'
+    releaseId: 'p02i-9255fd01e5c8d266',
+    remoteEnabled: 'true' === 'true',
+    nativeAuthCallbackScheme: 'com.misfinanzas.app'
   });
   function apiOrigin() {
+    if (!config.remoteEnabled) {
+      throw new Error('Las operaciones remotas están deshabilitadas en esta compilación local de prueba. No se usó ningún destino alternativo.');
+    }
     if (config.apiOrigin === '__YARBI_SAME_ORIGIN__') return window.location.origin;
     try {
       const parsed = new URL(config.apiOrigin);
@@ -18,4 +23,6 @@
   }
   window.gfcRuntimeConfig = config;
   window.gfcRuntimeApiOrigin = apiOrigin;
+  window.gfcRuntimeRemoteEnabled = () => config.remoteEnabled;
+  window.gfcRuntimeNativeAuthCallbackPrefix = () => `${config.nativeAuthCallbackScheme}://auth/callback`;
 })();

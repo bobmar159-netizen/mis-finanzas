@@ -99,7 +99,7 @@
       const payload=await response.json().catch(()=>({}));
       if(!response.ok||payload.ok!==true) return {reason:payload.error==='owner_reference_unauthorized'?'session_required':'crm_unavailable'};
       if(payload.outcome!=='dossier_found'||!payload.dossier) return {reason:payload.outcome||'crm_unavailable'};
-      return {reason:'ok',dossier:payload.dossier,activities:payload.activities||null,finance:payload.finance||null,timeline:Array.isArray(payload.timeline)?payload.timeline:[]};
+      return {reason:'ok',dossier:payload.dossier,activities:payload.activities||null,finance:payload.finance||null,timeline:Array.isArray(payload.timeline)?payload.timeline:[],conversationToken:typeof payload.conversation_token==='string'?payload.conversation_token:''};
     } catch (_) { return {reason:'crm_unavailable'}; }
   }
   function style() {
@@ -130,7 +130,7 @@
   function open() {
     style(); document.querySelector('.gfc-pc-shade')?.remove();
     const root=document.createElement('div'); root.className='gfc-pc-shade';
-    root.innerHTML='<section class="gfc-pc-panel" role="dialog" aria-label="Funciones de Yarbi"><button class="gfc-pc-close" aria-label="Cerrar">×</button><h2>Funciones de Yarbi</h2><p>Consulta CRM con tu sesión autenticada y accede a herramientas ya disponibles. Esta pantalla no envía mensajes ni ejecuta acciones comerciales.</p><div class="gfc-pc-grid"><button data-open="orders">Instrucciones guardadas</button><button data-open="learning">Entrenar Yarbi</button><button data-open="memory">Memoria operativa</button><button data-open="personal">WhatsApp personal · prueba</button></div><label><b>Buscar clientes</b><span style="display:block;color:#667085;font-size:12px;margin-top:3px">Nombre, teléfono, distrito, servicio, historial o estado.</span></label><div class="gfc-pc-search"><input data-query autocomplete="off" placeholder="Ej. reparación en Comas"><button data-search>Buscar</button></div><div data-results><p>La búsqueda respeta el propietario autenticado y nunca usa un fallback de producción.</p></div></section>';
+    root.innerHTML='<section class="gfc-pc-panel" role="dialog" aria-label="Funciones de Yarbi"><button class="gfc-pc-close" aria-label="Cerrar">×</button><h2>Funciones de Yarbi</h2><p>Consulta CRM con tu sesión autenticada y accede a herramientas ya disponibles. Esta pantalla no envía mensajes ni ejecuta acciones comerciales.</p><div class="gfc-pc-grid"><button data-open="finance">Resumen financiero</button><button data-open="orders">Instrucciones guardadas</button><button data-open="learning">Entrenar Yarbi</button><button data-open="memory">Memoria operativa</button><button data-open="personal">WhatsApp personal · prueba</button></div><label><b>Buscar clientes</b><span style="display:block;color:#667085;font-size:12px;margin-top:3px">Nombre, teléfono, distrito, servicio, historial o estado.</span></label><div class="gfc-pc-search"><input data-query autocomplete="off" placeholder="Ej. reparación en Comas"><button data-search>Buscar</button></div><div data-results><p>La búsqueda respeta el propietario autenticado y nunca usa un fallback de producción.</p></div></section>';
     document.body.appendChild(root);
     root.querySelector('.gfc-pc-close').onclick=()=>root.remove();
     root.addEventListener('click', event=>{ if(event.target===root) root.remove(); });
@@ -139,6 +139,7 @@
     root.querySelector('[data-query]').addEventListener('keydown', event=>{ if(event.key==='Enter') runSearch(); });
     root.querySelectorAll('[data-open]').forEach(button=>button.onclick=()=>{
       const target=button.dataset.open; root.remove();
+      if(target==='finance') return window.gfcOpenFinancialCoach?.();
       if(target==='orders') return window.gfcOpenCopilotModal?.('ordenes');
       if(target==='learning') return window.gfcOpenCopilotModal?.('learning');
       if(target==='memory') return window.gfcOpenCopilotModal?.('tools');
@@ -161,6 +162,10 @@
     root.querySelector('.gfc-pc-close').onclick=()=>root.remove(); root.addEventListener('click',event=>{if(event.target===root)root.remove();});
     loadDossier(id).then(result=>{
       const panel=root.querySelector('.gfc-pc-panel'); if(!panel||result.reason!=='ok'){ if(panel) panel.innerHTML='<button class="gfc-pc-close" aria-label="Cerrar">×</button><p>'+(result.reason==='session_required'?'Inicia sesión con el propietario autorizado para abrir el expediente.':'No se pudo abrir el expediente CRM. No se utilizó otro entorno.')+'</p>'; panel?.querySelector('.gfc-pc-close')?.addEventListener('click',()=>root.remove()); return; }
+      // El token solo procede de un expediente que el servidor ya autorizó para
+      // este propietario. No se construye a partir del contacto del DOM.
+      if(result.conversationToken&&typeof window.gfcSetOwnerConversationToken==='function') window.gfcSetOwnerConversationToken(result.conversationToken);
+      if(typeof window.gfcYarbiConversationFocusSet==='function') window.gfcYarbiConversationFocusSet({contact_id:id,client_name:result.dossier.client_name||'',confirmed:true},'crm-dossier-authorized');
       panel.innerHTML='<button class="gfc-pc-close" aria-label="Cerrar">×</button>'+dossierMarkup(result); panel.querySelector('.gfc-pc-close').onclick=()=>root.remove(); panel.querySelector('.gfc-pc-dossier-back').onclick=()=>{root.remove();open();};
     });
   };
