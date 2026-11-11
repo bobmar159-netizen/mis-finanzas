@@ -31,3 +31,10 @@ test('Financial Coach UI contains no network client or commercial write path', (
   const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-financial-coach-ui.js'), 'utf8');
   assert.equal(/fetch\s*\(|XMLHttpRequest|navigator\.sendBeacon|localStorage\.setItem|sessionStorage\.setItem/i.test(source), false);
 });
+
+test('the final local chat dispatcher preserves the Financial Coach fast read', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  const finalDispatcher = source.slice(source.lastIndexOf('window.gfcHandleYarbiLocalCommand = async function'));
+  assert.match(finalDispatcher, /gfcTryFinancialCoachMessage/);
+  assert.match(finalDispatcher, /kind:'financial_coach'/);
+});
