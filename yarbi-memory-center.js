@@ -1009,7 +1009,7 @@
   window.gfcHandleYarbiBack = function() {
     if (!document.body.classList.contains('gfc-yarbi-screen')) return false;
     const tab = String(window._gfcYarbiCurrentTab || 'chat');
-    if (tab === 'masivo' || tab === 'memoria' || tab === 'knowledge' || tab === 'ordenes' || tab === 'practice' || tab === 'learning') {
+    if (tab === 'masivo' || tab === 'memoria' || tab === 'knowledge' || tab === 'ads' || tab === 'ordenes' || tab === 'practice' || tab === 'learning') {
       window.gfcOpenCopilotModal('tools');
       return true;
     }
@@ -1054,6 +1054,7 @@
       '<div class="gfc-yarbi-grid">' +
       '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'masivo\')">📦<b>Importar chats</b><span>Aprender tu forma de responder desde TXT o ZIP.</span></button>' +
       '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'knowledge\')">📚<b>Conocimiento</b><span>Fuentes locales, revisión explícita y citas verificables.</span></button>' +
+      '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'ads\')">📣<b>Meta Ads</b><span>Métricas locales aprobadas, leads y ROAS sin conectar campañas.</span></button>' +
       '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'memoria\')">📷<b>Fotos y videos</b><span>Biblioteca privada solo en tu celular.</span></button>' +
       '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'ordenes\')">📜<b>Instrucciones</b><span>Reglas permanentes visibles, editables y sincronizadas.</span></button>' +
       '<button class="gfc-yarbi-hub-button" onclick="gfcSetYarbiInteractionMode(\'training\')">🎭<b>Entrenamiento</b><span>Entra al mismo chat de Yarbi, con voz Live y sin tocar datos reales.</span></button>' +
@@ -2107,7 +2108,7 @@
     if (!content) return;
     const title = tab === 'chat' ? 'Yarbi' : ({ conversations:'Conversaciones', tools:'Memoria y aprendizaje', masivo:'Importar chats', knowledge:'Conocimiento', memoria:'Fotos y videos', ordenes:'Instrucciones', practice:'Cliente simulado', learning:'Aprendizaje y autonomía', status:'Estado y diagnóstico' }[tab] || 'Yarbi');
     content.innerHTML = '<section class="gfc-yarbi-shell">' + headerHtml(title, tab) +
-      (tab === 'chat' ? chatHtml() : tab === 'conversations' ? conversationHistoryHtml() : tab === 'tools' ? hubHtml() : tab === 'masivo' ? importHtml() : tab === 'knowledge' ? (typeof window.gfcYarbiKnowledgeHtml === 'function' ? window.gfcYarbiKnowledgeHtml() : '<main class="gfc-yarbi-tool-page"><p>La biblioteca de conocimiento no está disponible en esta copia.</p></main>') : tab === 'memoria' ? mediaHtml() : tab === 'ordenes' ? ordersHtml() : tab === 'practice' ? trainingHtml() : tab === 'learning' ? learningHtml() : statusHtml()) + '</section>';
+      (tab === 'chat' ? chatHtml() : tab === 'conversations' ? conversationHistoryHtml() : tab === 'tools' ? hubHtml() : tab === 'masivo' ? importHtml() : tab === 'knowledge' ? (typeof window.gfcYarbiKnowledgeHtml === 'function' ? window.gfcYarbiKnowledgeHtml() : '<main class="gfc-yarbi-tool-page"><p>La biblioteca de conocimiento no está disponible en esta copia.</p></main>') : tab === 'ads' ? (typeof window.gfcYarbiMetaAdsHtml === 'function' ? window.gfcYarbiMetaAdsHtml() : '<main class="gfc-yarbi-tool-page"><p>Meta Ads local no está disponible en esta copia.</p></main>') : tab === 'memoria' ? mediaHtml() : tab === 'ordenes' ? ordersHtml() : tab === 'practice' ? trainingHtml() : tab === 'learning' ? learningHtml() : statusHtml()) + '</section>';
     document.body.classList.add('gfc-yarbi-screen');
     document.getElementById('modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -2137,6 +2138,7 @@
     }
     if (tab === 'conversations') setTimeout(() => window.gfcRenderYarbiConversationHistory(), 0);
     if (tab === 'knowledge') setTimeout(() => window.gfcYarbiKnowledgeAttach?.(), 0);
+    if (tab === 'ads') setTimeout(() => window.gfcYarbiMetaAdsAttach?.(), 0);
     if (tab === 'memoria') setTimeout(() => window.gfcRefreshYarbiMediaLibrary(), 0);
     if (tab === 'ordenes') loadInstructionViewInBackground(viewGeneration);
     if (tab === 'practice') setTimeout(() => {
