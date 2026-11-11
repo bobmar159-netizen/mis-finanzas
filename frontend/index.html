@@ -20596,9 +20596,11 @@ async function gfcSendCopilotChatMessage(promptText) {
   const persistedUser = await gfcAppendCopilotChatMessage('user', text);
   if (!persistedUser?.ok) {
     if (inputEl) inputEl.value = text;
+    if (typeof window.gfcSaveYarbiConversationDraft === 'function') window.gfcSaveYarbiConversationDraft(text);
     if (typeof toast === 'function') toast('No se pudo guardar el mensaje. Se conserva para reintentar.', 'warning');
     return;
   }
+  if (typeof window.gfcClearYarbiConversationDraft === 'function') window.gfcClearYarbiConversationDraft();
 
   const localCommand = await gfcHandleYarbiLocalCommand(text, { source:'yarbi_chat', speak:true });
   if (localCommand?.handled) {

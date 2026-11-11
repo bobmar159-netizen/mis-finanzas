@@ -14,6 +14,7 @@
   const AUTONOMY_KEY = 'gfc_yarbi_autonomy_v1';
   const ACTIVE_CONVERSATION_KEY = 'gfc_yarbi_active_conversation_v1';
   const CONVERSATION_VIEW_KEY = 'gfc_yarbi_conversation_view_v1';
+  const CONVERSATION_DRAFT_KEY = 'gfc_yarbi_conversation_drafts_v1';
   const DEFAULT_CONVERSATION_ID = 'default';
   const MAX_TRAINING_EXAMPLES = 80;
   const MAX_LOCAL_MESSAGES = 600;
@@ -94,6 +95,28 @@
     const next = conversationViewMap();
     delete next[safeConversationId(id)];
     writeJson(CONVERSATION_VIEW_KEY, next);
+  }
+  function conversationDraftMap() {
+    const saved = readJson(CONVERSATION_DRAFT_KEY, {});
+    return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+  }
+  function conversationDraft(id) {
+    const saved = conversationDraftMap()[safeConversationId(id)];
+    return typeof saved?.text === 'string' ? saved.text : '';
+  }
+  function saveConversationDraft(id, text) {
+    const conversationId = safeConversationId(id);
+    const value = String(text || '').slice(0, 8000);
+    const next = conversationDraftMap();
+    if (value.trim()) next[conversationId] = { text:value, updatedAt:Date.now() };
+    else delete next[conversationId];
+    const trimmed = Object.entries(next).sort((left, right) => Number(right[1]?.updatedAt || 0) - Number(left[1]?.updatedAt || 0)).slice(0, 60);
+    return writeJson(CONVERSATION_DRAFT_KEY, Object.fromEntries(trimmed));
+  }
+  function forgetConversationDraft(id) {
+    const next = conversationDraftMap();
+    delete next[safeConversationId(id)];
+    writeJson(CONVERSATION_DRAFT_KEY, next);
   }
   function autonomyConfig() {
     const saved = readJson(AUTONOMY_KEY, {});
@@ -774,6 +797,7 @@
       const result = await store.deleteConversation(id);
       if (!result.ok) { if (typeof toast === 'function') toast('No pude eliminar esa conversación local.', 'warning'); return false; }
       forgetConversationView(id);
+      forgetConversationDraft(id);
       if (activeConversationId() === id) return window.gfcStartNewYarbiConversation();
       await window.gfcRenderYarbiConversationHistory(document.getElementById('gfc-yarbi-conversation-search')?.value || '');
       if (typeof toast === 'function') toast('Conversación eliminada de este dispositivo.', 'success');
@@ -995,7 +1019,7 @@
       '<div id="gfc-yarbi-conversation-focus" class="gfc-yarbi-focus" hidden></div>' + conversation + hiddenTrainingFields +
       '<footer class="gfc-yarbi-composer-wrap">' +
         '<div class="gfc-yarbi-live-state"><span id="gfc-live-status">Gemini Live listo.</span><span id="gfc-ai-process-status">' + (training ? 'Práctica separada de tus datos reales.' : 'Verificando memoria…') + '</span><button id="gfc-ai-process-btn" hidden></button></div>' +
-        '<div class="gfc-yarbi-composer"><textarea id="gfc-copilot-input-text" rows="1" enterkeyhint="send" autocapitalize="sentences" aria-label="Mensaje para Yarbi" placeholder="' + (training ? 'Habla como cliente, corrige o enseña a Yarbi' : 'Escribe un mensaje…') + '" onkeydown="gfcHandleYarbiComposerKeydown(event)" oninput="gfcResizeYarbiComposer(this)"></textarea>' +
+        '<div class="gfc-yarbi-composer"><textarea id="gfc-copilot-input-text" rows="1" enterkeyhint="send" autocapitalize="sentences" aria-label="Mensaje para Yarbi" placeholder="' + (training ? 'Habla como cliente, corrige o enseña a Yarbi' : 'Escribe un mensaje…') + '" onkeydown="gfcHandleYarbiComposerKeydown(event)" oninput="gfcSaveYarbiConversationDraft(this.value);gfcResizeYarbiComposer(this)"></textarea>' +
         '<button id="gfc-mic-input-btn" class="gfc-yarbi-live-btn" data-live-phase="off" onclick="gfcStartCopilotVoiceInput()" aria-label="Activar conversación por voz"><span class="gfc-live-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="gfc-live-button-label">Live</span></button>' +
         '<button class="gfc-yarbi-send-btn" onclick="gfcSendYarbiUnifiedMessage()">➤</button></div>' +
       '</footer>';
@@ -1439,8 +1463,25 @@
 
   window.gfcYarbiUnifiedQuick = function(text) {
     const field = document.getElementById('gfc-copilot-input-text');
-    if (field) { field.value = String(text || ''); window.gfcResizeYarbiComposer(field); field.focus(); }
+    if (field) { field.value = String(text || ''); window.gfcSaveYarbiConversationDraft(field.value); window.gfcResizeYarbiComposer(field); field.focus(); }
   };
+
+  window.gfcSaveYarbiConversationDraft = function(text) {
+    if (interactionMode() !== 'normal') return false;
+    return saveConversationDraft(activeConversationId(), text);
+  };
+  window.gfcClearYarbiConversationDraft = function(conversationId) {
+    if (interactionMode() !== 'normal') return false;
+    forgetConversationDraft(conversationId || activeConversationId());
+    return true;
+  };
+  function restoreYarbiConversationDraft() {
+    if (interactionMode() !== 'normal') return;
+    const input = document.getElementById('gfc-copilot-input-text');
+    if (!input) return;
+    input.value = conversationDraft(activeConversationId());
+    window.gfcResizeYarbiComposer(input);
+  }
 
   window.gfcResizeYarbiComposer = function(field) {
     const input = field || document.getElementById('gfc-copilot-input-text');
@@ -1460,7 +1501,7 @@
     const input = document.getElementById('gfc-copilot-input-text');
     const text = String(promptText || input?.value || '').trim();
     if (!text) return;
-    if (input) { input.value = ''; window.gfcResizeYarbiComposer(input); input.focus(); }
+    if (input) { input.value = ''; window.gfcClearYarbiConversationDraft(); window.gfcResizeYarbiComposer(input); input.focus(); }
     const session = window._gfcLiveSession || {};
     if (session.active && session.liveReady && session.trainingMode && session.socket?.readyState === WebSocket.OPEN) {
       if (typeof gfcLiveAdvanceTurn === 'function') gfcLiveAdvanceTurn(session, 'training-text');
@@ -2041,7 +2082,10 @@
         trainingChatRender();
         const header = document.getElementById('gfc-yarbi-header-status');
         if (header) { header.textContent = '● Entrenamiento seguro'; header.style.color = '#6D28D9'; }
-      } else window.gfcRestoreCopilotChat();
+      } else {
+        window.gfcRestoreCopilotChat();
+        restoreYarbiConversationDraft();
+      }
       if (typeof gfcRefreshYarbiConversationFocusUi === 'function') gfcRefreshYarbiConversationFocusUi();
       if (typeof gfcRefreshYarbiModeUi === 'function') gfcRefreshYarbiModeUi();
       if (interactionMode() !== 'training') {

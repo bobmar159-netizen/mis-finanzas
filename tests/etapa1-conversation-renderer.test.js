@@ -162,6 +162,11 @@ test('chat: el compositor admite varias líneas y conserva Enter para enviar', (
   assert.match(memoryCenter, /onkeydown="gfcHandleYarbiComposerKeydown\(event\)"/);
   assert.match(memoryCenter, /event\.key !== 'Enter' \|\| event\.shiftKey \|\| event\.isComposing/);
   assert.match(memoryCenter, /gfcResizeYarbiComposer/);
+  assert.match(memoryCenter, /CONVERSATION_DRAFT_KEY/);
+  assert.match(memoryCenter, /gfcSaveYarbiConversationDraft/);
+  assert.match(memoryCenter, /restoreYarbiConversationDraft/);
+  assert.match(memoryCenter, /forgetConversationDraft\(id\)/);
   assert.match(html, /\.gfc-yarbi-composer textarea/);
   assert.match(html, /typeof window\.gfcResizeYarbiComposer === 'function'/);
+  assert.match(html, /typeof window\.gfcClearYarbiConversationDraft === 'function'/);
 });
