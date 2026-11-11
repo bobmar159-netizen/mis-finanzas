@@ -30,6 +30,37 @@ test('F03 FAST no llama Gemini para Agenda y conserva efectos comerciales desact
   assert.equal(result.commercial_effects_allowed, false);
 });
 
+test('F03 FAST responde el saldo o historial del contacto ya seleccionado sin llamar al proveedor', async () => {
+  let providerCalls = 0;
+  const state = { selected_entity: { contact_id: 11, display_name: 'Cliente sintético' } };
+  const dossier = {
+    contact_id: 11,
+    dossier: { client_name: 'Cliente sintético' },
+    finance: { summary: { pending_amount: 150 } },
+    timeline: [{ id: 'agenda:8', kind: 'agenda', title: 'Visita', detail: 'agendado' }]
+  };
+  const debt = await runOwnerConversation({ utterance: '¿Cuánto debe?', state, dossier, provider: async () => { providerCalls += 1; } });
+  assert.equal(debt.outcome, 'fast_local_contact_context');
+  assert.match(debt.reply, /S\/ 150\.00/);
+  const history = await runOwnerConversation({ utterance: '¿Qué pasó con este cliente?', state, dossier, provider: async () => { providerCalls += 1; } });
+  assert.equal(history.outcome, 'fast_local_contact_context');
+  assert.match(history.reply, /Visita/);
+  assert.equal(providerCalls, 0);
+  assert.equal(history.commercial_effects_allowed, false);
+});
+
+test('F03 never reads a dossier that does not match the selected contact', async () => {
+  let providerCalls = 0;
+  const result = await runOwnerConversation({
+    utterance: '¿Cuánto debe?',
+    state: { selected_entity: { contact_id: 11, display_name: 'Cliente A' } },
+    dossier: { contact_id: 12, finance: { summary: { pending_amount: 150 } } },
+    provider: async () => { providerCalls += 1; const error = new Error('provider should be attempted'); error.code = 'synthetic'; throw error; }
+  });
+  assert.equal(result.outcome, 'provider_unavailable');
+  assert.equal(providerCalls, 1);
+});
+
 test('F03 STANDARD conserva contexto y no inventa datos ante fallo de Gemini', async () => {
   const state = { active_constraints: { district: { value: 'Surco' } } };
   const result = await runOwnerConversation({ utterance: '¿Qué pasó con Carlos?', state, now: NOW, provider: async () => { const error = new Error('timeout'); error.code = 'gemini_timeout'; throw error; } });
