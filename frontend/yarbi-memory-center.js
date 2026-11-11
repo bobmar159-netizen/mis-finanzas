@@ -5,6 +5,7 @@
   const TIMELINE_KEY = 'gfc_yarbi_chat_timeline_v1';
   const TIMELINE_OUTBOX_KEY = 'gfc_yarbi_chat_outbox_v1';
   const IMPORT_STATE_KEY = 'gfc_yarbi_mass_import_v2';
+  const HISTORICAL_RECONCILIATION_KEY = 'gfc_yarbi_historical_reconciliation_v1';
   const TRAINING_HISTORY_KEY = 'gfc_yarbi_client_simulator_v1';
   const TRAINING_OUTBOX_KEY = 'gfc_yarbi_client_simulator_outbox_v1';
   const TRAINING_ROLE_KEY = 'gfc_yarbi_client_simulator_role_v1';
@@ -1071,6 +1072,25 @@
     const percent = Math.max(0, Math.min(100, Math.round((Number(value) || 0) / safeMax * 100)));
     return '<div class="gfc-yarbi-learning-row"><div><b>' + esc(label) + '</b><span>' + Number(value || 0) + ' / ' + safeMax + '</span></div><div class="gfc-yarbi-learning-bar"><i style="width:' + percent + '%"></i></div></div>';
   }
+  function historicalReconciliationItems() {
+    const stored = readJson(HISTORICAL_RECONCILIATION_KEY, []);
+    return (Array.isArray(stored) ? stored : []).filter(item => item && typeof item === 'object' && String(item.id || '')).slice(-600);
+  }
+  function historicalReconciliationSave(items) {
+    return writeJson(HISTORICAL_RECONCILIATION_KEY, (Array.isArray(items) ? items : []).filter(item => item && typeof item === 'object' && String(item.id || '')).slice(-600));
+  }
+  function historicalReconciliationHtml() {
+    const items = historicalReconciliationItems();
+    const pending = items.filter(item => item.status === 'needs_reconciliation');
+    const unmatched = items.filter(item => item.status === 'needs_contact_match');
+    const reviewed = items.filter(item => item.status === 'reviewed');
+    const labels = { service_mentioned:'Servicio', visit_mentioned:'Visita', work_completion_reported:'Trabajo reportado', payment_reported:'Pago reportado' };
+    const cards = pending.slice(-8).reverse().map(item => '<div class="gfc-yarbi-learning-evidence"><b>' + esc(labels[item.type] || 'Dato histórico') + '</b><span>' + (item.service ? esc(item.service) + ' · ' : '') + 'Contacto CRM ' + esc(item.contact_id || 'por vincular') + '</span><small>Importado como evidencia; no modifica Agenda, CRM ni Movimientos.</small><button class="gfc-yarbi-secondary" onclick="gfcYarbiHistoricalCandidateReviewed(\'' + esc(item.id) + '\')">Marcar revisado</button></div>').join('');
+    return '<div class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Conciliación del historial</div>' +
+      '<div class="gfc-yarbi-tool-copy">' + pending.length + ' propuesta(s) por conciliar · ' + unmatched.length + ' requieren vincular un contacto CRM · ' + reviewed.length + ' revisada(s). Un mensaje histórico nunca marca por sí solo un pago completo, una visita realizada ni un trabajo terminado.</div>' +
+      (cards || '<div class="gfc-yarbi-learning-evidence"><span>Aún no hay propuestas históricas pendientes.</span></div>') +
+      '<div class="gfc-yarbi-safety">Para confirmar un pago se requerirá contrastar Movimientos; para una visita o trabajo, tu confirmación explícita. Esa aplicación comercial se implementará como un paso separado y auditable.</div></div>';
+  }
   function learningHtml() {
     const metrics = learningSnapshot();
     const autonomy = autonomyConfig();
@@ -1102,8 +1122,16 @@
         learningRequirement(metrics.unresolved === 0, 'Todos los chats con identidad verificable (' + metrics.unresolved + ' pendientes)') +
       '</ul>' +
       '<div class="gfc-yarbi-safety">🛑 Freno de emergencia siempre activo. Fuera de la ventana permitida por WhatsApp se usarán únicamente plantillas aprobadas; los casos sensibles pasarán a una persona.</div>' +
-      '<div class="gfc-yarbi-training-actions"><button class="gfc-yarbi-primary" onclick="gfcOpenCopilotModal(\'practice\')">Probar respuestas</button><button class="gfc-yarbi-secondary" onclick="gfcOpenCopilotModal(\'masivo\')">Importar conversación</button></div></div></main>';
+      '<div class="gfc-yarbi-training-actions"><button class="gfc-yarbi-primary" onclick="gfcOpenCopilotModal(\'practice\')">Probar respuestas</button><button class="gfc-yarbi-secondary" onclick="gfcOpenCopilotModal(\'masivo\')">Importar conversación</button></div></div>' + historicalReconciliationHtml() + '</main>';
   }
+  window.gfcYarbiHistoricalCandidateReviewed = function(id) {
+    const safeId = String(id || '');
+    const items = historicalReconciliationItems();
+    const next = items.map(item => String(item.id) === safeId ? { ...item, status:'reviewed', reviewed_at:Date.now() } : item);
+    historicalReconciliationSave(next);
+    if (typeof toast === 'function') toast('Marcado como revisado. No se realizó ningún cambio comercial.', 'success');
+    if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+  };
   window.gfcYarbiSetAutonomyMode = function(mode) {
     const safe = ['observe','suggest','approval'].includes(String(mode)) ? String(mode) : 'observe';
     writeJson(AUTONOMY_KEY, { mode:safe, emergencyStop:true, updatedAt:Date.now() });
@@ -2424,12 +2452,26 @@
       const contactId = String(row.contact_id || '');
       if (phone && contactId && contactById.has(contactId) && !contactByPhone.has(phone)) contactByPhone.set(phone, contactId);
     });
+    const reconciliation = [];
     draft.conversations.forEach((conversation, conversationIndex) => {
       const conversationReview = review.conversations[conversationIndex] || {};
       const people = [...new Set(conversation.messages.map(m => m.sender))];
       const contact = conversationReview.counterparty_names?.[0] || people.find(name => normalizePerson(name) !== ownerNorm) || '';
       const phone = phoneKey(conversationReview.phone_candidate || '');
       const contactId = conversationReview.identity_state === 'candidate_phone_match' ? contactByPhone.get(phone) : '';
+      (conversationReview.event_candidates || []).forEach((candidate, candidateIndex) => reconciliation.push({
+        id:'historical_' + makeId('reconciliation', batchId + ':' + conversationIndex + ':' + candidateIndex + ':' + candidate.type),
+        batch_id:batchId,
+        contact_id:contactId || null,
+        source_name:conversationReview.source_name || conversation.name,
+        source_message_index:Number(candidate.source_message_index || 0),
+        type:String(candidate.type || ''),
+        service:candidate.service || null,
+        status:contactId ? 'needs_reconciliation' : 'needs_contact_match',
+        requires_reconciliation:true,
+        automatic_change:false,
+        created_at:Date.now()
+      }));
       if (!contactId) { unresolved += 1; deferred += 1; return; }
       const crmContact = contactById.get(contactId) || {};
       conversation.messages.forEach(message => {
@@ -2461,6 +2503,7 @@
       });
     });
     const eventCandidates = Number(review.totals?.event_candidates || 0);
+    historicalReconciliationSave([...historicalReconciliationItems().filter(item => item.batch_id !== batchId), ...reconciliation]);
     if (!records.length) {
       writeJson(IMPORT_STATE_KEY, { batchId, imported:0, deferredConversations:deferred, outgoing, incoming, unresolvedConversations:unresolved, eventCandidates, at:Date.now(), owner:selected, status:'needs_contact_matching' });
       importStatus('No importé chats todavía: ' + deferred + ' conversación(es) requieren coincidir primero con un contacto CRM verificable. No se creó ni modificó ningún contacto.', 100);

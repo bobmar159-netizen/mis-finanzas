@@ -26,3 +26,11 @@ test('historical import sends only conversations mapped to a verified CRM phone 
   assert.match(memoryCenter, /needs_contact_matching/);
   assert.doesNotMatch(memoryCenter, /gfcProcessYarbiInformation\(\)\)\.catch\(\(\) => \{\}\);\s*if \(typeof gfcLearnHistoricalReplyStyle/);
 });
+
+test('historical signals are persisted as a local reconciliation queue, never as commercial state changes', () => {
+  assert.match(memoryCenter, /HISTORICAL_RECONCILIATION_KEY/);
+  assert.match(memoryCenter, /status:contactId \? 'needs_reconciliation' : 'needs_contact_match'/);
+  assert.match(memoryCenter, /automatic_change:false/);
+  assert.match(memoryCenter, /payment complete|pago completo/i);
+  assert.doesNotMatch(memoryCenter, /commercial_status:\s*['"]cerrado/);
+});
