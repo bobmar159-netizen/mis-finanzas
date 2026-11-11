@@ -64,6 +64,17 @@ test('Financial Coach answers structured installation collections without readin
   assert.doesNotMatch(response.reply, /900\.00/);
 });
 
+test('Financial Coach names only structured pending receivables on request', () => {
+  const window = uiWith({
+    now:Date.parse('2026-11-10T15:00:00Z'), transactions:[], commitments:[],
+    receivables:[{ id:'a', name:'Ana', balance_amount:120 }, { id:'b', name:'Bruno', balance_amount:80 }]
+  });
+  const response = window.gfcTryFinancialCoachMessage('¿Quién me debe?');
+  assert.equal(response.handled, true);
+  assert.match(response.reply, /Ana/);
+  assert.match(response.reply, /Bruno/);
+});
+
 test('Financial Coach UI contains no network client or commercial write path', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-financial-coach-ui.js'), 'utf8');
   assert.equal(/fetch\s*\(|XMLHttpRequest|navigator\.sendBeacon|localStorage\.setItem|sessionStorage\.setItem/i.test(source), false);

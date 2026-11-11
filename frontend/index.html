@@ -5141,7 +5141,7 @@ window.gfcGetFinancialCoachInput=function(){
   const remaining=row=>Math.max(0,(Number(row?.cuotasTotales)||0)-(Number(row?.cuotasPagadas)||0))*Math.max(0,moneyValue(row?.cuotaMonto));
   return {
     transactions:transactions.map(row=>({...row,business:true,noCashFlow:!isCashFlowTx(row)})),
-    receivables:debts.filter(deudaEsPorCobrar).map(row=>({id:row.id,balance_amount:remaining(row),status:row.estado||'pending'})),
+    receivables:debts.filter(deudaEsPorCobrar).map(row=>({id:row.id,name:row.nombre||row.name||row.cliente||'',balance_amount:remaining(row),status:row.estado||'pending'})),
     commitments:debts.filter(row=>!deudaEsPorCobrar(row)).map(row=>({id:row.id,amount:remaining(row),next_due_amount:row.cuotaMonto === undefined || row.cuotaMonto === null || row.cuotaMonto === '' ? null : moneyValue(row.cuotaMonto),due_at:row.proximoPago||row.proximo_pago||row.fechaVencimiento||row.vencimiento||null,paid:remaining(row)===0,status:row.estado||'pending'})),
     policy:{currency:state.moneda||'PEN',daily_free_cash_goal:500}
   };

@@ -99,3 +99,17 @@ test('Financial Coach aggregates a service only from structured service-linked c
   });
   assert.deepEqual(result.summary.collected_by_service_month, [{ service:'Instalación nueva', collected:600 }]);
 });
+
+test('Financial Coach returns only named and pending receivables, ordered by verified balance', () => {
+  const result = buildFinancialCoach({
+    now:NOW, transactions:[], commitments:[],
+    receivables:[
+      { id:'first', name:'Ana', balance_amount:80 },
+      { id:'second', nombre:'Bruno', balance_amount:150 },
+      { id:'unknown', balance_amount:500 },
+      { id:'ignored', name:'Cancelado', balance_amount:999, status:'cancelado' }
+    ]
+  });
+  assert.equal(result.summary.pending_receivables, 730);
+  assert.deepEqual(result.summary.top_named_receivables, [{ name:'Bruno', balance_amount:150 }, { name:'Ana', balance_amount:80 }]);
+});

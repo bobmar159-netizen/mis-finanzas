@@ -20,7 +20,7 @@
   }
   function localReply(utterance) {
     const value = normalized(utterance);
-    if (!/\b(caja|meta|cobrar|cobro|compromiso|vencimiento|vence|debo|deuda|pagar|gasto|ingreso|finanzas?|dinero|proyeccion|proyecta|este mes|mensual)\b/.test(value)) return null;
+    if (!/\b(caja|meta|cobrar|cobro|compromiso|vencimiento|vence|debo|debe|deben|deudor|deudores|deuda|pagar|gasto|ingreso|finanzas?|dinero|proyeccion|proyecta|este mes|mensual)\b/.test(value)) return null;
     const result = currentSummary();
     if (!result) return { handled:true, reply:'No puedo leer el resumen financiero local ahora. No se realizó ninguna consulta externa.' };
     const summary = result.summary;
@@ -29,6 +29,12 @@
       if (!matches.length) return { handled:true, reply:'No tengo cobros de instalaciones vinculados de forma estructurada en los movimientos locales de este mes.' };
       const total = matches.reduce((sum, row) => sum + Number(row.collected || 0), 0);
       return { handled:true, reply:`Este mes hay ${soles(total)} cobrados por instalaciones con vínculo de servicio registrado. No incluí cotizaciones ni cuentas por cobrar.` };
+    }
+    if (/quien me debe|quién me debe|deudores|quienes deben|quiénes deben/.test(value)) {
+      const people = Array.isArray(summary.top_named_receivables) ? summary.top_named_receivables : [];
+      if (!people.length) return { handled:true, reply:'No tengo nombres verificados asociados a los cobros pendientes locales. El total sigue separado de la caja.' };
+      const entries = people.map(row => `${row.name}: ${soles(row.balance_amount)}`).join('; ');
+      return { handled:true, reply:`Cobros pendientes con nombre registrado: ${entries}. En total son ${soles(summary.pending_receivables)} y no los cuento como efectivo hasta registrar el cobro.` };
     }
     if (/por cobrar|cobrar|cobro pendiente/.test(value)) return { handled:true, reply:`Tienes ${soles(summary.pending_receivables)} por cobrar registrado. Lo mantengo separado de la caja hasta que confirmes el cobro.` };
     if (/vencimiento|vence|proximo|próximo/.test(value)) {
