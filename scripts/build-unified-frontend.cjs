@@ -7,6 +7,7 @@ const path = require('path');
 const repo = path.resolve(__dirname, '..');
 const frontend = path.join(repo, 'frontend');
 const financialCoach = path.join(repo, 'lib', 'yarbi-financial-coach.js');
+const agendaReadModel = path.join(repo, 'lib', 'yarbi-agenda-intelligence.js');
 const args = new Map(process.argv.slice(2).map(value => {
   const [key, ...rest] = value.split('=');
   return [key, rest.join('=') || true];
@@ -37,7 +38,8 @@ function copyTree(from, to) {
 function sourceDigest() {
   const frontendFiles = walk(frontend).sort().map(file => `frontend/${path.relative(frontend, file).replace(/\\/g, '/')}` + '\t' + sha(fs.readFileSync(file)));
   if (!fs.existsSync(financialCoach)) fail('falta el módulo compartido yarbi-financial-coach.js.');
-  return sha([...frontendFiles, 'lib/yarbi-financial-coach.js\t' + sha(fs.readFileSync(financialCoach))].join('\n'));
+  if (!fs.existsSync(agendaReadModel)) fail('falta el módulo compartido yarbi-agenda-intelligence.js.');
+  return sha([...frontendFiles, 'lib/yarbi-financial-coach.js\t' + sha(fs.readFileSync(financialCoach)), 'lib/yarbi-agenda-intelligence.js\t' + sha(fs.readFileSync(agendaReadModel))].join('\n'));
 }
 function validateOrigin(value) {
   let parsed;
@@ -95,6 +97,7 @@ copyTree(frontend, out);
 // Financial Coach is a shared deterministic domain module, emitted verbatim
 // for the browser rather than duplicated in the frontend source tree.
 fs.copyFileSync(financialCoach, path.join(out, 'yarbi-financial-coach.js'));
+fs.copyFileSync(agendaReadModel, path.join(out, 'yarbi-agenda-intelligence.js'));
 renderTemplate(path.join(out, 'runtime-config.js'), {
   '__YARBI_API_ORIGIN__': apiOrigin,
   '__YARBI_ENVIRONMENT__': target,

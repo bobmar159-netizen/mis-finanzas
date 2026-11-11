@@ -5147,6 +5147,21 @@ window.gfcGetFinancialCoachInput=function(){
   };
 };
 
+// Agenda local entregada como una instantánea de solo lectura. Las consultas
+// conversacionales no crean, reprograman ni cierran actividades.
+window.gfcGetAgendaReadInput=function(){
+  const toStartAt=row=>{
+    const day=String(row?.fecha||row?.date||'').trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+    const time=/^\d{2}:\d{2}$/.test(String(row?.hora||row?.time||''))?String(row.hora||row.time):'09:00';
+    return day+'T'+time+':00-05:00';
+  };
+  return { now:Date.now(), events:(state.agenda||[]).map(row=>({
+    id:row.id,contact_id:row.contact_id||null,client_name:row.cliente||row.client||'',event_type:row.tipo||row.type||'visita',service:row.servicio||row.service||'',
+    status:row.estado||row.status||'',starts_at:toStartAt(row),location:row.ubicacion||row.location||'',source:row.source||'local_agenda',dedupe_key:row.dedupe_key||null
+  })) };
+};
+
 function circleProgress(pct,size,stroke,color,labelHtml){
   const r=(size-stroke*2)/2,circ=2*Math.PI*r,offset=circ*(1-pct/100);
   return `<div class="circle-wrap" style="width:${size}px;height:${size}px">
@@ -20418,6 +20433,8 @@ async function gfcHandleYarbiLocalCommand(text, options = {}) {
   gfcYarbiConversationFocusTouchFromText(text, options.source || 'yarbi-follow-up');
   const financial = typeof window.gfcTryFinancialCoachMessage === 'function' ? window.gfcTryFinancialCoachMessage(text) : null;
   if (financial?.handled) return { handled:true, kind:'financial_coach', reply:financial.reply };
+  const agendaRead = typeof window.gfcTryAgendaReadMessage === 'function' ? window.gfcTryAgendaReadMessage(text) : null;
+  if (agendaRead?.handled) return { handled:true, kind:'agenda_read', reply:agendaRead.reply };
   if (gfcIsTodayBoardRequest(text)) { const board = gfcShowYarbiTodayBoard({ speak:options.speak !== false }); return { handled:true, kind:'board', board }; }
   const quickAgendaStatus = gfcYarbiFastAgendaStatusIntent(text);
   if (quickAgendaStatus) return gfcYarbiApplyQuickAgendaStatus(quickAgendaStatus, text, options);
@@ -47340,7 +47357,7 @@ body.gfc-yarbi-screen #modal-box,.gfc-yarbi-shell{background:#FFFDF8 !important}
     sheet.querySelector('#gfc-historical-import-confirm').onclick = async () => { sheet.remove(); await window.gfcImportHistoricalServices(); };
   };
   window.gfcShowYarbiTodayBoard = function(){ const board=gfcYarbiTodayBoard(); if(typeof switchPage==='function') switchPage('crm'); if(typeof toast==='function') toast('Abrí el CRM con las prioridades actuales.','info'); if(typeof gfcRefreshConversationInbox==='function') Promise.resolve(gfcRefreshConversationInbox({reason:'crm-overview-background'})).catch(()=>{}); return {summary:board.summary}; };
-  window.gfcHandleYarbiLocalCommand = async function(text, options={}) { gfcYarbiConversationFocusTouchFromText(text,options.source||'yarbi-follow-up'); const financial=typeof window.gfcTryFinancialCoachMessage==='function'?window.gfcTryFinancialCoachMessage(text):null; if(financial?.handled)return {handled:true,kind:'financial_coach',reply:financial.reply}; if(gfcIsTodayBoardRequest(text)){const board=gfcShowYarbiTodayBoard();return {handled:true,kind:'crm_overview',reply:board.summary};} const intent=gfcYarbiFastAgendaStatusIntent(text); if(intent)return gfcYarbiApplyQuickAgendaStatus(intent,text,options); const status=gfcYarbiLocalResolutionIntent(text); if(!status)return null; const target=gfcYarbiTargetFromFocus(); if(!target)return {handled:true,kind:'resolution',reply:'¿De qué cliente hablamos? Dime su nombre o una pista reciente y lo clasifico sin borrar su historial.'}; return {handled:true,kind:'resolution',...(await gfcYarbiSaveClientResolution(target,status,{source:options.source||'yarbi_chat',days:status==='no_response'?30:0}))}; };
+  window.gfcHandleYarbiLocalCommand = async function(text, options={}) { gfcYarbiConversationFocusTouchFromText(text,options.source||'yarbi-follow-up'); const financial=typeof window.gfcTryFinancialCoachMessage==='function'?window.gfcTryFinancialCoachMessage(text):null; if(financial?.handled)return {handled:true,kind:'financial_coach',reply:financial.reply}; const agendaRead=typeof window.gfcTryAgendaReadMessage==='function'?window.gfcTryAgendaReadMessage(text):null; if(agendaRead?.handled)return {handled:true,kind:'agenda_read',reply:agendaRead.reply}; if(gfcIsTodayBoardRequest(text)){const board=gfcShowYarbiTodayBoard();return {handled:true,kind:'crm_overview',reply:board.summary};} const intent=gfcYarbiFastAgendaStatusIntent(text); if(intent)return gfcYarbiApplyQuickAgendaStatus(intent,text,options); const status=gfcYarbiLocalResolutionIntent(text); if(!status)return null; const target=gfcYarbiTargetFromFocus(); if(!target)return {handled:true,kind:'resolution',reply:'¿De qué cliente hablamos? Dime su nombre o una pista reciente y lo clasifico sin borrar su historial.'}; return {handled:true,kind:'resolution',...(await gfcYarbiSaveClientResolution(target,status,{source:options.source||'yarbi_chat',days:status==='no_response'?30:0}))}; };
 })();
 </script>
 <style>
@@ -47896,6 +47913,8 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
 <script src="./yarbi-app-voice.js"></script>
 <script src="./yarbi-financial-coach.js"></script>
 <script src="./yarbi-financial-coach-ui.js"></script>
+<script src="./yarbi-agenda-intelligence.js"></script>
+<script src="./yarbi-agenda-read-ui.js"></script>
 <script src="./yarbi-product-completion-ui.js"></script>
 <script src="./yarbi-owner-inbox-ui.js"></script>
 </body>

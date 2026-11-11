@@ -37,4 +37,6 @@ test('the final local chat dispatcher preserves the Financial Coach fast read', 
   const finalDispatcher = source.slice(source.lastIndexOf('window.gfcHandleYarbiLocalCommand = async function'));
   assert.match(finalDispatcher, /gfcTryFinancialCoachMessage/);
   assert.match(finalDispatcher, /kind:'financial_coach'/);
+  assert.match(finalDispatcher, /gfcTryAgendaReadMessage/);
+  assert.match(finalDispatcher, /kind:'agenda_read'/);
 });
