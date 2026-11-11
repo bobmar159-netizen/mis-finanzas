@@ -26,7 +26,7 @@ test('P0.2I: source preserves Android-only flows and backend owner inbox', () =>
   for (const marker of [
     'gfcManualAgendaDraft', 'gfcRepairLegacyVisitedAgenda', 'crm-followup-planner', 'crm-delete-record-sheet',
     "case 'yarbi-pendientes':", 'yarbi-owner-inbox-ui.js', 'gfcStartGeminiLive', 'gfcCallGeminiAPI',
-    'gfcYarbiApplyQuickAgendaStatus', 'crmSendFollowUpNow', '/api/notion-proxy', 'yarbi-owner-memory-ui.js', 'yarbi-app-voice.js', 'yarbi-financial-coach.js', 'yarbi-financial-coach-ui.js', 'yarbi-agenda-intelligence.js', 'yarbi-agenda-read-ui.js', 'yarbi-client-context-read.js', 'yarbi-client-context-read-ui.js',
+    'gfcYarbiApplyQuickAgendaStatus', 'crmSendFollowUpNow', '/api/notion-proxy', 'yarbi-owner-memory-ui.js', 'yarbi-app-voice.js', 'yarbi-financial-coach.js', 'yarbi-financial-coach-ui.js', 'yarbi-finance-context.js', 'yarbi-agenda-intelligence.js', 'yarbi-agenda-read-ui.js', 'yarbi-client-context-read.js', 'yarbi-client-context-read-ui.js',
     '/api/assistant/send-whatsapp', '/api/assistant/chat', '/api/assistant/conversation', 'gfcCallAuthenticatedOwnerConversation', '/api/assistant/live-token', '/api/whatsapp/messages'
   ]) {
     assert.ok(html.includes(marker), `missing ${marker}`);
@@ -60,7 +60,7 @@ test('P0.2I: web and Android builds are reproducible and environment-specific', 
   assert.equal(fs.readFileSync(path.join(android, 'BUILD_MANIFEST.json'), 'utf8'), fs.readFileSync(path.join(androidRepeat, 'BUILD_MANIFEST.json'), 'utf8'));
   for (const output of [web, android]) {
     assert.ok(fs.existsSync(path.join(output, 'BUILD_MANIFEST.json')));
-    for (const file of ['index.html', 'yarbi-assistant.js', 'yarbi-memory-center.js', 'yarbi-owner-memory-ui.js', 'yarbi-app-voice.js', 'yarbi-owner-inbox-ui.js', 'yarbi-financial-coach.js', 'yarbi-financial-coach-ui.js', 'yarbi-agenda-intelligence.js', 'yarbi-agenda-read-ui.js', 'yarbi-client-context-read.js', 'yarbi-client-context-read-ui.js']) assert.ok(fs.existsSync(path.join(output, file)));
+    for (const file of ['index.html', 'yarbi-assistant.js', 'yarbi-memory-center.js', 'yarbi-owner-memory-ui.js', 'yarbi-app-voice.js', 'yarbi-owner-inbox-ui.js', 'yarbi-financial-coach.js', 'yarbi-financial-coach-ui.js', 'yarbi-finance-context.js', 'yarbi-agenda-intelligence.js', 'yarbi-agenda-read-ui.js', 'yarbi-client-context-read.js', 'yarbi-client-context-read-ui.js']) assert.ok(fs.existsSync(path.join(output, file)));
     for (const file of fs.readdirSync(output)) {
       const full = path.join(output, file);
       if (fs.statSync(full).isFile()) assert.equal(fs.readFileSync(full, 'utf8').includes(productionOrigin), false, `${file} has production literal`);

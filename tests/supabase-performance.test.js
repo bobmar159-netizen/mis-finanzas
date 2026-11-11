@@ -29,7 +29,8 @@ test('performance: local mirror is incremental, bounded and parallel', () => {
   assert.match(messages, /messageLimit = localMirrorLimit\(body\.message_limit, 200, 250\)/);
   assert.match(messages, /entityLimit = localMirrorLimit\(body\.entity_limit, 400, 500\)/);
   assert.match(messages, /localMirrorSince\('updated_at', entityCursor\)/);
-  assert.match(messages, /const \[contacts, identifiers, memories, agenda, alerts, analyses, observations, habits, replyStyles, messages, deletedMessages\] = await Promise\.all/);
+  assert.match(messages, /const \[contacts, identifiers, memories, agenda, alerts, analyses, observations, receivables, habits, replyStyles, messages, deletedMessages\] = await Promise\.all/);
+  assert.match(messages, /yarbi_receivables\?select=id,contact_id,agreed_amount,paid_amount,balance_amount,status/);
 });
 
 test('performance: processing status uses HEAD counts in parallel instead of row downloads', () => {

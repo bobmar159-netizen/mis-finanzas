@@ -39,6 +39,8 @@ test('reports a balance only when it has a canonical verified amount', () => {
   const missing = replyForContext({ utterance: '¿Cuánto debe Carlos?', context: base });
   assert.equal(missing.outcome, 'no_verified_balance');
   assert.match(missing.reply, /No tengo un saldo verificable/);
+  const zero = replyForContext({ utterance: '¿Cuánto debe Carlos?', context: { ...base, finance: { summary: { pending_amount: 0 } } } });
+  assert.equal(zero.outcome, 'no_verified_balance');
 });
 
 test('requires clarification rather than selecting a homonym', () => {
