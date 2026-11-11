@@ -9,6 +9,20 @@
     const input = typeof window.gfcGetFinancialCoachInput === 'function' ? window.gfcGetFinancialCoachInput() : null;
     return coach && input ? coach.buildFinancialCoach(input) : null;
   }
+  function normalized(value) {
+    return String(value || '').toLocaleLowerCase('es-PE').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  function localReply(utterance) {
+    const value = normalized(utterance);
+    if (!/\b(caja|meta|cobrar|cobro|compromiso|gasto|ingreso|finanzas?|dinero)\b/.test(value)) return null;
+    const result = currentSummary();
+    if (!result) return { handled:true, reply:'No puedo leer el resumen financiero local ahora. No se realizó ninguna consulta externa.' };
+    const summary = result.summary;
+    if (/por cobrar|cobrar|cobro pendiente/.test(value)) return { handled:true, reply:`Tienes ${soles(summary.pending_receivables)} por cobrar registrado. Lo mantengo separado de la caja hasta que confirmes el cobro.` };
+    if (/compromiso|debo|deuda|pagar/.test(value)) return { handled:true, reply:`Hay ${soles(summary.known_commitments_due)} en compromisos locales pendientes. No lo confundí con gastos ya registrados.` };
+    if (/meta|falta|faltan/.test(value)) return { handled:true, reply:summary.remaining_to_daily_goal > 0 ? `Faltan ${soles(summary.remaining_to_daily_goal)} para la meta diaria de caja libre. Hoy llevas ${soles(summary.free_cash_today)} registrados.` : `La meta diaria de caja libre está cubierta: hoy llevas ${soles(summary.free_cash_today)} registrados.` };
+    return { handled:true, reply:`La caja libre registrada hoy es ${soles(summary.free_cash_today)}. Hay ${soles(summary.pending_receivables)} por cobrar, que no cuento como efectivo hasta registrarlo.` };
+  }
   function markup(result) {
     if (!result) return '<p>No pude preparar el resumen financiero local. No se realizó ninguna consulta externa.</p>';
     const summary = result.summary;
@@ -42,4 +56,5 @@
     document.head.appendChild(node);
   }
   window.gfcOpenFinancialCoach = function () { style(); open(); };
+  window.gfcTryFinancialCoachMessage = localReply;
 })();

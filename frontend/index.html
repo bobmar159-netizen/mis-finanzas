@@ -20416,6 +20416,8 @@ function gfcYarbiTargetFromFocus() {
 }
 async function gfcHandleYarbiLocalCommand(text, options = {}) {
   gfcYarbiConversationFocusTouchFromText(text, options.source || 'yarbi-follow-up');
+  const financial = typeof window.gfcTryFinancialCoachMessage === 'function' ? window.gfcTryFinancialCoachMessage(text) : null;
+  if (financial?.handled) return { handled:true, kind:'financial_coach', reply:financial.reply };
   if (gfcIsTodayBoardRequest(text)) { const board = gfcShowYarbiTodayBoard({ speak:options.speak !== false }); return { handled:true, kind:'board', board }; }
   const quickAgendaStatus = gfcYarbiFastAgendaStatusIntent(text);
   if (quickAgendaStatus) return gfcYarbiApplyQuickAgendaStatus(quickAgendaStatus, text, options);
