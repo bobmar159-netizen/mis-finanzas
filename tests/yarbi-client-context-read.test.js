@@ -24,14 +24,17 @@ test('classifies only deterministic client-read questions', () => {
 test('summarizes a verified local client dossier without inventing facts', () => {
   const result = replyForContext({ utterance: '¿Qué pasó con Carlos?', context: base });
   assert.equal(result.outcome, 'client_context_found');
+  assert.match(result.reply, /## 🧾 Expediente de Carlos/);
   assert.match(result.reply, /Carlos/);
   assert.match(result.reply, /instalación nueva/);
+  assert.match(result.reply, /\*\*Estado comercial:\*\* tibio/);
   assert.equal(result.execute, false);
 });
 
 test('reports a balance only when it has a canonical verified amount', () => {
   const found = replyForContext({ utterance: '¿Cuánto debe Carlos?', context: { ...base, finance: { summary: { pending_amount: 230 } } } });
   assert.equal(found.outcome, 'client_balance_found');
+  assert.match(found.reply, /## 💳 Saldo pendiente/);
   assert.match(found.reply, /S\/ 230\.00/);
   const missing = replyForContext({ utterance: '¿Cuánto debe Carlos?', context: base });
   assert.equal(missing.outcome, 'no_verified_balance');
