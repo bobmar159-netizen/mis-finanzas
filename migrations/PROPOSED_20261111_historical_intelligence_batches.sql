@@ -181,7 +181,41 @@ begin
 end;
 $$;
 
-revoke all on function public.enqueue_yarbi_historical_intelligence_batch(uuid,bigint,text,jsonb,jsonb,integer,integer,bigint,bigint), public.claim_yarbi_historical_intelligence_batch(uuid), public.complete_yarbi_historical_intelligence_batch(uuid,uuid,integer,jsonb) from public, anon, authenticated;
-grant execute on function public.enqueue_yarbi_historical_intelligence_batch(uuid,bigint,text,jsonb,jsonb,integer,integer,bigint,bigint), public.claim_yarbi_historical_intelligence_batch(uuid), public.complete_yarbi_historical_intelligence_batch(uuid,uuid,integer,jsonb) to service_role;
+create function public.fail_yarbi_historical_intelligence_batch(
+  p_owner_account_id uuid,
+  p_batch_id uuid,
+  p_expected_attempt_count integer,
+  p_error_code text
+)
+returns table(batch_id uuid, status text)
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_row public.yarbi_historical_intelligence_batches%rowtype;
+begin
+  if p_batch_id is null or p_expected_attempt_count < 1 or p_error_code !~ '^[a-z0-9_:-]{1,80}$' then
+    raise exception 'historical_batch_failure_invalid' using errcode = '22023';
+  end if;
+  select * into v_row
+  from public.yarbi_historical_intelligence_batches
+  where id = p_batch_id and owner_account_id = p_owner_account_id
+  for update;
+  if not found then
+    raise exception 'historical_batch_not_found' using errcode = 'P0002';
+  end if;
+  if v_row.status <> 'processing' or v_row.attempt_count <> p_expected_attempt_count then
+    raise exception 'historical_batch_claim_conflict' using errcode = '40001';
+  end if;
+  update public.yarbi_historical_intelligence_batches
+  set status = 'failed', error_code = p_error_code, updated_at = now()
+  where id = v_row.id;
+  return query select v_row.id, 'failed'::text;
+end;
+$$;
+
+revoke all on function public.enqueue_yarbi_historical_intelligence_batch(uuid,bigint,text,jsonb,jsonb,integer,integer,bigint,bigint), public.claim_yarbi_historical_intelligence_batch(uuid), public.complete_yarbi_historical_intelligence_batch(uuid,uuid,integer,jsonb), public.fail_yarbi_historical_intelligence_batch(uuid,uuid,integer,text) from public, anon, authenticated;
+grant execute on function public.enqueue_yarbi_historical_intelligence_batch(uuid,bigint,text,jsonb,jsonb,integer,integer,bigint,bigint), public.claim_yarbi_historical_intelligence_batch(uuid), public.complete_yarbi_historical_intelligence_batch(uuid,uuid,integer,jsonb), public.fail_yarbi_historical_intelligence_batch(uuid,uuid,integer,text) to service_role;
 
 commit;

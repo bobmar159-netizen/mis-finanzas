@@ -13,6 +13,7 @@ El historial disponible de WhatsApp se incorpora una vez, se segmenta por contac
 5. Gemini, cuando sea autorizado, podrá proponer contexto y patrones de respuesta citando referencias del segmento.
 6. Toda propuesta espera revisión explícita del propietario. No confirma pagos, visitas, servicios, cierres, deudas ni citas.
 7. Agenda y Movimientos son las fuentes para corroborar hechos comerciales; una coincidencia histórica se presenta para revisión, no altera estados.
+8. Un segmento se reclama de forma exclusiva. Si el modelo o la lectura fallan, queda marcado con un código técnico sanitizado y no se reintenta silenciosamente.
 
 ## Respuesta rápida y privacidad
 

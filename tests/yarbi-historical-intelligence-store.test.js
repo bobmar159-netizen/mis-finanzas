@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { batchRow, claimedTask, createHistoricalIntelligenceQueue, proposalPatch } = require('../lib/yarbi-historical-intelligence-store');
+const { batchRow, claimedTask, createHistoricalIntelligenceQueue, failureCode, proposalPatch } = require('../lib/yarbi-historical-intelligence-store');
 
 const OWNER = { kind: 'validated_auth_identity', subject: '11111111-1111-4111-8111-111111111111' };
 const TASK = { idempotency_key: 'a'.repeat(64), contact_id: 71, message_ids: ['m1', 'm2'], outgoing_message_ids: ['m2'], segment_index: 0, segment_count: 1, occurred_from: 1, occurred_to: 2 };
@@ -35,6 +35,7 @@ test('proposed SQL keeps the queue service-role-only and review-only', () => {
   assert.match(sql, /for update skip locked/i);
   assert.match(sql, /historical_batch_claim_conflict/i);
   assert.match(sql, /historical_batch_result_binding_invalid/i);
+  assert.match(sql, /fail_yarbi_historical_intelligence_batch/i);
   assert.match(sql, /grant execute on function public\.enqueue_yarbi_historical_intelligence_batch/i);
   assert.doesNotMatch(sql, /grant select, insert, update on table public\.yarbi_historical_intelligence_batches to service_role/i);
 });
@@ -53,6 +54,7 @@ test('queue uses RPC only and retains the owner/task binding end to end', async 
     if (name === 'enqueue_yarbi_historical_intelligence_batch') return { response: { ok: true }, data: [{ batch_id: '11111111-1111-4111-8111-111111111111', outcome: 'created', status: 'ready', attempt_count: 0 }] };
     if (name === 'claim_yarbi_historical_intelligence_batch') return { response: { ok: true }, data: [{ batch_id: '11111111-1111-4111-8111-111111111111', ...TASK, attempt_count: 1 }] };
     if (name === 'complete_yarbi_historical_intelligence_batch') return { response: { ok: true }, data: [{ batch_id: '11111111-1111-4111-8111-111111111111', status: 'awaiting_owner_review' }] };
+    if (name === 'fail_yarbi_historical_intelligence_batch') return { response: { ok: true }, data: [{ batch_id: '11111111-1111-4111-8111-111111111111', status: 'failed' }] };
     throw new Error('unexpected rpc');
   };
   const queue = createHistoricalIntelligenceQueue({ supabase, now });
@@ -68,4 +70,17 @@ test('queue uses RPC only and retains the owner/task binding end to end', async 
   assert.equal(calls[2].body.p_proposal.commercial_effects_allowed, false);
   assert.equal(calls[2].body.p_proposal.requires_owner_review, true);
   assert.equal(calls[2].body.p_proposal.contact_id, '71');
+});
+
+test('queue failure is tied to the same claim and stores only a sanitized code', async () => {
+  const calls = [];
+  const queue = createHistoricalIntelligenceQueue({ supabase: async (path, init) => {
+    calls.push({ path, body: JSON.parse(init.body) });
+    return { response: { ok: true }, data: [{ batch_id: '11111111-1111-4111-8111-111111111111', status: 'failed' }] };
+  } });
+  const task = claimedTask({ batch_id: '11111111-1111-4111-8111-111111111111', ...TASK, attempt_count: 2 });
+  const failed = await queue.fail({ ownerIdentity: OWNER, task, error_code: 'Provider message contains a phone +51 999 111 222' });
+  assert.equal(failed.status, 'failed');
+  assert.equal(calls[0].body.p_error_code, 'provider_message_contains_a_phone_51_999_111_222');
+  assert.equal(failureCode('!!!'), 'historical_batch_processing_failed');
 });
