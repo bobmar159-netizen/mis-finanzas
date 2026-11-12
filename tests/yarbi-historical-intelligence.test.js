@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildHistoricalIntelligenceRequest, createHistoricalOwnerScopeResolver, normalizeHistoricalIntelligenceResult, planHistoricalIntelligence } = require('../lib/yarbi-historical-intelligence');
+const { buildHistoricalIntelligenceRequest, createHistoricalMessageReader, createHistoricalOwnerScopeResolver, normalizeHistoricalIntelligenceResult, planHistoricalIntelligence, planHistoricalOwnerIntelligence } = require('../lib/yarbi-historical-intelligence');
 
 const OWNER = '11111111-1111-4111-8111-111111111111';
 
@@ -98,4 +98,37 @@ test('historical scope fails explicitly beyond its documented maximum', async ()
     }
   });
   await assert.rejects(() => resolve({ kind: 'validated_auth_identity', subject: OWNER }), /historical_owner_scope_limit_exceeded/);
+});
+
+test('owner-scoped historical reader pages only canonical contacts and does not silently truncate', async () => {
+  const paths = [];
+  const supabase = async path => {
+    paths.push(path);
+    const offset = Number(new URL('https://local' + path).searchParams.get('offset'));
+    const data = offset === 0
+      ? [{ id: 'h1', contact_id: 4, text: 'hola', timestamp: 1, metadata: { historical: true } }, { id: 'n1', contact_id: 4, text: 'actual', timestamp: 2, metadata: { historical: false } }]
+      : [];
+    return { response: { ok: true }, data };
+  };
+  const read = createHistoricalMessageReader({ supabase, pageSize: 2, contactBatchSize: 10 });
+  const rows = await read({ contact_ids: [4, 5] });
+  assert.deepEqual(rows.map(row => row.id), ['h1']);
+  assert.equal(paths.length, 2);
+  assert.match(paths[0], /contact_id=in\.\(4%2C5\)/);
+});
+
+test('owner historical plan rejects a mismatched scope and excludes rows outside its canonical scope', async () => {
+  const identity = { kind: 'validated_auth_identity', subject: OWNER };
+  const resolveOwnerScope = async () => ({ owner_id: OWNER, contact_ids: [4] });
+  const readMessages = async () => [
+    { id: 'h1', contact_id: 4, text: 'mensaje histórico', timestamp: 1, metadata: { historical: true, direction: 'incoming' } },
+    { id: 'h2', contact_id: 9, text: 'otro propietario', timestamp: 2, metadata: { historical: true, direction: 'incoming' } }
+  ];
+  const plan = await planHistoricalOwnerIntelligence({ ownerIdentity: identity, resolveOwnerScope, readMessages });
+  assert.deepEqual(plan.tasks.map(task => task.contact_id), ['4']);
+  assert.equal(plan.source, 'canonical_owner_scoped_historical_messages');
+  await assert.rejects(
+    planHistoricalOwnerIntelligence({ ownerIdentity: identity, resolveOwnerScope: async () => ({ owner_id: '22222222-2222-4222-8222-222222222222', contact_ids: [] }), readMessages }),
+    /historical_owner_scope_binding_invalid/
+  );
 });

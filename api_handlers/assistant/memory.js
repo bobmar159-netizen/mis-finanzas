@@ -5,12 +5,24 @@ const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 const { verifiedOwnerId } = require('../../lib/yarbi-owner-scope');
 const { traceSecret } = require('../../lib/yarbi-trace');
 const { MAX_INSTRUCTIONS, safeInstruction, classifyMemoryInput, createProposalToken, readProposalToken, relevantInstructions } = require('../../lib/yarbi-owner-memory');
+const { createHistoricalMessageReader, createHistoricalOwnerScopeResolver, planHistoricalOwnerIntelligence } = require('../../lib/yarbi-historical-intelligence');
+const { createHistoricalIntelligenceQueue } = require('../../lib/yarbi-historical-intelligence-store');
 
 function object(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
 function clean(value, limit = 1200) { return String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, limit); }
 function serviceClient(config, fetchImpl) { return async (path, options = {}) => { const response = await fetchImpl(config.supabaseUrl + path, { ...options, headers: { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}`, ...(options.headers || {}) } }); return { response, data: await response.json().catch(() => []) }; }; }
 function rows(value) { return Array.isArray(value) ? value.map(safeInstruction).filter(Boolean).slice(0, MAX_INSTRUCTIONS) : []; }
 function selectPath(ownerId) { return '/rest/v1/yarbi_owner_instructions?owner_account_id=eq.' + encodeURIComponent(ownerId) + '&deleted_at=is.null&select=id,name,instruction,category,scope,active,origin,source_channel,version,semantic_key,created_at,updated_at&order=updated_at.desc&limit=' + MAX_INSTRUCTIONS; }
+function historicalTaskSummary(task) {
+  return {
+    idempotency_key: clean(task?.idempotency_key, 80), contact_id: Number(task?.contact_id),
+    message_count: Array.isArray(task?.message_ids) ? task.message_ids.length : 0,
+    outgoing_message_count: Array.isArray(task?.outgoing_message_ids) ? task.outgoing_message_ids.length : 0,
+    segment_index: Number(task?.segment_index), segment_count: Number(task?.segment_count),
+    occurred_from: Number(task?.occurred_from) || null, occurred_to: Number(task?.occurred_to) || null,
+    requires_owner_review: true, commercial_effects_allowed: false
+  };
+}
 
 function createOwnerMemoryHandler({ fetchImpl = fetch, now = () => Date.now() } = {}) {
   return async function ownerMemoryHandler(req, res) {
@@ -24,6 +36,34 @@ function createOwnerMemoryHandler({ fetchImpl = fetch, now = () => Date.now() } 
       if (['owner_id','owner_account_id','ownerid','owneraccountid'].some(key => Object.prototype.hasOwnProperty.call(body, key))) return res.status(400).json({ ok: false, error: 'owner_memory_client_owner_forbidden' });
       const authenticated = await authenticatedOwnerIdentity(req, config, fetchImpl); if (!authenticated.ok) return res.status(authenticated.status).json({ ok: false, error: authenticated.code });
       const ownerId = verifiedOwnerId(authenticated.identity); const supabase = serviceClient(config, fetchImpl); const action = clean(body.action, 32).toLowerCase() || 'list';
+      if (action === 'historical-plan' || action === 'historical-enqueue') {
+        const requestedLimit = Math.max(1, Math.min(24, Number(body.limit) || 12));
+        const plan = await planHistoricalOwnerIntelligence({
+          ownerIdentity: authenticated.identity,
+          resolveOwnerScope: createHistoricalOwnerScopeResolver({ supabase }),
+          readMessages: createHistoricalMessageReader({ supabase }),
+          limit: requestedLimit
+        });
+        const taskSummaries = plan.tasks.map(historicalTaskSummary);
+        if (action === 'historical-plan') {
+          return res.status(200).json({
+            ok: true, outcome: 'historical_plan_ready', source: plan.source,
+            counts: plan.counts, tasks: taskSummaries,
+            next_step: plan.tasks.length ? 'owner_confirmation_required_to_enqueue' : 'no_new_historical_segments',
+            requires_owner_review: true, commercial_effects_allowed: false
+          });
+        }
+        if (body.confirm_historical_preparation !== true) return res.status(400).json({ ok: false, error: 'historical_enqueue_confirmation_required' });
+        const queue = createHistoricalIntelligenceQueue({ supabase });
+        const entries = [];
+        for (const task of plan.tasks) entries.push(await queue.enqueue({ ownerIdentity: authenticated.identity, task }));
+        return res.status(200).json({
+          ok: true, outcome: 'historical_segments_enqueued', source: plan.source,
+          counts: { ...plan.counts, enqueued: entries.filter(entry => entry.outcome === 'created').length, existing: entries.filter(entry => entry.outcome === 'existing').length },
+          tasks: entries.map(entry => ({ batch_id: entry.batch_id, outcome: entry.outcome, status: entry.status })),
+          requires_owner_review: true, commercial_effects_allowed: false
+        });
+      }
       const currentResult = await supabase(selectPath(ownerId)); if (!currentResult.response.ok) return res.status(503).json({ ok: false, error: 'owner_memory_store_unavailable' });
       const instructions = rows(currentResult.data);
       if (action === 'list') return res.status(200).json({ ok: true, source: 'supabase_owner_memory', active_count: instructions.filter(row => row.active).length, instructions });

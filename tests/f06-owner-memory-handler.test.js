@@ -10,6 +10,7 @@ function json(value, status = 200) { return new Response(JSON.stringify(value), 
 function responseBox() { const state = { status: 200, body: null }; return { state, status(value) { state.status = value; return this; }, json(value) { state.body = value; return this; } }; }
 function preview(run) { const old = Object.fromEntries(ENV_KEYS.map(key => [key, process.env[key]])); Object.assign(process.env, { VERCEL_ENV:'preview', YARBI_PREVIEW_OWNER_REFERENCES_ONLY:'true', YARBI_PREVIEW_SUPABASE_PROJECT_REF:'uevilhbstnmmdlgyshlv', SUPABASE_URL:'https://uevilhbstnmmdlgyshlv.supabase.co', SUPABASE_SECRET_KEY:'f06-isolated-service-key-not-real-123456789012345678', SUPABASE_PUBLISHABLE_KEY:'f06-isolated-publishable-key-not-real-123456789012', YARBI_TRACE_HMAC_KEY:'f06-trace-hmac-key-not-real-123456789012345678' }); return Promise.resolve().then(run).finally(() => Object.entries(old).forEach(([key, value]) => value === undefined ? delete process.env[key] : process.env[key] = value)); }
 function client(calls, store) { return async (raw, options = {}) => { const url = new URL(String(raw)); calls.push({ host:url.hostname, path:url.pathname, method:options.method || 'GET' }); assert.equal(url.hostname, 'uevilhbstnmmdlgyshlv.supabase.co'); if (url.pathname === '/auth/v1/user') return json({ id: OWNER }); if (url.pathname === '/rest/v1/yarbi_owner_instructions' && (!options.method || options.method === 'GET')) return json(store.rows); if (url.pathname === '/rest/v1/yarbi_owner_instructions' && options.method === 'POST') { const row = { id:'00000000-0000-4000-8000-0000000000b1', ...JSON.parse(options.body), created_at:'2026-11-06T12:00:00.000Z', updated_at:'2026-11-06T12:00:00.000Z' }; store.rows.unshift(row); return json([row], 201); } throw new Error('unexpected_request'); }; }
+function historicalClient(calls) { return async (raw, options = {}) => { const url = new URL(String(raw)); calls.push({ host:url.hostname, path:url.pathname, method:options.method || 'GET', body:options.body || null }); assert.equal(url.hostname, 'uevilhbstnmmdlgyshlv.supabase.co'); if (url.pathname === '/auth/v1/user') return json({ id: OWNER }); if (url.pathname === '/rest/v1/yarbi_owner_contact_scope') return json([{ contact_id: 71 }]); if (url.pathname === '/rest/v1/whatsapp_messages') return json([{ id:'historical-1', contact_id:71, text:'Necesito una instalación', timestamp:1, metadata:{ historical:true, direction:'incoming' } }]); if (url.pathname === '/rest/v1/rpc/enqueue_yarbi_historical_intelligence_batch') return json([{ batch_id:'00000000-0000-4000-8000-0000000000b1', outcome:'created', status:'ready', attempt_count:0 }]); throw new Error('unexpected_request:' + url.pathname); }; }
 
 test('F06 propone sin escribir y confirma una única vez para el owner autenticado', async () => preview(async () => {
   const calls = []; const store = { rows: [] }; const handler = createOwnerMemoryHandler({ fetchImpl: client(calls, store), now: () => Date.parse('2026-11-06T12:00:00.000Z') });
@@ -33,4 +34,23 @@ test('F07 conserva procedencia voice solo tras la confirmación explícita del o
   assert.equal(proposed.state.body.proposal.source_channel, 'voice'); assert.equal(store.rows.length, 0);
   const confirmed = responseBox(); await handler({ method:'POST', url:'/api/assistant/memory', headers:{ authorization:'Bearer synthetic' }, body:{ action:'confirm', confirm:true, proposal_token:proposed.state.body.proposal_token } }, confirmed);
   assert.equal(store.rows[0].source_channel, 'voice'); assert.equal(store.rows[0].origin, 'voice_proposed');
+}));
+
+test('historial canónico se planifica desde owner scope sin exponer texto ni escribir', async () => preview(async () => {
+  const calls = []; const handler = createOwnerMemoryHandler({ fetchImpl: historicalClient(calls) }); const res = responseBox();
+  await handler({ method:'POST', url:'/api/assistant/memory', headers:{ authorization:'Bearer synthetic' }, body:{ action:'historical-plan', limit:12 } }, res);
+  assert.equal(res.state.status, 200); assert.equal(res.state.body.outcome, 'historical_plan_ready');
+  assert.equal(res.state.body.tasks[0].contact_id, 71); assert.equal(JSON.stringify(res.state.body).includes('Necesito una instalación'), false);
+  assert.equal(calls.some(call => call.path.includes('/rpc/')), false);
+  assert.equal(calls.some(call => call.path === '/rest/v1/yarbi_owner_instructions'), false);
+}));
+
+test('historial requiere confirmación antes de encolar y la cola no tiene efectos comerciales', async () => preview(async () => {
+  const calls = []; const handler = createOwnerMemoryHandler({ fetchImpl: historicalClient(calls) }); const rejected = responseBox();
+  await handler({ method:'POST', url:'/api/assistant/memory', headers:{ authorization:'Bearer synthetic' }, body:{ action:'historical-enqueue' } }, rejected);
+  assert.equal(rejected.state.status, 400); assert.equal(rejected.state.body.error, 'historical_enqueue_confirmation_required');
+  const confirmed = responseBox(); await handler({ method:'POST', url:'/api/assistant/memory', headers:{ authorization:'Bearer synthetic' }, body:{ action:'historical-enqueue', confirm_historical_preparation:true } }, confirmed);
+  assert.equal(confirmed.state.status, 200); assert.equal(confirmed.state.body.outcome, 'historical_segments_enqueued');
+  assert.equal(confirmed.state.body.commercial_effects_allowed, false);
+  assert.equal(calls.some(call => call.path.includes('generativelanguage')), false);
 }));
