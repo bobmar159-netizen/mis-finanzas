@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { batchRow, proposalPatch } = require('../lib/yarbi-historical-intelligence-store');
+const { batchRow, claimedTask, createHistoricalIntelligenceQueue, proposalPatch } = require('../lib/yarbi-historical-intelligence-store');
 
 const OWNER = { kind: 'validated_auth_identity', subject: '11111111-1111-4111-8111-111111111111' };
 const TASK = { idempotency_key: 'a'.repeat(64), contact_id: 71, message_ids: ['m1', 'm2'], outgoing_message_ids: ['m2'], segment_index: 0, segment_count: 1, occurred_from: 1, occurred_to: 2 };
@@ -29,7 +29,43 @@ test('historical result patch requires the task and contact binding', () => {
 test('proposed SQL keeps the queue service-role-only and review-only', () => {
   const sql = fs.readFileSync(path.join(__dirname, '..', 'migrations', 'PROPOSED_20261111_historical_intelligence_batches.sql'), 'utf8');
   assert.match(sql, /enable row level security/i);
-  assert.match(sql, /revoke all on table public\.yarbi_historical_intelligence_batches from public, anon, authenticated/i);
+  assert.match(sql, /revoke all on table public\.yarbi_historical_intelligence_batches from public, anon, authenticated, service_role/i);
   assert.match(sql, /requires_owner_review boolean not null default true check \(requires_owner_review\)/i);
   assert.match(sql, /commercial_effects_allowed boolean not null default false check \(not commercial_effects_allowed\)/i);
+  assert.match(sql, /for update skip locked/i);
+  assert.match(sql, /historical_batch_claim_conflict/i);
+  assert.match(sql, /historical_batch_result_binding_invalid/i);
+  assert.match(sql, /grant execute on function public\.enqueue_yarbi_historical_intelligence_batch/i);
+  assert.doesNotMatch(sql, /grant select, insert, update on table public\.yarbi_historical_intelligence_batches to service_role/i);
+});
+
+test('claimed task validates immutable references before a provider could run', () => {
+  const row = claimedTask({ batch_id: '11111111-1111-4111-8111-111111111111', ...TASK, attempt_count: 1 });
+  assert.equal(row.attempt_count, 1);
+  assert.throws(() => claimedTask({ batch_id: 'b', ...TASK, outgoing_message_ids: ['not-in-task'], attempt_count: 1 }), /historical_batch_claim_invalid/);
+});
+
+test('queue uses RPC only and retains the owner/task binding end to end', async () => {
+  const calls = [];
+  const supabase = async (path, init) => {
+    calls.push({ path, body: JSON.parse(init.body) });
+    const name = path.split('/').at(-1);
+    if (name === 'enqueue_yarbi_historical_intelligence_batch') return { response: { ok: true }, data: [{ batch_id: '11111111-1111-4111-8111-111111111111', outcome: 'created', status: 'ready', attempt_count: 0 }] };
+    if (name === 'claim_yarbi_historical_intelligence_batch') return { response: { ok: true }, data: [{ batch_id: '11111111-1111-4111-8111-111111111111', ...TASK, attempt_count: 1 }] };
+    if (name === 'complete_yarbi_historical_intelligence_batch') return { response: { ok: true }, data: [{ batch_id: '11111111-1111-4111-8111-111111111111', status: 'awaiting_owner_review' }] };
+    throw new Error('unexpected rpc');
+  };
+  const queue = createHistoricalIntelligenceQueue({ supabase, now });
+  await queue.enqueue({ ownerIdentity: OWNER, task: TASK });
+  const task = await queue.claim({ ownerIdentity: OWNER });
+  const result = { schema: 'yarbi.historical-intelligence-result.v1', task_key: TASK.idempotency_key, contact_id: '71', contact_context_observations: [], reply_style_patterns: [], requires_owner_review: true, commercial_effects_allowed: false, status: 'awaiting_owner_review' };
+  await queue.complete({ ownerIdentity: OWNER, task, result });
+  assert.deepEqual(calls.map(call => call.path.split('/').at(-1)), [
+    'enqueue_yarbi_historical_intelligence_batch',
+    'claim_yarbi_historical_intelligence_batch',
+    'complete_yarbi_historical_intelligence_batch'
+  ]);
+  assert.equal(calls[2].body.p_proposal.commercial_effects_allowed, false);
+  assert.equal(calls[2].body.p_proposal.requires_owner_review, true);
+  assert.equal(calls[2].body.p_proposal.contact_id, '71');
 });
