@@ -18,9 +18,12 @@ android {
     }
     buildTypes {
         debug {
-            // The test build coexists with the proven 3.4.25 APK on a device.
-            applicationIdSuffix ".debug"
-            versionNameSuffix "-chat-preview-local"
+            // R3 uses a separate application id so it starts with a fresh
+            // WebView/Service Worker storage namespace. This is essential
+            // when validating changes to runtime configuration against the
+            // earlier Preview test APKs, while still preserving 3.4.25.
+            applicationIdSuffix ".debug.r3"
+            versionNameSuffix "-chat-preview-local-r3"
         }
         release {
             minifyEnabled false
