@@ -9,6 +9,7 @@ const { createHistoricalMessageReader, createHistoricalOwnerScopeResolver, creat
 const { createHistoricalIntelligenceQueue } = require('../../lib/yarbi-historical-intelligence-store');
 const { createHistoricalIntelligenceProcessor } = require('../../lib/yarbi-historical-intelligence-processor');
 const { createHistoricalGeminiInterpreter } = require('../../lib/yarbi-historical-gemini');
+const { createApprovedHistoricalReplyContextReader } = require('../../lib/yarbi-approved-historical-reply-context');
 
 function object(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
 function clean(value, limit = 1200) { return String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, limit); }
@@ -37,7 +38,19 @@ function createOwnerMemoryHandler({ fetchImpl = fetch, now = () => Date.now(), h
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : object(req.body);
       if (['owner_id','owner_account_id','ownerid','owneraccountid'].some(key => Object.prototype.hasOwnProperty.call(body, key))) return res.status(400).json({ ok: false, error: 'owner_memory_client_owner_forbidden' });
       const authenticated = await authenticatedOwnerIdentity(req, config, fetchImpl); if (!authenticated.ok) return res.status(authenticated.status).json({ ok: false, error: authenticated.code });
-      const ownerId = verifiedOwnerId(authenticated.identity); const supabase = serviceClient(config, fetchImpl); const action = clean(body.action, 32).toLowerCase() || 'list';
+      const ownerId = verifiedOwnerId(authenticated.identity); const supabase = serviceClient(config, fetchImpl); const action = clean(body.action, 64).toLowerCase() || 'list';
+      if (action === 'historical-approved-reply-context') {
+        // Esta lectura no es una acción de chat ni de CRM: entrega al backend
+        // únicamente el contexto ya aprobado para una futura composición.
+        // El owner nunca proviene del cuerpo y la RPC vuelve a aplicar su scope.
+        const reader = createApprovedHistoricalReplyContextReader({ queue: createHistoricalIntelligenceQueue({ supabase }) });
+        const context = await reader.read({ ownerIdentity: authenticated.identity, contact_id: body.contact_id, limit: body.limit });
+        return res.status(200).json({
+          ok: true, outcome: 'historical_approved_reply_context_ready', context,
+          commercial_effects_allowed: false, reply_send_allowed: false,
+          note: 'Contexto aprobado de solo lectura. No confirma pagos, visitas, Agenda ni cierres; tampoco envía mensajes.'
+        });
+      }
       if (action === 'historical-review-list') {
         const queue = createHistoricalIntelligenceQueue({ supabase });
         const batches = await queue.listReview({ ownerIdentity: authenticated.identity, limit: body.limit });

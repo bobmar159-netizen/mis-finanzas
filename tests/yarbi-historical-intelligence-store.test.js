@@ -37,6 +37,7 @@ test('proposed SQL keeps the queue service-role-only and review-only', () => {
   assert.match(sql, /historical_batch_result_binding_invalid/i);
   assert.match(sql, /fail_yarbi_historical_intelligence_batch/i);
   assert.match(sql, /list_yarbi_historical_intelligence_review_batches/i);
+  assert.match(sql, /list_yarbi_historical_intelligence_approved_batches/i);
   assert.match(sql, /review_yarbi_historical_intelligence_batch/i);
   assert.match(sql, /historical_batch_review_conflict/i);
   assert.match(sql, /grant execute on function public\.enqueue_yarbi_historical_intelligence_batch/i);
@@ -106,4 +107,20 @@ test('review queue returns only owner-bound proposals and makes identical decisi
   assert.equal(calls[0].body.p_limit, 50);
   assert.equal(calls[1].body.p_decision, 'approved');
   await assert.rejects(() => queue.review({ ownerIdentity:OWNER, batch_id:pending[0].batch_id, decision:'erase_everything' }), /historical_batch_review_input_invalid/);
+});
+
+test('approved context is read only through an owner-bound RPC and never accepts arbitrary contacts', async () => {
+  const proposal = { schema:'yarbi.historical-intelligence-result.v1', contact_id:'71', commercial_effects_allowed:false, contact_context_observations:[], reply_style_patterns:[] };
+  const calls = [];
+  const queue = createHistoricalIntelligenceQueue({ supabase: async (path, init) => {
+    calls.push({ path, body:JSON.parse(init.body) });
+    return { response:{ ok:true }, data:[{ batch_id:'11111111-1111-4111-8111-111111111111', contact_id:71, status:'approved', segment_index:0, segment_count:1, proposal }] };
+  } });
+  const rows = await queue.listApproved({ ownerIdentity:OWNER, contact_id:71, limit:1000 });
+  assert.equal(rows.length, 1);
+  assert.equal(calls[0].path.split('/').at(-1), 'list_yarbi_historical_intelligence_approved_batches');
+  assert.equal(calls[0].body.p_owner_account_id, OWNER.subject);
+  assert.equal(calls[0].body.p_contact_id, 71);
+  assert.equal(calls[0].body.p_limit, 200);
+  await assert.rejects(() => queue.listApproved({ ownerIdentity:OWNER, contact_id:'wrong' }), /historical_batch_approved_context_input_invalid/);
 });

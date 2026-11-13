@@ -294,7 +294,48 @@ begin
 end;
 $$;
 
-revoke all on function public.enqueue_yarbi_historical_intelligence_batch(uuid,bigint,text,jsonb,jsonb,integer,integer,bigint,bigint), public.claim_yarbi_historical_intelligence_batch(uuid), public.complete_yarbi_historical_intelligence_batch(uuid,uuid,integer,jsonb), public.fail_yarbi_historical_intelligence_batch(uuid,uuid,integer,text), public.list_yarbi_historical_intelligence_review_batches(uuid,integer), public.review_yarbi_historical_intelligence_batch(uuid,uuid,text) from public, anon, authenticated;
-grant execute on function public.enqueue_yarbi_historical_intelligence_batch(uuid,bigint,text,jsonb,jsonb,integer,integer,bigint,bigint), public.claim_yarbi_historical_intelligence_batch(uuid), public.complete_yarbi_historical_intelligence_batch(uuid,uuid,integer,jsonb), public.fail_yarbi_historical_intelligence_batch(uuid,uuid,integer,text), public.list_yarbi_historical_intelligence_review_batches(uuid,integer), public.review_yarbi_historical_intelligence_batch(uuid,uuid,text) to service_role;
+-- Fuente de contexto para composición de respuestas. No expone mensajes
+-- crudos: solo propuestas que el propietario ya aprobó, siempre filtradas por
+-- su identidad canónica y, si corresponde, por el contacto ya resuelto.
+create function public.list_yarbi_historical_intelligence_approved_batches(
+  p_owner_account_id uuid,
+  p_contact_id bigint default null,
+  p_limit integer default 100
+)
+returns table(
+  batch_id uuid,
+  contact_id bigint,
+  status text,
+  segment_index integer,
+  segment_count integer,
+  occurred_from bigint,
+  occurred_to bigint,
+  proposal jsonb,
+  completed_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if p_owner_account_id is null or p_limit not between 1 and 200
+    or (p_contact_id is not null and p_contact_id <= 0) then
+    raise exception 'historical_batch_approved_context_invalid' using errcode = '22023';
+  end if;
+  return query
+  select batch.id, batch.contact_id, batch.status, batch.segment_index,
+    batch.segment_count, batch.occurred_from, batch.occurred_to, batch.proposal,
+    batch.completed_at
+  from public.yarbi_historical_intelligence_batches as batch
+  where batch.owner_account_id = p_owner_account_id
+    and batch.status = 'approved'
+    and (p_contact_id is null or batch.contact_id = p_contact_id)
+  order by batch.completed_at desc nulls last, batch.id asc
+  limit p_limit;
+end;
+$$;
+
+revoke all on function public.enqueue_yarbi_historical_intelligence_batch(uuid,bigint,text,jsonb,jsonb,integer,integer,bigint,bigint), public.claim_yarbi_historical_intelligence_batch(uuid), public.complete_yarbi_historical_intelligence_batch(uuid,uuid,integer,jsonb), public.fail_yarbi_historical_intelligence_batch(uuid,uuid,integer,text), public.list_yarbi_historical_intelligence_review_batches(uuid,integer), public.review_yarbi_historical_intelligence_batch(uuid,uuid,text), public.list_yarbi_historical_intelligence_approved_batches(uuid,bigint,integer) from public, anon, authenticated;
+grant execute on function public.enqueue_yarbi_historical_intelligence_batch(uuid,bigint,text,jsonb,jsonb,integer,integer,bigint,bigint), public.claim_yarbi_historical_intelligence_batch(uuid), public.complete_yarbi_historical_intelligence_batch(uuid,uuid,integer,jsonb), public.fail_yarbi_historical_intelligence_batch(uuid,uuid,integer,text), public.list_yarbi_historical_intelligence_review_batches(uuid,integer), public.review_yarbi_historical_intelligence_batch(uuid,uuid,text), public.list_yarbi_historical_intelligence_approved_batches(uuid,bigint,integer) to service_role;
 
 commit;
