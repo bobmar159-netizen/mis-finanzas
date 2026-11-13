@@ -24,6 +24,10 @@ android {
             // earlier Preview test APKs, while still preserving 3.4.25.
             applicationIdSuffix ".debug.r3"
             versionNameSuffix "-chat-preview-local-r3"
+            // Visible label: allows the owner to distinguish this isolated
+            // validation app from the historical 3.4.25 and previous tests.
+            resValue "string", "app_name", "Yarbi Preview R3"
+            resValue "string", "title_activity_main", "Yarbi Preview R3"
         }
         release {
             minifyEnabled false
