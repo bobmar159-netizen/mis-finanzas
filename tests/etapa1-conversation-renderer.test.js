@@ -188,6 +188,17 @@ test('chat: la bienvenida guía consultas sin crear otro recorrido ni acciones c
   assert.match(html, /\.gfc-yarbi-welcome-action\{/);
 });
 
+test('chat: una respuesta puede copiarse localmente sin convertir el mensaje en una acción comercial', () => {
+  const memoryCenter = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-memory-center.js'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  assert.match(memoryCenter, /function appendTimelineMessageActions\(element, item\)/);
+  assert.match(memoryCenter, /navigator\?\.clipboard\?\.writeText/);
+  assert.match(memoryCenter, /No se envió información/);
+  assert.match(memoryCenter, /item\?\.role !== 'assistant'/);
+  assert.match(html, /\.gfc-yarbi-message-actions\{/);
+  assert.match(html, /\.gfc-yarbi-message-copy\{/);
+});
+
 test('chat contextual: reutiliza la superficie canónica y no crea un segundo recorrido', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
   const start = html.indexOf('const legacyOpen = window.gfcOpenCopilotModal;');

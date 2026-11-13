@@ -483,6 +483,7 @@
         time.className = 'gfc-yarbi-message-time';
         time.textContent = timeLabel(item.at);
         rendered.element.appendChild(time);
+        appendTimelineMessageActions(rendered.element, item);
         return rendered;
       }
     }
@@ -494,8 +495,51 @@
     time.className = 'gfc-yarbi-message-time';
     time.textContent = timeLabel(item.at);
     wrap.append(label, body, time);
+    appendTimelineMessageActions(wrap, item);
     box.appendChild(wrap);
     if (shouldFollow) box.scrollTop = box.scrollHeight;
+  }
+
+  async function copyTimelineMessageText(text) {
+    const value = String(text || '').trim();
+    if (!value) return false;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const field = document.createElement('textarea');
+        field.value = value;
+        field.setAttribute('readonly', '');
+        field.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+        document.body.appendChild(field);
+        field.select();
+        const copied = document.execCommand?.('copy');
+        field.remove();
+        if (!copied) return false;
+      }
+      if (typeof toast === 'function') toast('Respuesta copiada. No se envió información.', 'success');
+      return true;
+    } catch (_) {
+      if (typeof toast === 'function') toast('No pude copiar esa respuesta en este dispositivo.', 'warning');
+      return false;
+    }
+  }
+
+  function appendTimelineMessageActions(element, item) {
+    if (!element || item?.role !== 'assistant' || boardPayload(item.text)) return;
+    const value = String(item.text || '').trim();
+    if (!value) return;
+    const actions = document.createElement('div');
+    actions.className = 'gfc-yarbi-message-actions';
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'gfc-yarbi-message-copy';
+    copy.setAttribute('aria-label', 'Copiar respuesta de Yarbi');
+    copy.title = 'Copiar respuesta';
+    copy.textContent = '⧉ Copiar';
+    copy.addEventListener('click', () => { void copyTimelineMessageText(value); });
+    actions.appendChild(copy);
+    element.appendChild(actions);
   }
 
   function removeChatWelcome(box) {
