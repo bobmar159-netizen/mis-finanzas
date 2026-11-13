@@ -86,6 +86,32 @@ test('F05 falla de proveedor sin inventar datos ni perder el estado conversacion
   assert.equal(result.proposal.execute, false);
   assert.equal(result.commercial_effects_allowed, false);
   assert.doesNotMatch(result.reply, /Carlos.*pas[oó]/i);
+  assert.deepEqual(renderer.validateContent(result.reply).blocks.map(block => block.type), ['heading', 'paragraph', 'heading', 'unordered_list']);
+  assert.match(result.reply, /No inventaré datos/i);
+});
+
+test('F05 presenta aclaraciones y resultados estándar con jerarquía segura para el chat', async () => {
+  const resolved = await runOwnerConversation({
+    utterance: 'Carlos de Surco', now: NOW,
+    provider: async () => ({
+      schema:'yarbi.owner-understanding.v1', intent:'open_client', conversational_act:'clarification', target_type:'contact',
+      target_reference:{ name:'Carlos', district:'Surco' },
+      constraints:{ name:{ value:'Carlos', certainty:'confirmed' }, district:{ value:'Surco', certainty:'confirmed' } },
+      correction:{}, continuation:{}, cancel_scope:'none', temporal_clues:[], location_clues:[], service_clues:[], confidence:0.9, ambiguity:false, missing_information:[],
+      entity_mentions:[{ kind:'proper_name', value:'Carlos', source:'utterance', certainty:'confirmed', evidence:'Carlos' }]
+    })
+  });
+  assert.equal(resolved.outcome, 'no_match');
+  assert.match(resolved.reply, /^## Búsqueda en CRM/m);
+  assert.match(resolved.reply, /alcance autorizado/i);
+  assert.equal(resolved.commercial_effects_allowed, false);
+  assert.equal(resolved.proposal.execute, false);
+  assert.deepEqual(renderer.validateContent(resolved.reply).blocks.map(block => block.type), ['heading', 'paragraph', 'heading', 'unordered_list']);
+
+  const continuation = await runOwnerConversation({ utterance:'El segundo cliente', candidates:[31, 32], now:NOW });
+  assert.match(continuation.reply, /^## Cliente de referencia/m);
+  assert.match(continuation.reply, /no se modificó|solo cuando lo confirmes/i);
+  assert.equal(continuation.proposal.execute, false);
 });
 
 test('F05 métricas separan CPU local de Preview, Android y Gemini aún no medidos', async () => {
