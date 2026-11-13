@@ -454,13 +454,16 @@
   }
   function renderTimelineItem(item) {
     const box = document.getElementById('gfc-copilot-chat-messages');
-    if (!box || !item) return;
+    if (!box || !item || isLegacyAutomaticGreeting(item)) return;
     removeChatWelcome(box);
     const shouldFollow = chatIsNearBottom(box);
     const key = dayKey(item.at);
-    if (key !== renderedDay) {
+    const lastDivider = [...box.querySelectorAll('.gfc-yarbi-day[data-day-key]')].at(-1);
+    const lastVisibleDay = lastDivider?.dataset?.dayKey || renderedDay;
+    if (key !== lastVisibleDay) {
       const divider = document.createElement('div');
       divider.className = 'gfc-yarbi-day';
+      divider.dataset.dayKey = key;
       divider.textContent = dayLabel(item.at);
       box.appendChild(divider);
       renderedDay = key;
@@ -547,6 +550,18 @@
     target?.querySelector?.('#gfc-yarbi-chat-welcome')?.remove();
   }
 
+  function isLegacyAutomaticGreeting(item) {
+    if (!item || item.role !== 'assistant') return false;
+    const value = String(item.text || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-PE');
+    return value === 'hola, ¿en qué te ayudo?'
+      || value === 'hola, estoy listo para ayudarte. ¿qué quieres revisar?'
+      || value === 'hola, omar. ¿en qué te puedo ayudar?';
+  }
+
+  function visibleTimeline(items) {
+    return (Array.isArray(items) ? items : []).filter(item => !isLegacyAutomaticGreeting(item));
+  }
+
   function ensureChatWelcome(box) {
     const target = box || document.getElementById('gfc-copilot-chat-messages');
     if (!target || target.querySelector('[data-message-id], .gfc-yarbi-message, #gfc-yarbi-chat-welcome')) return;
@@ -568,6 +583,7 @@
       '<div class="gfc-yarbi-welcome-note"><span aria-hidden="true">✦</span><span><b>Conversación segura.</b> Escribe, dicta o usa Live; no se envían mensajes ni se registran cambios sin tu autorización.</span></div>';
     target.appendChild(welcome);
   }
+  window.gfcEnsureYarbiChatWelcome = ensureChatWelcome;
 
   // La transcripcion Live se pinta como un borrador visual y se persiste una
   // sola vez cuando Gemini cierra el turno. De esta forma el usuario ve cada
@@ -764,7 +780,7 @@
     if (!box || box.dataset.gfcRestored !== '1') return;
     let timeline;
     try { timeline = await loadTimeline(); } catch (_) { return; }
-    timeline.forEach(item => {
+    visibleTimeline(timeline).forEach(item => {
       if (!box.querySelector('[data-message-id="' + item.id + '"]')) renderTimelineItem(item);
     });
   }
@@ -810,16 +826,20 @@
         timeline = await loadTimeline();
       } catch (_) { box.dataset.gfcRestored = '0'; return; }
     }
+    const initialVisibleTimeline = visibleTimeline(timeline);
     renderedDay = '';
-    timeline.forEach(renderTimelineItem);
-    if (!timeline.length) ensureChatWelcome(box);
+    initialVisibleTimeline.forEach(renderTimelineItem);
+    if (!initialVisibleTimeline.length) ensureChatWelcome(box);
     restoreConversationScroll(box);
     watchConversationScroll(box);
     syncTimelineFromCloud().then(list => {
       if (!document.getElementById('gfc-copilot-chat-messages')) return;
-      if (list.length !== timeline.length) {
-        box.innerHTML = ''; renderedDay = ''; list.forEach(renderTimelineItem); restoreConversationScroll(box);
-        if (!list.length) ensureChatWelcome(box);
+      const nextVisibleTimeline = visibleTimeline(list);
+      const currentIds = [...box.querySelectorAll('[data-message-id]')].map(node => node.dataset.messageId).join('|');
+      const nextIds = nextVisibleTimeline.map(item => item.id).join('|');
+      if (currentIds !== nextIds) {
+        box.innerHTML = ''; renderedDay = ''; nextVisibleTimeline.forEach(renderTimelineItem); restoreConversationScroll(box);
+        if (!nextVisibleTimeline.length) ensureChatWelcome(box);
       }
     }).catch(() => {});
   };
@@ -1021,10 +1041,6 @@
       setActiveConversationId(result.conversation.id);
       window.gfcToggleYarbiMainMenu(false);
       window.gfcOpenCopilotModal('chat');
-      window.setTimeout(() => {
-        if (activeConversationId() !== result.conversation.id) return;
-        window.gfcAppendCopilotTimelineMessage('assistant', 'Hola, estoy listo para ayudarte. ¿Qué quieres revisar?', Date.now(), { channel:'session', conversationId:result.conversation.id });
-      }, 0);
       return true;
     } catch (_) {
       if (typeof toast === 'function') toast('No pude crear una conversación local segura.', 'warning');
@@ -1045,7 +1061,7 @@
     return '<header class="gfc-yarbi-header">' +
       '<button class="gfc-yarbi-back" onclick="gfcHandleYarbiBack()" aria-label="Volver">‹</button>' +
       '<div class="gfc-yarbi-brand"><div class="gfc-yarbi-avatar" aria-hidden="true">Y</div><div style="min-width:0"><div class="gfc-yarbi-brand-title">' + esc(title || 'Yarbi') + '</div><div class="gfc-yarbi-online" id="gfc-yarbi-header-status">' + sectionStatus + '</div></div></div>' +
-      '<button class="gfc-yarbi-mode-pill" id="gfc-yarbi-mode-chip" onclick="gfcToggleYarbiModeMenu()">' + esc(mode.label + ' · ' + mode.voice) + '</button>' +
+      '<button class="gfc-yarbi-mode-pill" id="gfc-yarbi-mode-chip" onclick="gfcToggleYarbiModeMenu()" aria-label="Cambiar voz y enfoque de Yarbi">' + esc(mode.voice + ' ▾') + '</button>' +
       '<button class="gfc-yarbi-icon-btn" onclick="gfcToggleYarbiMainMenu()" aria-label="Menú">⋮</button>' +
       '<div id="gfc-yarbi-mode-menu" class="gfc-yarbi-popover gfc-yarbi-hidden">' +
         allModes().map(m => '<button onclick="gfcSetYarbiMode(\'' + m.id + '\');gfcToggleYarbiModeMenu(false)">' + esc(m.icon + ' ' + m.label + ' · ' + m.voice) + '</button>').join('') +
@@ -1104,25 +1120,20 @@
 
   function chatHtml() {
     const training = interactionMode() === 'training';
-    const proactive = typeof gfcProactiveAlertStripHtml === 'function' ? gfcProactiveAlertStripHtml() : '';
-    const switcher = '<div class="gfc-yarbi-interaction-switch" role="tablist" aria-label="Tipo de conversación">' +
-      '<button class="' + (!training ? 'active' : '') + '" onclick="gfcSetYarbiInteractionMode(\'normal\')">💬 Trabajo real</button>' +
-      '<button class="training ' + (training ? 'active' : '') + '" onclick="gfcSetYarbiInteractionMode(\'training\')">🎭 Entrenamiento</button></div>';
     const trainingTools = training ?
-      '<div class="gfc-yarbi-training-unified-banner"><b>🔒 Entrenamiento seguro</b><span>Usa la misma voz Live, pero no envía WhatsApp ni modifica clientes, agenda o dinero.</span></div>' +
+      '<div class="gfc-yarbi-training-unified-banner"><div><b>🔒 Entrenamiento seguro</b><span>Practica sin enviar mensajes ni modificar clientes, agenda o dinero.</span></div><button type="button" onclick="gfcSetYarbiInteractionMode(\'normal\')">Volver al chat</button></div>' +
       '<div class="gfc-yarbi-training-quick"><button onclick="gfcYarbiUnifiedQuick(\'¿Cómo responderías a un cliente que pide precio?\')">Pedir una respuesta</button><button onclick="gfcYarbiUnifiedQuick(\'Deberías responder más corto y natural\')">Corregir a Yarbi</button><button onclick="gfcYarbiUnifiedQuick(\'Guarda eso como instrucción\')">Guardar aprendizaje</button></div>' : '';
-    const quickReads = training ? '' : '<div class="gfc-yarbi-quick-reads" aria-label="Consultas rápidas"><button type="button" onclick="gfcYarbiAskQuickRead(\'¿Qué tengo hoy?\')">📅 Hoy</button><button type="button" onclick="gfcYarbiAskQuickRead(\'¿Qué visitas siguen pendientes?\')">📍 Pendientes</button><button type="button" onclick="gfcYarbiAskQuickRead(\'¿Qué clientes tengo que llamar?\')">👥 Clientes</button><button type="button" onclick="gfcYarbiAskQuickRead(\'¿Cuánto hemos cobrado este mes?\')">💰 Cobros</button></div>';
     const conversation = training
       ? '<main id="gfc-yarbi-training-chat" class="gfc-yarbi-chat gfc-yarbi-training-chat gfc-yarbi-training-unified"></main>'
       : '<main id="gfc-copilot-chat-messages" class="gfc-yarbi-chat"></main>';
     const hiddenTrainingFields = training ? '<div class="gfc-yarbi-training-support" hidden><textarea id="gfc-yarbi-training-input"></textarea><textarea id="gfc-yarbi-training-client"></textarea><textarea id="gfc-yarbi-training-response"></textarea><textarea id="gfc-yarbi-training-correction"></textarea><div id="gfc-yarbi-training-status"></div><div id="gfc-yarbi-training-evidence"></div><div id="gfc-yarbi-training-learning"></div><div id="gfc-yarbi-training-tip"><span></span></div></div>' : '';
-    return switcher + (training ? trainingTools : learningChipHtml() + '<div class="gfc-yarbi-alert">' + proactive + '</div>' + quickReads) +
+    return (training ? trainingTools : '') +
       '<div id="gfc-yarbi-conversation-focus" class="gfc-yarbi-focus" hidden></div>' + conversation + hiddenTrainingFields +
       '<footer class="gfc-yarbi-composer-wrap">' +
-        '<div class="gfc-yarbi-live-state"><span id="gfc-live-status">Gemini Live listo.</span><span id="gfc-ai-process-status">' + (training ? 'Práctica separada de tus datos reales.' : 'Verificando memoria…') + '</span><button id="gfc-ai-process-btn" hidden></button></div>' +
-        '<div class="gfc-yarbi-composer"><textarea id="gfc-copilot-input-text" rows="1" enterkeyhint="send" autocapitalize="sentences" aria-label="Mensaje para Yarbi" placeholder="' + (training ? 'Habla como cliente, corrige o enseña a Yarbi' : 'Pregunta sobre tu negocio o escribe un mensaje…') + '" onkeydown="gfcHandleYarbiComposerKeydown(event)" oninput="gfcSaveYarbiConversationDraft(this.value);gfcResizeYarbiComposer(this)"></textarea>' +
-        '<button id="gfc-mic-input-btn" class="gfc-yarbi-live-btn" data-live-phase="off" onclick="gfcStartCopilotVoiceInput()" aria-label="Activar conversación por voz" title="Hablar con Yarbi"><span class="gfc-live-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="gfc-live-button-label">Live</span></button>' +
-        '<button class="gfc-yarbi-send-btn" onclick="gfcSendYarbiUnifiedMessage()" aria-label="Enviar mensaje" title="Enviar mensaje">➤</button></div>' +
+        '<div class="gfc-yarbi-live-state"><span id="gfc-live-status">Listo para hablar o escribir</span><span id="gfc-ai-process-status" aria-live="polite">' + (training ? 'Práctica privada' : '') + '</span><button id="gfc-ai-process-btn" hidden></button></div>' +
+        '<div class="gfc-yarbi-composer"><textarea id="gfc-copilot-input-text" rows="1" enterkeyhint="send" autocapitalize="sentences" aria-label="Mensaje para Yarbi" placeholder="' + (training ? 'Escribe como cliente o enséñale a Yarbi…' : 'Pregunta lo que necesites…') + '" onkeydown="gfcHandleYarbiComposerKeydown(event)" oninput="gfcSaveYarbiConversationDraft(this.value);gfcResizeYarbiComposer(this)"></textarea>' +
+        '<div class="gfc-yarbi-composer-toolbar"><button id="gfc-mic-input-btn" class="gfc-yarbi-live-btn" data-live-phase="off" onclick="gfcStartCopilotVoiceInput()" aria-label="Activar conversación por voz" title="Hablar con Yarbi"><span class="gfc-live-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="gfc-live-button-label">Hablar</span></button><span class="gfc-yarbi-composer-hint">Enter para enviar · Shift+Enter para otra línea</span>' +
+        '<button class="gfc-yarbi-send-btn" onclick="gfcSendYarbiUnifiedMessage()" aria-label="Enviar mensaje" title="Enviar mensaje"><span aria-hidden="true">↑</span></button></div></div>' +
       '</footer>';
   }
   function hubHtml() {
@@ -1836,8 +1847,8 @@
     const input = field || document.getElementById('gfc-copilot-input-text');
     if (!input || String(input.tagName || '').toLowerCase() !== 'textarea') return;
     input.style.setProperty('height', 'auto', 'important');
-    input.style.setProperty('height', Math.min(Math.max(input.scrollHeight, 46), 132) + 'px', 'important');
-    input.classList.toggle('is-multiline', input.scrollHeight > 50);
+    input.style.setProperty('height', Math.min(Math.max(input.scrollHeight, 56), 148) + 'px', 'important');
+    input.classList.toggle('is-multiline', input.scrollHeight > 62);
   };
   window.gfcHandleYarbiComposerKeydown = function(event) {
     if (!event || event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
@@ -2476,7 +2487,7 @@
     if (typeof originalRefreshMode === 'function') originalRefreshMode(message);
     const mode = activeMode();
     const chip = document.getElementById('gfc-yarbi-mode-chip');
-    if (chip) chip.textContent = message || (mode.label + ' · ' + mode.voice);
+    if (chip) chip.textContent = message || (mode.voice + ' ▾');
   };
   const originalProcessingUi = window.gfcSetYarbiProcessingUi;
   window.gfcSetYarbiProcessingUi = function(data) {

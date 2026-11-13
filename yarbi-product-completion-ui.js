@@ -148,6 +148,10 @@
   }
   function install() {
     style(); if(document.querySelector('.gfc-pc-launch')) return;
+    // El panel fue una superficie de validación. En la aplicación Android las
+    // mismas funciones viven en CRM y en el menú de Yarbi, por lo que no debe
+    // aparecer un botón flotante de prueba sobre la conversación.
+    if (window.Capacitor?.isNativePlatform?.()) return;
     const button=document.createElement('button'); button.className='gfc-pc-launch'; button.type='button'; button.textContent='✦ Funciones de Yarbi'; button.onclick=open; document.body.appendChild(button);
   }
   window.gfcOpenYarbiProductCompletionPanel=open;
