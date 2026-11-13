@@ -11,6 +11,8 @@ const root = path.resolve(__dirname, '..');
 const build = path.join(root, 'scripts', 'build-unified-frontend.cjs');
 const frontend = path.join(root, 'frontend');
 const productionOrigin = 'https://misfinanzas-backend.vercel.app';
+const stableSupabaseOrigin = 'https://haifktjvyhbsazmiyqps.supabase.co';
+const syntheticPublishableKey = 'sb_publishable_' + 'a'.repeat(32);
 
 function run(target, output, environment = {}, extraArgs = []) {
   const env = { ...process.env, ...environment };
@@ -89,12 +91,20 @@ test('Android stable: Production requires the explicit stable channel and exact 
     /canal stable exige exactamente/
   );
   const stable = path.join(temp, 'stable');
-  run('android', stable, { YARBI_ANDROID_API_ORIGIN: productionOrigin }, ['--channel=stable']);
+  run('android', stable, {
+    YARBI_ANDROID_API_ORIGIN: productionOrigin,
+    YARBI_ANDROID_SUPABASE_URL: stableSupabaseOrigin,
+    YARBI_ANDROID_SUPABASE_PUBLISHABLE_KEY: syntheticPublishableKey
+  }, ['--channel=stable']);
   const runtime = fs.readFileSync(path.join(stable, 'runtime-config.js'), 'utf8');
   const manifest = JSON.parse(fs.readFileSync(path.join(stable, 'BUILD_MANIFEST.json'), 'utf8'));
   assert.match(runtime, /apiOrigin: 'https:\/\/misfinanzas-backend\.vercel\.app'/);
+  assert.match(runtime, /supabaseUrl: 'https:\/\/haifktjvyhbsazmiyqps\.supabase\.co'/);
+  assert.ok(runtime.includes(syntheticPublishableKey));
   assert.equal(manifest.channel, 'stable');
   assert.equal(manifest.api_origin_mode, 'explicit_https');
+  assert.equal(manifest.public_auth_embedded, true);
+  assert.equal(manifest.supabase_project_ref, 'haifktjvyhbsazmiyqps');
   for (const file of fs.readdirSync(stable)) {
     const full = path.join(stable, file);
     if (!fs.statSync(full).isFile() || file === 'runtime-config.js') continue;

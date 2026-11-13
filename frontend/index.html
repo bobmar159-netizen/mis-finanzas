@@ -12031,10 +12031,20 @@ function gfcAccountRedirectUri() {
 }
 const GFC_ACCOUNT_STATUS_KEY = 'gfc_supabase_account_status_v1';
 async function gfcSupabaseAuthConfig() {
-  const response = await fetch(window.gfcRuntimeApiOrigin() + '/api/assistant/preferences?action=auth-config', { cache: 'no-store' });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.supabaseUrl || !data.publishableKey) throw new Error('Falta la configuración pública de Supabase');
-  return data;
+  try {
+    const response = await fetch(window.gfcRuntimeApiOrigin() + '/api/assistant/preferences?action=auth-config', { cache: 'no-store' });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok && data.supabaseUrl && data.publishableKey) return data;
+  } catch (_) {
+    // La configuración pública integrada en Android permite iniciar sesión
+    // aunque falle únicamente el bootstrap del backend. Nunca contiene una
+    // service-role key ni habilita operaciones sin autenticación.
+  }
+  const embedded = typeof window.gfcRuntimePublicAuthConfig === 'function'
+    ? window.gfcRuntimePublicAuthConfig()
+    : null;
+  if (embedded?.supabaseUrl && embedded?.publishableKey) return embedded;
+  throw new Error('Falta la configuración pública de Supabase');
 }
 async function gfcSupabaseAuthRequest(path, body) {
   const config = await gfcSupabaseAuthConfig();

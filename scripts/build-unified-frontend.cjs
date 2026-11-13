@@ -23,6 +23,7 @@ const publishRoot = publishRootArg === true ? repo : (publishRootArg ? path.reso
 const androidOfflineOnly = target === 'android' && process.env.YARBI_ANDROID_OFFLINE_ONLY === 'true';
 const androidChannel = target === 'android' ? String(args.get('--channel') || 'non-production') : 'web';
 const stableAndroidOrigin = 'https://misfinanzas-backend.vercel.app';
+const stableSupabaseOrigin = 'https://haifktjvyhbsazmiyqps.supabase.co';
 
 function fail(message) { throw new Error(`P0.2I build: ${message}`); }
 function sha(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
@@ -60,6 +61,15 @@ function validateOrigin(value) {
 function validateAuthScheme(value) {
   if (!/^[a-z][a-z0-9+.-]*$/i.test(value)) fail('YARBI_ANDROID_AUTH_CALLBACK_SCHEME debe ser un esquema URI válido.');
   return value;
+}
+function validateStablePublicAuth(urlValue, keyValue) {
+  const supabaseUrl = validateOrigin(urlValue || '');
+  const publishableKey = String(keyValue || '').trim();
+  if (supabaseUrl !== stableSupabaseOrigin) fail(`el canal stable exige exactamente ${stableSupabaseOrigin}.`);
+  if (!/^sb_publishable_[A-Za-z0-9._-]{20,}$/.test(publishableKey)) {
+    fail('YARBI_ANDROID_SUPABASE_PUBLISHABLE_KEY debe ser una publishable key válida; no se aceptan secretos ni service-role keys.');
+  }
+  return { supabaseUrl, publishableKey };
 }
 function renderTemplate(file, replacements) {
   let value = fs.readFileSync(file, 'utf8');
@@ -104,6 +114,12 @@ if (target === 'android' && androidChannel === 'stable' && apiOrigin !== stableA
 if (target === 'android' && androidChannel !== 'stable' && apiOrigin === stableAndroidOrigin) {
   fail('Production solo puede usarse con --channel=stable explícito.');
 }
+const stablePublicAuth = target === 'android' && androidChannel === 'stable'
+  ? validateStablePublicAuth(
+      process.env.YARBI_ANDROID_SUPABASE_URL,
+      process.env.YARBI_ANDROID_SUPABASE_PUBLISHABLE_KEY
+    )
+  : { supabaseUrl: '', publishableKey: '' };
 const remoteEnabled = target === 'web' || !androidOfflineOnly;
 const nativeAuthCallbackScheme = target === 'android'
   ? validateAuthScheme(process.env.YARBI_ANDROID_AUTH_CALLBACK_SCHEME || 'com.misfinanzas.app')
@@ -123,6 +139,8 @@ renderTemplate(path.join(out, 'runtime-config.js'), {
   '__YARBI_RELEASE_ID__': releaseId,
   '__YARBI_REMOTE_ENABLED__': String(remoteEnabled),
   '__YARBI_NATIVE_AUTH_CALLBACK_SCHEME__': nativeAuthCallbackScheme,
+  '__YARBI_SUPABASE_URL__': stablePublicAuth.supabaseUrl,
+  '__YARBI_SUPABASE_PUBLISHABLE_KEY__': stablePublicAuth.publishableKey,
   '__YARBI_SAME_ORIGIN__': '__YARBI_SAME_ORIGIN__'
 });
 renderTemplate(path.join(out, 'service-worker.js'), { '__YARBI_RELEASE_ID__': releaseId });
@@ -145,6 +163,8 @@ const manifest = {
   source_sha256: sourceHash,
   api_origin_mode: target === 'web' ? 'same_origin' : (androidOfflineOnly ? 'remote_disabled' : 'explicit_https'),
   channel: target === 'android' ? androidChannel : 'web',
+  public_auth_embedded: Boolean(stablePublicAuth.supabaseUrl && stablePublicAuth.publishableKey),
+  ...(stablePublicAuth.supabaseUrl ? { supabase_project_ref: new URL(stablePublicAuth.supabaseUrl).hostname.split('.')[0] } : {}),
   files: files.map(file => ({ path: path.relative(out, file).replace(/\\/g, '/'), sha256: sha(fs.readFileSync(file)), bytes: fs.statSync(file).size }))
 };
 fs.writeFileSync(path.join(out, 'BUILD_MANIFEST.json'), JSON.stringify(manifest, null, 2) + '\n');

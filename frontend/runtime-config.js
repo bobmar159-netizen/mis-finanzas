@@ -6,7 +6,9 @@
     environment: '__YARBI_ENVIRONMENT__',
     releaseId: '__YARBI_RELEASE_ID__',
     remoteEnabled: '__YARBI_REMOTE_ENABLED__' === 'true',
-    nativeAuthCallbackScheme: '__YARBI_NATIVE_AUTH_CALLBACK_SCHEME__'
+    nativeAuthCallbackScheme: '__YARBI_NATIVE_AUTH_CALLBACK_SCHEME__',
+    supabaseUrl: '__YARBI_SUPABASE_URL__',
+    supabasePublishableKey: '__YARBI_SUPABASE_PUBLISHABLE_KEY__'
   });
   function apiOrigin() {
     if (!config.remoteEnabled) {
@@ -25,4 +27,17 @@
   window.gfcRuntimeApiOrigin = apiOrigin;
   window.gfcRuntimeRemoteEnabled = () => config.remoteEnabled;
   window.gfcRuntimeNativeAuthCallbackPrefix = () => `${config.nativeAuthCallbackScheme}://auth/callback`;
+  window.gfcRuntimePublicAuthConfig = () => {
+    if (!config.supabaseUrl || !config.supabasePublishableKey) return null;
+    try {
+      const parsed = new URL(config.supabaseUrl);
+      if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.supabase.co')) return null;
+      return Object.freeze({
+        supabaseUrl: parsed.origin,
+        publishableKey: config.supabasePublishableKey
+      });
+    } catch (_) {
+      return null;
+    }
+  };
 })();
