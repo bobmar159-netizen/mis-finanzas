@@ -211,6 +211,19 @@ test('chat: el recorrido escrito permite formato Markdown seguro sin afectar el 
   assert.match(html, /const liveEmojiSpeechRule =/);
 });
 
+test('aprendizaje histórico: la interfaz planifica antes de preparar y no dispara Gemini', () => {
+  const memoryCenter = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-memory-center.js'), 'utf8');
+  const start = memoryCenter.indexOf('function historicalPreparationState()');
+  const end = memoryCenter.indexOf('window.gfcYarbiLoadHistoricalApprovedLearning', start);
+  const section = memoryCenter.slice(start, end);
+  assert.match(section, /action:'historical-plan'/);
+  assert.match(section, /action:'historical-enqueue'/);
+  assert.match(section, /confirm_historical_preparation:true/);
+  assert.match(section, /No se llamará a Gemini ni se modificarán clientes, Agenda, cobros o mensajes/);
+  assert.doesNotMatch(section, /historical-process-one/);
+  assert.doesNotMatch(section, /confirm_historical_model_call:true/);
+});
+
 test('chat contextual: reutiliza la superficie canónica y no crea un segundo recorrido', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
   const start = html.indexOf('const legacyOpen = window.gfcOpenCopilotModal;');

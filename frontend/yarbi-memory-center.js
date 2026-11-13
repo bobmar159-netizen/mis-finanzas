@@ -1202,6 +1202,38 @@
     const value = window._gfcYarbiHistoricalApprovedLearning;
     return value && typeof value === 'object' ? value : { loading:false, error:'', context:null };
   }
+  function historicalPreparationState() {
+    const value = window._gfcYarbiHistoricalPreparation;
+    return value && typeof value === 'object' ? value : { loading:false, error:'', plan:null, prepared:null };
+  }
+  function historicalPreparationHtml() {
+    const state = historicalPreparationState();
+    const plan = state.plan && typeof state.plan === 'object' ? state.plan : null;
+    const counts = plan?.counts && typeof plan.counts === 'object' ? plan.counts : {};
+    const taskCount = Array.isArray(plan?.tasks) ? plan.tasks.length : 0;
+    const available = Number(counts.available_messages || 0);
+    const segmented = Number(counts.segmented_messages || 0);
+    const prepared = state.prepared && typeof state.prepared === 'object' ? state.prepared : null;
+    const status = state.loading ? 'Revisando únicamente los mensajes históricos ya sincronizados…'
+      : state.error ? state.error
+        : prepared ? (prepared.created ? 'Cola de revisión preparada: ' + prepared.created + ' segmento(s) nuevo(s). Aún no se llamó a Gemini ni se modificó CRM, Agenda o Caja.' : 'No había segmentos nuevos que preparar. Ningún dato comercial fue modificado.')
+          : plan ? (taskCount ? 'Encontré ' + taskCount + ' segmento(s) listos para revisión. No contienen una decisión comercial automática.' : 'No hay segmentos nuevos disponibles. Esto no significa que falten chats en WhatsApp: solo revisa lo que ya está sincronizado y autorizado.')
+            : 'Revisa de forma segura el historial que ya esté sincronizado para tu cuenta. Yarbi no intenta descargar chats antiguos que el proveedor no haya entregado.';
+    const summary = plan
+      ? '<div class="gfc-yarbi-learning-evidence"><b>' + taskCount + ' segmento(s) por preparar</b><span>' + available + ' mensaje(s) disponibles · ' + segmented + ' mensaje(s) segmentados</span><small>Cada segmento conserva su propio estado, se procesa como máximo una vez por intento y siempre requiere revisión tuya.</small></div>'
+      : '';
+    const planButton = state.loading
+      ? '<button class="gfc-yarbi-secondary" disabled>Revisando…</button>'
+      : '<button class="gfc-yarbi-secondary" onclick="gfcYarbiPlanHistoricalLearning()">Revisar historial sincronizado</button>';
+    const enqueueButton = plan && taskCount && !state.loading
+      ? '<button class="gfc-yarbi-primary" onclick="gfcYarbiEnqueueHistoricalLearning()">Preparar cola para revisión</button>'
+      : '';
+    return '<div class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Historial sincronizado</div>' +
+      '<div class="gfc-yarbi-tool-copy">Este paso no importa un ZIP ni analiza chats con IA. Solo detecta mensajes históricos que ya existen en tu fuente autorizada y los divide en segmentos pequeños, aislados por propietario y contacto.</div>' +
+      '<div class="gfc-yarbi-learning-evidence"><b>Aprendizaje bajo control</b><span>' + esc(status) + '</span></div>' + summary +
+      '<div class="gfc-yarbi-safety">Primero revisas y preparas. Una llamada de IA posterior requerirá una habilitación separada y tu confirmación por segmento. Las señales históricas nunca cambian solas cobros, visitas, servicios ni estados.</div>' +
+      '<div class="gfc-yarbi-training-actions">' + planButton + enqueueButton + '</div></div>';
+  }
   function historicalApprovedLearningHtml() {
     const state = historicalApprovedLearningState();
     const context = state.context && typeof state.context === 'object' ? state.context : null;
@@ -1247,8 +1279,72 @@
         learningRequirement(metrics.unresolved === 0, 'Todos los chats con identidad verificable (' + metrics.unresolved + ' pendientes)') +
       '</ul>' +
       '<div class="gfc-yarbi-safety">🛑 Freno de emergencia siempre activo. Fuera de la ventana permitida por WhatsApp se usarán únicamente plantillas aprobadas; los casos sensibles pasarán a una persona.</div>' +
-      '<div class="gfc-yarbi-training-actions"><button class="gfc-yarbi-primary" onclick="gfcOpenCopilotModal(\'practice\')">Probar respuestas</button><button class="gfc-yarbi-secondary" onclick="gfcOpenCopilotModal(\'masivo\')">Importar conversación</button></div></div>' + historicalApprovedLearningHtml() + historicalReconciliationHtml() + '</main>';
+      '<div class="gfc-yarbi-training-actions"><button class="gfc-yarbi-primary" onclick="gfcOpenCopilotModal(\'practice\')">Probar respuestas</button><button class="gfc-yarbi-secondary" onclick="gfcOpenCopilotModal(\'masivo\')">Importar conversación</button></div></div>' + historicalPreparationHtml() + historicalApprovedLearningHtml() + historicalReconciliationHtml() + '</main>';
   }
+  window.gfcYarbiPlanHistoricalLearning = async function() {
+    if (historicalPreparationState().loading) return;
+    if (!remoteTimelineEnabled()) {
+      window._gfcYarbiHistoricalPreparation = { loading:false, error:'Activa una sesión de Preview aislada para revisar el historial ya sincronizado.', plan:null, prepared:null };
+      if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+      return;
+    }
+    const accessToken = await ownerSessionToken();
+    if (!accessToken) {
+      window._gfcYarbiHistoricalPreparation = { loading:false, error:'Inicia sesión con la cuenta autorizada de Preview para revisar este historial.', plan:null, prepared:null };
+      if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+      return;
+    }
+    window._gfcYarbiHistoricalPreparation = { loading:true, error:'', plan:null, prepared:null };
+    if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+    try {
+      const response = await fetch(BACKEND + '/api/assistant/memory', {
+        method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + accessToken },
+        body:JSON.stringify({ action:'historical-plan', limit:12 })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok !== true || payload?.outcome !== 'historical_plan_ready') throw new Error('El historial sincronizado no está disponible todavía.');
+      const tasks = Array.isArray(payload.tasks) ? payload.tasks.map(task => ({
+        message_count:Math.max(0, Number(task?.message_count) || 0),
+        outgoing_message_count:Math.max(0, Number(task?.outgoing_message_count) || 0),
+        segment_index:Math.max(0, Number(task?.segment_index) || 0),
+        segment_count:Math.max(0, Number(task?.segment_count) || 0)
+      })) : [];
+      const counts = payload.counts && typeof payload.counts === 'object' ? {
+        available_messages:Math.max(0, Number(payload.counts.available_messages) || 0),
+        segmented_messages:Math.max(0, Number(payload.counts.segmented_messages) || 0)
+      } : {};
+      window._gfcYarbiHistoricalPreparation = { loading:false, error:'', plan:{ tasks, counts }, prepared:null };
+    } catch (_) {
+      window._gfcYarbiHistoricalPreparation = { loading:false, error:'No pude revisar el historial sincronizado. No se usó ningún otro entorno ni se modificó información.', plan:null, prepared:null };
+    }
+    if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+  };
+  window.gfcYarbiEnqueueHistoricalLearning = async function() {
+    const plan = historicalPreparationState().plan;
+    if (!Array.isArray(plan?.tasks) || !plan.tasks.length || historicalPreparationState().loading) return;
+    if (!confirm('Se preparará una cola de revisión para los segmentos detectados. No se llamará a Gemini ni se modificarán clientes, Agenda, cobros o mensajes. ¿Continuar?')) return;
+    const accessToken = await ownerSessionToken();
+    if (!accessToken) {
+      window._gfcYarbiHistoricalPreparation = { loading:false, error:'Tu sesión autorizada ya no está disponible. No se preparó ninguna cola.', plan, prepared:null };
+      if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+      return;
+    }
+    window._gfcYarbiHistoricalPreparation = { loading:true, error:'', plan, prepared:null };
+    if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+    try {
+      const response = await fetch(BACKEND + '/api/assistant/memory', {
+        method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + accessToken },
+        body:JSON.stringify({ action:'historical-enqueue', limit:12, confirm_historical_preparation:true })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok !== true || payload?.outcome !== 'historical_segments_enqueued') throw new Error('No se pudo preparar la cola de revisión.');
+      const counts = payload.counts && typeof payload.counts === 'object' ? payload.counts : {};
+      window._gfcYarbiHistoricalPreparation = { loading:false, error:'', plan:null, prepared:{ created:Math.max(0, Number(counts.enqueued) || 0), existing:Math.max(0, Number(counts.existing) || 0) } };
+    } catch (_) {
+      window._gfcYarbiHistoricalPreparation = { loading:false, error:'No se pudo preparar la cola. No se ejecutó análisis con IA ni una acción comercial.', plan, prepared:null };
+    }
+    if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+  };
   window.gfcYarbiLoadHistoricalApprovedLearning = async function() {
     if (historicalApprovedLearningState().loading) return;
     if (!remoteTimelineEnabled()) {
