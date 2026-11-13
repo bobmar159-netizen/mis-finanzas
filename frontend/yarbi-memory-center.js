@@ -455,6 +455,7 @@
   function renderTimelineItem(item) {
     const box = document.getElementById('gfc-copilot-chat-messages');
     if (!box || !item) return;
+    removeChatWelcome(box);
     const shouldFollow = chatIsNearBottom(box);
     const key = dayKey(item.at);
     if (key !== renderedDay) {
@@ -495,6 +496,33 @@
     wrap.append(label, body, time);
     box.appendChild(wrap);
     if (shouldFollow) box.scrollTop = box.scrollHeight;
+  }
+
+  function removeChatWelcome(box) {
+    const target = box || document.getElementById('gfc-copilot-chat-messages');
+    target?.querySelector?.('#gfc-yarbi-chat-welcome')?.remove();
+  }
+
+  function ensureChatWelcome(box) {
+    const target = box || document.getElementById('gfc-copilot-chat-messages');
+    if (!target || target.querySelector('[data-message-id], .gfc-yarbi-message, #gfc-yarbi-chat-welcome')) return;
+    const welcome = document.createElement('section');
+    welcome.id = 'gfc-yarbi-chat-welcome';
+    welcome.className = 'gfc-yarbi-chat-welcome';
+    welcome.setAttribute('aria-label', 'Inicio de conversación con Yarbi');
+    welcome.innerHTML =
+      '<div class="gfc-yarbi-welcome-mark" aria-hidden="true">Y</div>' +
+      '<p class="gfc-yarbi-welcome-kicker">TU COPILOTO DEL NEGOCIO</p>' +
+      '<h1>¿Qué quieres resolver hoy?</h1>' +
+      '<p>Consulta clientes, visitas, cobros y seguimientos con lenguaje natural. Yarbi te mostrará lo que sabe y te pedirá confirmación antes de cualquier cambio.</p>' +
+      '<div class="gfc-yarbi-welcome-actions" role="list" aria-label="Consultas sugeridas">' +
+        '<button type="button" role="listitem" class="gfc-yarbi-welcome-action" onclick="gfcYarbiAskQuickRead(\'¿Qué tengo hoy?\')"><span aria-hidden="true">📅</span><b>Mi día</b><small>Visitas y pendientes de hoy</small></button>' +
+        '<button type="button" role="listitem" class="gfc-yarbi-welcome-action" onclick="gfcYarbiAskQuickRead(\'¿Qué clientes tengo que llamar?\')"><span aria-hidden="true">👥</span><b>Clientes</b><small>Seguimientos que requieren atención</small></button>' +
+        '<button type="button" role="listitem" class="gfc-yarbi-welcome-action" onclick="gfcYarbiAskQuickRead(\'¿Qué visitas siguen pendientes?\')"><span aria-hidden="true">📍</span><b>Agenda</b><small>Visitas y trabajos por revisar</small></button>' +
+        '<button type="button" role="listitem" class="gfc-yarbi-welcome-action" onclick="gfcYarbiAskQuickRead(\'¿Cuánto hemos cobrado este mes?\')"><span aria-hidden="true">💰</span><b>Finanzas</b><small>Cobros confirmados del periodo</small></button>' +
+      '</div>' +
+      '<div class="gfc-yarbi-welcome-note"><span aria-hidden="true">✦</span><span><b>Conversación segura.</b> Escribe, dicta o usa Live; no se envían mensajes ni se registran cambios sin tu autorización.</span></div>';
+    target.appendChild(welcome);
   }
 
   // La transcripcion Live se pinta como un borrador visual y se persiste una
@@ -740,12 +768,14 @@
     }
     renderedDay = '';
     timeline.forEach(renderTimelineItem);
+    if (!timeline.length) ensureChatWelcome(box);
     restoreConversationScroll(box);
     watchConversationScroll(box);
     syncTimelineFromCloud().then(list => {
       if (!document.getElementById('gfc-copilot-chat-messages')) return;
       if (list.length !== timeline.length) {
         box.innerHTML = ''; renderedDay = ''; list.forEach(renderTimelineItem); restoreConversationScroll(box);
+        if (!list.length) ensureChatWelcome(box);
       }
     }).catch(() => {});
   };
@@ -966,7 +996,7 @@
   function headerHtml(title, tab) {
     const mode = activeMode();
     const sectionStatus = tab === 'chat'
-      ? (interactionMode() === 'training' ? '● Entrenamiento seguro' : '● Verificando…')
+      ? (interactionMode() === 'training' ? '● Entrenamiento seguro' : '● Listo para ayudarte')
       : (tab === 'ordenes' ? '● Instrucciones disponibles' : '● Herramientas de Yarbi');
     return '<header class="gfc-yarbi-header">' +
       '<button class="gfc-yarbi-back" onclick="gfcHandleYarbiBack()" aria-label="Volver">‹</button>' +
@@ -1046,9 +1076,9 @@
       '<div id="gfc-yarbi-conversation-focus" class="gfc-yarbi-focus" hidden></div>' + conversation + hiddenTrainingFields +
       '<footer class="gfc-yarbi-composer-wrap">' +
         '<div class="gfc-yarbi-live-state"><span id="gfc-live-status">Gemini Live listo.</span><span id="gfc-ai-process-status">' + (training ? 'Práctica separada de tus datos reales.' : 'Verificando memoria…') + '</span><button id="gfc-ai-process-btn" hidden></button></div>' +
-        '<div class="gfc-yarbi-composer"><textarea id="gfc-copilot-input-text" rows="1" enterkeyhint="send" autocapitalize="sentences" aria-label="Mensaje para Yarbi" placeholder="' + (training ? 'Habla como cliente, corrige o enseña a Yarbi' : 'Escribe un mensaje…') + '" onkeydown="gfcHandleYarbiComposerKeydown(event)" oninput="gfcSaveYarbiConversationDraft(this.value);gfcResizeYarbiComposer(this)"></textarea>' +
-        '<button id="gfc-mic-input-btn" class="gfc-yarbi-live-btn" data-live-phase="off" onclick="gfcStartCopilotVoiceInput()" aria-label="Activar conversación por voz"><span class="gfc-live-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="gfc-live-button-label">Live</span></button>' +
-        '<button class="gfc-yarbi-send-btn" onclick="gfcSendYarbiUnifiedMessage()">➤</button></div>' +
+        '<div class="gfc-yarbi-composer"><textarea id="gfc-copilot-input-text" rows="1" enterkeyhint="send" autocapitalize="sentences" aria-label="Mensaje para Yarbi" placeholder="' + (training ? 'Habla como cliente, corrige o enseña a Yarbi' : 'Pregunta sobre tu negocio o escribe un mensaje…') + '" onkeydown="gfcHandleYarbiComposerKeydown(event)" oninput="gfcSaveYarbiConversationDraft(this.value);gfcResizeYarbiComposer(this)"></textarea>' +
+        '<button id="gfc-mic-input-btn" class="gfc-yarbi-live-btn" data-live-phase="off" onclick="gfcStartCopilotVoiceInput()" aria-label="Activar conversación por voz" title="Hablar con Yarbi"><span class="gfc-live-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="gfc-live-button-label">Live</span></button>' +
+        '<button class="gfc-yarbi-send-btn" onclick="gfcSendYarbiUnifiedMessage()" aria-label="Enviar mensaje" title="Enviar mensaje">➤</button></div>' +
       '</footer>';
   }
   function hubHtml() {

@@ -174,6 +174,20 @@ test('chat: el compositor admite varias líneas y conserva Enter para enviar', (
   assert.match(html, /typeof window\.gfcClearYarbiConversationDraft === 'function'/);
 });
 
+test('chat: la bienvenida guía consultas sin crear otro recorrido ni acciones comerciales', () => {
+  const memoryCenter = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-memory-center.js'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  assert.match(memoryCenter, /function ensureChatWelcome\(box\)/);
+  assert.match(memoryCenter, /id = 'gfc-yarbi-chat-welcome'/);
+  assert.match(memoryCenter, /¿Qué quieres resolver hoy\?/);
+  assert.match(memoryCenter, /¿Qué tengo hoy\?/);
+  assert.match(memoryCenter, /¿Cuánto hemos cobrado este mes\?/);
+  assert.match(memoryCenter, /removeChatWelcome\(box\)/);
+  assert.doesNotMatch(memoryCenter.slice(memoryCenter.indexOf('function ensureChatWelcome'), memoryCenter.indexOf('// La transcripcion Live')), /send-whatsapp|gfcApplyYarbiCommandResult|gfcTryYarbiCommand/);
+  assert.match(html, /\.gfc-yarbi-chat-welcome\{/);
+  assert.match(html, /\.gfc-yarbi-welcome-action\{/);
+});
+
 test('chat contextual: reutiliza la superficie canónica y no crea un segundo recorrido', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
   const start = html.indexOf('const legacyOpen = window.gfcOpenCopilotModal;');

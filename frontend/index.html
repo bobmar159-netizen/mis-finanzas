@@ -46938,6 +46938,33 @@ body.gfc-yarbi-screen #modal-box,.gfc-yarbi-shell{background:#FFFDF8 !important}
 .gfc-yarbi-instruction-chip>span{grid-row:1/3;font-size:15px}.gfc-yarbi-instruction-chip>b{font-size:9.5px;line-height:1.1}.gfc-yarbi-instruction-chip>small{font-size:8px;color:#648172;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gfc-yarbi-instruction-chip.is-current{animation:gfcInstructionChipIn .22s ease-out}
 @keyframes gfcInstructionChipIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
+/* Yarbi 3.4.26: inicio conversacional. La guía visual propone consultas,
+   pero no dispara acciones comerciales ni sustituye al renderer canónico. */
+.gfc-yarbi-chat-welcome{width:min(100%,620px);box-sizing:border-box;margin:auto;padding:24px 18px 20px;text-align:center;color:#31463a;animation:gfcYarbiWelcomeIn .26s ease-out}
+.gfc-yarbi-welcome-mark{width:48px;height:48px;margin:0 auto 12px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(145deg,#4E6E61,#759D83);color:#FFFDF8;font-size:23px;font-weight:900;box-shadow:0 9px 22px rgba(78,110,97,.16)}
+.gfc-yarbi-welcome-kicker{margin:0 0 7px;color:#6D8E79;font-size:9px;font-weight:900;letter-spacing:.14em}
+.gfc-yarbi-chat-welcome h1{margin:0;color:#294A3D;font-size:24px;line-height:1.12;letter-spacing:-.035em}
+.gfc-yarbi-chat-welcome>p:not(.gfc-yarbi-welcome-kicker){max-width:500px;margin:10px auto 18px;color:#6A756D;font-size:13px;line-height:1.5}
+.gfc-yarbi-welcome-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;text-align:left}
+.gfc-yarbi-welcome-action{min-height:94px;border:1px solid #E6DDCF;border-radius:14px;padding:12px;background:#FFFEFC;color:#294A3D;text-align:left;cursor:pointer;transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease}
+.gfc-yarbi-welcome-action:hover{border-color:#B9DCCB;box-shadow:0 7px 16px rgba(79,102,87,.09);transform:translateY(-1px)}
+.gfc-yarbi-welcome-action:active{transform:translateY(0);box-shadow:none}
+.gfc-yarbi-welcome-action span{display:block;margin-bottom:6px;font-size:19px;line-height:1}
+.gfc-yarbi-welcome-action b,.gfc-yarbi-welcome-action small{display:block}.gfc-yarbi-welcome-action b{font-size:12px}.gfc-yarbi-welcome-action small{margin-top:3px;color:#7B837D;font-size:10px;line-height:1.35}
+.gfc-yarbi-welcome-note{display:flex;gap:8px;align-items:flex-start;margin-top:15px;padding:10px 11px;border:1px solid #DDE9DF;border-radius:11px;background:#F3FAF5;color:#5E6E63;text-align:left;font-size:10px;line-height:1.42}.gfc-yarbi-welcome-note>span:first-child{color:#4E816B;font-size:14px;line-height:1}.gfc-yarbi-welcome-note b{color:#365F4E}
+@keyframes gfcYarbiWelcomeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:380px){.gfc-yarbi-chat-welcome{padding:18px 6px}.gfc-yarbi-chat-welcome h1{font-size:21px}.gfc-yarbi-welcome-actions{gap:7px}.gfc-yarbi-welcome-action{min-height:88px;padding:10px}.gfc-yarbi-welcome-action small{font-size:9.5px}}
+
+/* La respuesta tipada usa el renderer seguro, con una jerarquía de lectura
+   propia de conversación: simple si es breve y más expresiva si trae bloques. */
+.gfc-yarbi-chat .yarbi-conversation-message{max-width:min(92%,700px);margin:0 0 13px;padding:15px 16px;border:1px solid #E2E8E4;border-radius:16px 16px 16px 4px;background:#FFFEFC;color:#294A3D;box-shadow:0 3px 12px rgba(54,95,78,.055)}
+.gfc-yarbi-chat .yarbi-conversation-message[data-role="user"]{align-self:flex-end;border-color:#E8CD8A;border-radius:16px 16px 4px 16px;background:#FFF3D7;color:#4B3A18;box-shadow:none}
+.gfc-yarbi-chat .yarbi-conversation-label{margin-bottom:8px;color:#4E816B;font-size:10px;font-weight:850;letter-spacing:.035em;text-transform:uppercase}.gfc-yarbi-chat .yarbi-conversation-message[data-role="user"] .yarbi-conversation-label{color:#806222}
+.gfc-yarbi-chat .yarbi-content-paragraph{font-size:15px;line-height:1.62}.gfc-yarbi-chat .yarbi-content-paragraph strong{color:#294A3D;font-weight:800}.gfc-yarbi-chat .yarbi-content-heading{color:#294A3D;letter-spacing:-.025em}.gfc-yarbi-chat .yarbi-content-heading-1{font-size:25px}.gfc-yarbi-chat .yarbi-content-heading-2{font-size:20px}.gfc-yarbi-chat .yarbi-content-heading-3{font-size:16px}
+.gfc-yarbi-chat .yarbi-content-list{font-size:14px;line-height:1.55;padding-left:22px}.gfc-yarbi-chat .yarbi-content-checklist{list-style:"✓  ";padding-left:24px}.gfc-yarbi-chat .yarbi-content-checklist li[data-checked="true"]{color:#5D7566;text-decoration:none}.gfc-yarbi-chat .yarbi-content-table-wrap{margin:13px 0;border-color:#DCE8E0;border-radius:11px;background:#fff}.gfc-yarbi-chat .yarbi-content-table th{background:#F2F8F4;color:#365F4E}.gfc-yarbi-chat .yarbi-content-table th,.gfc-yarbi-chat .yarbi-content-table td{font-size:12px;border-bottom-color:#E6EEE8}
+.gfc-yarbi-chat .yarbi-content-panel{margin:13px 0;padding:12px 13px;border-color:#D8E7DD;border-left-color:#6EA98D;border-radius:12px;background:#F2F9F4}.gfc-yarbi-chat .yarbi-content-panel-warning{border-color:#EBD9AA;border-left-color:#C58A22;background:#FFF9EA}.gfc-yarbi-chat .yarbi-content-panel-title{font-size:13px}.gfc-yarbi-chat .yarbi-content-panel p{font-size:13px;line-height:1.5}.gfc-yarbi-chat .yarbi-content-chip{margin:2px 4px 3px 0;padding:5px 9px;font-size:11px;background:#E8F5EE;color:#365F4E}.gfc-yarbi-chat .yarbi-content-source{font-size:11px;color:#698176;border-top-color:#E0EAE3}
+@media(max-width:430px){.gfc-yarbi-chat .yarbi-conversation-message{max-width:94%;padding:14px}.gfc-yarbi-chat .yarbi-content-paragraph{font-size:15px}.gfc-yarbi-chat .yarbi-content-heading-1{font-size:23px}}
+
 /* CRM: usa el mismo componente desplegable y la misma jerarquía de Movimientos. */
 .crm-mv-card{border-left:4px solid var(--crm-accent,#B8D5EE)!important;overflow:hidden}
 .crm-mv-card .mv-top{padding:0}
