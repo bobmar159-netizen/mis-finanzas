@@ -141,6 +141,13 @@ test('timeout y configuración incompleta fallan cerrados, sin interpretar ni ha
   });
   assert.equal(missingKey.valid, false);
   assert.equal(missingKey.code, 'owner_reference_preview_gemini_missing');
+  const historicalWithoutGemini = configuration({
+    VERCEL_ENV: 'preview', YARBI_PREVIEW_OWNER_REFERENCES_ONLY: 'true', YARBI_PREVIEW_HISTORICAL_INTELLIGENCE_ENABLED: 'true',
+    YARBI_PREVIEW_SUPABASE_PROJECT_REF: 'uevilhbstnmmdlgyshlv', SUPABASE_URL: 'https://uevilhbstnmmdlgyshlv.supabase.co',
+    SUPABASE_SECRET_KEY: 'isolated-service-key-not-real-123456789012345678'
+  });
+  assert.equal(historicalWithoutGemini.valid, false);
+  assert.equal(historicalWithoutGemini.code, 'owner_reference_preview_historical_intelligence_requires_gemini');
 });
 
 test('dataset semántico versionado cubre correcciones, continuidad, cancelación, tiempo, ubicación, servicio y ambigüedad', () => {

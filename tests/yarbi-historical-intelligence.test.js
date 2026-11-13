@@ -47,6 +47,8 @@ test('historical model contract permits only reviewed context and style grounded
   const task = planHistoricalIntelligence({ messages }).tasks[0];
   const request = buildHistoricalIntelligenceRequest({ task, messages });
   assert.equal(request.response_mime_type, 'application/json');
+  assert.equal(request.response_json_schema.type, 'object');
+  assert.equal(request.response_json_schema.additionalProperties, false);
   assert.match(request.prompt, /No declares pagos, visitas, servicios terminados/);
   const normalized = normalizeHistoricalIntelligenceResult({ task, result: {
     contact_context_observations: [

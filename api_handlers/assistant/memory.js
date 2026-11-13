@@ -5,8 +5,10 @@ const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 const { verifiedOwnerId } = require('../../lib/yarbi-owner-scope');
 const { traceSecret } = require('../../lib/yarbi-trace');
 const { MAX_INSTRUCTIONS, safeInstruction, classifyMemoryInput, createProposalToken, readProposalToken, relevantInstructions } = require('../../lib/yarbi-owner-memory');
-const { createHistoricalMessageReader, createHistoricalOwnerScopeResolver, planHistoricalOwnerIntelligence } = require('../../lib/yarbi-historical-intelligence');
+const { createHistoricalMessageReader, createHistoricalOwnerScopeResolver, createHistoricalTaskMessageReader, planHistoricalOwnerIntelligence } = require('../../lib/yarbi-historical-intelligence');
 const { createHistoricalIntelligenceQueue } = require('../../lib/yarbi-historical-intelligence-store');
+const { createHistoricalIntelligenceProcessor } = require('../../lib/yarbi-historical-intelligence-processor');
+const { createHistoricalGeminiInterpreter } = require('../../lib/yarbi-historical-gemini');
 
 function object(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
 function clean(value, limit = 1200) { return String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, limit); }
@@ -24,7 +26,7 @@ function historicalTaskSummary(task) {
   };
 }
 
-function createOwnerMemoryHandler({ fetchImpl = fetch, now = () => Date.now() } = {}) {
+function createOwnerMemoryHandler({ fetchImpl = fetch, now = () => Date.now(), historicalInterpreterFactory = createHistoricalGeminiInterpreter } = {}) {
   return async function ownerMemoryHandler(req, res) {
     const decision = decidePreviewOwnerReferenceRequest(req, process.env);
     if (!decision.allow) return res.status(decision.status).json({ ok: false, error: decision.code });
@@ -36,6 +38,21 @@ function createOwnerMemoryHandler({ fetchImpl = fetch, now = () => Date.now() } 
       if (['owner_id','owner_account_id','ownerid','owneraccountid'].some(key => Object.prototype.hasOwnProperty.call(body, key))) return res.status(400).json({ ok: false, error: 'owner_memory_client_owner_forbidden' });
       const authenticated = await authenticatedOwnerIdentity(req, config, fetchImpl); if (!authenticated.ok) return res.status(authenticated.status).json({ ok: false, error: authenticated.code });
       const ownerId = verifiedOwnerId(authenticated.identity); const supabase = serviceClient(config, fetchImpl); const action = clean(body.action, 32).toLowerCase() || 'list';
+      if (action === 'historical-process-one') {
+        // No hay cron ni procesamiento implícito: cada llamada requiere dos
+        // habilitaciones de Preview más una confirmación explícita del dueño.
+        if (config.historicalIntelligence?.enabled !== true) return res.status(403).json({ ok: false, error: 'historical_intelligence_preview_not_enabled' });
+        if (body.confirm_historical_model_call !== true) return res.status(400).json({ ok: false, error: 'historical_model_call_confirmation_required' });
+        const interpreter = historicalInterpreterFactory({ apiKey: config.gemini.apiKey, model: config.gemini.model, timeoutMs: config.gemini.timeoutMs, fetchImpl });
+        const processor = createHistoricalIntelligenceProcessor({
+          queue: createHistoricalIntelligenceQueue({ supabase }),
+          resolveOwnerScope: createHistoricalOwnerScopeResolver({ supabase }),
+          readTaskMessages: createHistoricalTaskMessageReader({ supabase }),
+          interpret: request => interpreter.interpretHistoricalSegment(request)
+        });
+        const result = await processor.processOne({ ownerIdentity: authenticated.identity });
+        return res.status(200).json({ ok: true, ...result });
+      }
       if (action === 'historical-plan' || action === 'historical-enqueue') {
         const requestedLimit = Math.max(1, Math.min(24, Number(body.limit) || 12));
         const plan = await planHistoricalOwnerIntelligence({
