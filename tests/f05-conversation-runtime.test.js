@@ -8,6 +8,7 @@ const path = require('node:path');
 const { runOwnerConversation, summarizePerformance } = require('../lib/yarbi-conversation-runtime');
 const { createConversationToken, readConversationToken } = require('../lib/yarbi-conversation-continuity');
 const { adaptV4Understanding } = require('../lib/yarbi-v4-provider');
+const renderer = require('../frontend/yarbi-conversation-renderer');
 
 const OWNER_A = '00000000-0000-4000-8000-0000000000a1';
 const OWNER_B = '00000000-0000-4000-8000-0000000000b2';
@@ -35,6 +36,7 @@ test('F05 FAST_LOCAL responde Agenda y Finanzas verificables sin llamar al prove
   });
   assert.equal(agenda.outcome, 'fast_local_agenda');
   assert.match(agenda.reply, /actividad\(es\) verificable/i);
+  assert.deepEqual(renderer.validateContent(agenda.reply).blocks.map(block => block.type), ['heading', 'paragraph', 'ordered_list']);
   assert.equal(agenda.proposal.execute, false);
   assert.equal(agenda.commercial_effects_allowed, false);
 
@@ -44,6 +46,7 @@ test('F05 FAST_LOCAL responde Agenda y Finanzas verificables sin llamar al prove
   });
   assert.equal(finance.outcome, 'fast_local_finance');
   assert.match(finance.reply, /S\/ 200\.00/);
+  assert.deepEqual(renderer.validateContent(finance.reply).blocks.map(block => block.type), ['heading', 'paragraph', 'paragraph']);
   assert.equal(finance.proposal.execute, false);
   assert.equal(calls, 0);
 });
