@@ -54,6 +54,15 @@ test('historical context requires an explicit owner action and remains separate 
   assert.match(memoryCenter, /No se modificó ningún dato comercial/);
 });
 
+test('approved historical style is a deliberate authenticated preview read with no raw chat or send path', () => {
+  assert.match(memoryCenter, /gfcYarbiLoadHistoricalApprovedLearning/);
+  assert.match(memoryCenter, /historical-approved-reply-context/);
+  assert.match(memoryCenter, /ownerSessionToken\(\)/);
+  assert.match(memoryCenter, /No lee ni reenvía chats completos/);
+  assert.match(memoryCenter, /Nada se envía ni se convierte en un pago, visita o cierre/);
+  assert.doesNotMatch(memoryCenter, /historical-approved-reply-context[\s\S]{0,800}send-whatsapp/);
+});
+
 test('the active client chip distinguishes reviewed historical observations from verified commercial state', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
   assert.match(indexHtml, /gfcYarbiHistoricalContactContext/);

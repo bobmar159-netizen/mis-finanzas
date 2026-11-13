@@ -1124,6 +1124,24 @@
       '<div class="gfc-yarbi-safety">Para confirmar un pago se requerirá contrastar Movimientos; para una visita o trabajo, tu confirmación explícita. Los cierres ya confirmados en Movimientos usan el flujo histórico existente del CRM, con deduplicación.</div>' +
       '<div class="gfc-yarbi-training-actions"><button class="gfc-yarbi-secondary" onclick="gfcYarbiRefreshHistoricalReconciliation()">Actualizar coincidencias</button><button class="gfc-yarbi-secondary" onclick="if(typeof gfcOpenHistoricalServiceImport===\'function\')gfcOpenHistoricalServiceImport();else if(typeof toast===\'function\')toast(\'La integración histórica de Movimientos todavía no está disponible en esta copia.\',\'warning\')">Ver cierres confirmados en Movimientos</button></div></div>';
   }
+  function historicalApprovedLearningState() {
+    const value = window._gfcYarbiHistoricalApprovedLearning;
+    return value && typeof value === 'object' ? value : { loading:false, error:'', context:null };
+  }
+  function historicalApprovedLearningHtml() {
+    const state = historicalApprovedLearningState();
+    const context = state.context && typeof state.context === 'object' ? state.context : null;
+    const patterns = Array.isArray(context?.owner_reply_style_patterns) ? context.owner_reply_style_patterns : [];
+    const status = state.loading ? 'Consultando tus aprendizajes aprobados…'
+      : state.error ? state.error
+        : context ? (patterns.length ? patterns.map(item => item.category + ': ' + item.guidance).slice(0, 3).join(' · ') : 'Aún no hay patrones históricos aprobados.')
+          : 'Consulta opcional: solo muestra patrones que tú aprobaste. No lee ni reenvía chats completos.';
+    const button = state.loading ? '<button class="gfc-yarbi-secondary" disabled>Consultando…</button>' : '<button class="gfc-yarbi-secondary" onclick="gfcYarbiLoadHistoricalApprovedLearning()">Ver aprendizajes aprobados</button>';
+    return '<div class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Estilo aprendido del historial</div>' +
+      '<div class="gfc-yarbi-tool-copy">Los patrones aprobados pertenecen a tu estilo de respuesta. El contexto de cada cliente solo se usa cuando Yarbi ya resolvió ese contacto. Nada se envía ni se convierte en un pago, visita o cierre.</div>' +
+      '<div class="gfc-yarbi-learning-evidence"><b>' + (context ? patterns.length + ' patrón(es) aprobados' : 'Aprendizaje histórico protegido') + '</b><span>' + esc(status) + '</span></div>' +
+      '<div class="gfc-yarbi-training-actions">' + button + '</div></div>';
+  }
   function learningHtml() {
     const metrics = learningSnapshot();
     const autonomy = autonomyConfig();
@@ -1155,8 +1173,33 @@
         learningRequirement(metrics.unresolved === 0, 'Todos los chats con identidad verificable (' + metrics.unresolved + ' pendientes)') +
       '</ul>' +
       '<div class="gfc-yarbi-safety">🛑 Freno de emergencia siempre activo. Fuera de la ventana permitida por WhatsApp se usarán únicamente plantillas aprobadas; los casos sensibles pasarán a una persona.</div>' +
-      '<div class="gfc-yarbi-training-actions"><button class="gfc-yarbi-primary" onclick="gfcOpenCopilotModal(\'practice\')">Probar respuestas</button><button class="gfc-yarbi-secondary" onclick="gfcOpenCopilotModal(\'masivo\')">Importar conversación</button></div></div>' + historicalReconciliationHtml() + '</main>';
+      '<div class="gfc-yarbi-training-actions"><button class="gfc-yarbi-primary" onclick="gfcOpenCopilotModal(\'practice\')">Probar respuestas</button><button class="gfc-yarbi-secondary" onclick="gfcOpenCopilotModal(\'masivo\')">Importar conversación</button></div></div>' + historicalApprovedLearningHtml() + historicalReconciliationHtml() + '</main>';
   }
+  window.gfcYarbiLoadHistoricalApprovedLearning = async function() {
+    if (historicalApprovedLearningState().loading) return;
+    if (!remoteTimelineEnabled()) {
+      window._gfcYarbiHistoricalApprovedLearning = { loading:false, error:'Activa una sesión de Preview aislada para consultar los aprendizajes aprobados.', context:null };
+      if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+      return;
+    }
+    const accessToken = await ownerSessionToken();
+    if (!accessToken) {
+      window._gfcYarbiHistoricalApprovedLearning = { loading:false, error:'Inicia sesión con la cuenta autorizada de Preview para consultar tus aprendizajes.', context:null };
+      if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+      return;
+    }
+    window._gfcYarbiHistoricalApprovedLearning = { loading:true, error:'', context:null };
+    if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+    try {
+      const response = await fetch(BACKEND + '/api/assistant/memory', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + accessToken }, body:JSON.stringify({ action:'historical-approved-reply-context' }) });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok !== true || payload?.outcome !== 'historical_approved_reply_context_ready') throw new Error('Aprendizajes históricos no disponibles todavía.');
+      window._gfcYarbiHistoricalApprovedLearning = { loading:false, error:'', context:payload.context || null };
+    } catch (_) {
+      window._gfcYarbiHistoricalApprovedLearning = { loading:false, error:'Aprendizajes históricos no disponibles todavía. No se usó ningún otro entorno.', context:null };
+    }
+    if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
+  };
   window.gfcYarbiHistoricalCandidateReviewed = function(id) {
     const safeId = String(id || '');
     const items = historicalReconciliationItems();
