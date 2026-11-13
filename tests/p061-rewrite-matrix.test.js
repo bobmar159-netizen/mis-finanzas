@@ -7,7 +7,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 
-// Twenty-four public API patterns. Interactive WhatsApp reads use their own
+// Twenty-five public API patterns. Interactive WhatsApp reads use their own
 // authenticated handler instead of sharing the provider webhook. Conversation
 // and drafts are routed through the existing assistant router, so neither adds
 // a Vercel bundle.
@@ -29,6 +29,7 @@ const apiMatrix = Object.freeze([
   ['/api/assistant/memory', '/api/assistant-router.js?__p06_route=memory', 'assistant:memory', 'api_handlers/assistant/memory.js'],
   ['/api/assistant/crm-dossier', '/api/assistant-router.js?__p06_route=crm-dossier', 'assistant:crm-dossier', 'api_handlers/assistant/crm-dossier.js'],
   ['/api/assistant/crm-search', '/api/assistant-router.js?__p06_route=crm-search', 'assistant:crm-search', 'api_handlers/assistant/crm-search.js'],
+  ['/api/assistant/gemini', '/api/assistant-router.js?__p06_route=gemini', 'assistant:gemini', 'api_handlers/assistant/gemini.js'],
   ['/api/assistant/live-token', '/api/assistant-router.js?__p06_route=live-token', 'assistant:live-token', 'api_handlers/assistant/live-token.js'],
   ['/api/assistant/owner-action', '/api/assistant-router.js?__p06_route=owner-action', 'assistant:owner-action', 'api_handlers/assistant/owner-action.js'],
   ['/api/assistant/owner-inbox', '/api/assistant-router.js?__p06_route=owner-inbox', 'assistant:owner-inbox', 'api_handlers/assistant/owner-inbox.js'],
@@ -47,16 +48,16 @@ const logicalHandlers = Object.freeze([
   'api_handlers/audit/trace.js', 'api_handlers/location/resolve.js'
 ]);
 
-test('F02.1 rewrite matrix has twenty-four API patterns and remains under the Vercel Function budget', () => {
+test('F02.1 rewrite matrix has twenty-five API patterns and remains under the Vercel Function budget', () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
-  assert.equal(config.routes.length, 26, '24 API patterns + auth callback + static privacy route');
+  assert.equal(config.routes.length, 27, '25 API patterns + auth callback + static privacy route');
   const seenSources = new Set();
   for (const route of config.routes) {
     assert.equal(seenSources.has(route.src), false, `duplicate rewrite source: ${route.src}`);
     seenSources.add(route.src);
   }
-  assert.equal(new Set(apiMatrix.map(([src]) => src)).size, 24);
-  assert.equal(new Set(logicalHandlers).size, 23);
+  assert.equal(new Set(apiMatrix.map(([src]) => src)).size, 25);
+  assert.equal(new Set(logicalHandlers).size, 24);
   for (const [src, dest, routerId, handler] of apiMatrix) {
     const matches = config.routes.filter(route => route.src === src);
     assert.equal(matches.length, 1, `one rewrite for ${src}`);

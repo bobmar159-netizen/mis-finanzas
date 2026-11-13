@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const assistantRoutes = Object.freeze({
-  chat: 'chat.js', collections: 'collections.js', command: 'command.js', conversation: 'conversation.js', memory: 'memory.js', 'crm-dossier': 'crm-dossier.js', 'crm-search': 'crm-search.js', 'live-token': 'live-token.js',
+  chat: 'chat.js', drafts: 'drafts.js', collections: 'collections.js', command: 'command.js', conversation: 'conversation.js', memory: 'memory.js', 'crm-dossier': 'crm-dossier.js', 'crm-search': 'crm-search.js', gemini: 'gemini.js', 'live-token': 'live-token.js',
   'owner-action': 'owner-action.js', 'owner-inbox': 'owner-inbox.js', preferences: 'preferences.js',
   'proactive-loop': 'proactive-loop.js', 'reference-candidates': 'reference-candidates.js', 'scheduled-followups': 'scheduled-followups.js'
 });
@@ -44,7 +44,7 @@ test('P06 maps every public API URL explicitly and leaves no grouped handler as 
   const routeSources = new Set(config.routes.map(route => route.src));
   for (const publicPath of requiredPublicPaths) assert.equal(routeSources.has(publicPath), true, publicPath);
   const apiEntries = fs.readdirSync(path.join(__dirname, '..', 'api'), { recursive: true }).filter(file => file.endsWith('.js'));
-  assert.equal(apiEntries.length, 8);
+  assert.equal(apiEntries.length, 9, '9 bundled Functions remain below the Hobby limit of 12');
   assert.equal(apiEntries.includes(path.join('assistant', 'chat.js')), false);
   assert.equal(apiEntries.includes(path.join('audit', 'trace.js')), false);
   assert.equal(apiEntries.includes(path.join('location', 'resolve.js')), false);

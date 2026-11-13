@@ -21,6 +21,7 @@
     { "src": "/api/assistant/memory", "dest": "/api/assistant-router.js?__p06_route=memory" },
     { "src": "/api/assistant/crm-dossier", "dest": "/api/assistant-router.js?__p06_route=crm-dossier" },
     { "src": "/api/assistant/crm-search", "dest": "/api/assistant-router.js?__p06_route=crm-search" },
+    { "src": "/api/assistant/gemini", "dest": "/api/assistant-router.js?__p06_route=gemini" },
     { "src": "/api/assistant/live-token", "dest": "/api/assistant-router.js?__p06_route=live-token" },
     { "src": "/api/assistant/owner-action", "dest": "/api/assistant-router.js?__p06_route=owner-action" },
     { "src": "/api/assistant/owner-inbox", "dest": "/api/assistant-router.js?__p06_route=owner-inbox" },
