@@ -15410,7 +15410,23 @@ async function gfcFetchCloudWhatsAppMessages(period = 'today', direction = 'all'
     gfcChatDiag('live-cloud-messages', { period: requested, direction: requestedDirection, query: localMirror.query, count: localMirror.count, source: 'app-local-mirror' });
     return localMirror;
   }
-  const token = localStorage.getItem('fnz_assistant_token') || '';
+  // La superficie estable ya no acepta el token histórico del asistente. Cada
+  // lectura usa la sesión Supabase fresca del propietario, igual que Chat y
+  // Gemini Live. Esto evita que una cuenta autenticada reciba un 401 oculto al
+  // preguntar por mensajes recientes.
+  const accessToken = await gfcAccountFreshAccessToken();
+  if (!accessToken) {
+    return {
+      ok: false,
+      available: false,
+      auth_required: true,
+      period: requested,
+      direction: requestedDirection,
+      count: 0,
+      messages: [],
+      instruction: 'La sesión de Yarbi no está disponible para consultar WhatsApp. Indica que debe volver a iniciar sesión; no inventes mensajes ni afirmes que no existen.'
+    };
+  }
   const params = new URLSearchParams();
   params.set('order', requested === 'latest' || requested === 'ultimo' ? 'desc' : 'asc');
   params.set('limit', requested === 'latest' || requested === 'ultimo' ? '500' : '5000');
@@ -15420,12 +15436,40 @@ async function gfcFetchCloudWhatsAppMessages(period = 'today', direction = 'all'
   let response;
   let payload;
   try {
-    response = await fetch(window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?' + params.toString(), { headers: { 'X-Assistant-Token': token } });
+    response = await fetch(window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?' + params.toString(), { headers: { Authorization: 'Bearer ' + accessToken } });
     payload = await response.json().catch(() => ({}));
+  } catch (error) {
+    gfcChatDiag('live-cloud-messages-error', { period:requested, direction:requestedDirection, category:'network_unavailable' });
+    return {
+      ok: false,
+      available: false,
+      period: requested,
+      direction: requestedDirection,
+      count: 0,
+      messages: [],
+      error: 'whatsapp_messages_unavailable',
+      instruction: 'La consulta de mensajes no está disponible en este momento. Dilo claramente y no inventes mensajes ni uses datos antiguos como si fueran de hoy.'
+    };
   } finally {
     gfcVoicePipelineLatencyEnd('supabase_query', { action: 'whatsapp_messages' });
   }
-  if (!response.ok) throw new Error(payload?.error || 'Backend WhatsApp HTTP ' + response.status);
+  if (!response.ok) {
+    const authRequired = response.status === 401 || response.status === 403;
+    gfcChatDiag('live-cloud-messages-error', { period:requested, direction:requestedDirection, category:authRequired ? 'authorization_required' : 'backend_unavailable', status:response.status });
+    return {
+      ok: false,
+      available: false,
+      auth_required: authRequired,
+      period: requested,
+      direction: requestedDirection,
+      count: 0,
+      messages: [],
+      error: authRequired ? 'owner_session_required' : 'whatsapp_messages_unavailable',
+      instruction: authRequired
+        ? 'La sesión del propietario no autorizó la consulta. Indica que debe volver a iniciar sesión; no inventes mensajes.'
+        : 'La consulta de mensajes no está disponible en este momento. Dilo claramente y no inventes mensajes ni uses datos antiguos como si fueran de hoy.'
+    };
+  }
   const raw = Array.isArray(payload?.messages) ? payload.messages : [];
   const rows = gfcAttachConversationIdentity(raw.map(item => ({
     id: String(item.id || ''),
@@ -18594,7 +18638,11 @@ session.captureDiagnostics = gfcLiveCaptureDiagnostics(openedStream); gfcChatDia
         systemInstruction: { parts: [{ text: effectiveLiveInstruction }] },
         ...(trainingLiveMode ? {} : { tools:gfcLiveToolDeclarations() }),
         inputAudioTranscription: { languageCodes: ['es-PE'] },
-        outputAudioTranscription: { languageCodes: ['es-PE'] },
+        // Gemini Live infiere el idioma de la voz de salida. La API actual
+        // habilita esta transcripción con un objeto vacío; languageCodes solo
+        // corresponde a la transcripción de entrada y puede impedir que llegue
+        // outputTranscription aunque el audio sí se reproduzca.
+        outputAudioTranscription: {},
         realtimeInputConfig: { automaticActivityDetection: { disabled: true }, activityHandling: 'NO_INTERRUPTION' },
       }};
       try {

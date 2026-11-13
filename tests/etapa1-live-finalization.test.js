@@ -176,7 +176,10 @@ function createTimelinePersistenceHarness() {
     async acknowledgeOutbox() { return { ok:true }; }
   };
   const parts = [
+    "const DEFAULT_CONVERSATION_ID = 'default';",
     extractFunction(memoryCenter, 'function makeId('),
+    extractFunction(memoryCenter, 'function safeConversationId('),
+    extractFunction(memoryCenter, 'function isLegacyRemoteTimelineItem('),
     extractFunction(memoryCenter, 'function normalizeTimelineItem('),
     "let lastTimelinePersistence = Object.freeze({ outcome:'idle' });",
     extractFunction(memoryCenter, 'function setTimelinePersistence('),

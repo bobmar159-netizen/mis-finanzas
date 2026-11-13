@@ -314,7 +314,8 @@
       return null;
     }
     const explicitId = typeof id === 'string' ? id.trim() : '';
-    const normalized = normalizeTimelineItem({ id:explicitId || undefined, role, text, at:at || Date.now(), channel:channel || 'chat', conversation_id:conversationId || activeConversationId() });
+    const resolvedConversationId = conversationId || (typeof activeConversationId === 'function' ? activeConversationId() : 'yarbi-default');
+    const normalized = normalizeTimelineItem({ id:explicitId || undefined, role, text, at:at || Date.now(), channel:channel || 'chat', conversation_id:resolvedConversationId });
     if (!normalized) { setTimelinePersistence('content_invalid'); return null; }
     try {
       const store = await conversationStore();
