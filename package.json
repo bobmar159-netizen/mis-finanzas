@@ -16,6 +16,7 @@
     "test:syntax": "node tests/validate-inline-scripts.js index.html",
     "build:frontend:web": "node scripts/build-unified-frontend.cjs --target=web --replace-generated --publish-root",
     "build:frontend:android": "node scripts/build-unified-frontend.cjs --target=android --replace-generated",
+    "build:frontend:android:stable": "node scripts/build-unified-frontend.cjs --target=android --channel=stable --replace-generated",
     "test:frontend:unified": "node --test tests/frontend-unified-build.test.js"
   },
   "dependencies": {

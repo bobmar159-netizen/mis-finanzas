@@ -78,6 +78,30 @@ test('P0.2I: Android output refuses an absent API origin and the service worker 
   assert.match(serviceWorker, /yarbi-static-__YARBI_RELEASE_ID__/);
 });
 
+test('Android stable: Production requires the explicit stable channel and exact canonical backend', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'yarbi-android-stable-'));
+  assert.throws(
+    () => run('android', path.join(temp, 'implicit-production'), { YARBI_ANDROID_API_ORIGIN: productionOrigin }),
+    /--channel=stable/
+  );
+  assert.throws(
+    () => run('android', path.join(temp, 'wrong-stable'), { YARBI_ANDROID_API_ORIGIN: 'https://wrong.example.test' }, ['--channel=stable']),
+    /canal stable exige exactamente/
+  );
+  const stable = path.join(temp, 'stable');
+  run('android', stable, { YARBI_ANDROID_API_ORIGIN: productionOrigin }, ['--channel=stable']);
+  const runtime = fs.readFileSync(path.join(stable, 'runtime-config.js'), 'utf8');
+  const manifest = JSON.parse(fs.readFileSync(path.join(stable, 'BUILD_MANIFEST.json'), 'utf8'));
+  assert.match(runtime, /apiOrigin: 'https:\/\/misfinanzas-backend\.vercel\.app'/);
+  assert.equal(manifest.channel, 'stable');
+  assert.equal(manifest.api_origin_mode, 'explicit_https');
+  for (const file of fs.readdirSync(stable)) {
+    const full = path.join(stable, file);
+    if (!fs.statSync(full).isFile() || file === 'runtime-config.js') continue;
+    assert.equal(fs.readFileSync(full, 'utf8').includes(productionOrigin), false, `${file} has an unexpected production literal`);
+  }
+});
+
 test('Etapa 1.2C: Android offline build explicitly blocks remote operations without a fallback origin', () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'yarbi-android-offline-'));
   const offline = path.join(temp, 'android');

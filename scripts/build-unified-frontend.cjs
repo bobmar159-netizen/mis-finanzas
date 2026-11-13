@@ -21,6 +21,8 @@ const replaceGenerated = args.has('--replace-generated');
 const publishRootArg = args.get('--publish-root');
 const publishRoot = publishRootArg === true ? repo : (publishRootArg ? path.resolve(repo, publishRootArg) : null);
 const androidOfflineOnly = target === 'android' && process.env.YARBI_ANDROID_OFFLINE_ONLY === 'true';
+const androidChannel = target === 'android' ? String(args.get('--channel') || 'non-production') : 'web';
+const stableAndroidOrigin = 'https://misfinanzas-backend.vercel.app';
 
 function fail(message) { throw new Error(`P0.2I build: ${message}`); }
 function sha(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
@@ -80,6 +82,8 @@ function publishWebRoot(from, destination) {
 
 if (!['web', 'android'].includes(target)) fail('use --target=web o --target=android.');
 if (publishRoot && target !== 'web') fail('--publish-root solo es válido para --target=web.');
+if (target === 'android' && !['non-production', 'stable'].includes(androidChannel)) fail('--channel Android debe ser non-production o stable.');
+if (androidOfflineOnly && androidChannel === 'stable') fail('el canal stable no puede compilarse en modo offline.');
 if (!fs.existsSync(frontend)) fail('falta frontend/. Ejecute primero bootstrap-unified-frontend.cjs.');
 if (fs.existsSync(out)) {
   const previousManifest = path.join(out, 'BUILD_MANIFEST.json');
@@ -94,6 +98,12 @@ const releaseId = `p02i-${sourceHash.slice(0, 16)}`;
 const apiOrigin = target === 'web'
   ? '__YARBI_SAME_ORIGIN__'
   : (androidOfflineOnly ? 'offline://remote-disabled' : validateOrigin(process.env.YARBI_ANDROID_API_ORIGIN || ''));
+if (target === 'android' && androidChannel === 'stable' && apiOrigin !== stableAndroidOrigin) {
+  fail(`el canal stable exige exactamente ${stableAndroidOrigin}.`);
+}
+if (target === 'android' && androidChannel !== 'stable' && apiOrigin === stableAndroidOrigin) {
+  fail('Production solo puede usarse con --channel=stable explícito.');
+}
 const remoteEnabled = target === 'web' || !androidOfflineOnly;
 const nativeAuthCallbackScheme = target === 'android'
   ? validateAuthScheme(process.env.YARBI_ANDROID_AUTH_CALLBACK_SCHEME || 'com.misfinanzas.app')
@@ -120,7 +130,13 @@ renderTemplate(path.join(out, 'service-worker.js'), { '__YARBI_RELEASE_ID__': re
 const files = walk(out).filter(file => path.basename(file) !== 'BUILD_MANIFEST.json').sort();
 const forbidden = 'https://misfinanzas-backend.vercel.app';
 for (const file of files) {
-  if (fs.readFileSync(file, 'utf8').includes(forbidden)) fail(`URL literal de Production detectada en ${path.relative(out, file)}.`);
+  const relative = path.relative(out, file).replace(/\\/g, '/');
+  if (!fs.readFileSync(file, 'utf8').includes(forbidden)) continue;
+  const approvedStableRuntime = target === 'android'
+    && androidChannel === 'stable'
+    && apiOrigin === stableAndroidOrigin
+    && relative === 'runtime-config.js';
+  if (!approvedStableRuntime) fail(`URL literal de Production detectada en ${relative}.`);
 }
 const manifest = {
   schema: 'yarbi.frontend-build.v1',
@@ -128,6 +144,7 @@ const manifest = {
   release_id: releaseId,
   source_sha256: sourceHash,
   api_origin_mode: target === 'web' ? 'same_origin' : (androidOfflineOnly ? 'remote_disabled' : 'explicit_https'),
+  channel: target === 'android' ? androidChannel : 'web',
   files: files.map(file => ({ path: path.relative(out, file).replace(/\\/g, '/'), sha256: sha(fs.readFileSync(file)), bytes: fs.statSync(file).size }))
 };
 fs.writeFileSync(path.join(out, 'BUILD_MANIFEST.json'), JSON.stringify(manifest, null, 2) + '\n');
