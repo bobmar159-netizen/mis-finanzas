@@ -55,6 +55,8 @@ test('P0.2I: web and Android builds are reproducible and environment-specific', 
   assert.match(webConfig, /apiOrigin: '__YARBI_SAME_ORIGIN__'/);
   assert.match(androidConfig, /apiOrigin: 'https:\/\/android-build\.invalid'/);
   assert.match(webSw, /yarbi-static-p02i-/);
+  assert.doesNotMatch(webSw, /ASSETS = \[[^\]]*runtime-config\.js/);
+  assert.match(webSw, /pathname\.endsWith\('\/runtime-config\.js'\)/);
   assert.match(webSw, /includes\('\/api\/'\)/);
   assert.equal(fs.readFileSync(path.join(web, 'BUILD_MANIFEST.json'), 'utf8'), fs.readFileSync(path.join(webRepeat, 'BUILD_MANIFEST.json'), 'utf8'));
   assert.equal(fs.readFileSync(path.join(android, 'BUILD_MANIFEST.json'), 'utf8'), fs.readFileSync(path.join(androidRepeat, 'BUILD_MANIFEST.json'), 'utf8'));
