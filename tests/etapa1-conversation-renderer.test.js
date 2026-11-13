@@ -199,6 +199,18 @@ test('chat: una respuesta puede copiarse localmente sin convertir el mensaje en 
   assert.match(html, /\.gfc-yarbi-message-copy\{/);
 });
 
+test('chat: el recorrido escrito permite formato Markdown seguro sin afectar el canal Live', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  const writtenStart = html.indexOf('const systemInstruction = `Eres "Yarbi"');
+  const writtenEnd = html.indexOf('// Asegurar alternancia limpia', writtenStart);
+  const writtenInstruction = html.slice(writtenStart, writtenEnd);
+  assert.match(writtenInstruction, /FORMATO EN ESTE CHAT/);
+  assert.match(writtenInstruction, /Markdown seguro/);
+  assert.match(writtenInstruction, /S\/ 200\.00/);
+  assert.doesNotMatch(writtenInstruction, /NUNCA uses símbolos como "\*", "#" ni "S\/"/);
+  assert.match(html, /const liveEmojiSpeechRule =/);
+});
+
 test('chat contextual: reutiliza la superficie canónica y no crea un segundo recorrido', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
   const start = html.indexOf('const legacyOpen = window.gfcOpenCopilotModal;');
