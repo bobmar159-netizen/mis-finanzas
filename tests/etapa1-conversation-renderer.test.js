@@ -132,6 +132,14 @@ test('Etapa 1.1: adapta Markdown permitido a bloques tipados y conserva sintaxis
   assert.equal(renderer.validateContent('Comparación segura: x < y.').ok, true);
 });
 
+test('chat visual: convierte una cita en tarjeta y conserva énfasis dentro de listas', () => {
+  const result = renderer.validateContent('## Resumen\n\n- ✅ **Ingresos:** S/ 500\n- ➖ **Egresos:** S/ 120\n\n> [Importante]\n> El precio final requiere visita técnica.');
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.blocks.map(block => block.type), ['heading', 'unordered_list', 'information_panel']);
+  assert.equal(result.blocks[2].title, 'Importante');
+  assert.equal(result.blocks[2].text, 'El precio final requiere visita técnica.');
+});
+
 test('Etapa 1.1: corta la validación estructural al exceder el presupuesto global', () => {
   const large = paragraph(Array.from({ length:renderer.LIMITS.runsPerParagraph }, () => ({ text:'x'.repeat(renderer.LIMITS.runChars) })));
   const unvisited = {};

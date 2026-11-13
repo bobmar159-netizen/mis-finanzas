@@ -10,9 +10,18 @@
 <link rel="manifest" href="manifest.json">
 <script>
   if ('serviceWorker' in navigator) {
+    let gfcServiceWorkerReloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (gfcServiceWorkerReloading) return;
+      gfcServiceWorkerReloading = true;
+      window.location.reload();
+    });
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('service-worker.js')
-        .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))
+        .then(reg => {
+          console.log('Service Worker registrado con éxito:', reg.scope);
+          return reg.update();
+        })
         .catch(err => console.error('Error al registrar el Service Worker:', err));
       });
   }
@@ -13005,7 +13014,10 @@ function gfcCommitLiveTurn(session) {
     return;
   }
   const input = String(session.inputBuffer || '').trim();
-  const output = String(session.outputBuffer || '').trim();
+  const structuredReply = session.liveStructuredReply && Number(session.liveStructuredReply.turnId || 0) === committedTurnId
+    ? String(session.liveStructuredReply.text || '').trim()
+    : '';
+  const output = structuredReply || String(session.outputBuffer || '').trim();
   if (session.suppressCurrentLiveTurnCommit) {
     session.suppressCurrentLiveTurnCommit = false;
     if (typeof gfcDiscardLiveTranscriptDraft === 'function') gfcDiscardLiveTranscriptDraft(committedTurnId, undefined, { liveSessionId:session.liveSessionId });
@@ -13082,6 +13094,7 @@ function gfcCommitLiveTurn(session) {
   session.inputBuffer = '';
   session.outputBuffer = '';
   session.transcript = '';
+  session.liveStructuredReply = null;
 }
 function gfcClearLiveMemory() {
   window._gfcLiveMemory = { turns: [] };
@@ -13147,6 +13160,20 @@ function gfcUpdateLiveVoiceMeter(rms, threshold, force) {
   });
 }
 
+function gfcYarbiSetProcessStatus(phase, label) {
+  const status = document.getElementById('gfc-live-status');
+  if (!status) return;
+  const resolved = String(phase || 'ready');
+  const labels = {
+    preparing:'Preparando', listening:'Escuchando', capturing:'Escuchando',
+    processing:'Procesando', consulting:'Consultando datos', writing:'Escribiendo',
+    speaking:'Hablando', ready:'Listo', error:'Necesita atención', off:'Listo'
+  };
+  status.dataset.phase = resolved;
+  status.textContent = String(label || labels[resolved] || 'Listo');
+}
+window.gfcYarbiSetProcessStatus = gfcYarbiSetProcessStatus;
+
 function gfcLiveSetUi(active, label, phase) {
   const resolvedPhase = phase || (String(label || '').toLowerCase().includes('hablando') ? 'speaking' : active ? 'listening' : 'off');
   const button = document.getElementById('gfc-mic-input-btn');
@@ -13157,7 +13184,10 @@ function gfcLiveSetUi(active, label, phase) {
     listening: { text:'🟢 Te escucho', background:'#16A34A', soft:'#DCFCE7', color:'#166534', border:'#86EFAC', shadow:'0 0 0 3px #BBF7D0' },
     capturing: { text:'🟢 Capturando…', background:'#059669', soft:'#D1FAE5', color:'#047857', border:'#6EE7B7', shadow:'0 0 0 4px #A7F3D0' },
     processing: { text:'🟠 Procesando…', background:'#D97706', soft:'#FEF3C7', color:'#92400E', border:'#FCD34D', shadow:'0 0 0 3px #FDE68A' },
+    writing: { text:'Escribiendo…', background:'#6D28D9', soft:'#F3E8FF', color:'#6B21A8', border:'#D8B4FE', shadow:'0 0 0 3px #E9D5FF' },
     speaking: { text:'🔴 Yarbi hablando', background:'#DC2626', soft:'#FEE2E2', color:'#B91C1C', border:'#FCA5A5', shadow:'0 0 0 3px #FECACA' },
+    ready: { text:'Listo', background:'#15803D', soft:'#ECFDF5', color:'#166534', border:'#BBF7D0', shadow:'' },
+    error: { text:'Revisar', background:'#B91C1C', soft:'#FEF2F2', color:'#991B1B', border:'#FECACA', shadow:'' },
     off: { text:'🎙️ Live', background:'linear-gradient(135deg,#0EA5E9,#0284C7)', soft:'', color:'', border:'', shadow:'' }
   };
   const visual = phaseUi[resolvedPhase] || phaseUi[active ? 'listening' : 'off'];
@@ -13180,7 +13210,7 @@ function gfcLiveSetUi(active, label, phase) {
     mainButton.title = active ? (resolvedPhase === 'speaking' ? 'Yarbi está hablando: toca para detener' : resolvedPhase === 'processing' ? 'Yarbi está procesando tu frase' : 'Yarbi está escuchando: toca para detener') : resolvedPhase === 'preparing' ? 'Yarbi está preparando el micrófono' : 'Abrir Yarbi y activar voz';
   }
   if (!['listening','capturing'].includes(resolvedPhase)) gfcUpdateLiveVoiceMeter(0, 0.01, true);
-  if (status) status.textContent = label || (resolvedPhase === 'speaking' ? 'Yarbi está hablando…' : resolvedPhase === 'processing' ? 'Procesando lo que dijiste…' : resolvedPhase === 'capturing' ? 'Capturando tu voz…' : active ? 'Te escucho · habla ahora.' : 'Gemini Live listo. Pulsa el micrófono para hablar.');
+  gfcYarbiSetProcessStatus(resolvedPhase, label || (resolvedPhase === 'speaking' ? 'Yarbi está hablando…' : resolvedPhase === 'writing' ? 'Yarbi está escribiendo…' : resolvedPhase === 'processing' ? 'Procesando lo que dijiste…' : resolvedPhase === 'capturing' ? 'Capturando tu voz…' : active ? 'Te escucho · habla ahora.' : 'Listo para hablar o escribir'));
   if (window._gfcMascot) window._gfcMascot.setState(active ? (resolvedPhase === 'speaking' ? 'hablando' : 'escuchando') : 'reposo', active ? (resolvedPhase === 'speaking' ? 'Yarbi está respondiendo...' : 'Te escucho en tiempo real...') : '');
   const session = window._gfcLiveSession || {};
   if (session.liveUiPhase !== resolvedPhase) {
@@ -15321,6 +15351,41 @@ async function gfcBuildMentorBriefing() {
   };
 }
 
+// FINANCIAL_SUMMARY_LIVE_V1: la voz usa el mismo modelo determinista que el
+// chat escrito. No delegamos saldos ni totales a la memoria del modelo.
+function gfcBuildVerifiedFinancialSummary() {
+  const coach = window.YarbiFinancialCoach;
+  const input = typeof gfcGetFinancialCoachInput === 'function' ? gfcGetFinancialCoachInput() : null;
+  if (!coach || !input) return { ok:false, unavailable:true, instruction:'La lectura financiera local no está disponible. Dilo claramente y no inventes montos.' };
+  const result = coach.buildFinancialCoach(input);
+  return { ok:true, ...result, instruction:'Responde con los importes exactos. Separa ingresos cobrados, egresos, caja libre y cuentas por cobrar. No presentes cotizaciones ni cuentas por cobrar como efectivo.' };
+}
+
+function gfcFinancialSummaryRichText(result) {
+  const summary = result?.summary;
+  const money = value => 'S/ ' + Number(value || 0).toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  if (!result?.ok || !summary) return '## ⚠️ Balance no disponible\n\nNo pude leer los movimientos locales. **No inventé ningún monto** ni consulté otro entorno.';
+  const source = result.source_status?.transactions;
+  const sourceNote = source === 'unavailable'
+    ? '⚠️ La fuente de movimientos no está disponible en este dispositivo.'
+    : source === 'no_information'
+      ? 'ℹ️ Aún no hay movimientos registrados para este mes.'
+      : '✅ Calculado únicamente con movimientos registrados que afectan caja.';
+  return [
+    '## 💰 Balance del mes',
+    '',
+    '**' + money(summary.free_cash_month) + ' de caja libre registrada.**',
+    '',
+    '- ✅ **Ingresos cobrados:** ' + money(summary.collected_cash_month),
+    '- ➖ **Egresos registrados:** ' + money(summary.operating_expenses_month),
+    '- 📥 **Por cobrar (fuera de caja):** ' + money(summary.pending_receivables),
+    '',
+    '> ' + sourceNote,
+    '',
+    'Las cotizaciones y los cobros pendientes **no se cuentan como dinero disponible**.'
+  ].join('\n');
+}
+
 function gfcLiveToolDeclarations() {
   return [{ functionDeclarations: [
     { name: 'get_current_lima_time', description: 'Obtiene la fecha y hora actual y oficial de Lima desde el reloj interno de la aplicación.', parameters: { type: 'OBJECT', properties: {} } },
@@ -15335,6 +15400,7 @@ function gfcLiveToolDeclarations() {
     { name: 'find_whatsapp_client', description: 'Busca candidatos verificables en mensajes reales, notificaciones y agenda Android por nombre, texto o servicio mencionado, teléfono, hora aproximada o ubicación compartida. Úsala cuando no exista una coincidencia exacta en memoria antes de pedir teléfono o abrir un formulario. Confirma con el Maestro el nombre y últimos dígitos solo cuando el número exista.', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, phone: { type: 'STRING' }, text_hint: { type: 'STRING', description: 'Frase, servicio o detalle que el cliente escribió, por ejemplo modificación de tubería.' }, period: { type: 'STRING', enum: ['today', 'yesterday', 'latest'] }, time_hint: { type: 'STRING', description: 'Hora aproximada, por ejemplo 16:30 o 4:30 pm.' }, requires_location: { type: 'BOOLEAN' } } } },
     { name: 'get_crm_overview', description: 'Consulta un panorama compacto de memorias procesadas del CRM para identificar clientes recientes, fríos, tibios, calientes o con seguimiento pendiente. No carga mensajes crudos.', parameters: { type: 'OBJECT', properties: { commercial_status: { type: 'STRING', enum: ['all', 'frio', 'tibio', 'caliente'], description: 'Filtro comercial opcional.' }, limit: { type: 'NUMBER', description: 'Cantidad máxima de clientes, entre 1 y 30.' } } } },
     { name: 'get_mentor_briefing', description: 'Construye un ranking deterministico y de solo lectura con agenda pendiente, estados CRM, alertas, deudas y señales de producción. Separa hechos, señales y recomendaciones. Úsala antes de aconsejar prioridades o riesgos.', parameters: { type: 'OBJECT', properties: {} } },
+    { name: 'get_financial_summary', description: 'Obtiene el balance verificado del mes desde Movimientos: ingresos cobrados, egresos, caja libre y cuentas por cobrar separadas. Úsala obligatoriamente para balance, caja, ingresos, egresos, gastos, cobros o resultado del mes.', parameters: { type: 'OBJECT', properties: {} } },
     { name: 'get_today_snapshot', description: 'Consulta determinista de agenda y mensajes SOLO de HOY en Lima. Obligatoria ante preguntas como que tenemos para hoy, que hay hoy o lo de hoy. Nunca devuelve registros historicos.', parameters: { type: 'OBJECT', properties: {} } },
     { name: 'get_conversation_inbox', description: 'Consulta la bandeja local estructurada de conversaciones de clientes. Distingue mensajes sin responder, clientes listos para agendar y seguimientos. Devuelve una pista natural por cliente y usa teléfono solo como último recurso.', parameters: { type: 'OBJECT', properties: { scope: { type: 'STRING', enum: ['actionable', 'all', 'unanswered', 'ready_to_schedule', 'follow_up'] }, limit: { type: 'NUMBER' }, refresh: { type: 'BOOLEAN' } } } },
     { name: 'get_next_best_actions', description: 'Devuelve las próximas acciones comerciales y operativas ordenadas por urgencia, oportunidad y evidencia. Solo recomienda; nunca envía, agenda ni modifica sin confirmación.', parameters: { type: 'OBJECT', properties: { limit: { type: 'NUMBER' }, refresh: { type: 'BOOLEAN' } } } },
@@ -18197,7 +18263,7 @@ async function gfcExecuteLiveTool(call) {
   call = gfcYarbiApplyFocusToLiveToolCall(call || {});
   const name = String(call?.name || '');
   const ambiguousInput = gfcLiveInputNeedsClarification(gfcCurrentLiveUserInput());
-  const lookupTools = new Set(['list_whatsapp_messages','search_client_history_by_clues','get_whatsapp_voice_notes','find_whatsapp_client','resolve_client_candidate','get_client_memory','get_crm_overview','get_mentor_briefing','get_today_snapshot','get_conversation_inbox','get_next_best_actions','get_daily_close','get_proactive_alerts','get_agenda_summary','read_app_module']);
+  const lookupTools = new Set(['list_whatsapp_messages','search_client_history_by_clues','get_whatsapp_voice_notes','find_whatsapp_client','resolve_client_candidate','get_client_memory','get_crm_overview','get_mentor_briefing','get_financial_summary','get_today_snapshot','get_conversation_inbox','get_next_best_actions','get_daily_close','get_proactive_alerts','get_agenda_summary','read_app_module']);
   if (ambiguousInput && lookupTools.has(name)) {
     gfcChatDiag('live-ambiguous-input-tool-blocked', { input:gfcCurrentLiveUserInput().slice(0,120), tool:name });
     return { ok:false, ambiguous_input:true, tool_blocked:name, instruction:'La frase llegó incompleta o era solo un saludo. No consultes clientes, agenda ni mensajes y no uses resultados anteriores. Responde: “Hola, te escucho. ¿En qué te ayudo?”; si parece recortada, pide repetirla.' };
@@ -18269,6 +18335,7 @@ async function gfcExecuteLiveTool(call) {
     window._gfcMentorAnalysisChipTimer = setTimeout(() => gfcRefreshYarbiModeUi(), 6000);
     return gfcBuildMentorBriefing();
   }
+  if (name === 'get_financial_summary') return gfcBuildVerifiedFinancialSummary();
   if (name === 'get_today_snapshot') return gfcTodaySnapshot();
   if (name === 'get_conversation_inbox') return gfcGetConversationInbox(call?.args || {});
   if (name === 'get_next_best_actions') return gfcGetNextBestActions(call?.args || {});
@@ -18381,7 +18448,7 @@ async function gfcExecuteLiveToolBounded(call) {
 // BACKGROUND_PROCESSING_STATUS_V1: una lectura estructurada no se presenta como reprocesamiento pesado.
 function gfcLiveToolStatusLabel(calls) {
   const names = (calls || []).map(call => String(call?.name || ''));
-  const fastReadTools = new Set(['get_current_lima_time', 'list_whatsapp_messages', 'search_client_history_by_clues', 'find_whatsapp_client', 'get_client_memory', 'resolve_client_candidate', 'cancel_client_search', 'prepare_whatsapp_draft', 'get_crm_overview', 'get_mentor_briefing', 'get_today_snapshot', 'get_conversation_inbox', 'get_next_best_actions', 'get_daily_close', 'get_proactive_alerts', 'get_agenda_summary', 'read_app_module']);
+  const fastReadTools = new Set(['get_current_lima_time', 'list_whatsapp_messages', 'search_client_history_by_clues', 'find_whatsapp_client', 'get_client_memory', 'resolve_client_candidate', 'cancel_client_search', 'prepare_whatsapp_draft', 'get_crm_overview', 'get_mentor_briefing', 'get_financial_summary', 'get_today_snapshot', 'get_conversation_inbox', 'get_next_best_actions', 'get_daily_close', 'get_proactive_alerts', 'get_agenda_summary', 'read_app_module']);
   return names.length && names.every(name => fastReadTools.has(name))
     ? 'Consultando datos ya procesados...'
     : 'Ejecutando la solicitud...';
@@ -18400,6 +18467,16 @@ function gfcScheduleLiveToolResponseWatchdog(socket, functionResponses, liveSess
     const timedOut = results.some(result => result?.timed_out);
     const notFound = results.some(result => result?.not_found || result?.found === false || result?.candidate_count === 0);
     const cancelled = results.some(result => result?.cancelled);
+    const structured = liveSession.liveStructuredReply && Number(liveSession.liveStructuredReply.turnId || 0) === turnId
+      ? String(liveSession.liveStructuredReply.text || '').trim()
+      : '';
+    if (structured) {
+      liveSession.outputBuffer = structured;
+      gfcCommitLiveTurn(liveSession);
+      gfcLiveSetUi(true, 'Respuesta lista · sigo escuchando', 'listening');
+      gfcChatDiag('live-tool-structured-fallback', { turnId, tools:(functionResponses || []).map(item => item.name) });
+      return;
+    }
     const message = cancelled
       ? 'Búsqueda cancelada.'
       : timedOut
@@ -18434,6 +18511,13 @@ async function gfcHandleLiveToolCalls(socket, calls) {
       if (resolvesClient) gfcVoicePipelineLatencyEnd('client_resolution', { tool: call.name });
     }
   }));
+  const financialResponse = functionResponses.find(item => item.name === 'get_financial_summary');
+  if (financialResponse) {
+    const richText = gfcFinancialSummaryRichText(financialResponse.response?.result);
+    liveSession.liveStructuredReply = { turnId:Number(liveSession.liveTurnId || 0), tool:'get_financial_summary', text:richText };
+    if (typeof gfcUpdateLiveTranscriptDraft === 'function') gfcUpdateLiveTranscriptDraft('assistant', richText, liveSession.liveTurnId);
+    gfcYarbiSetProcessStatus('writing', 'Organizando el balance del mes');
+  }
   gfcVoicePipelineLatencyEnd('additional_processing', { tools: functionResponses.map(item => item.name) });
   if (!functionResponses.length || socket.readyState !== WebSocket.OPEN) return;
   functionResponses.forEach(item => gfcLiveTrace(window._gfcLiveSession, 'tool', { name: item.name, result: item.response?.result?.ok === false ? 'failed' : 'returned' }));
@@ -18611,6 +18695,7 @@ session.captureDiagnostics = gfcLiveCaptureDiagnostics(openedStream); gfcChatDia
       const liveDailyCloseRule = 'CIERRE OPERATIVO DIARIO: Si el Maestro pide cierre del dia, revisar pendientes o comprobar que nada se escapa, llama get_daily_close. Primero procesa current de Agenda uno por uno y registra su respuesta con record_daily_outcome usando exactamente agenda_id. Después revisa conversation_pending por prioridad: mensajes sin respuesta, clientes listos para agendar y seguimientos. Usa clue para identificar naturalmente al cliente; recomienda una sola siguiente acción y espera autorización. Nunca deduzcas ejecución por fecha ni envíes, agendes o modifiques sin confirmación.';
       const liveHistoricalClueRule = 'BÚSQUEDA HISTÓRICA POR PISTAS: Si el Maestro recuerda un cliente o situación pero no dice nombre ni teléfono y aporta pistas como construcción o visita, sábado u otro día, viaje, regreso, cancelación, ubicación o reprogramación, llama search_client_history_by_clues con su frase completa. Esta búsqueda cruza pistas repartidas entre conversaciones, agenda, notas de voz procesadas y CRM. No uses get_client_memory sin identidad y nunca respondas “no tengo historial” antes de ejecutar esta búsqueda. Presenta hasta tres coincidencias con evidencia natural y pregunta cuál es. Si no hay coincidencia segura, conserva las pistas y pide solo distrito, servicio, mes aproximado o si envió ubicación.';
       const liveCollectionRule = 'COBROS Y SALDOS: Si record_daily_outcome devuelve collection_prompt, pregunta exactamente si se cobro todo o quedo saldo. Si responde que todo fue cobrado, llama record_collection_balance con balance_amount=0. Si indica un saldo, usa exclusivamente el monto hablado. No inventes monto ni fecha de cobranza. Solo confirma el saldo cuando persisted_remote sea true; la herramienta abre el formulario real de cierre para revisar gastos y forma de pago.';
+      const liveFinancialSummaryRule = 'BALANCE Y MOVIMIENTOS: Ante balance del mes, caja del mes, resultado mensual, ingresos, egresos, gastos o cobros, llama obligatoriamente get_financial_summary. No uses get_mentor_briefing para calcular montos. Responde primero la caja libre y después separa ingresos cobrados, egresos y por cobrar. Las cotizaciones y cuentas por cobrar no son efectivo. La aplicación mostrará una versión visual estructurada del resultado; en voz resume los importes sin anunciar la consulta y nunca te quedes en silencio después de la herramienta.';
       const liveServiceCloseRule = 'REGISTRAR SERVICIO: El formulario Registrar existe precisamente para cerrar clientes aunque nunca hayan tenido visita ni construcción en Agenda; jamás rechaces la orden por falta de agenda. Cuando el Maestro diga registra, cierra o cobra un servicio, llama open_service_close_form. Esa herramienta abre el mismo formulario completo que usa el botón manual, nunca una tarjeta o formulario alternativo. Si solo dio un nombre, la herramienta devolverá candidatos: pregunta “¿Es [nombre], número terminado en [últimos 3]?” y resuelve su respuesta con resolve_client_candidate; al confirmarlo el formulario real se abrirá automáticamente. Completa con update_service_close_form y pregunta de uno en uno solamente lo que falte entre hora, servicio y precio, materiales, gasolina o movilidad, comida, agregados, otros gastos y forma/monto de pago. Agregados y otros gastos son campos diferentes. Cliente, celular, distrito y enlace Maps también son campos diferentes: el distrito jamás contiene un enlace y maps_url conserva el enlace exacto. Cero es válido. Cada corrección debe ejecutar update_service_close_form; jamás digas “ya está” basándote solo en conversación. Nunca guardes ni afirmes que se guardó hasta que el Maestro diga explícitamente guardalo, registra o confirma; entonces llama update_service_close_form con confirm_save=true. Informa por separado los estados local, notion_report y notion_clients que devuelva la herramienta. saved=true confirma el guardado local, pero solo status=synced confirma cada destino de Notion. Si duplicate_blocked=true, explica brevemente que ya estaba registrado y no se creó otro.';
       const liveProactiveAlertRule = 'ALERTAS PROACTIVAS: Para revisar prioridades usa get_next_best_actions o get_proactive_alerts. Menciona como maximo tres, separa hecho, nivel de certeza y recomendación. En una intervención espontánea menciona solo una. Nunca leas alertas durante el saludo inicial ni interrumpas una respuesta. Si existe una PROPUESTA DE AGENDA PENDIENTE y el Maestro responde sí, sí por favor, agéndalo o equivalente, llama confirm_pending_agenda_proposal; no pidas otra confirmación.';
       const liveClockRule = 'EXCEPCION PARA FECHA Y HORA ACTUALES: esta regla prevalece sobre cualquier sugerencia anterior de anunciar una consulta. Llama a get_current_lima_time sin anunciar una busqueda. Cuando llegue el resultado, responde inmediatamente en una sola frase breve. Si el resultado tiene requested:false o suppress_output:true, no menciones fecha ni hora y responde a la consulta original. Si el usuario pidio fecha y hora, di AMBAS: usa literalmente date_label y la hora con minutos en Lima. Si pidio solo la fecha o el dia, usa literalmente date_label; si pidio solo la hora, di solo time. weekday y date_label son deterministas: nunca recalcules, traduzcas ni sustituyas el dia de la semana. Nunca termines despues de decir la fecha si tambien pidio la hora. No inventes la hora ni uses un reloj guardado al abrir la sesion.';
@@ -18622,7 +18707,7 @@ session.captureDiagnostics = gfcLiveCaptureDiagnostics(openedStream); gfcChatDia
       const liveAgendaEditRule = 'EDICION DE AGENDA: Una frase como "se hizo la visita hoy a las 9 y ponlo en seguimiento" modifica el registro existente; usa fecha y hora indicadas y estado seguimiento, nunca crea otra visita. Si el formulario ya está abierto y el Maestro corrige fecha, hora, estado, servicio, precio, ubicación o teléfono, llama update_open_agenda_form. Para hoy, mañana o ayer usa date_reference y nunca te limites a prometer el cambio. Entregar campos no significa guardar. Solo cuando diga guarda, guardar o guárdalo llama save_open_agenda_form.';
       const trainingSystemInstruction = 'MODO ENTRENAMIENTO SEGURO DE YARBI. Esta conversación sirve para practicar atención de clientes y enseñar el estilo de Omar. Conversa en español peruano natural usando la misma voz Live seleccionada. El usuario puede hablar como cliente, pedir una sugerencia, corregirte o dictar una instrucción. Si habla como cliente, responde como el negocio de servicios de gas natural. Si te corrige, resume exactamente qué cambió y cómo debería responder en el futuro. Si pide guardar, no afirmes que quedó guardado: di brevemente que la aplicación verificará el aprendizaje local y en Supabase. PROHIBIDO ejecutar acciones reales, enviar WhatsApp, abrir o guardar formularios, modificar clientes, agenda, CRM, Notion, deudas, ingresos o gastos. No inventes precios, fechas, disponibilidad, ubicaciones ni datos de clientes. Pide un solo dato útil cuando falte información. ' + (typeof gfcYarbiTrainingLiveContext === 'function' ? gfcYarbiTrainingLiveContext() : '');
       const liveEmojiSpeechRule = 'PRESENTACIÓN DE EMOJIS: puedes incluir emojis apropiados en el texto visible, pero jamás pronuncies sus nombres, los describas ni leas símbolos decorativos en el audio.';
-      const normalLiveInstruction = liveSystemInstruction + '\n\n' + liveEmojiSpeechRule + '\n\n' + liveSessionRules + '\n\n' + liveHistoricalClueRule + '\n\n' + liveAgendaEditRule + '\n\n' + liveDailyCloseRule + '\n\n' + liveCollectionRule + '\n\n' + liveServiceCloseRule + '\n\n' + liveProactiveAlertRule + '\n\n' + liveClockRule + '\n\n' + liveReliabilityRule + '\n\n' + liveRoutingRule + '\n\n' + liveContextualCrmRule + '\n\n' + liveNaturalIdentityRule + '\n\n' + liveConversationContinuityRule + '\n\n' + liveModeInstruction;
+      const normalLiveInstruction = liveSystemInstruction + '\n\n' + liveEmojiSpeechRule + '\n\n' + liveSessionRules + '\n\n' + liveHistoricalClueRule + '\n\n' + liveAgendaEditRule + '\n\n' + liveDailyCloseRule + '\n\n' + liveCollectionRule + '\n\n' + liveFinancialSummaryRule + '\n\n' + liveServiceCloseRule + '\n\n' + liveProactiveAlertRule + '\n\n' + liveClockRule + '\n\n' + liveReliabilityRule + '\n\n' + liveRoutingRule + '\n\n' + liveContextualCrmRule + '\n\n' + liveNaturalIdentityRule + '\n\n' + liveConversationContinuityRule + '\n\n' + liveModeInstruction;
       const effectiveLiveInstruction = trainingLiveMode ? trainingSystemInstruction + '\n\n' + liveEmojiSpeechRule : normalLiveInstruction;
       session.liveContextTokensBeforeSend = Math.ceil(effectiveLiveInstruction.length / 4);
       gfcVoicePipelineEvent('live-context-prepared', { contextTokensBeforeSend: session.liveContextTokensBeforeSend, memoryChars: liveMemoryContext.length, ownerInstructionChars: ownerInstructionContext.length, mode: activeYarbiMode.id, voice: activeYarbiMode.voice, model: GFC_YARBI_LIVE_MODEL });
@@ -19029,7 +19114,7 @@ gfcLiveForensicsPushFrame(session, { frameId, timestamp: Date.now(), rms, frameD
         if (text && !session.liveLocalIntent) {
           gfcLiveTrace(session, 'output', { text });
           session.outputBuffer = gfcMergeLiveTranscript(session.outputBuffer, text);
-          if (typeof gfcUpdateLiveTranscriptDraft === 'function') {
+          if (!session.liveStructuredReply && typeof gfcUpdateLiveTranscriptDraft === 'function') {
             gfcUpdateLiveTranscriptDraft('assistant', session.outputBuffer, session.liveTurnId);
           }
           gfcChatDiag('live-output', { text, turnId: session.liveTurnId, responseId: session.liveResponseId || '', phraseId: session.livePhraseId || 0 });
@@ -19049,6 +19134,10 @@ gfcLiveForensicsPushFrame(session, { frameId, timestamp: Date.now(), rms, frameD
           gfcLiveSetUi(true, 'Consultando datos recientes del cliente...', 'processing');
           gfcChatDiag('live-client-prefetch-waiting', { turnId:session.liveTurnId || 0, ready:!!prefetch?.ready });
           return;
+        }
+        if (session.liveStructuredReply && Number(session.liveStructuredReply.turnId || 0) === Number(session.liveTurnId || 0)) {
+          session.outputBuffer = String(session.liveStructuredReply.text || session.outputBuffer || '');
+          if (typeof gfcUpdateLiveTranscriptDraft === 'function') gfcUpdateLiveTranscriptDraft('assistant', session.outputBuffer, session.liveTurnId);
         }
         gfcLiveSetTurnState(session, (session.voiceDiagPlaybackActive || session.audioSources?.size) ? GFC_LIVE_TURN_STATES.PLAYING : GFC_LIVE_TURN_STATES.LISTENING, 'server-turn-complete');
         gfcLiveTrace(session, 'server-turn-complete');
@@ -20652,6 +20741,8 @@ async function gfcSendCopilotChatMessage(promptText) {
   const inputEl = document.getElementById('gfc-copilot-input-text');
   const text = (promptText || (inputEl ? inputEl.value : '')).trim();
   if (!text) return;
+  window._gfcYarbiTextRequestActive = true;
+  gfcYarbiSetProcessStatus('processing', 'Procesando tu consulta');
   if (inputEl) {
     inputEl.value = '';
     if (typeof window.gfcResizeYarbiComposer === 'function') window.gfcResizeYarbiComposer(inputEl);
@@ -20660,6 +20751,8 @@ async function gfcSendCopilotChatMessage(promptText) {
   gfcChatDiag('input', { text });
   const persistedUser = await gfcAppendCopilotChatMessage('user', text);
   if (!persistedUser?.ok) {
+    window._gfcYarbiTextRequestActive = false;
+    gfcYarbiSetProcessStatus('error', 'No se pudo guardar el mensaje');
     if (inputEl) inputEl.value = text;
     if (typeof window.gfcSaveYarbiConversationDraft === 'function') window.gfcSaveYarbiConversationDraft(text);
     if (typeof toast === 'function') toast('No se pudo guardar el mensaje. Se conserva para reintentar.', 'warning');
@@ -20669,6 +20762,7 @@ async function gfcSendCopilotChatMessage(promptText) {
 
   // Solo una solicitud explícita a la biblioteca usa citas locales aprobadas.
   // No requieren Gemini ni activan ninguna acción comercial.
+  gfcYarbiSetProcessStatus('consulting', 'Consultando información verificada');
   const knowledgeReply = typeof window.gfcYarbiKnowledgeAnswer === 'function'
     ? await window.gfcYarbiKnowledgeAnswer(text)
     : null;
@@ -20775,6 +20869,7 @@ async function gfcSendCopilotChatMessage(promptText) {
   }
 
   // Cargar contexto en tiempo real desde Supabase & Memoria Local
+  gfcYarbiSetProcessStatus('writing', 'Yarbi está preparando la respuesta');
   const cloudMessagesUrl = window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages';
   const cloudHeaders = { 'X-Assistant-Token': localStorage.getItem('fnz_assistant_token') || '' };
 
@@ -47045,7 +47140,7 @@ body.gfc-yarbi-screen #modal-box,.gfc-yarbi-shell{background:#FFFFFF !important}
 .gfc-yarbi-chat,.gfc-yarbi-training-chat{padding:18px max(14px,calc((100% - 760px)/2)) 28px;background:#FFFFFF !important;scroll-padding-bottom:28px}
 .gfc-yarbi-day{margin:5px 0 18px;padding:3px 9px;border:0;background:transparent;color:#9AA39F;font-size:10px;font-weight:700}
 .gfc-yarbi-message{word-break:break-word;overflow-wrap:anywhere;white-space:normal}
-.gfc-yarbi-message.assistant,.gfc-yarbi-chat .yarbi-conversation-message:not([data-role="user"]){align-self:stretch;width:100%;max-width:760px;box-sizing:border-box;margin:0 auto 22px;padding:0 2px;border:0;border-radius:0;background:transparent;color:#24312B;box-shadow:none}
+.gfc-yarbi-message.assistant,.gfc-yarbi-chat .yarbi-conversation-message:not([data-role="user"]){align-self:stretch!important;width:100%!important;max-width:760px!important;box-sizing:border-box;margin:0 auto 22px!important;padding:0 2px!important;border:0!important;border-radius:0!important;background:transparent!important;color:#24312B!important;box-shadow:none!important}
 .gfc-yarbi-message.user,.gfc-yarbi-chat .yarbi-conversation-message[data-role="user"]{align-self:flex-end;width:auto;max-width:min(86%,620px);box-sizing:border-box;margin:0 0 20px;padding:11px 15px;border:1px solid #E1E7E4;border-radius:20px 20px 5px 20px;background:#F2F5F3;color:#26332D;box-shadow:none}
 .gfc-yarbi-message-label,.gfc-yarbi-chat .yarbi-conversation-label{display:flex;align-items:center;gap:7px;margin:0 0 9px;color:#456B5B;font-size:11px;font-weight:850;letter-spacing:.02em;text-transform:none}
 .gfc-yarbi-message.assistant>.gfc-yarbi-message-label::before,.gfc-yarbi-chat .yarbi-conversation-message:not([data-role="user"])>.yarbi-conversation-label::before{content:"Y";width:23px;height:23px;display:grid;place-items:center;flex:0 0 23px;border-radius:8px;background:#507A68;color:#fff;font-size:11px;font-weight:900}
@@ -47063,10 +47158,10 @@ body.gfc-yarbi-screen #modal-box,.gfc-yarbi-shell{background:#FFFFFF !important}
 .gfc-yarbi-chat .yarbi-content-list li{margin:5px 0;padding-left:2px}
 .gfc-yarbi-chat .yarbi-content-checklist{list-style:"✓  ";padding-left:25px}
 .gfc-yarbi-chat .yarbi-content-checklist li::marker{color:#2F8A64;font-weight:900}
-.gfc-yarbi-chat .yarbi-content-panel{margin:14px 0;padding:13px 14px;border:1px solid #DCE9E2;border-left:4px solid #5C9277;border-radius:13px;background:#F4F9F6}
+.gfc-yarbi-chat .yarbi-content-panel{margin:14px 0;padding:14px 15px;border:1px solid #DCE9E2;border-left:4px solid #5C9277;border-radius:15px;background:#F7FAF8;box-shadow:0 4px 14px rgba(37,55,46,.045)}
 .gfc-yarbi-chat .yarbi-content-panel-warning{border-color:#F0DCAA;border-left-color:#C58A22;background:#FFF9EA}
 .gfc-yarbi-chat .yarbi-content-panel-title{font-size:14px;font-weight:850}
-.gfc-yarbi-chat .yarbi-content-panel p{font-size:14px;line-height:1.55}
+.gfc-yarbi-chat .yarbi-content-panel p{font-size:14.5px;line-height:1.6;white-space:pre-wrap}
 .gfc-yarbi-chat .yarbi-content-table-wrap{max-width:100%;overflow-x:auto;margin:15px 0;border:1px solid #DFE8E3;border-radius:12px;background:#fff}
 .gfc-yarbi-chat .yarbi-content-table{min-width:480px}
 .gfc-yarbi-chat .yarbi-content-table th{background:#F1F7F3;color:#315A49}
@@ -47087,8 +47182,19 @@ body.gfc-yarbi-screen #modal-box,.gfc-yarbi-shell{background:#FFFFFF !important}
 .gfc-yarbi-training-unified-banner>div{min-width:0;display:grid;gap:2px}.gfc-yarbi-training-unified-banner b{font-size:12px}.gfc-yarbi-training-unified-banner span{font-size:10px;line-height:1.35}
 .gfc-yarbi-training-unified-banner button{flex:0 0 auto;min-height:36px;border:1px solid #D8C9E8;border-radius:10px;background:#fff;color:#5D4772;padding:7px 9px;font-size:10px;font-weight:850}
 .gfc-yarbi-composer-wrap{padding:7px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid #ECEFED;background:rgba(255,255,255,.98);box-shadow:0 -8px 26px rgba(40,58,49,.045);overflow:visible}
-.gfc-yarbi-live-state{width:min(100%,760px);box-sizing:border-box;min-height:20px;margin:0 auto;padding:0 6px 5px;color:#7B8580;font-size:10.5px;font-weight:650}
-.gfc-yarbi-live-state span:empty{display:none}
+.gfc-yarbi-live-state{width:min(100%,760px);box-sizing:border-box;min-height:28px;margin:0 auto;padding:0 5px 6px;display:flex;align-items:center;gap:7px;color:#69756F;font-size:11px;font-weight:720;overflow-x:auto;scrollbar-width:none}
+.gfc-yarbi-live-state::-webkit-scrollbar{display:none}.gfc-yarbi-live-state span:empty{display:none}
+#gfc-live-status{display:inline-flex;align-items:center;min-height:25px;width:max-content;max-width:100%;box-sizing:border-box;padding:4px 10px;border:1px solid #DDE5E1;border-radius:999px;background:#F4F7F5;color:#5E6B65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .18s ease,border-color .18s ease,color .18s ease}
+#gfc-live-status::before{content:"";width:7px;height:7px;flex:0 0 7px;margin-right:6px;border-radius:50%;background:#7C8982}
+#gfc-live-status[data-phase="preparing"]::before,#gfc-live-status[data-phase="processing"]::before,#gfc-live-status[data-phase="consulting"]::before,#gfc-live-status[data-phase="writing"]::before{animation:gfcYarbiStatusPulse 1.05s ease-in-out infinite}
+#gfc-live-status[data-phase="listening"],#gfc-live-status[data-phase="capturing"]{border-color:#A7DFC1;background:#ECFAF2;color:#176A46}#gfc-live-status[data-phase="listening"]::before,#gfc-live-status[data-phase="capturing"]::before{background:#22A365}
+#gfc-live-status[data-phase="processing"],#gfc-live-status[data-phase="consulting"]{border-color:#F2D590;background:#FFF8E8;color:#8A5A0D}#gfc-live-status[data-phase="processing"]::before,#gfc-live-status[data-phase="consulting"]::before{background:#E39A20}
+#gfc-live-status[data-phase="writing"]{border-color:#D9C5F0;background:#F7F1FC;color:#654584}#gfc-live-status[data-phase="writing"]::before{background:#8A5DB2}
+#gfc-live-status[data-phase="speaking"]{border-color:#BED5F0;background:#EFF6FD;color:#275D8C}#gfc-live-status[data-phase="speaking"]::before{background:#3A82BE}
+#gfc-live-status[data-phase="ready"],#gfc-live-status[data-phase="off"]{border-color:#D8E5DE;background:#F5F8F6;color:#527060}#gfc-live-status[data-phase="ready"]::before,#gfc-live-status[data-phase="off"]::before{background:#4B9271}
+#gfc-live-status[data-phase="error"]{border-color:#F0C1C1;background:#FFF2F2;color:#9B2C2C}#gfc-live-status[data-phase="error"]::before{background:#CF4545}
+#gfc-ai-process-status:not(:empty){display:inline-flex;align-items:center;min-height:25px;padding:4px 9px;border-radius:999px;background:#F4F6F5;color:#68736E;white-space:nowrap}
+@keyframes gfcYarbiStatusPulse{0%,100%{opacity:.42;transform:scale(.82)}50%{opacity:1;transform:scale(1.15)}}
 .gfc-yarbi-composer{width:min(100%,760px);margin:0 auto;display:flex;flex-direction:column;align-items:stretch;gap:0;padding:3px 6px 6px;border:1px solid #DDE4E0;border-radius:24px;background:#FAFCFB;box-shadow:0 7px 24px rgba(37,55,46,.09);overflow:visible}
 .gfc-yarbi-composer input,.gfc-yarbi-composer textarea{display:block;width:100% !important;min-width:0;height:56px !important;min-height:56px;max-height:148px;flex:none !important;box-sizing:border-box;padding:14px 12px 6px !important;border:0 !important;border-radius:18px !important;background:transparent !important;color:#25312B !important;font-family:inherit;font-size:16px !important;line-height:1.48;resize:none;overflow-y:auto}
 .gfc-yarbi-composer input:focus,.gfc-yarbi-composer textarea:focus{border:0 !important;outline:none !important;box-shadow:none !important;background:transparent !important}
@@ -47760,7 +47866,7 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
     document.body.classList.add('gfc-yarbi-screen'); document.body.style.overflow='hidden';
     modal.style.cssText='display:flex;position:fixed;inset:0;z-index:10020;background:#FFFDF8;align-items:stretch;padding:0';
     box.style.cssText='display:block;width:100%;height:100%;max-width:none;max-height:none;margin:0;border-radius:0;box-shadow:none;overflow:hidden;background:#FFFDF8';
-    root.innerHTML='<main class="gfc-yarbi-shell"><header class="gfc-yarbi-header" style="display:flex;align-items:center;gap:8px"><button class="gfc-yarbi-back" type="button" onclick="gfcCloseYarbiContextual()" aria-label="Volver">←</button><div class="gfc-yarbi-avatar">Y</div><div class="gfc-yarbi-brand" style="min-width:0;flex:1"><div class="gfc-yarbi-brand-title">Yarbi</div><div id="gfc-yarbi-mode-sub" class="gfc-yarbi-online">Listo para ayudarte</div></div><button class="gfc-yarbi-mode-pill" type="button" onclick="gfcToggleYarbiMenu()">'+esc((typeof gfcGetActiveYarbiMode==='function'?gfcGetActiveYarbiMode().label:'Copiloto'))+' · ⋯</button></header>'+(focusName?'<section class="gfc-yarbi-context-banner"><b>'+esc(focusName)+(focusService?' · '+esc(focusService):'')+'</b>Contexto activo: cualquier mejora, mensaje o seguimiento se aplica a este cliente.</section>':'')+'<section id="gfc-copilot-chat-messages" class="gfc-yarbi-chat"></section><footer class="gfc-yarbi-composer-wrap"><div id="gfc-live-status" class="gfc-yarbi-live-state">Pulsa Live para hablar.</div><div class="gfc-yarbi-composer"><input id="gfc-copilot-input-text" autocomplete="off" placeholder="Escribe o habla con Yarbi…" onkeydown="if(event.key===\'Enter\')gfcSendCopilotChatMessage()"><button id="gfc-mic-input-btn" type="button" class="gfc-yarbi-live-btn" onclick="gfcStartCopilotVoiceInput()"><span class="gfc-live-wave"><i></i><i></i><i></i><i></i><i></i></span><span class="gfc-live-button-label">Live</span></button><button type="button" class="gfc-yarbi-send-btn" onclick="gfcSendCopilotChatMessage()">➤</button></div></footer></main>';
+    root.innerHTML='<main class="gfc-yarbi-shell"><header class="gfc-yarbi-header" style="display:flex;align-items:center;gap:8px"><button class="gfc-yarbi-back" type="button" onclick="gfcCloseYarbiContextual()" aria-label="Volver">←</button><div class="gfc-yarbi-avatar">Y</div><div class="gfc-yarbi-brand" style="min-width:0;flex:1"><div class="gfc-yarbi-brand-title">Yarbi</div><div id="gfc-yarbi-mode-sub" class="gfc-yarbi-online">Listo para ayudarte</div></div><button class="gfc-yarbi-mode-pill" type="button" onclick="gfcToggleYarbiMenu()">'+esc((typeof gfcGetActiveYarbiMode==='function'?gfcGetActiveYarbiMode().label:'Copiloto'))+' · ⋯</button></header>'+(focusName?'<section class="gfc-yarbi-context-banner"><b>'+esc(focusName)+(focusService?' · '+esc(focusService):'')+'</b>Contexto activo: cualquier mejora, mensaje o seguimiento se aplica a este cliente.</section>':'')+'<section id="gfc-copilot-chat-messages" class="gfc-yarbi-chat"></section><footer class="gfc-yarbi-composer-wrap"><div id="gfc-live-status" data-phase="ready" class="gfc-yarbi-live-state">Listo para hablar o escribir</div><div class="gfc-yarbi-composer"><input id="gfc-copilot-input-text" autocomplete="off" placeholder="Escribe o habla con Yarbi…" onkeydown="if(event.key===\'Enter\')gfcSendCopilotChatMessage()"><button id="gfc-mic-input-btn" type="button" class="gfc-yarbi-live-btn" onclick="gfcStartCopilotVoiceInput()"><span class="gfc-live-wave"><i></i><i></i><i></i><i></i><i></i></span><span class="gfc-live-button-label">Live</span></button><button type="button" class="gfc-yarbi-send-btn" onclick="gfcSendCopilotChatMessage()">➤</button></div></footer></main>';
     const chat=document.getElementById('gfc-copilot-chat-messages');
     const draft=currentDraft();
     // Desde CRM se abre una conversación limpia, enfocada únicamente en este

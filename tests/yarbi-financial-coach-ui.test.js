@@ -40,6 +40,24 @@ test('Financial Coach distinguishes an elapsed-days projection from a promised c
   assert.match(response.reply, /excluye/i);
 });
 
+test('Financial Coach answers balance del mes immediately with separated cash facts', () => {
+  const window = uiWith({
+    now:Date.parse('2026-11-13T15:00:00Z'),
+    transactions:[
+      { id:'income-month', type:'ingreso', amount:1500, date:'2026-11-02' },
+      { id:'expense-month', type:'egreso', amount:420, date:'2026-11-05' }
+    ],
+    receivables:[{ id:'receivable-month', balance_amount:300 }], commitments:[]
+  });
+  const response = window.gfcTryFinancialCoachMessage('¿Cuál es mi balance del mes?');
+  assert.equal(response.handled, true);
+  assert.match(response.reply, /^## 💰 Balance del mes/);
+  assert.match(response.reply, /S\/ 1,080\.00/);
+  assert.match(response.reply, /Ingresos cobrados: \*\*S\/ 1,500\.00\*\*/);
+  assert.match(response.reply, /Egresos registrados: \*\*S\/ 420\.00\*\*/);
+  assert.match(response.reply, /Por cobrar, fuera de caja: \*\*S\/ 300\.00\*\*/);
+});
+
 test('Financial Coach reports a recorded upcoming commitment without inventing a payment', () => {
   const window = uiWith({
     now:Date.parse('2026-11-10T15:00:00Z'), transactions:[], receivables:[],
