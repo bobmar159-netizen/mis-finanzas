@@ -1,5 +1,8 @@
 # Solo se despliegan las funciones API y los assets web necesarios.
 android/
+# Local Android build candidates are never part of a web Preview deployment.
+android-debug-build/
+android-historical-debug/
 node_modules/
 dist/
 .env*
@@ -19,6 +22,8 @@ gabinetes/
 api keys eleven labs 2026.txt
 token.txt
 output-metadata.json
+.tools/
+.gradle-user-home/
 # El plan Hobby admite 12 funciones. Esta tarea se conserva en el código para
 # moverla a Supabase Cron o Vercel Pro; no se publica hasta entonces.
 api/assistant/scheduled-followups.js

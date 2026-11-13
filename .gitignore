@@ -2,7 +2,7 @@
 .env*
 node_modules/
 dist/
-android/
+# The native Capacitor source is tracked; its own .gitignore excludes generated outputs.
 *.apk
 *.aab
 *.zip
@@ -13,3 +13,14 @@ backups/
 backup*/
 historical/
 coverage/
+
+# Local-only Android build workspaces; the reproducible native source is android/.
+android-debug-build/
+android-historical-debug/
+
+# Per-workspace Android build cache and historical source snapshots.
+android/.gradle-user-home/
+android/app/src/main/java/**/*.bak
+android/app/src/main/java/**/*.before-*
+android/**/*.before-*
+android/**/*.pre-*
