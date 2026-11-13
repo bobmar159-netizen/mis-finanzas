@@ -215,7 +215,86 @@ begin
 end;
 $$;
 
-revoke all on function public.enqueue_yarbi_historical_intelligence_batch(uuid,bigint,text,jsonb,jsonb,integer,integer,bigint,bigint), public.claim_yarbi_historical_intelligence_batch(uuid), public.complete_yarbi_historical_intelligence_batch(uuid,uuid,integer,jsonb), public.fail_yarbi_historical_intelligence_batch(uuid,uuid,integer,text) from public, anon, authenticated;
-grant execute on function public.enqueue_yarbi_historical_intelligence_batch(uuid,bigint,text,jsonb,jsonb,integer,integer,bigint,bigint), public.claim_yarbi_historical_intelligence_batch(uuid), public.complete_yarbi_historical_intelligence_batch(uuid,uuid,integer,jsonb), public.fail_yarbi_historical_intelligence_batch(uuid,uuid,integer,text) to service_role;
+-- Lectura y decisión separadas del procesamiento. Ambas RPC conservan el
+-- vínculo con el owner autenticado y nunca devuelven texto de mensajes: la
+-- propuesta ya fue normalizada antes de persistirse.
+create function public.list_yarbi_historical_intelligence_review_batches(
+  p_owner_account_id uuid,
+  p_limit integer default 20
+)
+returns table(
+  batch_id uuid,
+  contact_id bigint,
+  status text,
+  segment_index integer,
+  segment_count integer,
+  occurred_from bigint,
+  occurred_to bigint,
+  proposal jsonb,
+  completed_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if p_owner_account_id is null or p_limit not between 1 and 50 then
+    raise exception 'historical_batch_review_list_invalid' using errcode = '22023';
+  end if;
+  return query
+  select batch.id, batch.contact_id, batch.status, batch.segment_index,
+    batch.segment_count, batch.occurred_from, batch.occurred_to, batch.proposal,
+    batch.completed_at
+  from public.yarbi_historical_intelligence_batches as batch
+  where batch.owner_account_id = p_owner_account_id
+    and batch.status = 'awaiting_owner_review'
+  order by batch.completed_at asc nulls last, batch.id asc
+  limit p_limit;
+end;
+$$;
+
+create function public.review_yarbi_historical_intelligence_batch(
+  p_owner_account_id uuid,
+  p_batch_id uuid,
+  p_decision text
+)
+returns table(batch_id uuid, contact_id bigint, status text, proposal jsonb)
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_row public.yarbi_historical_intelligence_batches%rowtype;
+begin
+  if p_owner_account_id is null or p_batch_id is null
+    or p_decision not in ('approved', 'rejected') then
+    raise exception 'historical_batch_review_invalid' using errcode = '22023';
+  end if;
+  select * into v_row
+  from public.yarbi_historical_intelligence_batches
+  where id = p_batch_id and owner_account_id = p_owner_account_id
+  for update;
+  if not found then
+    raise exception 'historical_batch_not_found' using errcode = 'P0002';
+  end if;
+  -- Un doble clic con la misma decisión es idempotente. Una decisión opuesta
+  -- o un estado no revisable se rechaza de forma explícita.
+  if v_row.status <> 'awaiting_owner_review' then
+    if v_row.status = p_decision then
+      return query select v_row.id, v_row.contact_id, v_row.status, v_row.proposal;
+      return;
+    end if;
+    raise exception 'historical_batch_review_conflict' using errcode = '40001';
+  end if;
+  update public.yarbi_historical_intelligence_batches
+  set status = p_decision, updated_at = now()
+  where id = v_row.id
+  returning * into v_row;
+  return query select v_row.id, v_row.contact_id, v_row.status, v_row.proposal;
+end;
+$$;
+
+revoke all on function public.enqueue_yarbi_historical_intelligence_batch(uuid,bigint,text,jsonb,jsonb,integer,integer,bigint,bigint), public.claim_yarbi_historical_intelligence_batch(uuid), public.complete_yarbi_historical_intelligence_batch(uuid,uuid,integer,jsonb), public.fail_yarbi_historical_intelligence_batch(uuid,uuid,integer,text), public.list_yarbi_historical_intelligence_review_batches(uuid,integer), public.review_yarbi_historical_intelligence_batch(uuid,uuid,text) from public, anon, authenticated;
+grant execute on function public.enqueue_yarbi_historical_intelligence_batch(uuid,bigint,text,jsonb,jsonb,integer,integer,bigint,bigint), public.claim_yarbi_historical_intelligence_batch(uuid), public.complete_yarbi_historical_intelligence_batch(uuid,uuid,integer,jsonb), public.fail_yarbi_historical_intelligence_batch(uuid,uuid,integer,text), public.list_yarbi_historical_intelligence_review_batches(uuid,integer), public.review_yarbi_historical_intelligence_batch(uuid,uuid,text) to service_role;
 
 commit;

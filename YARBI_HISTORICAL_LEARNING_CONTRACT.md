@@ -15,6 +15,7 @@ El historial disponible de WhatsApp se incorpora una vez, se segmenta por contac
 7. Agenda y Movimientos son las fuentes para corroborar hechos comerciales; una coincidencia histórica se presenta para revisión, no altera estados.
 8. Un segmento se reclama de forma exclusiva. Si el modelo o la lectura fallan, queda marcado con un código técnico sanitizado y no se reintenta silenciosamente.
 9. Nunca existe un cron ni una ejecución masiva implícita: cada segmento requiere la habilitación exclusiva de Preview, Gemini habilitado, confirmación explícita del propietario y una sola solicitud.
+10. Las propuestas terminadas se muestran solo al mismo propietario mediante una RPC de revisión. Aprobar o rechazar es idempotente y solo cambia el estado de la propuesta; no materializa todavía datos comerciales.
 
 ## Respuesta rápida y privacidad
 
@@ -25,4 +26,4 @@ El historial disponible de WhatsApp se incorpora una vez, se segmenta por contac
 
 ## Estado actual
 
-El endpoint de memoria del Preview aislado puede exponer un plan sanitizado (`historical-plan`), sin texto de chats ni escrituras. Preparar referencias en la cola (`historical-enqueue`) requiere confirmación explícita. `historical-process-one` está implementado pero apagado: además de una confirmación por segmento exige `YARBI_PREVIEW_HISTORICAL_INTELLIGENCE_ENABLED=true` junto a la habilitación Gemini ya existente. El planificador, el contrato de salida del modelo, el adaptador Structured Output y la cola transaccional están preparados localmente. La migración `PROPOSED_20261111_historical_intelligence_batches.sql` es una propuesta: no está aplicada a Supabase y no se ha realizado ninguna llamada a Gemini.
+El endpoint de memoria del Preview aislado puede exponer un plan sanitizado (`historical-plan`), sin texto de chats ni escrituras. Preparar referencias en la cola (`historical-enqueue`) requiere confirmación explícita. `historical-process-one` está implementado pero apagado: además de una confirmación por segmento exige `YARBI_PREVIEW_HISTORICAL_INTELLIGENCE_ENABLED=true` junto a la habilitación Gemini ya existente. `historical-review-list` permite ver únicamente propuestas del propietario autenticado y `historical-review-confirm` requiere confirmar cada aprobación o rechazo. El planificador, el contrato de salida del modelo, el adaptador Structured Output, la cola transaccional y el flujo de revisión están preparados localmente. La migración `PROPOSED_20261111_historical_intelligence_batches.sql` es una propuesta: no está aplicada a Supabase y no se ha realizado ninguna llamada a Gemini.

@@ -38,6 +38,25 @@ function createOwnerMemoryHandler({ fetchImpl = fetch, now = () => Date.now(), h
       if (['owner_id','owner_account_id','ownerid','owneraccountid'].some(key => Object.prototype.hasOwnProperty.call(body, key))) return res.status(400).json({ ok: false, error: 'owner_memory_client_owner_forbidden' });
       const authenticated = await authenticatedOwnerIdentity(req, config, fetchImpl); if (!authenticated.ok) return res.status(authenticated.status).json({ ok: false, error: authenticated.code });
       const ownerId = verifiedOwnerId(authenticated.identity); const supabase = serviceClient(config, fetchImpl); const action = clean(body.action, 32).toLowerCase() || 'list';
+      if (action === 'historical-review-list') {
+        const queue = createHistoricalIntelligenceQueue({ supabase });
+        const batches = await queue.listReview({ ownerIdentity: authenticated.identity, limit: body.limit });
+        return res.status(200).json({
+          ok: true, outcome: 'historical_review_ready', batches,
+          requires_owner_review: true, commercial_effects_allowed: false,
+          note: 'La aprobación conserva contexto y estilo para integración posterior; no modifica pagos, visitas, Agenda ni estados comerciales.'
+        });
+      }
+      if (action === 'historical-review-confirm') {
+        if (body.confirm_historical_review !== true) return res.status(400).json({ ok: false, error: 'historical_review_confirmation_required' });
+        const queue = createHistoricalIntelligenceQueue({ supabase });
+        const batch = await queue.review({ ownerIdentity: authenticated.identity, batch_id: clean(body.batch_id, 80), decision: clean(body.decision, 16) });
+        return res.status(200).json({
+          ok: true, outcome: batch.status === 'approved' ? 'historical_review_approved' : 'historical_review_rejected', batch,
+          requires_owner_review: true, commercial_effects_allowed: false,
+          note: 'Esta decisión no ejecuta ninguna acción comercial.'
+        });
+      }
       if (action === 'historical-process-one') {
         // No hay cron ni procesamiento implícito: cada llamada requiere dos
         // habilitaciones de Preview más una confirmación explícita del dueño.

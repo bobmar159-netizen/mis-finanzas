@@ -36,6 +36,9 @@ test('proposed SQL keeps the queue service-role-only and review-only', () => {
   assert.match(sql, /historical_batch_claim_conflict/i);
   assert.match(sql, /historical_batch_result_binding_invalid/i);
   assert.match(sql, /fail_yarbi_historical_intelligence_batch/i);
+  assert.match(sql, /list_yarbi_historical_intelligence_review_batches/i);
+  assert.match(sql, /review_yarbi_historical_intelligence_batch/i);
+  assert.match(sql, /historical_batch_review_conflict/i);
   assert.match(sql, /grant execute on function public\.enqueue_yarbi_historical_intelligence_batch/i);
   assert.doesNotMatch(sql, /grant select, insert, update on table public\.yarbi_historical_intelligence_batches to service_role/i);
 });
@@ -83,4 +86,24 @@ test('queue failure is tied to the same claim and stores only a sanitized code',
   assert.equal(failed.status, 'failed');
   assert.equal(calls[0].body.p_error_code, 'provider_message_contains_a_phone_51_999_111_222');
   assert.equal(failureCode('!!!'), 'historical_batch_processing_failed');
+});
+
+test('review queue returns only owner-bound proposals and makes identical decisions idempotent', async () => {
+  const proposal = { schema:'yarbi.historical-intelligence-result.v1', contact_id:'71', contact_context_observations:[], reply_style_patterns:[] };
+  const calls = [];
+  const queue = createHistoricalIntelligenceQueue({ supabase: async (path, init) => {
+    calls.push({ path, body:JSON.parse(init.body) });
+    const name = path.split('/').at(-1);
+    if (name === 'list_yarbi_historical_intelligence_review_batches') return { response:{ ok:true }, data:[{ batch_id:'11111111-1111-4111-8111-111111111111', contact_id:71, status:'awaiting_owner_review', segment_index:0, segment_count:1, proposal }] };
+    if (name === 'review_yarbi_historical_intelligence_batch') return { response:{ ok:true }, data:[{ batch_id:'11111111-1111-4111-8111-111111111111', contact_id:71, status:'approved', proposal }] };
+    throw new Error('unexpected rpc');
+  } });
+  const pending = await queue.listReview({ ownerIdentity:OWNER, limit:100 });
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].proposal.commercial_effects_allowed, false);
+  const approved = await queue.review({ ownerIdentity:OWNER, batch_id:pending[0].batch_id, decision:'approve' });
+  assert.equal(approved.status, 'approved');
+  assert.equal(calls[0].body.p_limit, 50);
+  assert.equal(calls[1].body.p_decision, 'approved');
+  await assert.rejects(() => queue.review({ ownerIdentity:OWNER, batch_id:pending[0].batch_id, decision:'erase_everything' }), /historical_batch_review_input_invalid/);
 });
