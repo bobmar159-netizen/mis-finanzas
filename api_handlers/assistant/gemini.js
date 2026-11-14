@@ -28,7 +28,7 @@ function sanitizePart(part) {
   if (!data || typeof data !== 'object') return null;
   const mimeType = text(data.mime_type || data.mimeType, 120);
   const encoded = text(data.data, Math.ceil(MAX_INLINE_BYTES * 4 / 3));
-  if (!/^image\/(jpeg|png|webp)$/i.test(mimeType) || !encoded || Buffer.byteLength(encoded, 'base64') > MAX_INLINE_BYTES) return null;
+  if (!/^(?:image\/(jpeg|png|webp)|audio\/(mpeg|mp4|wav|ogg|aac|webm)|video\/(mp4|webm|quicktime)|application\/pdf)$/i.test(mimeType) || !encoded || Buffer.byteLength(encoded, 'base64') > MAX_INLINE_BYTES) return null;
   return { inline_data: { mime_type: mimeType, data: encoded } };
 }
 function sanitizeContents(value) {

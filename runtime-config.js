@@ -4,9 +4,11 @@
   const config = Object.freeze({
     apiOrigin: '__YARBI_SAME_ORIGIN__',
     environment: 'web',
-    releaseId: 'p02i-798e70e0c4ffcd96',
+    releaseId: 'p02i-b1899456db87faa2',
     remoteEnabled: 'true' === 'true',
-    nativeAuthCallbackScheme: 'com.misfinanzas.app'
+    nativeAuthCallbackScheme: 'com.misfinanzas.app',
+    supabaseUrl: '',
+    supabasePublishableKey: ''
   });
   function apiOrigin() {
     if (!config.remoteEnabled) {
@@ -25,4 +27,17 @@
   window.gfcRuntimeApiOrigin = apiOrigin;
   window.gfcRuntimeRemoteEnabled = () => config.remoteEnabled;
   window.gfcRuntimeNativeAuthCallbackPrefix = () => `${config.nativeAuthCallbackScheme}://auth/callback`;
+  window.gfcRuntimePublicAuthConfig = () => {
+    if (!config.supabaseUrl || !config.supabasePublishableKey) return null;
+    try {
+      const parsed = new URL(config.supabaseUrl);
+      if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.supabase.co')) return null;
+      return Object.freeze({
+        supabaseUrl: parsed.origin,
+        publishableKey: config.supabasePublishableKey
+      });
+    } catch (_) {
+      return null;
+    }
+  };
 })();

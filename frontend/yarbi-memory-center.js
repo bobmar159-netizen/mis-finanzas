@@ -2370,6 +2370,7 @@
       '<div class="gfc-yarbi-progress"><div id="gfc-yarbi-import-progress"></div></div><div id="gfc-yarbi-import-status" class="gfc-yarbi-tool-copy">Sin importación pendiente.</div><div id="gfc-yarbi-import-preview"></div></div></main>';
   }
   function mediaHtml() {
+    if (typeof window.gfcYarbiMultimodalHtml === 'function') return window.gfcYarbiMultimodalHtml();
     return '<main class="gfc-yarbi-tool-page"><div class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Biblioteca local Yarbi</div>' +
       '<div class="gfc-yarbi-tool-copy">Elige una carpeta “Yarbi Multimedia”. Las fotos y videos permanecen únicamente en el celular: no se envían a Supabase. Para compartir, Android abre WhatsApp Business y tú confirmas el destinatario y el envío.</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="gfc-yarbi-primary" onclick="gfcChooseYarbiMediaFolder()">Elegir carpeta</button><button class="gfc-yarbi-secondary" onclick="gfcRefreshYarbiMediaLibrary()">Actualizar</button></div>' +
@@ -2475,7 +2476,10 @@
     if (tab === 'conversations') setTimeout(() => window.gfcRenderYarbiConversationHistory(), 0);
     if (tab === 'knowledge') setTimeout(() => window.gfcYarbiKnowledgeAttach?.(), 0);
     if (tab === 'ads') setTimeout(() => window.gfcYarbiMetaAdsAttach?.(), 0);
-    if (tab === 'memoria') setTimeout(() => window.gfcRefreshYarbiMediaLibrary(), 0);
+    if (tab === 'memoria') setTimeout(() => {
+      if (typeof window.gfcYarbiMultimodalAttach === 'function') window.gfcYarbiMultimodalAttach();
+      else window.gfcRefreshYarbiMediaLibrary?.();
+    }, 0);
     if (tab === 'ordenes') loadInstructionViewInBackground(viewGeneration);
     if (tab === 'practice') setTimeout(() => {
       if (window._gfcLiveSession?.active && typeof gfcStopGeminiLive === 'function') gfcStopGeminiLive();

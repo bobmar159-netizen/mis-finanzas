@@ -7,8 +7,8 @@ android {
         applicationId "com.misfinanzas.app.yarbitest"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 121
-        versionName "3.4.30-yarbi-owner-sync"
+        versionCode 122
+        versionName "3.4.31-yarbi-bke-tutor-multimodal"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -23,11 +23,11 @@ android {
             // when validating changes to runtime configuration against the
             // earlier Preview test APKs, while still preserving 3.4.25.
             applicationIdSuffix ".debug.r3"
-            versionNameSuffix "-chat-preview-local-r3"
+            versionNameSuffix "-chat-preview-local-r4"
             // Visible label: allows the owner to distinguish this isolated
             // validation app from the historical 3.4.25 and previous tests.
-            resValue "string", "app_name", "Yarbi Preview R3"
-            resValue "string", "title_activity_main", "Yarbi Preview R3"
+            resValue "string", "app_name", "Yarbi Preview R4"
+            resValue "string", "title_activity_main", "Yarbi Preview R4"
         }
         release {
             minifyEnabled false

@@ -314,7 +314,8 @@
       return null;
     }
     const explicitId = typeof id === 'string' ? id.trim() : '';
-    const normalized = normalizeTimelineItem({ id:explicitId || undefined, role, text, at:at || Date.now(), channel:channel || 'chat', conversation_id:conversationId || activeConversationId() });
+    const resolvedConversationId = conversationId || (typeof activeConversationId === 'function' ? activeConversationId() : 'yarbi-default');
+    const normalized = normalizeTimelineItem({ id:explicitId || undefined, role, text, at:at || Date.now(), channel:channel || 'chat', conversation_id:resolvedConversationId });
     if (!normalized) { setTimelinePersistence('content_invalid'); return null; }
     try {
       const store = await conversationStore();
@@ -771,8 +772,18 @@
     if (!item) return { handled:true, result:{ ok:false, code:'timeline_item_invalid' } };
     const box = document.getElementById('gfc-copilot-chat-messages');
     if (!box) return { handled:false };
-    if ([...box.querySelectorAll('[data-message-id]')].some(node => node.dataset.messageId === item.id)) return { handled:true, result:{ ok:true, duplicate:true } };
+    if ([...box.querySelectorAll('[data-message-id]')].some(node => node.dataset.messageId === item.id)) {
+      if (role === 'assistant' && window._gfcYarbiTextRequestActive) {
+        window._gfcYarbiTextRequestActive = false;
+        window.gfcYarbiSetProcessStatus?.('ready', 'Respuesta lista');
+      }
+      return { handled:true, result:{ ok:true, duplicate:true } };
+    }
     const rendered = renderTimelineItem(item);
+    if (role === 'assistant' && window._gfcYarbiTextRequestActive) {
+      window._gfcYarbiTextRequestActive = false;
+      window.gfcYarbiSetProcessStatus?.('ready', 'Respuesta lista');
+    }
     return { handled:true, result:{ ok:true, timelineId:item.id, rendered:!!rendered } };
   };
   async function refreshConversationTimelineRenderer() {
@@ -1130,7 +1141,7 @@
     return (training ? trainingTools : '') +
       '<div id="gfc-yarbi-conversation-focus" class="gfc-yarbi-focus" hidden></div>' + conversation + hiddenTrainingFields +
       '<footer class="gfc-yarbi-composer-wrap">' +
-        '<div class="gfc-yarbi-live-state"><span id="gfc-live-status">Listo para hablar o escribir</span><span id="gfc-ai-process-status" aria-live="polite">' + (training ? 'Práctica privada' : '') + '</span><button id="gfc-ai-process-btn" hidden></button></div>' +
+        '<div class="gfc-yarbi-live-state"><span id="gfc-live-status" data-phase="ready">Listo para hablar o escribir</span><span id="gfc-ai-process-status" aria-live="polite">' + (training ? 'Práctica privada' : '') + '</span><button id="gfc-ai-process-btn" hidden></button></div>' +
         '<div class="gfc-yarbi-composer"><textarea id="gfc-copilot-input-text" rows="1" enterkeyhint="send" autocapitalize="sentences" aria-label="Mensaje para Yarbi" placeholder="' + (training ? 'Escribe como cliente o enséñale a Yarbi…' : 'Pregunta lo que necesites…') + '" onkeydown="gfcHandleYarbiComposerKeydown(event)" oninput="gfcSaveYarbiConversationDraft(this.value);gfcResizeYarbiComposer(this)"></textarea>' +
         '<div class="gfc-yarbi-composer-toolbar"><button id="gfc-mic-input-btn" class="gfc-yarbi-live-btn" data-live-phase="off" onclick="gfcStartCopilotVoiceInput()" aria-label="Activar conversación por voz" title="Hablar con Yarbi"><span class="gfc-live-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="gfc-live-button-label">Hablar</span></button><span class="gfc-yarbi-composer-hint">Enter para enviar · Shift+Enter para otra línea</span>' +
         '<button class="gfc-yarbi-send-btn" onclick="gfcSendYarbiUnifiedMessage()" aria-label="Enviar mensaje" title="Enviar mensaje"><span aria-hidden="true">↑</span></button></div></div>' +
@@ -2359,6 +2370,7 @@
       '<div class="gfc-yarbi-progress"><div id="gfc-yarbi-import-progress"></div></div><div id="gfc-yarbi-import-status" class="gfc-yarbi-tool-copy">Sin importación pendiente.</div><div id="gfc-yarbi-import-preview"></div></div></main>';
   }
   function mediaHtml() {
+    if (typeof window.gfcYarbiMultimodalHtml === 'function') return window.gfcYarbiMultimodalHtml();
     return '<main class="gfc-yarbi-tool-page"><div class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Biblioteca local Yarbi</div>' +
       '<div class="gfc-yarbi-tool-copy">Elige una carpeta “Yarbi Multimedia”. Las fotos y videos permanecen únicamente en el celular: no se envían a Supabase. Para compartir, Android abre WhatsApp Business y tú confirmas el destinatario y el envío.</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="gfc-yarbi-primary" onclick="gfcChooseYarbiMediaFolder()">Elegir carpeta</button><button class="gfc-yarbi-secondary" onclick="gfcRefreshYarbiMediaLibrary()">Actualizar</button></div>' +
@@ -2464,7 +2476,10 @@
     if (tab === 'conversations') setTimeout(() => window.gfcRenderYarbiConversationHistory(), 0);
     if (tab === 'knowledge') setTimeout(() => window.gfcYarbiKnowledgeAttach?.(), 0);
     if (tab === 'ads') setTimeout(() => window.gfcYarbiMetaAdsAttach?.(), 0);
-    if (tab === 'memoria') setTimeout(() => window.gfcRefreshYarbiMediaLibrary(), 0);
+    if (tab === 'memoria') setTimeout(() => {
+      if (typeof window.gfcYarbiMultimodalAttach === 'function') window.gfcYarbiMultimodalAttach();
+      else window.gfcRefreshYarbiMediaLibrary?.();
+    }, 0);
     if (tab === 'ordenes') loadInstructionViewInBackground(viewGeneration);
     if (tab === 'practice') setTimeout(() => {
       if (window._gfcLiveSession?.active && typeof gfcStopGeminiLive === 'function') gfcStopGeminiLive();

@@ -24,7 +24,7 @@
   }
   function localReply(utterance) {
     const value = normalized(utterance);
-    if (!/\b(caja|meta|cobrar|cobro|compromiso|vencimiento|vence|debo|debe|deben|deudor|deudores|deuda|pagar|gasto|ingreso|finanzas?|dinero|proyeccion|proyecta|este mes|mensual)\b/.test(value)) return null;
+    if (!/\b(caja|balance|saldo|resultado|meta|cobrar|cobro|compromiso|vencimiento|vence|debo|debe|deben|deudor|deudores|deuda|pagar|gasto|ingreso|finanzas?|dinero|proyeccion|proyecta|este mes|mensual|mes)\b/.test(value)) return null;
     const result = currentSummary();
     if (!result) return { handled:true, reply:'No puedo leer el resumen financiero local ahora. No se realizó ninguna consulta externa.' };
     const summary = result.summary;
@@ -48,6 +48,14 @@
       return { handled:true, reply:next.status === 'overdue' ? richReply('⚠️ Compromiso vencido', `Vencido desde ${next.due_at}.`, [amount.trim()]) : next.status === 'due_today' ? richReply('📅 Compromiso de hoy', 'Tienes un compromiso que vence hoy.', [amount.trim()]) : richReply('📅 Próximo compromiso', `Vence el ${next.due_at}.`, [amount.trim()]) };
     }
     if (/compromiso|debo|deuda|pagar/.test(value)) return { handled:true, reply:richReply('📌 Compromisos', `${soles(summary.known_commitments_due)} en compromisos locales pendientes.`, ['No lo confundí con gastos ya registrados.']) };
+    if (/\b(balance|saldo|resultado|caja)\b/.test(value) && /\b(mes|mensual)\b/.test(value) && !/proyeccion|proyecta/.test(value)) {
+      return { handled:true, reply:richReply('💰 Balance del mes', `${soles(summary.free_cash_month)} de caja libre registrada.`, [
+        `✅ Ingresos cobrados: **${soles(summary.collected_cash_month)}**`,
+        `➖ Egresos registrados: **${soles(summary.operating_expenses_month)}**`,
+        `📥 Por cobrar, fuera de caja: **${soles(summary.pending_receivables)}**`,
+        'El balance usa movimientos registrados; no convierte cotizaciones ni deudas por cobrar en efectivo.'
+      ]) };
+    }
     if (/proyeccion|proyecta|este mes|mensual/.test(value)) {
       if (summary.projected_free_cash_month === null) return { handled:true, reply:richReply('📈 Proyección del mes', 'No hay movimientos locales suficientes para proyectar el mes.', ['No convertiré cuentas por cobrar ni cotizaciones en efectivo estimado.']) };
       return { handled:true, reply:richReply('📈 Proyección del mes', `${soles(summary.projected_free_cash_month)} de caja libre estimada.`, ['Se calcula con el promedio registrado por día transcurrido.', 'Es una estimación, no una garantía.', `Excluye ${soles(summary.pending_receivables)} por cobrar.`]) };
