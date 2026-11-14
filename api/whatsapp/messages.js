@@ -4,7 +4,10 @@
 // los proveedores conservan sus firmas en /api/webhook y el navegador solo
 // llega aquí con una sesión Supabase y alcance canónico de contactos.
 const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
-const { authenticateScopedOwner, blockedOwnerInput, scopedContact, scopedFilter } = require('../../lib/yarbi-authenticated-route');
+const { authenticateCompleteScopedOwner, blockedOwnerInput, scopedFilter } = require('../../lib/yarbi-authenticated-route');
+
+const SCOPE_BATCH_SIZE = 100;
+const READ_CONCURRENCY = 3;
 
 function first(value) { return Array.isArray(value) ? value[0] : value; }
 function cleanPhone(value) { return String(first(value) || '').replace(/\D/g, '').slice(0, 20); }
@@ -21,6 +24,33 @@ function limit(value) {
 function offset(value) {
   const parsed = Number.parseInt(String(first(value) || ''), 10);
   return Math.min(Math.max(Number.isFinite(parsed) ? parsed : 0, 0), 100000);
+}
+function iso(value) {
+  const raw = String(first(value) || '').trim();
+  return raw && Number.isFinite(new Date(raw).getTime()) ? new Date(raw).toISOString() : null;
+}
+function body(req) {
+  if (req?.body && typeof req.body === 'object') return req.body;
+  try { return JSON.parse(String(req?.body || '{}')); } catch (_) { return {}; }
+}
+function scopeBatches(scope, batchSize = SCOPE_BATCH_SIZE) {
+  const ids = [...new Set((Array.isArray(scope?.contact_ids) ? scope.contact_ids : [])
+    .map(Number).filter(id => Number.isSafeInteger(id) && id > 0))];
+  const batches = [];
+  for (let index = 0; index < ids.length; index += batchSize) batches.push(ids.slice(index, index + batchSize));
+  return batches;
+}
+async function mapConcurrent(items, concurrency, worker) {
+  const values = new Array(items.length);
+  let cursor = 0;
+  async function run() {
+    while (cursor < items.length) {
+      const index = cursor++;
+      values[index] = await worker(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(Math.max(concurrency, 1), items.length) }, run));
+  return values;
 }
 
 function serviceClient(config, fetchImpl) {
@@ -43,40 +73,184 @@ function messageQuery(query, scope) {
   const phone = cleanPhone(query.phone);
   const since = timestamp(query.since);
   const fromTimestamp = timestamp(query.from_timestamp);
+  const beforeTimestamp = timestamp(query.before_timestamp);
   if (phone) params.set('phone', `eq.${phone}`);
   if (since !== null) params.set('timestamp', `gt.${since}`);
   if (fromTimestamp !== null) params.set('timestamp', `gte.${fromTimestamp}`);
+  if (beforeTimestamp !== null) params.set('timestamp', `lt.${beforeTimestamp}`);
   params.set('order', `timestamp.${String(first(query.order) || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc'}`);
   params.set('limit', String(limit(query.limit)));
   params.set('offset', String(offset(query.offset)));
   return '/rest/v1/whatsapp_messages?' + params.toString();
 }
 
-function createWhatsAppMessagesHandler({ configResolver = () => validateServerRouteConfig({ requirePublicAuth: true }), authenticate = authenticateScopedOwner, fetchImpl = fetch } = {}) {
+function messageQueries(query, scope) {
+  const batches = scopeBatches(scope);
+  if (batches.length <= 1) return batches.length ? [messageQuery(query, { contact_ids: batches[0] })] : [];
+  const requestedOffset = offset(query.offset);
+  const perBatch = Math.min(limit(query.limit) + requestedOffset, 5000);
+  return batches.map(ids => messageQuery({ ...query, limit: perBatch, offset: 0 }, { contact_ids: ids }));
+}
+
+function rowTimestamp(row) {
+  const numeric = Number(row?.timestamp || 0);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : (new Date(row?.created_at || 0).getTime() || 0);
+}
+function dedupeRows(rows, key = 'id') {
+  const seen = new Set();
+  return rows.filter(row => {
+    const value = String(row?.[key] ?? '');
+    if (!value || seen.has(value)) return false;
+    seen.add(value);
+    return true;
+  });
+}
+async function readScopedMessages(supabase, query, scope) {
+  const paths = messageQueries(query, scope).filter(Boolean);
+  if (!paths.length) return [];
+  const pages = await mapConcurrent(paths, READ_CONCURRENCY, async path => {
+    const result = await supabase(path);
+    if (!result.response.ok) {
+      const error = new Error('whatsapp_messages_read_failed');
+      error.status = result.response.status;
+      throw error;
+    }
+    return Array.isArray(result.data) ? result.data : [];
+  });
+  const allowed = new Set(scope.contact_ids.map(Number));
+  const direction = String(first(query.order) || 'desc').toLowerCase() === 'asc' ? 1 : -1;
+  const globalOffset = paths.length > 1 ? offset(query.offset) : 0;
+  return dedupeRows(pages.flat().filter(row => allowed.has(Number(row?.contact_id))))
+    .sort((a, b) => direction * (rowTimestamp(a) - rowTimestamp(b)) || String(a.id).localeCompare(String(b.id)))
+    .slice(globalOffset, globalOffset + limit(query.limit));
+}
+
+async function readScopedEntityRows(supabase, scope, spec, cursor, requestedLimit) {
+  const batches = scopeBatches(scope);
+  const paths = batches.map(ids => {
+    const params = new URLSearchParams();
+    params.set('select', spec.select);
+    params.set(spec.scopeField || 'contact_id', scopedFilter({ contact_ids: ids }));
+    if (cursor) params.set(spec.cursorField || 'updated_at', `gte.${cursor}`);
+    params.set('order', `${spec.cursorField || 'updated_at'}.asc`);
+    params.set('limit', String(requestedLimit));
+    return `/rest/v1/${spec.table}?${params.toString()}`;
+  });
+  if (!paths.length) return [];
+  const pages = await mapConcurrent(paths, READ_CONCURRENCY, async (path, index) => {
+    const result = await supabase(path);
+    if (!result.response.ok) {
+      if (spec.optional) return [];
+      const error = new Error('owner_sync_entity_read_failed');
+      error.status = result.response.status;
+      throw error;
+    }
+    const allowed = new Set(batches[index].map(Number));
+    const field = spec.scopeField || 'contact_id';
+    return Array.isArray(result.data) ? result.data.filter(row => allowed.has(Number(row?.[field]))) : [];
+  });
+  const rows = dedupeRows(pages.flat(), spec.key || 'id');
+  const field = spec.cursorField || 'updated_at';
+  return rows.sort((a, b) => String(a?.[field] || '').localeCompare(String(b?.[field] || ''))).slice(0, requestedLimit);
+}
+
+function maxIso(rows, field, fallback = null) {
+  return rows.reduce((latest, row) => {
+    const value = iso(row?.[field]);
+    return value && (!latest || value > latest) ? value : latest;
+  }, fallback);
+}
+function maxNumber(rows, field, fallback = null) {
+  return rows.reduce((latest, row) => Math.max(Number(latest || 0), Number(row?.[field] || 0)) || null, fallback);
+}
+
+const LOCAL_ENTITY_SPECS = [
+  { name:'contacts', table:'crm_contacts', scopeField:'id', select:'id,full_name,display_name,commercial_status,status_reason,commercial_status_event_at,commercial_status_source_message_ids,operational_status,operational_reason,operational_event_at,operational_status_source_message_ids,notes,source,created_at,updated_at' },
+  { name:'identifiers', table:'contact_identifiers', select:'id,contact_id,identifier_type,identifier_value,normalized_value,is_primary,created_at,updated_at' },
+  { name:'memories', table:'ai_conversation_memory', key:'contact_id', select:'contact_id,summary,last_interaction_at,last_ai_interaction_at,customer_summary_version,latest_intent,latest_service,follow_up_status,next_steps,created_at,updated_at' },
+  { name:'agenda', table:'agenda_events', select:'id,contact_id,event_type,title,service,description,location,maps_url,latitude,longitude,starts_at,ends_at,timezone,status,source,dedupe_key,created_at,updated_at' },
+  { name:'alerts', table:'ai_intelligent_alerts', select:'id,contact_id,analysis_id,agenda_event_id,alert_type,title,reason,severity,status,created_at,updated_at' },
+  { name:'analyses', table:'ai_message_analysis', select:'id,message_id,contact_id,status,intent,service,extracted_data,confidence,requires_review,error_message,analyzed_at,completed_at,created_at,updated_at' },
+  { name:'observations', table:'ai_contact_observations', optional:true, select:'id,contact_id,analysis_id,processing_run_id,observation_type,category,value,source_message_ids,confidence,status,observed_at,created_at,updated_at' },
+  { name:'receivables', table:'yarbi_receivables', optional:true, select:'id,contact_id,agreed_amount,paid_amount,balance_amount,status,next_action,next_action_due,created_at,updated_at' }
+];
+
+async function ownerLocalSync(req, res, supabase, access) {
+  const input = body(req);
+  if (blockedOwnerInput(input)) return res.status(400).json({ error: 'owner_scope_client_input_forbidden' });
+  const entityCursor = iso(input.entity_cursor);
+  const messageCursor = timestamp(input.message_cursor);
+  const deletionCursor = iso(input.deletion_cursor);
+  const historyBefore = timestamp(input.history_before);
+  const messageLimit = Math.min(limit(input.message_limit || 200), 250);
+  const entityLimit = Math.min(limit(input.entity_limit || 400), 500);
+  try {
+    const entityPages = await Promise.all(LOCAL_ENTITY_SPECS.map(spec => readScopedEntityRows(supabase, access.scope, spec, entityCursor, entityLimit)));
+    const entities = Object.fromEntries(LOCAL_ENTITY_SPECS.map((spec, index) => [spec.name, entityPages[index]]));
+    entities.habits = [];
+    entities.reply_styles = [];
+    const messageRequest = historyBefore
+      ? { before_timestamp: historyBefore, order:'desc', limit:messageLimit }
+      : messageCursor
+        ? { from_timestamp: Math.max(0, messageCursor - 1), order:'asc', limit:messageLimit }
+        : { order:'desc', limit:messageLimit };
+    const messages = await readScopedMessages(supabase, messageRequest, access.scope);
+    const deleted = deletionCursor
+      ? await readScopedMessages(supabase, { include_deleted:'true', order:'asc', limit:messageLimit }, access.scope)
+      : [];
+    const deletedMessages = deleted.filter(row => {
+      const value = iso(row?.deleted_at);
+      return value && value >= deletionCursor;
+    });
+    const entityRows = entityPages.flat();
+    const oldest = messages.reduce((value, row) => Math.min(value || Number.MAX_SAFE_INTEGER, rowTimestamp(row) || Number.MAX_SAFE_INTEGER), 0);
+    return res.status(200).json({
+      status:'ok',
+      contract:'yarbi-local-mirror-v4-owner-scoped',
+      source:'supabase-backend',
+      server_time:new Date().toISOString(),
+      entities,
+      messages,
+      deleted_message_ids:deletedMessages.map(row => String(row.id || '')).filter(Boolean),
+      cursors:{
+        entity_cursor:maxIso(entityRows, 'updated_at', entityCursor),
+        message_cursor:historyBefore ? messageCursor : maxNumber(messages, 'timestamp', messageCursor),
+        deletion_cursor:maxIso(deletedMessages, 'deleted_at', deletionCursor),
+        history_before:(historyBefore || !messageCursor) && messages.length === messageLimit ? oldest : null
+      },
+      has_more_history:Boolean((historyBefore || !messageCursor) && messages.length === messageLimit && oldest)
+    });
+  } catch (error) {
+    return res.status(error?.status >= 400 && error.status < 500 ? error.status : 502).json({ error:'whatsapp_owner_sync_unavailable' });
+  }
+}
+
+function createWhatsAppMessagesHandler({ configResolver = () => validateServerRouteConfig({ requirePublicAuth: true }), authenticate = authenticateCompleteScopedOwner, fetchImpl = fetch } = {}) {
   return async function whatsappMessagesHandler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Cache-Control', 'no-store');
     if (req.method === 'OPTIONS') return res.status(204).end();
-    if (req.method !== 'GET') return res.status(405).json({ error: 'method_not_allowed' });
+    if (!['GET', 'POST'].includes(req.method)) return res.status(405).json({ error: 'method_not_allowed' });
     const query = req.query || {};
     if (blockedOwnerInput(query)) return res.status(400).json({ error: 'owner_scope_client_input_forbidden' });
-    if (String(first(query.action) || '').trim()) return res.status(410).json({ error: 'interactive_whatsapp_action_moved' });
+    const action = String(first(query.action) || '').trim();
+    if (action && action !== 'local-sync') return res.status(410).json({ error: 'interactive_whatsapp_action_moved' });
+    if (req.method === 'POST' && action !== 'local-sync') return res.status(405).json({ error: 'method_not_allowed' });
+    if (req.method === 'GET' && action === 'local-sync') return res.status(405).json({ error: 'method_not_allowed' });
     const config = configResolver();
     if (!config?.ok) return res.status(503).json({ error: 'configuration_invalid', code: config?.code || 'configuration_invalid' });
     const supabase = serviceClient(config, fetchImpl);
     const access = await authenticate(req, config, supabase, fetchImpl);
     if (!access?.ok) return res.status(access?.status || 403).json({ error: access?.code || 'owner_scope_forbidden' });
-    const path = messageQuery(query, access.scope);
-    if (!path) return res.status(200).json({ status: 'ok', source: 'supabase-backend', messages: [] });
+    if (action === 'local-sync') return ownerLocalSync(req, res, supabase, access);
+    if (!scopeBatches(access.scope).length) return res.status(200).json({ status: 'ok', source: 'supabase-backend', messages: [] });
     try {
-      const result = await supabase(path);
-      if (!result.response.ok) return res.status(result.response.status).json({ error: 'whatsapp_messages_unavailable' });
-      const messages = Array.isArray(result.data) ? result.data.filter(row => scopedContact(access.scope, row?.contact_id)) : [];
+      const messages = await readScopedMessages(supabase, query, access.scope);
       return res.status(200).json({ status: 'ok', source: 'supabase-backend', messages });
-    } catch (_) {
-      return res.status(502).json({ error: 'whatsapp_messages_unavailable' });
+    } catch (error) {
+      return res.status(error?.status >= 400 && error.status < 500 ? error.status : 502).json({ error: 'whatsapp_messages_unavailable' });
     }
   };
 }
@@ -84,3 +258,4 @@ function createWhatsAppMessagesHandler({ configResolver = () => validateServerRo
 module.exports = createWhatsAppMessagesHandler();
 module.exports.createWhatsAppMessagesHandler = createWhatsAppMessagesHandler;
 module.exports.messageQuery = messageQuery;
+module.exports.messageQueries = messageQueries;

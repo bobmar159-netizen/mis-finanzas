@@ -7,8 +7,8 @@ android {
         applicationId "com.misfinanzas.app.yarbitest"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 120
-        versionName "3.4.29-yarbi-rich-chat"
+        versionCode 121
+        versionName "3.4.30-yarbi-owner-sync"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

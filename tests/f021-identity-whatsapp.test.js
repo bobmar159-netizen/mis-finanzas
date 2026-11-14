@@ -113,3 +113,55 @@ test('F02.1 removes the frontend fallback that sent interactive preferences to t
   const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
   assert.doesNotMatch(source, /\/api\/whatsapp\/messages\?action=preferences/);
 });
+
+test('WhatsApp sync reuses the authenticated owner session and never the legacy assistant token', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  const start = source.indexOf('async function gfcSyncYarbiLocalMirror');
+  const end = source.indexOf('async function gfcYarbiLocalBackfill', start);
+  const block = source.slice(start, end);
+  assert.match(block, /gfcAccountFreshAccessToken\(\)/);
+  assert.match(block, /Authorization:\s*'Bearer '\s*\+\s*token/);
+  assert.doesNotMatch(block, /X-Assistant-Token|fnz_assistant_token/);
+});
+
+test('owner-scoped local sync accepts POST and excludes another owner data', async () => {
+  const requested = [];
+  const handler = createWhatsAppMessagesHandler({
+    configResolver: () => CONFIG,
+    authenticate: auth(OWNER_A),
+    fetchImpl: async input => {
+      const url = new URL(String(input)); requested.push(url);
+      if (url.pathname.endsWith('/whatsapp_messages')) return json([{ id:'message-a', contact_id:101, text:'hola', timestamp:1000 }, { id:'message-b', contact_id:202, text:'privado', timestamp:1001 }]);
+      if (url.pathname.endsWith('/crm_contacts')) return json([{ id:101, display_name:'A', updated_at:'2026-11-14T10:00:00Z' }, { id:202, display_name:'B', updated_at:'2026-11-14T10:00:00Z' }]);
+      return json([]);
+    }
+  });
+  const res = response();
+  await handler(req({ method:'POST', query:{ action:'local-sync' }, headers:{ authorization:'Bearer synthetic-session' }, body:{ message_limit:200, entity_limit:400 } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.contract, 'yarbi-local-mirror-v4-owner-scoped');
+  assert.deepEqual(res.body.messages.map(row => row.contact_id), [101]);
+  assert.deepEqual(res.body.entities.contacts.map(row => row.id), [101]);
+  assert.ok(requested.every(url => !String(url.searchParams.get('contact_id') || url.searchParams.get('id') || '').includes('202')));
+});
+
+test('WhatsApp reads batch 2000 scoped contacts without truncation or cross-owner rows', async () => {
+  const calls = [];
+  const contactIds = Array.from({ length:2000 }, (_, index) => index + 1);
+  const handler = createWhatsAppMessagesHandler({
+    configResolver: () => CONFIG,
+    authenticate: auth({ ok:true, scope:{ owner_id:OWNER_A.scope.owner_id, contact_ids:contactIds } }),
+    fetchImpl: async input => {
+      const url = new URL(String(input)); calls.push(url);
+      const ids = String(url.searchParams.get('contact_id') || '').match(/in\.\(([^)]+)\)/)?.[1].split(',').map(Number) || [];
+      return json(ids.length ? [{ id:'m-' + ids[0], contact_id:ids[0], timestamp:ids[0] }, { id:'foreign-' + ids[0], contact_id:9001, timestamp:9001 }] : []);
+    }
+  });
+  const res = response();
+  await handler(req({ query:{ limit:'5000', order:'asc' }, headers:{ authorization:'Bearer synthetic-session' } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(calls.length, 20);
+  assert.equal(res.body.messages.length, 20);
+  assert.ok(res.body.messages.every(row => row.contact_id <= 2000));
+  assert.ok(calls.every(url => String(url.searchParams.get('contact_id')).split(',').length <= 100));
+});

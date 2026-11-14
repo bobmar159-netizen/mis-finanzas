@@ -16300,12 +16300,12 @@ async function gfcSyncYarbiLocalMirror(options = {}) {
   if (window._gfcYarbiLocalMirrorSync) return window._gfcYarbiLocalMirrorSync;
   gfcYarbiLocalStatusWrite({ status: 'syncing', reason: options.reason || 'background', last_error: '' });
   const task = (async () => {
-    const token = localStorage.getItem('fnz_assistant_token') || '';
-    if (!token) { gfcYarbiLocalStatusWrite({ status: 'blocked', reason: options.reason || 'background', last_error: 'Falta el token de Yarbi en este dispositivo.' }); return null; }
+    const token = await gfcAccountFreshAccessToken();
+    if (!token) { gfcYarbiLocalStatusWrite({ status: 'blocked', reason: options.reason || 'background', last_error: 'La sesión de Yarbi debe iniciarse nuevamente.' }); return null; }
     const [entityCursor, messageCursor, deletionCursor, savedHistoryCursor] = await Promise.all([gfcYarbiLocalGetMeta('entity_cursor'), gfcYarbiLocalGetMeta('message_cursor'), gfcYarbiLocalGetMeta('deletion_cursor'), gfcYarbiLocalGetMeta('history_before')]);
     const body = { entity_cursor: entityCursor || null, message_cursor: messageCursor || null, deletion_cursor: deletionCursor || null, message_limit: 200, entity_limit: 400 };
     if (options.historyBefore) body.history_before = options.historyBefore;
-    const response = await fetch(gfcYarbiLocalMirrorEndpoint(), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token }, body: JSON.stringify(body) });
+    const response = await fetch(gfcYarbiLocalMirrorEndpoint(), { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(body) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) { const message = data.detail || data.error || 'No se pudo sincronizar la réplica local'; gfcYarbiLocalStatusWrite({ status: 'error', reason: options.reason || 'background', http: response.status, last_error: message }); throw new Error(message); }
     await gfcYarbiLocalApply(data, options.reason || 'background');
@@ -16599,7 +16599,7 @@ async function gfcConfirmPendingAgendaProposal(confirmationPhrase) {
 }
 
 function gfcRunYarbiBackgroundSync(reason) {
-  if (!navigator.onLine || document.visibilityState === 'hidden' || !localStorage.getItem('fnz_assistant_token')) return Promise.resolve(null);
+  if (!navigator.onLine || document.visibilityState === 'hidden') return Promise.resolve(null);
   if (window._gfcLiveSession?.connecting) {
     gfcChatDiag('yarbi-background-sync-deferred', { reason: reason || 'background-auto', liveState: 'connecting' });
     return Promise.resolve({ deferred: true, reason: 'live-connecting' });
