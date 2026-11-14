@@ -33,6 +33,16 @@ test('BKE multimodal: solo usa fuentes aprobadas como evidencia del tutor', () =
   assert.equal(results[0].assetId, 'ok');
 });
 
+test('BKE multimodal: el resultado analizado queda indexado y no obliga a reprocesar la fuente', () => {
+  const results = api.searchApproved([
+    { id:'pdf-1', title:'NTP técnica', kind:'pdf', status:'approved', sections:[{ text:'La instalación debe verificarse antes de operar.' }], analysis:{ text:'Resumen: verificar instalación antes de operar.' } }
+  ], 'verificar instalación');
+  assert.equal(results[0].assetId, 'pdf-1');
+  assert.match(source, /status === 'analyzed_draft' \|\| asset\.status === 'approved'/);
+  assert.match(source, /cached:true/);
+  assert.match(source, /const learnedSections = asset\.sections\?\.length \? asset\.sections : sectionsFromText\(analysis\.text\)/);
+});
+
 test('BKE multimodal: no anuncia aprendizaje automático ni acciones comerciales', () => {
   assert.match(api.html(), /aprobación es obligatoria/i);
   assert.match(api.html(), /no se ejecutan acciones comerciales/i);
