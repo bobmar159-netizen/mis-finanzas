@@ -5,7 +5,7 @@ const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
-const GEMINI_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-3.6-flash';
+const GEMINI_MODEL = process.env.GEMINI_CHAT_MODEL || process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
 function cors(res) {
   if (process.env.APP_ORIGIN) res.setHeader('Access-Control-Allow-Origin', process.env.APP_ORIGIN);

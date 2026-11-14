@@ -5,7 +5,11 @@ const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
-const GEMINI_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+// The deployed project intentionally does not define a model environment
+// variable. Keep the default aligned with the model used by the validated
+// Yarbi understanding pipeline, and use the same resolved value for the
+// provider URL and the response metadata.
+const GEMINI_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 const TRACE_HMAC_KEY = process.env.YARBI_TRACE_HMAC_KEY || '';
 let traceConfigWarned = false;
 
@@ -86,7 +90,7 @@ module.exports = async function handler(req, res) {
     const conversationText = conversation.map(m => `[${m.role === 'model' ? 'Yarbi' : 'Maestro'}] ${m.parts[0].text}`).join('\n');
     const system = String(body.systemInstruction || 'Eres Yarbi, asistente de finanzas y CRM para instalaciones de gas natural en Lima. Responde en español peruano, claro y breve. Nunca envíes mensajes ni confirmes citas sin aprobación del usuario.').slice(0, 12000);
     const prompt = `${system}\n\nConversacion reciente con el Maestro:\n${conversationText || '[Sin turnos previos]'}\n\nHistorial completo del cliente:\n${historyText || '[Sin historial asociado a un telefono activo]'}\n\nAgenda y reglas actuales:\n${JSON.stringify({ agenda: body.agenda || [], rules: body.rules || '' }).slice(0, 12000)}`;
-    const result = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || 'gemini-3.6-flash'}:generateContent?key=${GEMINI_KEY}`, {
+    const result = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_CHAT_MODEL)}:generateContent?key=${GEMINI_KEY}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ system_instruction: { parts: [{ text: prompt }] }, contents: conversation.length ? conversation : [{ role: 'user', parts: [{ text }] }] })
     });

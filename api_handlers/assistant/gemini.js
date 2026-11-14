@@ -7,7 +7,7 @@ const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
 const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || process.env.GEMINI_CHAT_MODEL || 'gemini-3.5-flash-lite';
 const MAX_TEXT = 16000;
 const MAX_INLINE_BYTES = 3 * 1024 * 1024;
 
