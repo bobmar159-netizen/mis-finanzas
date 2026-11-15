@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { formatReply, candidateLabel } = require('../frontend/yarbi-owner-conversation-ui');
+const { formatReply, candidateLabel, presentationText } = require('../frontend/yarbi-owner-conversation-ui');
 
 test('la conversación propietaria muestra candidatas verificadas sin incluir IDs internos', () => {
   const reply = formatReply({
@@ -13,6 +13,7 @@ test('la conversación propietaria muestra candidatas verificadas sin incluir ID
     ] }
   });
   assert.match(reply, /^## Búsqueda en CRM/m);
+  assert.match(reply, /## Búsqueda en CRM\n\nEncontré referencias compatibles\.\n\n### Coincidencias verificadas/);
   assert.match(reply, /### Coincidencias verificadas/);
   assert.match(reply, /1\. \*\*Carlos Ramírez\*\* · Surco · instalación/);
   assert.match(reply, /2\. \*\*Carlos Paredes\*\* · Comas · visita técnica/);
@@ -22,4 +23,5 @@ test('la conversación propietaria muestra candidatas verificadas sin incluir ID
 test('la etiqueta reduce controles y la respuesta no inventa candidatas cuando no hay resultados', () => {
   assert.equal(candidateLabel({ display_name:'\n# Mónica', district:'<script>', latest_service:'  terma  ' }, 0), '1. **# Mónica** · <script> · terma');
   assert.equal(formatReply({ reply:'Sin coincidencias.', crm_search:{ results:[] } }), 'Sin coincidencias.');
+  assert.equal(presentationText('😀😀😀', 2), '😀😀');
 });
