@@ -5,10 +5,12 @@
     root.YarbiMultimodalTutor = api;
     root.gfcYarbiMultimodalHtml = api.html;
     root.gfcYarbiMultimodalAttach = api.attach;
-    root.gfcYarbiMultimodalImport = api.importFiles;
-    root.gfcYarbiMultimodalAnalyze = api.analyze;
-    root.gfcYarbiMultimodalApprove = api.approve;
-    root.gfcYarbiTutorAsk = api.askTutor;
+    root.gfcYarbiMultimodalImport = () => api.importFromUi(true);
+    root.gfcYarbiMultimodalSaveOnly = () => api.importFromUi(false);
+    root.gfcYarbiMultimodalAnalyze = api.analyzeFromUi;
+    root.gfcYarbiMultimodalApprove = api.approveFromUi;
+    root.gfcYarbiMultimodalFilesChosen = api.filesChosen;
+    root.gfcYarbiTutorAsk = api.askTutorFromUi;
   }
 }(typeof window === 'undefined' ? globalThis : window, function (root) {
   'use strict';
@@ -20,6 +22,7 @@
   const MAX_INLINE_BYTES = 3 * 1024 * 1024;
   const MAX_FILE_BYTES = 40 * 1024 * 1024;
   let dbPromise = null;
+  let progressTimer = null;
 
   function clean(value, limit = 240) {
     return String(value == null ? '' : value).replace(/\u0000/g, '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, limit);
@@ -130,22 +133,48 @@
   function readAsDataUrl(file) {
     return new Promise((resolve, reject) => { const reader = new root.FileReader(); reader.onload = () => resolve(String(reader.result || '')); reader.onerror = () => reject(reader.error || new Error('file_read_failed')); reader.readAsDataURL(file); });
   }
-  async function buildAsset(file) {
+  function readAsArrayBuffer(file, onProgress) {
+    if (!root?.FileReader) return file.arrayBuffer();
+    return new Promise((resolve, reject) => {
+      const reader = new root.FileReader();
+      reader.onprogress = event => {
+        if (!event.lengthComputable || typeof onProgress !== 'function') return;
+        onProgress(Math.max(0, Math.min(1, event.loaded / Math.max(1, event.total))));
+      };
+      reader.onload = () => { if (typeof onProgress === 'function') onProgress(1); resolve(reader.result); };
+      reader.onerror = () => reject(reader.error || new Error('file_read_failed'));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  async function buildAsset(file, onProgress) {
     const kind = classifyFile(file);
     if (kind === 'unsupported') throw new Error('unsupported_multimodal_type');
     if (Number(file?.size || 0) > MAX_FILE_BYTES) throw new Error('multimodal_file_too_large');
-    const buffer = await file.arrayBuffer();
+    const buffer = await readAsArrayBuffer(file, onProgress);
     const sha256 = await digest(buffer);
     let sections = []; let dataUrl = '';
     if (kind === 'text') sections = sectionsFromText(new TextDecoder().decode(buffer));
     if (kind !== 'text' && Number(file.size || 0) <= MAX_INLINE_BYTES) dataUrl = await readAsDataUrl(file);
     return { id:'bke_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8), title:titleFor(file), kind, mime:String(file.type || 'application/octet-stream').slice(0, 120), bytes:Number(file.size || 0), sha256, sections, dataUrl, analysis:null, status:kind === 'text' ? 'local_ready' : (dataUrl ? 'pending_analysis' : 'blocked'), createdAt:Date.now(), updatedAt:Date.now() };
   }
-  async function importFiles(files) {
+  async function importFiles(files, onProgress) {
     const incoming = [...(files || [])]; const existing = await list();
     if (existing.length + incoming.length > MAX_ASSETS) throw new Error('multimodal_asset_limit');
     const created = [];
-    for (const file of incoming) { const asset = await buildAsset(file); if (asset.sha256 && existing.some(row => row.sha256 === asset.sha256)) continue; await put(asset); existing.push(asset); created.push(asset); }
+    for (let index = 0; index < incoming.length; index += 1) {
+      const file = incoming[index];
+      const asset = await buildAsset(file, fraction => {
+        if (typeof onProgress !== 'function') return;
+        const overall = ((index + fraction) / Math.max(1, incoming.length)) * 72;
+        onProgress({ phase:'reading', percent:Math.round(overall), label:'Leyendo archivo', detail:titleFor(file) });
+      });
+      if (asset.sha256 && existing.some(row => row.sha256 === asset.sha256)) {
+        if (typeof onProgress === 'function') onProgress({ phase:'duplicate', percent:Math.round(((index + 1) / Math.max(1, incoming.length)) * 72), label:'Fuente ya guardada', detail:asset.title });
+        continue;
+      }
+      await put(asset); existing.push(asset); created.push(asset);
+      if (typeof onProgress === 'function') onProgress({ phase:'stored', percent:Math.round(((index + 1) / Math.max(1, incoming.length)) * 72), label:'Guardado seguro', detail:asset.title });
+    }
     return created;
   }
   async function analyze(id) {
@@ -178,18 +207,111 @@
     return { ok:true, text:responseText(data) + '\n\n---\n\n## Referencias verificadas\n\n' + citations, evidence:evidence.map(row => ({ title:row.title, assetId:row.assetId, sectionLabel:row.sectionLabel })) };
   }
   function statusText(error) { return ({ unsupported_multimodal_type:'Formato no compatible.', multimodal_file_too_large:'El archivo supera el límite local de 40 MB.', multimodal_asset_limit:'La biblioteca local alcanzó 80 fuentes.', multimodal_storage_unavailable:'El almacenamiento local no está disponible.', extractor_required:'Este archivo necesita un extractor autorizado.' }[error?.message] || error?.message || 'No pude procesar la fuente.'); }
+  function progressTone(phase) {
+    if (phase === 'error') return 'error';
+    if (phase === 'complete' || phase === 'approved') return 'success';
+    if (phase === 'pending_review') return 'review';
+    return 'working';
+  }
+  function setProgress(percent, label, detail, phase) {
+    const safePercent = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+    const shell = root?.document?.getElementById('gfc-mm-progress');
+    const chip = root?.document?.getElementById('gfc-mm-progress-chip');
+    const value = root?.document?.getElementById('gfc-mm-progress-percent');
+    const bar = root?.document?.getElementById('gfc-mm-progress-bar');
+    const copy = root?.document?.getElementById('gfc-mm-progress-detail');
+    if (shell) { shell.hidden = false; shell.dataset.tone = progressTone(phase); }
+    if (chip) chip.textContent = label || 'Procesando archivo';
+    if (value) value.textContent = safePercent + '%';
+    if (bar) bar.style.width = safePercent + '%';
+    if (copy) copy.textContent = detail || '';
+  }
+  function clearProgressTimer() {
+    if (progressTimer && root?.clearInterval) root.clearInterval(progressTimer);
+    progressTimer = null;
+  }
+  function startEstimatedAnalysis(title, startPercent) {
+    clearProgressTimer();
+    let percent = Math.max(18, Number(startPercent) || 24);
+    setProgress(percent, 'Procesando archivo', 'Yarbi está leyendo y organizando “' + clean(title, 80) + '”. Avance estimado.', 'working');
+    if (!root?.setInterval) return;
+    progressTimer = root.setInterval(() => {
+      percent = Math.min(88, percent + (percent < 55 ? 5 : percent < 76 ? 3 : 1));
+      setProgress(percent, percent < 58 ? 'Extrayendo contenido' : percent < 80 ? 'Organizando conocimiento' : 'Preparando borrador', 'El porcentaje del análisis remoto es estimado; 100% solo se muestra después de guardar el resultado.', 'working');
+    }, 650);
+  }
+  function filesChosen(files) {
+    const rows = [...(files || [])];
+    const selected = root?.document?.getElementById('gfc-mm-selected');
+    if (selected) selected.textContent = rows.length ? (rows.length === 1 ? rows[0].name : rows.length + ' archivos seleccionados') : 'Ningún archivo seleccionado';
+    if (rows.length) setProgress(0, 'Listo para procesar', rows.length === 1 ? rows[0].name : rows.length + ' fuentes seleccionadas', 'working');
+    return rows.length;
+  }
   function card(asset) {
     const analysis = asset.analysis?.text ? '<details><summary>Ver borrador</summary><p>' + escapeHtml(asset.analysis.text) + '</p>' + ((asset.analysis?.citations || []).length ? '<p><b>' + asset.analysis.citations.length + ' cita(s) extraída(s) para revisión.</b></p>' : '') + '</details>' : '';
     const action = asset.status === 'analyzed_draft' ? '<button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalApprove(\'' + escapeHtml(asset.id) + '\')">Aprobar para tutoría</button>' : asset.status === 'approved' ? '<span class="gfc-mm-approved">✓ Aprobado</span>' : '<button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalAnalyze(\'' + escapeHtml(asset.id) + '\')">Analizar con Yarbi</button>';
-    return '<article class="gfc-mm-card"><div><b>' + escapeHtml(asset.title) + '</b><small>' + kindLabel(asset.kind) + ' · ' + statusLabel(asset.status) + ' · ' + Math.max(1, Math.round(Number(asset.bytes || 0) / 1024)) + ' KB</small></div><p>SHA-256: ' + escapeHtml(String(asset.sha256 || '').slice(0, 16)) + '…</p>' + analysis + '<div class="gfc-mm-actions">' + action + '</div></article>';
+    return '<article class="gfc-mm-card"><div class="gfc-mm-card-head"><span class="gfc-mm-kind">' + ({ text:'📝', pdf:'📕', image:'🖼️', audio:'🎙️', video:'🎬' }[asset.kind] || '📎') + '</span><div><b>' + escapeHtml(asset.title) + '</b><small>' + kindLabel(asset.kind) + ' · ' + statusLabel(asset.status) + ' · ' + Math.max(1, Math.round(Number(asset.bytes || 0) / 1024)) + ' KB</small></div></div><p>Huella: ' + escapeHtml(String(asset.sha256 || '').slice(0, 16)) + '…</p>' + analysis + '<div class="gfc-mm-actions">' + action + '</div></article>';
   }
   async function render() { const target = root?.document?.getElementById('gfc-mm-list'); if (!target) return; try { const rows = await list(); target.innerHTML = rows.length ? rows.map(card).join('') : '<p>Aún no hay fuentes multimodales. Puedes cargar documentos, imágenes, audios o videos.</p>'; } catch (_) { target.innerHTML = '<p>No se pudo abrir la biblioteca local.</p>'; } }
-  function setStatus(message, error) { const target = root?.document?.getElementById('gfc-mm-status'); if (target) { target.textContent = message; target.style.color = error ? '#B91C1C' : '#334155'; } }
-  async function importFromUi() { const input = root.document.getElementById('gfc-mm-input'); try { const rows = await importFiles(input?.files); setStatus(rows.length + ' fuente(s) guardada(s) localmente. Los archivos binarios requieren análisis explícito; nada se envió automáticamente.'); if (input) input.value = ''; await render(); } catch (error) { setStatus(statusText(error), true); } }
-  async function analyzeFromUi(id) { setStatus('Analizando con el proveedor seguro…'); try { const result = await analyze(id); setStatus(result.ok ? 'Borrador listo. Revísalo antes de aprobarlo.' : (result.message || 'No se aprobó la fuente.'), !result.ok); } catch (error) { setStatus(statusText(error), true); } }
-  async function approveFromUi(id) { try { await approve(id); setStatus('Fuente aprobada para tutoría. No modifica CRM ni instrucciones permanentes.'); } catch (error) { setStatus(statusText(error), true); } }
+  function setStatus(message, error) { const target = root?.document?.getElementById('gfc-mm-status'); if (target) { target.textContent = message; target.dataset.tone = error ? 'error' : 'normal'; } }
+  async function importFromUi(autoAnalyze = true) {
+    const input = root?.document?.getElementById('gfc-mm-input');
+    const selectedFiles = [...(input?.files || [])];
+    if (!selectedFiles.length) { setStatus('Primero elige uno o más archivos desde el explorador del teléfono.', true); return []; }
+    try {
+      setProgress(1, 'Preparando archivos', selectedFiles.length === 1 ? selectedFiles[0].name : selectedFiles.length + ' fuentes', 'working');
+      const rows = await importFiles(selectedFiles, state => setProgress(state.percent, state.label, state.detail, state.phase));
+      await render();
+      if (!rows.length) {
+        setProgress(100, 'Sin duplicar', 'La fuente ya estaba guardada en tu biblioteca.', 'complete');
+        setStatus('No se creó una copia: Yarbi reconoció la misma huella SHA-256.', false);
+      } else if (!autoAnalyze) {
+        setProgress(100, 'Guardado local completado', rows.length + ' fuente(s) pendientes de análisis.', 'complete');
+        setStatus('La fuente quedó en el celular. Podrás procesarla después con “Analizar con Yarbi”.', false);
+      } else {
+        let analyzed = 0; let pending = 0;
+        for (let index = 0; index < rows.length; index += 1) {
+          const asset = rows[index];
+          if (asset.status === 'blocked') { pending += 1; continue; }
+          startEstimatedAnalysis(asset.title, 24 + Math.round(index / Math.max(1, rows.length) * 24));
+          const result = await analyze(asset.id);
+          clearProgressTimer();
+          if (result.ok) analyzed += 1; else pending += 1;
+        }
+        await render();
+        if (pending) {
+          setProgress(100, 'Procesamiento parcial', analyzed + ' analizada(s) · ' + pending + ' pendiente(s)', 'pending_review');
+          setStatus('Las fuentes disponibles quedaron guardadas. Las pendientes muestran su causa y no se marcaron como aprendidas.', false);
+        } else {
+          setProgress(100, 'Borrador listo para revisar', analyzed + ' fuente(s) procesada(s) una sola vez y guardada(s) localmente.', 'pending_review');
+          setStatus('Revisa las citas y pulsa “Aprobar para tutoría”. Yarbi todavía no las usa como conocimiento definitivo.', false);
+        }
+      }
+      if (input) input.value = '';
+      filesChosen([]);
+      return rows;
+    } catch (error) {
+      clearProgressTimer();
+      setProgress(0, 'No se pudo completar', statusText(error), 'error');
+      setStatus(statusText(error), true);
+      return [];
+    }
+  }
+  async function analyzeFromUi(id) {
+    const asset = await get(id).catch(() => null);
+    startEstimatedAnalysis(asset?.title || 'fuente', 20);
+    setStatus('Procesando una sola vez. Puedes seguir viendo el avance arriba.', false);
+    try {
+      const result = await analyze(id); clearProgressTimer();
+      if (result.ok) setProgress(100, result.cached ? 'Análisis recuperado' : 'Borrador listo', result.cached ? 'No fue necesario procesar la fuente otra vez.' : 'Revisa las citas antes de aprobar.', 'pending_review');
+      else setProgress(0, 'Análisis pendiente', result.message || 'La fuente no se aprobó.', 'error');
+      setStatus(result.ok ? 'Borrador listo. Revísalo antes de aprobarlo.' : (result.message || 'No se aprobó la fuente.'), !result.ok);
+      await render(); return result;
+    } catch (error) { clearProgressTimer(); setProgress(0, 'Análisis interrumpido', statusText(error), 'error'); setStatus(statusText(error), true); return { ok:false, message:statusText(error) }; }
+  }
+  async function approveFromUi(id) { try { setProgress(92, 'Guardando aprobación', 'Vinculando la revisión a esta fuente.', 'working'); await approve(id); setProgress(100, 'Fuente aprobada', 'Disponible para respuestas del tutor con citas verificables.', 'approved'); setStatus('Fuente aprobada para tutoría. No modifica CRM ni instrucciones permanentes.'); } catch (error) { setProgress(0, 'No se aprobó', statusText(error), 'error'); setStatus(statusText(error), true); } }
   async function askTutorFromUi() { const input = root.document.getElementById('gfc-mm-tutor-question'); const out = root.document.getElementById('gfc-mm-tutor-answer'); if (!out) return; out.textContent = 'El tutor está preparando una explicación…'; try { const result = await askTutor(input?.value || ''); out.textContent = result.ok ? result.text : (result.message || 'No pude responder sin inventar información.'); } catch (error) { out.textContent = statusText(error); } }
-  function html() { return '<main class="gfc-yarbi-tool-page"><div class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">📚 Conocimiento multimodal y Tutor</div><div class="gfc-yarbi-tool-copy">Carga documentos, imágenes, audios y videos para conservarlos localmente. Yarbi solo analiza una fuente cuando tú lo pides y la deja como borrador; la aprobación es obligatoria antes de usarla en tutoría. No se ejecutan acciones comerciales ni se guardan instrucciones automáticamente.</div><label class="gfc-mm-picker"><b>Seleccionar fuentes</b><input id="gfc-mm-input" type="file" multiple accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm, text/plain, application/pdf, image/*, audio/*, video/*"></label><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Guardar localmente</button><div id="gfc-mm-status" class="gfc-yarbi-import-summary">Sin fuentes multimodales cargadas.</div><div id="gfc-mm-list"></div><hr><div class="gfc-yarbi-tool-title">🎓 Tutor personal</div><div class="gfc-yarbi-tool-copy">Pregunta sobre una fuente aprobada o un tema general. El tutor explica con pasos, ejemplos y checks; no cambia datos ni aprende una regla sin confirmación.</div><textarea id="gfc-mm-tutor-question" rows="3" placeholder="Explícame este procedimiento paso a paso…"></textarea><button class="gfc-yarbi-primary" onclick="gfcYarbiTutorAsk()">Preguntar al tutor</button><article id="gfc-mm-tutor-answer" class="gfc-mm-tutor-answer">Aquí aparecerá la explicación.</article></div></main>'; }
+  function html() { return '<main class="gfc-yarbi-tool-page gfc-mm-page"><section class="gfc-mm-hero"><span>📚</span><div><h2>Conocimiento y Tutor</h2><p>Selecciona una fuente, observa su procesamiento y decide cuándo puede usarla Yarbi.</p></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Procesar</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div><label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>Abre el explorador de Android: Recientes, Descargas, almacenamiento y proveedores como Drive.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div><section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section><div id="gfc-mm-status" class="gfc-yarbi-import-summary">Tus fuentes aprobadas quedan indexadas localmente para responder rápido. La aprobación es obligatoria antes de usarlas como conocimiento. No se ejecutan acciones comerciales durante este proceso.</div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">🎓 Preguntar al Tutor</div><div class="gfc-yarbi-tool-copy">Yarbi responde con la cita disponible, la referencia visible y una explicación sencilla. Si falta evidencia, se abstiene.</div><textarea id="gfc-mm-tutor-question" rows="4" placeholder="Ejemplo: ¿Qué exige esta norma y qué significa en palabras sencillas?"></textarea><button class="gfc-yarbi-primary" onclick="gfcYarbiTutorAsk()">Preguntar al tutor</button><article id="gfc-mm-tutor-answer" class="gfc-mm-tutor-answer">Aquí aparecerá una explicación respaldada por tus fuentes aprobadas.</article></section></main>'; }
   function attach() { void render(); }
-  return Object.freeze({ classifyFile, normalize, sectionsFromText, searchApproved, responseText, parseStructuredAnalysis, citationMarkdown, buildAsset, importFiles, list, analyze, approve, askTutor, html, attach, render, analyzeFromUi, approveFromUi, importFromUi, askTutorFromUi, MAX_INLINE_BYTES });
+  return Object.freeze({ classifyFile, normalize, sectionsFromText, searchApproved, responseText, parseStructuredAnalysis, citationMarkdown, buildAsset, importFiles, list, analyze, approve, askTutor, html, attach, render, analyzeFromUi, approveFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, MAX_INLINE_BYTES });
 }));

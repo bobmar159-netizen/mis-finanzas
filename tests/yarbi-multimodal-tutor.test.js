@@ -75,6 +75,25 @@ test('BKE multimodal: limita el envío inline a 3 MB y mantiene archivos grandes
   assert.match(source, /multimodal_file_too_large/);
 });
 
+test('BKE multimodal: los controles visibles usan flujos UI con progreso y revisión', () => {
+  const markup = api.html();
+  assert.match(source, /root\.gfcYarbiMultimodalImport = \(\) => api\.importFromUi\(true\)/);
+  assert.match(source, /root\.gfcYarbiMultimodalAnalyze = api\.analyzeFromUi/);
+  assert.match(source, /root\.gfcYarbiMultimodalApprove = api\.approveFromUi/);
+  assert.match(source, /root\.gfcYarbiTutorAsk = api\.askTutorFromUi/);
+  assert.match(markup, /gfc-mm-progress-chip/);
+  assert.match(markup, /gfc-mm-progress-percent/);
+  assert.match(markup, /Agregar y procesar/);
+  assert.match(markup, /Buscar archivos en el teléfono/);
+});
+
+test('BKE multimodal: la navegación conserva la pantalla anterior', () => {
+  assert.match(memoryCenter, /_gfcYarbiNavigationStack/);
+  assert.match(memoryCenter, /const previous = stack\.pop\(\)/);
+  assert.match(memoryCenter, /Conocimiento y Tutor/);
+  assert.match(memoryCenter, /Notas y textos/);
+});
+
 test('pasarela Gemini: admite PDF, audio y video inline sin aceptar tipos arbitrarios', () => {
   const encoded = Buffer.from('synthetic-media').toString('base64');
   const contents = gemini.sanitizeContents([{ role:'user', parts:[
