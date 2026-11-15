@@ -42,7 +42,10 @@ test('el chat abre en los mensajes recientes y deja el historial bajo demanda', 
   assert.match(memory, /renderTimelineWindow\(box, initialVisibleTimeline, INITIAL_CHAT_MESSAGES, true\)/);
   assert.match(memory, /function scrollChatToLatest/);
   assert.match(memory, /_gfcYarbiForceLatestUntil = Date\.now\(\) \+ 1600/);
-  assert.match(memory, /setTimeout\(apply, 240\)/);
+  assert.match(memory, /box\.style\.scrollBehavior = 'auto'/);
+  assert.match(memory, /box\.dataset\.gfcRestoring === '1'/);
+  assert.match(html, /\.gfc-yarbi-chat\[data-gfc-restoring="1"\]\{visibility:hidden\}/);
+  assert.doesNotMatch(html, /\.gfc-yarbi-chat\{padding:18px 13px 24px;background:#F7F7F5;scroll-behavior:smooth/);
 });
 
 test('la timeline evita respuestas idénticas producidas por callbacks simultáneos', () => {

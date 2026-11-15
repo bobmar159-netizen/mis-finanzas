@@ -64,6 +64,11 @@ test('P0.2I: web and Android builds are reproducible and environment-specific', 
   assert.equal(fs.readFileSync(path.join(android, 'BUILD_MANIFEST.json'), 'utf8'), fs.readFileSync(path.join(androidRepeat, 'BUILD_MANIFEST.json'), 'utf8'));
   for (const output of [web, android]) {
     assert.ok(fs.existsSync(path.join(output, 'BUILD_MANIFEST.json')));
+    assert.ok(fs.existsSync(path.join(output, 'vendor', 'pdf.min.mjs')));
+    assert.ok(fs.existsSync(path.join(output, 'vendor', 'pdf.worker.min.mjs')));
+    assert.ok(fs.readdirSync(path.join(output, 'vendor', 'cmaps')).length > 0);
+    assert.ok(fs.readdirSync(path.join(output, 'vendor', 'standard_fonts')).length > 0);
+    assert.ok(fs.readdirSync(path.join(output, 'vendor', 'wasm')).length > 0);
     for (const file of ['index.html', 'yarbi-assistant.js', 'yarbi-memory-center.js', 'yarbi-owner-memory-ui.js', 'yarbi-app-voice.js', 'yarbi-owner-inbox-ui.js', 'yarbi-financial-coach.js', 'yarbi-financial-coach-ui.js', 'yarbi-finance-context.js', 'yarbi-business-timeline.js', 'yarbi-agenda-intelligence.js', 'yarbi-agenda-read-ui.js', 'yarbi-client-context-read.js', 'yarbi-client-context-read-ui.js']) assert.ok(fs.existsSync(path.join(output, file)));
     for (const file of fs.readdirSync(output)) {
       const full = path.join(output, file);

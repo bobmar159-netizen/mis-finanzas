@@ -22,8 +22,13 @@
   const MAX_TEXT = 200000;
   const MAX_INLINE_BYTES = 3 * 1024 * 1024;
   const MAX_FILE_BYTES = 40 * 1024 * 1024;
+  const MAX_PDF_FILE_BYTES = 120 * 1024 * 1024;
+  const MAX_PDF_PAGES = 2500;
+  const MAX_PDF_INDEX_CHARS = 12 * 1024 * 1024;
+  const MAX_PDF_SECTIONS = 8000;
   let dbPromise = null;
   let progressTimer = null;
+  let pdfJsPromise = null;
 
   function clean(value, limit = 240) {
     return String(value == null ? '' : value).replace(/\u0000/g, '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, limit);
@@ -128,21 +133,24 @@
     const found = parsed?.found === true && !!quote && !!reference;
     return { ok:true, found, answer, quote, reference, plain, caveat };
   }
+  function brief(value, maximumWords) {
+    const words = clean(value, 1800).split(/\s+/).filter(Boolean);
+    return words.length <= maximumWords ? words.join(' ') : words.slice(0, maximumWords).join(' ') + '…';
+  }
   function formatDirectedAnswer(result, asset) {
     const title = clean(asset?.title || 'Fuente aprobada', 140);
     if (!result?.found) {
-      return '## 🔎 No encontré esa regla en la fuente\n\nBusqué la consulta directamente en **' + title + '** y no encontré un fragmento que la respalde de forma literal.\n\n' + (result?.caveat ? result.caveat + '\n\n' : '') + 'No concluiré que está permitido o prohibido sin una cita verificable.';
+      return '## 🔎 Respuesta breve\n\nNo encontré en **' + title + '** una cita literal que responda esa pregunta.\n\n' + (result?.caveat ? '> [Qué falta verificar]\n> ' + result.caveat + '\n\n' : '') + 'No afirmaré que está permitido o prohibido sin evidencia.';
     }
-    return '## ✅ Respuesta directa\n\n' + (result.answer ? '**' + result.answer + '**\n\n' : '')
-      + '### 📖 Qué dice la fuente\n\n> ' + result.quote + '\n\n'
-      + '**Ubicación:** ' + result.reference + '\n\n'
-      + (result.plain ? '### 💡 En palabras sencillas\n\n' + result.plain + '\n\n' : '')
-      + (result.caveat ? '⚠️ **Importante:** ' + result.caveat + '\n\n' : '')
+    return '## ✅ Respuesta breve\n\n' + (result.answer ? '**' + brief(result.answer, 45) + '**\n\n' : '')
+      + '> [📖 ' + result.reference + ']\n> “' + brief(result.quote, 70) + '”\n\n'
+      + (result.plain ? '**En sencillo:** ' + brief(result.plain, 55) + '\n\n' : '')
+      + (result.caveat ? '⚠️ **Importante:** ' + brief(result.caveat, 40) + '\n\n' : '')
       + '_Fuente aprobada: ' + title + ' · SHA-256 ' + clean(String(asset?.sha256 || '').slice(0, 12)) + '…_';
   }
   function citationMarkdown(evidence) {
     return (Array.isArray(evidence) ? evidence : []).slice(0, 3).map(row =>
-      '### ' + clean(row.title, 140) + '\n\n**Referencia:** ' + clean(row.sectionLabel || 'Fragmento sin referencia', 240) + '\n\n> ' + clean(row.excerpt, 360) + '\n\n_Fuente aprobada · SHA-256 ' + clean(String(row.sourceHash || '').slice(0, 12)) + '…_'
+      '> [📖 ' + clean(row.sectionLabel || 'Fragmento sin referencia', 240) + ']\n> ' + clean(row.excerpt, 520) + '\n\n_Fuente aprobada: ' + clean(row.title, 140) + ' · SHA-256 ' + clean(String(row.sourceHash || '').slice(0, 12)) + '…_'
     ).join('\n\n');
   }
   function citationListMarkdown(evidence) {
@@ -152,6 +160,10 @@
       if (seen.has(key)) return false;
       seen.add(key); return true;
     }).slice(0, 3).map(row => '- **' + clean(row.title, 140) + '** — ' + clean(row.sectionLabel || 'Referencia no localizada', 240)).join('\n');
+  }
+  function quoteSupportedByEvidence(result, evidence) {
+    const quote = normalize(result?.quote || '');
+    return Boolean(quote) && (Array.isArray(evidence) ? evidence : []).some(row => normalize(row?.excerpt || '').includes(quote));
   }
   function localUnavailableReply() {
     return 'No puedo analizar esa fuente sin el servicio de comprensión configurado. La dejé guardada localmente como pendiente; no inventé su contenido ni la marqué como aprendida.';
@@ -185,7 +197,13 @@
     const hash = await root.crypto.subtle.digest('SHA-256', bytes);
     return [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('');
   }
-  function readAsDataUrl(file) {
+  async function readAsDataUrl(file) {
+    if (!root?.FileReader) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = '';
+      for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+      return 'data:' + (file.type || 'application/octet-stream') + ';base64,' + root.btoa(binary);
+    }
     return new Promise((resolve, reject) => { const reader = new root.FileReader(); reader.onload = () => resolve(String(reader.result || '')); reader.onerror = () => reject(reader.error || new Error('file_read_failed')); reader.readAsDataURL(file); });
   }
   function readAsArrayBuffer(file, onProgress) {
@@ -201,16 +219,106 @@
       reader.readAsArrayBuffer(file);
     });
   }
+  function pdfReferenceFromText(value, pageNumber) {
+    const lines = String(value || '').split(/\n+/).map(line => clean(line, 240)).filter(Boolean);
+    const reference = lines.find(line => /^(?:cap[ií]tulo|secci[oó]n|numeral|art[ií]culo|anexo|ntp|iso|tabla|figura)\b/i.test(line))
+      || lines.find(line => /^\d+(?:\.\d+){1,5}\s+\S/.test(line));
+    return (reference ? reference + ' · ' : '') + 'Página ' + pageNumber;
+  }
+  function pdfPageSections(pageNumber, value, state) {
+    const text = String(value || '').replace(/\u0000/g, '').replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+    if (!text) return [];
+    const label = pdfReferenceFromText(text, pageNumber);
+    const rows = [];
+    for (let offset = 0; offset < text.length; offset += 1500) {
+      const fragment = text.slice(offset, offset + 1700).trim();
+      if (!fragment) continue;
+      state.characters += fragment.length;
+      if (state.characters > MAX_PDF_INDEX_CHARS || state.sections + rows.length >= MAX_PDF_SECTIONS) throw new Error('multimodal_pdf_index_limit');
+      rows.push({ id:'p' + pageNumber + '-' + (rows.length + 1), label, text:fragment });
+    }
+    state.sections += rows.length;
+    return rows;
+  }
+  async function loadPdfJs() {
+    if (pdfJsPromise) return pdfJsPromise;
+    const source = root?.document?.baseURI ? new URL('vendor/pdf.min.mjs', root.document.baseURI).href : 'pdfjs-dist/legacy/build/pdf.mjs';
+    pdfJsPromise = import(source).then(pdfjs => {
+      if (pdfjs?.GlobalWorkerOptions && root?.document?.baseURI) pdfjs.GlobalWorkerOptions.workerSrc = new URL('vendor/pdf.worker.min.mjs', root.document.baseURI).href;
+      return pdfjs;
+    });
+    return pdfJsPromise;
+  }
+  async function extractPdfSections(buffer, onProgress) {
+    const pdfjs = await loadPdfJs();
+    const resources = root?.document?.baseURI ? new URL('vendor/', root.document.baseURI).href : '';
+    const task = pdfjs.getDocument({
+      data:new Uint8Array(buffer),
+      isEvalSupported:false,
+      stopEvent:false,
+      ...(resources ? {
+        cMapUrl:resources + 'cmaps/',
+        cMapPacked:true,
+        standardFontDataUrl:resources + 'standard_fonts/',
+        wasmUrl:resources + 'wasm/'
+      } : {})
+    });
+    let documentHandle;
+    try {
+      documentHandle = await task.promise;
+      if (documentHandle.numPages > MAX_PDF_PAGES) throw new Error('multimodal_pdf_page_limit');
+      const sections = [];
+      const state = { characters:0, sections:0 };
+      for (let pageNumber = 1; pageNumber <= documentHandle.numPages; pageNumber += 1) {
+        const page = await documentHandle.getPage(pageNumber);
+        const content = await page.getTextContent({ disableNormalization:false });
+        let pageText = '';
+        for (const item of content.items || []) {
+          if (typeof item?.str !== 'string') continue;
+          pageText += item.str + (item.hasEOL ? '\n' : ' ');
+        }
+        sections.push(...pdfPageSections(pageNumber, pageText, state));
+        page.cleanup?.();
+        if (typeof onProgress === 'function') onProgress({ phase:'extracting', fraction:pageNumber / documentHandle.numPages, page:pageNumber, pages:documentHandle.numPages });
+      }
+      if (!sections.length) throw new Error('multimodal_pdf_no_text');
+      return { sections, pages:documentHandle.numPages, indexedCharacters:state.characters };
+    } finally {
+      try { await documentHandle?.destroy?.(); } catch (_) {}
+      try { await task.destroy?.(); } catch (_) {}
+    }
+  }
+  function sampledAnalysisParts(sections) {
+    const rows = Array.isArray(sections) ? sections.filter(row => row?.text) : [];
+    if (!rows.length) return [];
+    const partCount = Math.min(11, rows.length);
+    const parts = [];
+    for (let partIndex = 0; partIndex < partCount; partIndex += 1) {
+      const start = Math.floor(partIndex * rows.length / partCount);
+      const end = Math.max(start + 1, Math.floor((partIndex + 1) * rows.length / partCount));
+      const sample = rows.slice(start, end).map(row => '[' + clean(row.label || 'Fragmento', 240) + '] ' + String(row.text || '')).join('\n\n').slice(0, 14500);
+      if (sample) parts.push({ text:'Muestra distribuida ' + (partIndex + 1) + '/' + partCount + ':\n' + sample });
+    }
+    return parts;
+  }
   async function buildAsset(file, onProgress) {
     const kind = classifyFile(file);
     if (kind === 'unsupported') throw new Error('unsupported_multimodal_type');
-    if (Number(file?.size || 0) > MAX_FILE_BYTES) throw new Error('multimodal_file_too_large');
-    const buffer = await readAsArrayBuffer(file, onProgress);
+    const byteLimit = kind === 'pdf' ? MAX_PDF_FILE_BYTES : MAX_FILE_BYTES;
+    if (Number(file?.size || 0) > byteLimit) throw new Error(kind === 'pdf' ? 'multimodal_pdf_too_large' : 'multimodal_file_too_large');
+    const buffer = await readAsArrayBuffer(file, progress => {
+      if (typeof onProgress === 'function') onProgress({ phase:'reading', fraction:Number(progress || 0) });
+    });
     const sha256 = await digest(buffer);
-    let sections = []; let dataUrl = '';
+    let sections = []; let dataUrl = ''; let extraction = null;
     if (kind === 'text') sections = sectionsFromText(new TextDecoder().decode(buffer));
+    if (kind === 'pdf') {
+      extraction = await extractPdfSections(buffer, onProgress);
+      sections = extraction.sections;
+    }
     if (kind !== 'text' && Number(file.size || 0) <= MAX_INLINE_BYTES) dataUrl = await readAsDataUrl(file);
-    return { id:'bke_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8), title:titleFor(file), kind, mime:String(file.type || 'application/octet-stream').slice(0, 120), bytes:Number(file.size || 0), sha256, sections, dataUrl, analysis:null, status:kind === 'text' ? 'local_ready' : (dataUrl ? 'pending_analysis' : 'blocked'), createdAt:Date.now(), updatedAt:Date.now() };
+    const locallyIndexed = kind === 'text' || (kind === 'pdf' && sections.length > 0);
+    return { id:'bke_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8), title:titleFor(file), kind, mime:String(file.type || 'application/octet-stream').slice(0, 120), bytes:Number(file.size || 0), sha256, sections, dataUrl, extraction, analysis:null, status:locallyIndexed ? 'local_ready' : (dataUrl ? 'pending_analysis' : 'blocked'), createdAt:Date.now(), updatedAt:Date.now() };
   }
   async function importFiles(files, onProgress) {
     const incoming = [...(files || [])]; const existing = await list();
@@ -218,10 +326,12 @@
     const created = [];
     for (let index = 0; index < incoming.length; index += 1) {
       const file = incoming[index];
-      const asset = await buildAsset(file, fraction => {
+      const asset = await buildAsset(file, state => {
         if (typeof onProgress !== 'function') return;
-        const overall = ((index + fraction) / Math.max(1, incoming.length)) * 72;
-        onProgress({ phase:'reading', percent:Math.round(overall), label:'Leyendo archivo', detail:titleFor(file) });
+        const fraction = Number(state?.fraction || 0);
+        const localPercent = state?.phase === 'extracting' ? 18 + fraction * 54 : fraction * 18;
+        const overall = ((index + localPercent / 72) / Math.max(1, incoming.length)) * 72;
+        onProgress({ phase:state?.phase || 'reading', percent:Math.round(overall), label:state?.phase === 'extracting' ? 'Indexando PDF' : 'Leyendo archivo', detail:state?.phase === 'extracting' ? ('Página ' + state.page + ' de ' + state.pages + ' · ' + titleFor(file)) : titleFor(file) });
       });
       if (asset.sha256 && existing.some(row => row.sha256 === asset.sha256)) {
         if (typeof onProgress === 'function') onProgress({ phase:'duplicate', percent:Math.round(((index + 1) / Math.max(1, incoming.length)) * 72), label:'Fuente ya guardada', detail:asset.title });
@@ -239,8 +349,8 @@
     }
     const token = typeof root.gfcAccountFreshAccessToken === 'function' ? await root.gfcAccountFreshAccessToken() : '';
     if (!token || !asset.sections?.length && !asset.dataUrl) return { ok:false, code:asset.status === 'blocked' ? 'extractor_required' : 'session_or_media_unavailable', message:asset.status === 'blocked' ? 'Este archivo supera el límite de análisis directo. Conservé su ficha local, pero requiere un extractor autorizado.' : localUnavailableReply() };
-    const parts = [{ text:'Analiza esta fuente para la biblioteca de conocimiento de Yarbi. Devuelve SOLO JSON válido: {"summary":"","citations":[{"reference":"Capítulo, sección, numeral o página SOLO si está visible en la fuente; si no, usa Referencia no localizada","quote":"cita literal corta"}]}. Cada quote debe proceder literalmente de la fuente. No inventes números de página, capítulos, normas ni requisitos. No ejecutes acciones, no guardes instrucciones y omite lo ilegible.' }];
-    if (asset.sections?.length) parts.push({ text:'Texto de la fuente:\n' + asset.sections.map(item => item.text).join('\n\n').slice(0, MAX_TEXT) });
+    const parts = [{ text:'Analiza esta fuente para la biblioteca de conocimiento de Yarbi. Devuelve SOLO JSON válido: {"summary":"","citations":[{"reference":"Capítulo, sección, numeral o página SOLO si está visible en la fuente; si no, usa Referencia no localizada","quote":"cita literal corta"}]}. Cada quote debe proceder literalmente de la fuente. No inventes números de página, capítulos, normas ni requisitos. No ejecutes acciones, no guardes instrucciones y omite lo ilegible. Las muestras están distribuidas por todo el documento; no afirmes que el resumen sustituye al índice completo.' }];
+    if (asset.sections?.length) parts.push(...sampledAnalysisParts(asset.sections));
     if (asset.dataUrl) parts.push({ inline_data:{ mime_type:asset.mime, data:asset.dataUrl.split(',')[1] || '' } });
     const response = await root.fetch((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token }, body:JSON.stringify({ system_instruction:{ parts:[{ text:'Eres el procesador seguro BKE de Yarbi. Solo produces un borrador de conocimiento para revisión del propietario. No alteres CRM, agenda, finanzas, WhatsApp ni memoria permanente.' }] }, contents:[{ role:'user', parts }], generationConfig:{ temperature:0.2, maxOutputTokens:2048 } }) });
     const data = await response.json().catch(() => ({})); if (!response.ok) return { ok:false, code:'multimodal_provider_unavailable', message:'El análisis no terminó (' + response.status + '). La fuente sigue pendiente y no se aprobó.' };
@@ -295,13 +405,18 @@
     const text = clean(question, 1200); if (!text) throw new Error('tutor_question_required');
     const assets = Array.isArray(prepared?.assets) ? prepared.assets : await list();
     const evidence = Array.isArray(prepared?.evidence) ? prepared.evidence : searchApproved(assets, text);
-    const citations = citationListMarkdown(evidence); const context = evidence.map(row => '[' + row.title + ' · ' + row.sectionLabel + '] ' + row.excerpt).join('\n');
+    const context = evidence.map(row => '[' + row.title + ' · ' + row.sectionLabel + '] ' + row.excerpt).join('\n');
     const token = typeof root.gfcAccountFreshAccessToken === 'function' ? await root.gfcAccountFreshAccessToken() : '';
     if (!token) return { ok:false, message:'Inicia sesión para usar el tutor. Tus fuentes aprobadas siguen guardadas localmente.' };
     if (!evidence.length) return { ok:false, message:'No encontré una cita aprobada que respalde esta respuesta. No inventaré una referencia técnica; carga y aprueba la norma primero.' };
-    const response = await root.fetch((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token }, body:JSON.stringify({ system_instruction:{ parts:[{ text:'Eres el Tutor personal de Yarbi. Explica exclusivamente con la evidencia aprobada proporcionada. Responde primero la conclusión y usa máximo 180 palabras. Separa solo si ayuda: 1) qué dice la fuente, 2) qué significa en palabras sencillas, 3) límite o dato faltante. No cites capítulo, numeral, página ni norma que no figure exactamente en la evidencia. Nunca ejecutes acciones ni guardes aprendizajes automáticamente.' }] }, contents:[{ role:'user', parts:[{ text:'Pregunta del propietario:\n' + text + '\n\nEvidencia aprobada disponible:\n' + context }] }], generationConfig:{ temperature:0.2, maxOutputTokens:900 } }) });
+    const response = await root.fetch((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token }, body:JSON.stringify({ system_instruction:{ parts:[{ text:'Eres el Tutor personal de Yarbi. Usa exclusivamente la evidencia aprobada. Devuelve SOLO JSON válido: {"found":true|false,"answer":"conclusión directa en máximo 45 palabras","exact_quote":"una única cita literal que responda la consulta","reference":"capítulo, numeral o página exacta de la evidencia","plain_explanation":"explicación sencilla en máximo 55 palabras","caveat":"condición relevante o vacío"}. No agregues introducciones, listas extensas ni conocimiento general. found=true requiere cita y referencia. Nunca ejecutes acciones ni guardes aprendizajes.' }] }, contents:[{ role:'user', parts:[{ text:'Pregunta del propietario:\n' + text + '\n\nEvidencia aprobada disponible:\n' + context }] }], generationConfig:{ temperature:0.1, maxOutputTokens:700, responseMimeType:'application/json' } }) });
     const data = await response.json().catch(() => ({})); if (!response.ok) return { ok:false, message:'El tutor no está disponible ahora. No inventé una explicación.' };
-    return { ok:true, text:responseText(data) + '\n\n---\n\n## Referencias verificadas\n\n' + citations, evidence:evidence.map(row => ({ title:row.title, assetId:row.assetId, sectionLabel:row.sectionLabel })) };
+    const parsed = parseDirectedAnswer(responseText(data));
+    const sourceAsset = assets.find(asset => String(asset.id) === String(evidence[0]?.assetId)) || { title:evidence[0]?.title, sha256:evidence[0]?.sourceHash };
+    if (!parsed.ok || parsed.found && !quoteSupportedByEvidence(parsed, evidence)) {
+      return { ok:true, text:formatDirectedAnswer({ found:false, caveat:'La respuesta recibida no pudo verificarse literalmente contra los fragmentos recuperados.' }, sourceAsset), evidence:[] };
+    }
+    return { ok:true, text:formatDirectedAnswer(parsed, sourceAsset), evidence:evidence.map(row => ({ title:row.title, assetId:row.assetId, sectionLabel:row.sectionLabel })) };
   }
   async function answerFromChat(question) {
     const text = clean(question, 1200);
@@ -351,7 +466,7 @@
       degraded:true
     };
   }
-  function statusText(error) { return ({ unsupported_multimodal_type:'Formato no compatible.', multimodal_file_too_large:'El archivo supera el límite local de 40 MB.', multimodal_asset_limit:'La biblioteca local alcanzó 80 fuentes.', multimodal_storage_unavailable:'El almacenamiento local no está disponible.', extractor_required:'Este archivo necesita un extractor autorizado.' }[error?.message] || error?.message || 'No pude procesar la fuente.'); }
+  function statusText(error) { return ({ unsupported_multimodal_type:'Formato no compatible.', multimodal_file_too_large:'El archivo supera el límite local de 40 MB para audio, video o imagen.', multimodal_pdf_too_large:'El PDF supera el límite seguro de 120 MB para este dispositivo.', multimodal_pdf_page_limit:'El PDF supera 2.500 páginas y no se procesó para proteger la memoria del teléfono.', multimodal_pdf_index_limit:'El texto del PDF supera el límite seguro de indexación local.', multimodal_pdf_no_text:'El PDF no contiene texto extraíble. Puede ser un escaneo y necesita OCR.', multimodal_asset_limit:'La biblioteca local alcanzó 80 fuentes.', multimodal_storage_unavailable:'El almacenamiento local no está disponible.', extractor_required:'Este archivo necesita un extractor autorizado.' }[error?.message] || error?.message || 'No pude procesar la fuente.'); }
   function progressTone(phase) {
     if (phase === 'error') return 'error';
     if (phase === 'complete' || phase === 'approved') return 'success';
@@ -395,7 +510,8 @@
   function card(asset) {
     const analysis = asset.analysis?.text ? '<details><summary>Ver borrador</summary><p>' + escapeHtml(asset.analysis.text) + '</p>' + ((asset.analysis?.citations || []).length ? '<p><b>' + asset.analysis.citations.length + ' cita(s) extraída(s) para revisión.</b></p>' : '') + '</details>' : '';
     const action = asset.status === 'analyzed_draft' ? '<button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalApprove(\'' + escapeHtml(asset.id) + '\')">Aprobar para tutoría</button>' : asset.status === 'approved' ? '<span class="gfc-mm-approved">✓ Aprobado</span>' : '<button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalAnalyze(\'' + escapeHtml(asset.id) + '\')">Analizar con Yarbi</button>';
-    return '<article class="gfc-mm-card"><div class="gfc-mm-card-head"><span class="gfc-mm-kind">' + ({ text:'📝', pdf:'📕', image:'🖼️', audio:'🎙️', video:'🎬' }[asset.kind] || '📎') + '</span><div><b>' + escapeHtml(asset.title) + '</b><small>' + kindLabel(asset.kind) + ' · ' + statusLabel(asset.status) + ' · ' + Math.max(1, Math.round(Number(asset.bytes || 0) / 1024)) + ' KB</small></div></div><p>Huella: ' + escapeHtml(String(asset.sha256 || '').slice(0, 16)) + '…</p>' + analysis + '<div class="gfc-mm-actions">' + action + '</div></article>';
+    const extraction = asset.extraction?.pages ? '<p>Índice local: ' + Number(asset.extraction.pages) + ' página(s) · ' + Number(asset.sections?.length || 0) + ' fragmento(s). No se vuelve a leer el archivo en cada consulta.</p>' : '';
+    return '<article class="gfc-mm-card"><div class="gfc-mm-card-head"><span class="gfc-mm-kind">' + ({ text:'📝', pdf:'📕', image:'🖼️', audio:'🎙️', video:'🎬' }[asset.kind] || '📎') + '</span><div><b>' + escapeHtml(asset.title) + '</b><small>' + kindLabel(asset.kind) + ' · ' + statusLabel(asset.status) + ' · ' + Math.max(1, Math.round(Number(asset.bytes || 0) / 1024)) + ' KB</small></div></div><p>Huella: ' + escapeHtml(String(asset.sha256 || '').slice(0, 16)) + '…</p>' + extraction + analysis + '<div class="gfc-mm-actions">' + action + '</div></article>';
   }
   async function render() { const target = root?.document?.getElementById('gfc-mm-list'); if (!target) return; try { const rows = await list(); target.innerHTML = rows.length ? rows.map(card).join('') : '<p>Aún no hay fuentes multimodales. Puedes cargar documentos, imágenes, audios o videos.</p>'; } catch (_) { target.innerHTML = '<p>No se pudo abrir la biblioteca local.</p>'; } }
   function setStatus(message, error) { const target = root?.document?.getElementById('gfc-mm-status'); if (target) { target.textContent = message; target.dataset.tone = error ? 'error' : 'normal'; } }
@@ -456,7 +572,7 @@
   }
   async function approveFromUi(id) { try { setProgress(92, 'Guardando aprobación', 'Vinculando la revisión a esta fuente.', 'working'); await approve(id); setProgress(100, 'Fuente aprobada', 'Disponible para respuestas del tutor con citas verificables.', 'approved'); setStatus('Fuente aprobada para tutoría. No modifica CRM ni instrucciones permanentes.'); } catch (error) { setProgress(0, 'No se aprobó', statusText(error), 'error'); setStatus(statusText(error), true); } }
   async function askTutorFromUi() { const input = root.document.getElementById('gfc-mm-tutor-question'); const out = root.document.getElementById('gfc-mm-tutor-answer'); if (!out) return; out.textContent = 'El tutor está preparando una explicación…'; try { const result = await askTutor(input?.value || ''); out.textContent = result.ok ? result.text : (result.message || 'No pude responder sin inventar información.'); } catch (error) { out.textContent = statusText(error); } }
-  function html() { return '<main class="gfc-yarbi-tool-page gfc-mm-page"><section class="gfc-mm-hero"><span>📚</span><div><h2>Conocimiento y Tutor</h2><p>Selecciona una fuente, observa su procesamiento y decide cuándo puede usarla Yarbi.</p></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Procesar</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div><label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>Abre el explorador de Android: Recientes, Descargas, almacenamiento y proveedores como Drive.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div><section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section><div id="gfc-mm-status" class="gfc-yarbi-import-summary">Tus fuentes aprobadas quedan indexadas localmente para responder rápido. La aprobación es obligatoria antes de usarlas como conocimiento. No se ejecutan acciones comerciales durante este proceso.</div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">🎓 Preguntar al Tutor</div><div class="gfc-yarbi-tool-copy">Yarbi responde con la cita disponible, la referencia visible y una explicación sencilla. Si falta evidencia, se abstiene.</div><textarea id="gfc-mm-tutor-question" rows="4" placeholder="Ejemplo: ¿Qué exige esta norma y qué significa en palabras sencillas?"></textarea><button class="gfc-yarbi-primary" onclick="gfcYarbiTutorAsk()">Preguntar al tutor</button><article id="gfc-mm-tutor-answer" class="gfc-mm-tutor-answer">Aquí aparecerá una explicación respaldada por tus fuentes aprobadas.</article></section></main>'; }
+  function html() { return '<main class="gfc-yarbi-tool-page gfc-mm-page"><section class="gfc-mm-hero"><span>📚</span><div><h2>Conocimiento y Tutor</h2><p>Selecciona una fuente, observa su procesamiento y decide cuándo puede usarla Yarbi.</p></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Procesar</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div><label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>PDF de hasta 120 MB: Yarbi los indexa por páginas en el teléfono. Los PDF escaneados sin texto requieren OCR.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div><section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section><div id="gfc-mm-status" class="gfc-yarbi-import-summary">Tus fuentes aprobadas quedan indexadas localmente para responder rápido. La aprobación es obligatoria antes de usarlas como conocimiento. No se ejecutan acciones comerciales durante este proceso.</div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">🎓 Preguntar al Tutor</div><div class="gfc-yarbi-tool-copy">Yarbi responde primero de forma breve y muestra una sola cita literal con su capítulo, numeral o página. Si falta evidencia, se abstiene.</div><textarea id="gfc-mm-tutor-question" rows="4" placeholder="Ejemplo: ¿Qué exige esta norma y qué significa en palabras sencillas?"></textarea><button class="gfc-yarbi-primary" onclick="gfcYarbiTutorAsk()">Preguntar al tutor</button><article id="gfc-mm-tutor-answer" class="gfc-mm-tutor-answer">Aquí aparecerá una explicación respaldada por tus fuentes aprobadas.</article></section></main>'; }
   function attach() { void render(); }
-  return Object.freeze({ classifyFile, normalize, contentTokens, knowledgeIntent, sectionsFromText, searchApproved, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, formatDirectedAnswer, citationMarkdown, citationListMarkdown, selectApprovedDirectAsset, queryApprovedSource, buildAsset, importFiles, list, analyze, approve, askTutor, answerFromChat, html, attach, render, analyzeFromUi, approveFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, MAX_INLINE_BYTES });
+  return Object.freeze({ classifyFile, normalize, contentTokens, knowledgeIntent, sectionsFromText, pdfPageSections, searchApproved, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, formatDirectedAnswer, citationMarkdown, citationListMarkdown, selectApprovedDirectAsset, queryApprovedSource, buildAsset, importFiles, list, analyze, approve, askTutor, answerFromChat, html, attach, render, analyzeFromUi, approveFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES });
 }));

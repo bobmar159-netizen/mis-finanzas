@@ -10,6 +10,23 @@ const source = fs.readFileSync(modulePath, 'utf8');
 const memoryCenter = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-memory-center.js'), 'utf8');
 const index = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
 
+function syntheticPdf(text) {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    '<< /Length ' + (text.length + 30) + ' >>\nstream\nBT /F1 12 Tf 72 720 Td (' + text.replace(/[()\\]/g, '\\$&') + ') Tj ET\nendstream',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
+  ];
+  let value = '%PDF-1.4\n';
+  const offsets = [0];
+  objects.forEach((object, index) => { offsets.push(Buffer.byteLength(value)); value += (index + 1) + ' 0 obj\n' + object + '\nendobj\n'; });
+  const xref = Buffer.byteLength(value);
+  value += 'xref\n0 ' + (objects.length + 1) + '\n0000000000 65535 f \n' + offsets.slice(1).map(offset => String(offset).padStart(10, '0') + ' 00000 n ').join('\n') + '\n';
+  value += 'trailer\n<< /Size ' + (objects.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF';
+  return Buffer.from(value, 'binary');
+}
+
 test('BKE multimodal: reconoce documentos, imágenes, audio y video sin mezclar categorías', () => {
   assert.equal(api.classifyFile({ name:'manual.pdf', type:'application/pdf' }), 'pdf');
   assert.equal(api.classifyFile({ name:'foto.jpg', type:'image/jpeg' }), 'image');
@@ -32,7 +49,7 @@ test('BKE multimodal: conserva la referencia visible y adjunta evidencia verific
   assert.equal(sections[0].label, 'Numeral 5.2');
   assert.equal(evidence[0].sectionLabel, 'Numeral 5.2');
   assert.equal(evidenceByReference[0].sectionLabel, 'Numeral 5.2');
-  assert.match(markdown, /Referencia:\*\* Numeral 5\.2/);
+  assert.match(markdown, /> \[📖 Numeral 5\.2\]/);
   assert.match(markdown, /SHA-256/);
 });
 
@@ -47,8 +64,29 @@ test('BKE multimodal: la búsqueda dirigida exige cita y ubicación antes de afi
   const unsafe = api.parseDirectedAnswer('{"found":true,"answer":"Sí.","exact_quote":"","reference":"","plain_explanation":"","caveat":""}');
   assert.equal(found.found, true);
   assert.equal(unsafe.found, false);
-  assert.match(api.formatDirectedAnswer(found, { title:'Norma técnica.pdf', sha256:'d'.repeat(64) }), /Numeral 7\.3/);
-  assert.match(api.formatDirectedAnswer(unsafe, { title:'Norma técnica.pdf' }), /No encontré esa regla/);
+  const formatted = api.formatDirectedAnswer(found, { title:'Norma técnica.pdf', sha256:'d'.repeat(64) });
+  assert.match(formatted, /## ✅ Respuesta breve/);
+  assert.match(formatted, /> \[📖 Numeral 7\.3\]/);
+  assert.match(formatted, /“La válvula podrá alimentar dos artefactos\.”/);
+  assert.match(api.formatDirectedAnswer(unsafe, { title:'Norma técnica.pdf' }), /No encontré/);
+});
+
+test('BKE multimodal: indexa páginas de PDF con referencia visible y límites explícitos', () => {
+  const state = { characters:0, sections:0 };
+  const rows = api.pdfPageSections(12, 'Numeral 6.2.5.4\nEl área libre de la rejilla será setenta y cinco por ciento.', state);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].label, 'Numeral 6.2.5.4 · Página 12');
+  assert.match(rows[0].text, /setenta y cinco/);
+  assert.equal(api.MAX_PDF_FILE_BYTES, 120 * 1024 * 1024);
+});
+
+test('BKE multimodal: PDF.js extrae e indexa un PDF real sin enviarlo al proveedor', async () => {
+  const file = new File([syntheticPdf('Numeral 7.3 La valvula alimenta dos artefactos.')], 'norma.pdf', { type:'application/pdf' });
+  const asset = await api.buildAsset(file);
+  assert.equal(asset.kind, 'pdf');
+  assert.equal(asset.status, 'local_ready');
+  assert.equal(asset.extraction.pages, 1);
+  assert.match(asset.sections.map(section => section.text).join(' '), /dos artefactos/);
 });
 
 test('BKE multimodal: selecciona el PDF aprobado sin mezclar varias normas', () => {
@@ -84,7 +122,8 @@ test('BKE multimodal: el chat principal consulta la misma biblioteca aprobada', 
   assert.match(source, /Busca la respuesta exclusivamente dentro del PDF adjunto/);
   assert.match(source, /responseMimeType:'application\/json'/);
   assert.match(source, /queryCache/);
-  assert.match(source, /máximo 180 palabras/);
+  assert.match(source, /conclusión directa en máximo 45 palabras/);
+  assert.match(source, /explicación sencilla en máximo 55 palabras/);
 });
 
 test('BKE multimodal: el resultado analizado queda indexado y no obliga a reprocesar la fuente', () => {
@@ -107,10 +146,13 @@ test('BKE multimodal: no anuncia aprendizaje automático ni acciones comerciales
   assert.match(index, /yarbi-multimodal-tutor\.js/);
 });
 
-test('BKE multimodal: limita el envío inline a 3 MB y mantiene archivos grandes pendientes', () => {
+test('BKE multimodal: limita el envío inline y procesa PDF grandes mediante índice local', () => {
   assert.equal(api.MAX_INLINE_BYTES, 3 * 1024 * 1024);
-  assert.match(source, /status:kind === 'text' \? 'local_ready' : \(dataUrl \? 'pending_analysis' : 'blocked'\)/);
-  assert.match(source, /multimodal_file_too_large/);
+  assert.match(source, /MAX_PDF_FILE_BYTES = 120 \* 1024 \* 1024/);
+  assert.match(source, /extractPdfSections/);
+  assert.match(source, /pdf\.worker\.min\.mjs/);
+  assert.match(source, /locallyIndexed \? 'local_ready'/);
+  assert.match(source, /Índice local:/);
 });
 
 test('BKE multimodal: los controles visibles usan flujos UI con progreso y revisión', () => {

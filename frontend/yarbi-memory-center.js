@@ -817,13 +817,21 @@
   };
   function scrollChatToLatest(box) {
     if (!box) return;
-    const apply = () => { box.scrollTop = box.scrollHeight; };
+    box.dataset.gfcRestoring = '1';
+    const previousBehavior = box.style.scrollBehavior;
+    box.style.scrollBehavior = 'auto';
+    const apply = () => { box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight); };
     apply();
     if (typeof requestAnimationFrame === 'function') {
       requestAnimationFrame(() => { apply(); requestAnimationFrame(apply); });
     }
     setTimeout(apply, 80);
-    setTimeout(apply, 240);
+    clearTimeout(box._gfcRevealLatestTimer);
+    box._gfcRevealLatestTimer = setTimeout(() => {
+      apply();
+      box.style.scrollBehavior = previousBehavior;
+      delete box.dataset.gfcRestoring;
+    }, 120);
   }
   function renderTimelineWindow(box, items, limit, restoreAtBottom) {
     if (!box) return;
@@ -876,7 +884,10 @@
   function watchConversationScroll(box) {
     if (!box || box.dataset.gfcConversationScrollBound === '1') return;
     box.dataset.gfcConversationScrollBound = '1';
-    box.addEventListener('scroll', () => saveConversationScrollTop(activeConversationId(), box.scrollTop), { passive:true });
+    box.addEventListener('scroll', () => {
+      if (box.dataset.gfcRestoring === '1') return;
+      saveConversationScrollTop(activeConversationId(), box.scrollTop);
+    }, { passive:true });
   }
   function installConversationStoreSubscription() {
     if (unsubscribeConversationStore) return;
@@ -889,10 +900,11 @@
     const box = document.getElementById('gfc-copilot-chat-messages');
     if (!box || box.dataset.gfcRestored === '1') return;
     box.dataset.gfcRestored = '1';
+    box.dataset.gfcRestoring = '1';
     window._gfcYarbiForceLatestUntil = Date.now() + 1600;
     let timeline;
     try { timeline = await loadTimeline(); }
-    catch (_) { box.dataset.gfcRestored = '0'; return; }
+    catch (_) { box.dataset.gfcRestored = '0'; delete box.dataset.gfcRestoring; return; }
     installConversationStoreSubscription();
     // El antiguo localStorage solo se importa una vez, dentro del historial
     // heredado. Una conversación nueva debe empezar realmente vacía.
@@ -910,7 +922,7 @@
       try {
         await importTimeline(migrated.filter(Boolean));
         timeline = await loadTimeline();
-      } catch (_) { box.dataset.gfcRestored = '0'; return; }
+      } catch (_) { box.dataset.gfcRestored = '0'; delete box.dataset.gfcRestoring; return; }
     }
     const initialVisibleTimeline = visibleTimeline(timeline);
     // Al abrir, Yarbi se sitúa siempre en la conversación reciente. El resto

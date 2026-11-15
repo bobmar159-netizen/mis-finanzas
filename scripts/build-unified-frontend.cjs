@@ -11,6 +11,11 @@ const financeContext = path.join(repo, 'lib', 'yarbi-finance-context.js');
 const businessTimeline = path.join(repo, 'lib', 'yarbi-business-timeline.js');
 const agendaReadModel = path.join(repo, 'lib', 'yarbi-agenda-intelligence.js');
 const clientContextReadModel = path.join(repo, 'lib', 'yarbi-client-context-read.js');
+const pdfRuntime = [
+  path.join(repo, 'node_modules', 'pdfjs-dist', 'build', 'pdf.min.mjs'),
+  path.join(repo, 'node_modules', 'pdfjs-dist', 'build', 'pdf.worker.min.mjs')
+];
+const pdfRuntimeDirectories = ['cmaps', 'standard_fonts', 'wasm'].map(name => path.join(repo, 'node_modules', 'pdfjs-dist', name));
 const args = new Map(process.argv.slice(2).map(value => {
   const [key, ...rest] = value.split('=');
   return [key, rest.join('=') || true];
@@ -48,7 +53,10 @@ function sourceDigest() {
   if (!fs.existsSync(businessTimeline)) fail('falta el módulo compartido yarbi-business-timeline.js.');
   if (!fs.existsSync(agendaReadModel)) fail('falta el módulo compartido yarbi-agenda-intelligence.js.');
   if (!fs.existsSync(clientContextReadModel)) fail('falta el módulo compartido yarbi-client-context-read.js.');
-  return sha([...frontendFiles, 'lib/yarbi-financial-coach.js\t' + sha(fs.readFileSync(financialCoach)), 'lib/yarbi-finance-context.js\t' + sha(fs.readFileSync(financeContext)), 'lib/yarbi-business-timeline.js\t' + sha(fs.readFileSync(businessTimeline)), 'lib/yarbi-agenda-intelligence.js\t' + sha(fs.readFileSync(agendaReadModel)), 'lib/yarbi-client-context-read.js\t' + sha(fs.readFileSync(clientContextReadModel))].join('\n'));
+  pdfRuntime.forEach(file => { if (!fs.existsSync(file)) fail('falta PDF.js; ejecute npm install antes del build.'); });
+  pdfRuntimeDirectories.forEach(dir => { if (!fs.existsSync(dir)) fail('faltan recursos de PDF.js; ejecute npm install antes del build.'); });
+  const pdfResources = pdfRuntimeDirectories.flatMap(dir => walk(dir).sort().map(file => 'vendor/' + path.basename(dir) + '/' + path.relative(dir, file).replace(/\\/g, '/') + '\t' + sha(fs.readFileSync(file))));
+  return sha([...frontendFiles, 'lib/yarbi-financial-coach.js\t' + sha(fs.readFileSync(financialCoach)), 'lib/yarbi-finance-context.js\t' + sha(fs.readFileSync(financeContext)), 'lib/yarbi-business-timeline.js\t' + sha(fs.readFileSync(businessTimeline)), 'lib/yarbi-agenda-intelligence.js\t' + sha(fs.readFileSync(agendaReadModel)), 'lib/yarbi-client-context-read.js\t' + sha(fs.readFileSync(clientContextReadModel)), ...pdfRuntime.map(file => 'vendor/' + path.basename(file) + '\t' + sha(fs.readFileSync(file))), ...pdfResources].join('\n'));
 }
 function validateOrigin(value) {
   let parsed;
@@ -126,6 +134,10 @@ const nativeAuthCallbackScheme = target === 'android'
   : 'com.misfinanzas.app';
 fs.mkdirSync(out, { recursive: true });
 copyTree(frontend, out);
+const vendorOut = path.join(out, 'vendor');
+fs.mkdirSync(vendorOut, { recursive: true });
+for (const file of pdfRuntime) fs.copyFileSync(file, path.join(vendorOut, path.basename(file)));
+for (const dir of pdfRuntimeDirectories) copyTree(dir, path.join(vendorOut, path.basename(dir)));
 // Financial Coach is a shared deterministic domain module, emitted verbatim
 // for the browser rather than duplicated in the frontend source tree.
 fs.copyFileSync(financialCoach, path.join(out, 'yarbi-financial-coach.js'));

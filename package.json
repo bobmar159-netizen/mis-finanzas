@@ -24,7 +24,8 @@
     "@capacitor/android": "^5.0.0",
     "@capacitor/cli": "^5.0.0",
     "@capacitor/core": "^5.0.0",
-    "@vercel/functions": "3.9.8"
+    "@vercel/functions": "3.9.8",
+    "pdfjs-dist": "5.4.624"
   },
   "devDependencies": {
     "supabase": "^2.122.0"
