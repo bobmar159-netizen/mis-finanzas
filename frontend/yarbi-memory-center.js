@@ -229,6 +229,7 @@
   let unsubscribeConversationStore = null;
   let renderedTimelineCache = [];
   let renderedTimelineLimit = INITIAL_CHAT_MESSAGES;
+  const recentTimelineReservations = new Map();
   function storageError(code) {
     return Object.assign(new Error(code), { code });
   }
@@ -564,7 +565,17 @@
   }
 
   function visibleTimeline(items) {
-    return (Array.isArray(items) ? items : []).filter(item => !isLegacyAutomaticGreeting(item));
+    const visible = [];
+    for (const item of (Array.isArray(items) ? items : [])) {
+      if (isLegacyAutomaticGreeting(item)) continue;
+      const previous = visible[visible.length - 1];
+      const sameContent = previous && previous.role === item?.role
+        && String(previous.text || '').trim() === String(item?.text || '').trim();
+      const closeTogether = sameContent && Math.abs(Number(item?.at || 0) - Number(previous?.at || 0)) <= 10000;
+      if (closeTogether) continue;
+      visible.push(item);
+    }
+    return visible;
   }
 
   function ensureChatWelcome(box) {
@@ -770,10 +781,24 @@
   window.gfcAppendCopilotTimelineMessage = async function (role, text, at, options) {
     if (typeof text !== 'string' || !text.trim()) return { handled:true, result:{ ok:false, code:'content_empty' } };
     const opts = options || {};
+    const reservationAt = Date.now();
+    for (const [key, value] of recentTimelineReservations) {
+      if (reservationAt - value > 12000) recentTimelineReservations.delete(key);
+    }
+    const reservationKey = safeConversationId(opts.conversationId || opts.conversation_id || activeConversationId())
+      + '|' + (role === 'user' ? 'user' : 'assistant') + '|' + String(text).trim().replace(/\s+/g, ' ');
+    const priorReservation = Number(recentTimelineReservations.get(reservationKey) || 0);
+    if (priorReservation && reservationAt - priorReservation < 4500) {
+      return { handled:true, result:{ ok:true, duplicate:true, reason:'recent_identical_message' } };
+    }
+    recentTimelineReservations.set(reservationKey, reservationAt);
     const item = opts.persist === false
       ? normalizeTimelineItem({ id:opts.id, role, text, at:at || opts.at || Date.now(), channel:opts.channel || 'chat', conversation_id:opts.conversationId || opts.conversation_id || activeConversationId() })
       : await persistTimelineMessage(role, text, at || opts.at, opts.channel, opts.id, opts.conversationId || opts.conversation_id);
-    if (!item) return { handled:true, result:{ ok:false, code:'timeline_item_invalid' } };
+    if (!item) {
+      if (recentTimelineReservations.get(reservationKey) === reservationAt) recentTimelineReservations.delete(reservationKey);
+      return { handled:true, result:{ ok:false, code:'timeline_item_invalid' } };
+    }
     const box = document.getElementById('gfc-copilot-chat-messages');
     if (!box) return { handled:false };
     if ([...box.querySelectorAll('[data-message-id]')].some(node => node.dataset.messageId === item.id)) {
@@ -790,6 +815,16 @@
     }
     return { handled:true, result:{ ok:true, timelineId:item.id, rendered:!!rendered } };
   };
+  function scrollChatToLatest(box) {
+    if (!box) return;
+    const apply = () => { box.scrollTop = box.scrollHeight; };
+    apply();
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => { apply(); requestAnimationFrame(apply); });
+    }
+    setTimeout(apply, 80);
+    setTimeout(apply, 240);
+  }
   function renderTimelineWindow(box, items, limit, restoreAtBottom) {
     if (!box) return;
     renderedTimelineCache = visibleTimeline(items);
@@ -809,7 +844,7 @@
     }
     windowItems.forEach(renderTimelineItem);
     if (!windowItems.length) ensureChatWelcome(box);
-    if (restoreAtBottom) box.scrollTop = box.scrollHeight;
+    if (restoreAtBottom) scrollChatToLatest(box);
   }
   window.gfcLoadOlderYarbiMessages = function() {
     const box = document.getElementById('gfc-copilot-chat-messages');
@@ -830,7 +865,7 @@
     const currentIds = renderedTimelineCache.map(item => item.id).join('|');
     const nextIds = nextVisibleTimeline.map(item => item.id).join('|');
     if (currentIds === nextIds) return;
-    const atBottom = chatIsNearBottom(box);
+    const atBottom = Date.now() < Number(window._gfcYarbiForceLatestUntil || 0) || chatIsNearBottom(box);
     renderTimelineWindow(box, nextVisibleTimeline, renderedTimelineLimit, atBottom);
   }
   function restoreConversationScroll(box, latest) {
@@ -854,6 +889,7 @@
     const box = document.getElementById('gfc-copilot-chat-messages');
     if (!box || box.dataset.gfcRestored === '1') return;
     box.dataset.gfcRestored = '1';
+    window._gfcYarbiForceLatestUntil = Date.now() + 1600;
     let timeline;
     try { timeline = await loadTimeline(); }
     catch (_) { box.dataset.gfcRestored = '0'; return; }
@@ -889,6 +925,7 @@
       if (currentIds !== nextIds) {
         renderTimelineWindow(box, nextVisibleTimeline, INITIAL_CHAT_MESSAGES, true);
       }
+      scrollChatToLatest(box);
     }).catch(() => {});
   };
 
@@ -1118,7 +1155,7 @@
         '<button onclick="gfcOpenCopilotModal(\'conversations\')">💬 Historial de conversaciones</button>' +
         '<button onclick="gfcStartNewYarbiConversation()">＋ Nueva conversación</button>' +
         '<button onclick="gfcExportYarbiConversationImage()">▧ Guardar conversación como imagen</button>' +
-        '<button onclick="gfcOpenCopilotModal(\'learning\')">📊 Aprendizaje y autonomía</button>' +
+        '<button onclick="gfcOpenCopilotModal(\'learning\')">🧠 Aprender de mis chats</button>' +
         '<button onclick="gfcOpenCopilotModal(\'memoria\')">📚 Conocimiento y Tutor</button>' +
         '<button onclick="gfcOpenCopilotModal(\'tools\')">🧠 Memoria y aprendizaje</button>' +
         '<button onclick="gfcOpenCopilotModal(\'status\')">✅ Estado y diagnóstico</button>' +
@@ -1201,7 +1238,7 @@
       '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'ads\')">📣<b>Meta Ads</b><span>Métricas locales aprobadas, leads y ROAS sin conectar campañas.</span></button>' +
       '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'ordenes\')">📜<b>Instrucciones</b><span>Reglas permanentes visibles, editables y sincronizadas.</span></button>' +
       '<button class="gfc-yarbi-hub-button" onclick="gfcSetYarbiInteractionMode(\'training\')">🎭<b>Entrenamiento</b><span>Entra al mismo chat de Yarbi, con voz Live y sin tocar datos reales.</span></button>' +
-      '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'learning\')">📊<b>Progreso y autonomía</b><span>Evidencia de aprendizaje y niveles seguros de respuesta.</span></button>' +
+      '<button class="gfc-yarbi-hub-button gfc-yarbi-hub-featured" onclick="gfcOpenCopilotModal(\'learning\')">🧠<b>Aprender de mis chats</b><span>Sincroniza el historial disponible, revisa patrones y enseña a Yarbi cómo respondes.</span></button>' +
       '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'status\')">✅<b>Estado</b><span>Procesamiento, memoria local y diagnóstico técnico.</span></button>' +
       '</div></div></main>';
   }
@@ -1320,6 +1357,9 @@
     const autonomy = autonomyConfig();
     const lastImport = metrics.lastImport ? new Intl.DateTimeFormat('es-PE', { timeZone:'America/Lima', dateStyle:'medium', timeStyle:'short' }).format(new Date(metrics.lastImport)) : 'Todavía no hay una importación confirmada';
     return '<main id="gfc-yarbi-learning-page" class="gfc-yarbi-tool-page">' +
+      '<div class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">🧠 Aprender de mis chats</div><div class="gfc-yarbi-tool-copy">Este es el recorrido del aprendizaje histórico. Yarbi solo usa mensajes ya sincronizados y patrones que tú hayas aprobado; no necesita reprocesar todo el historial en cada consulta.</div>' +
+      '<div class="gfc-mm-steps"><span><b>1</b> Sincronizar</span><span><b>2</b> Segmentar</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span><span><b>5</b> Usar estilo</span></div>' +
+      '<div class="gfc-yarbi-safety">Estado real: la detección y preparación del historial están disponibles. El análisis con IA y sus patrones no se consideran aprendidos hasta que el backend los procese y tú los apruebes. Ninguna señal histórica cierra por sí sola un pago, visita o trabajo.</div></div>' +
       '<div class="gfc-yarbi-tool-card"><div class="gfc-yarbi-learning-score"><div><strong>' + metrics.score + '%</strong><span>' + esc(metrics.level) + '</span></div><p>Este porcentaje sale de evidencia real: ejemplos, pruebas, cobertura de casos, mensajes tuyos importados, patrones e instrucciones. No mide “inteligencia” inventada.</p></div>' +
       '<div class="gfc-yarbi-tool-title">Qué aprendió Yarbi</div>' +
       learningBar('Casos cubiertos', metrics.intents, LEARNING_INTENTS.length) +
@@ -1351,13 +1391,13 @@
   window.gfcYarbiPlanHistoricalLearning = async function() {
     if (historicalPreparationState().loading) return;
     if (!remoteTimelineEnabled()) {
-      window._gfcYarbiHistoricalPreparation = { loading:false, error:'Activa una sesión de Preview aislada para revisar el historial ya sincronizado.', plan:null, prepared:null };
+      window._gfcYarbiHistoricalPreparation = { loading:false, error:'Activa tu cuenta autorizada de Yarbi para revisar el historial ya sincronizado.', plan:null, prepared:null };
       if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
       return;
     }
     const accessToken = await ownerSessionToken();
     if (!accessToken) {
-      window._gfcYarbiHistoricalPreparation = { loading:false, error:'Inicia sesión con la cuenta autorizada de Preview para revisar este historial.', plan:null, prepared:null };
+      window._gfcYarbiHistoricalPreparation = { loading:false, error:'Inicia sesión con tu cuenta autorizada de Yarbi para revisar este historial.', plan:null, prepared:null };
       if (window._gfcYarbiCurrentTab === 'learning') window.gfcOpenCopilotModal('learning');
       return;
     }
@@ -2497,7 +2537,7 @@
     }
     const content = document.getElementById('modal-content');
     if (!content) return;
-    const title = tab === 'chat' ? 'Yarbi' : ({ conversations:'Conversaciones', tools:'Centro de Yarbi', masivo:'Importar chats', knowledge:'Notas y textos', memoria:'Conocimiento y Tutor', ordenes:'Instrucciones', practice:'Cliente simulado', learning:'Aprendizaje y autonomía', status:'Estado y diagnóstico' }[tab] || 'Yarbi');
+    const title = tab === 'chat' ? 'Yarbi' : ({ conversations:'Conversaciones', tools:'Centro de Yarbi', masivo:'Importar chats', knowledge:'Notas y textos', memoria:'Conocimiento y Tutor', ordenes:'Instrucciones', practice:'Cliente simulado', learning:'Aprendizaje histórico', status:'Estado y diagnóstico' }[tab] || 'Yarbi');
     content.innerHTML = '<section class="gfc-yarbi-shell">' + headerHtml(title, tab) +
       (tab === 'chat' ? chatHtml() : tab === 'conversations' ? conversationHistoryHtml() : tab === 'tools' ? hubHtml() : tab === 'masivo' ? importHtml() : tab === 'knowledge' ? (typeof window.gfcYarbiKnowledgeHtml === 'function' ? window.gfcYarbiKnowledgeHtml() : '<main class="gfc-yarbi-tool-page"><p>La biblioteca de conocimiento no está disponible en esta copia.</p></main>') : tab === 'ads' ? (typeof window.gfcYarbiMetaAdsHtml === 'function' ? window.gfcYarbiMetaAdsHtml() : '<main class="gfc-yarbi-tool-page"><p>Meta Ads local no está disponible en esta copia.</p></main>') : tab === 'memoria' ? mediaHtml() : tab === 'ordenes' ? ordersHtml() : tab === 'practice' ? trainingHtml() : tab === 'learning' ? learningHtml() : statusHtml()) + '</section>';
     document.body.classList.add('gfc-yarbi-screen');

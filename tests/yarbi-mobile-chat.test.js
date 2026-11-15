@@ -40,6 +40,24 @@ test('el chat abre en los mensajes recientes y deja el historial bajo demanda', 
   assert.match(memory, /function renderTimelineWindow/);
   assert.match(memory, /Ver .* mensajes anteriores/);
   assert.match(memory, /renderTimelineWindow\(box, initialVisibleTimeline, INITIAL_CHAT_MESSAGES, true\)/);
+  assert.match(memory, /function scrollChatToLatest/);
+  assert.match(memory, /_gfcYarbiForceLatestUntil = Date\.now\(\) \+ 1600/);
+  assert.match(memory, /setTimeout\(apply, 240\)/);
+});
+
+test('la timeline evita respuestas idénticas producidas por callbacks simultáneos', () => {
+  assert.match(memory, /const recentTimelineReservations = new Map\(\)/);
+  assert.match(memory, /reason:'recent_identical_message'/);
+  assert.match(html, /if \(persistedUser\.duplicate\)/);
+  assert.match(memory, /const sameContent = previous/);
+});
+
+test('el aprendizaje histórico queda visible desde el centro y el menú principal', () => {
+  assert.match(memory, /Aprender de mis chats/);
+  assert.match(memory, /Sincronizar/);
+  assert.match(memory, /Segmentar/);
+  assert.match(memory, /Aprobar/);
+  assert.match(memory, /Aprendizaje histórico/);
 });
 
 test('el renderer conserva jerarquía rica y lectura móvil', () => {

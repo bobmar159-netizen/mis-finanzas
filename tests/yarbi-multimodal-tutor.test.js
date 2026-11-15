@@ -27,9 +27,11 @@ test('BKE multimodal: fragmenta texto de manera determinista para tutoría', () 
 test('BKE multimodal: conserva la referencia visible y adjunta evidencia verificable al tutor', () => {
   const sections = api.sectionsFromText('Numeral 5.2\n\nVerifique la instalación antes de operar.');
   const evidence = api.searchApproved([{ id:'ntp', title:'NTP de prueba', sha256:'c'.repeat(64), kind:'pdf', status:'approved', sections }], 'verifique instalación');
+  const evidenceByReference = api.searchApproved([{ id:'ntp', title:'NTP de prueba', sha256:'c'.repeat(64), kind:'pdf', status:'approved', sections }], 'numeral 5.2');
   const markdown = api.citationMarkdown(evidence);
   assert.equal(sections[0].label, 'Numeral 5.2');
   assert.equal(evidence[0].sectionLabel, 'Numeral 5.2');
+  assert.equal(evidenceByReference[0].sectionLabel, 'Numeral 5.2');
   assert.match(markdown, /Referencia:\*\* Numeral 5\.2/);
   assert.match(markdown, /SHA-256/);
 });
@@ -47,6 +49,21 @@ test('BKE multimodal: solo usa fuentes aprobadas como evidencia del tutor', () =
   ], 'visita pasos');
   assert.equal(results.length, 1);
   assert.equal(results[0].assetId, 'ok');
+});
+
+test('BKE multimodal: distingue consultas documentales de lecturas normales del negocio', () => {
+  assert.equal(api.knowledgeIntent('¿Qué dice el numeral 5.2 de la NTP?'), true);
+  assert.equal(api.knowledgeIntent('¿Cuál es mi balance del mes?'), false);
+  assert.deepEqual(api.contentTokens('¿Qué dice la norma sobre ventilación permanente?'), ['ventilacion', 'permanente']);
+});
+
+test('BKE multimodal: el chat principal consulta la misma biblioteca aprobada', () => {
+  assert.match(source, /root\.gfcYarbiMultimodalAnswer = api\.answerFromChat/);
+  assert.match(source, /function answerFromChat/);
+  assert.match(source, /Fuente procesada, aprobación pendiente/);
+  assert.match(source, /No usaré su contenido como conocimiento definitivo/);
+  assert.match(index, /window\.gfcYarbiMultimodalAnswer/);
+  assert.match(index, /const multimodalKnowledgeReply/);
 });
 
 test('BKE multimodal: el resultado analizado queda indexado y no obliga a reprocesar la fuente', () => {

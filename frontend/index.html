@@ -20913,6 +20913,10 @@ async function gfcYarbiFocusedLocalContext(focus = {}) {
         const text = String(row.text || '').trim() || (row.media_type === 'audio' ? '[Nota de voz ' + (row.audio_summary_status || 'sin resumen') + ']' : '[Mensaje sin texto]');
         return '[' + who + '] ' + text;
       });
+    const replyStyle = (Array.isArray(local.reply_style_profile) ? local.reply_style_profile : [])
+      .map(row => String(row?.guidance || '').trim())
+      .filter(Boolean)
+      .slice(0, 8);
     const facts = {
       cliente:focus.client_name || local.contact?.display_name || local.contact?.full_name || '',
       telefono_termina_en:String(local.phone || focus.phone || '').slice(-3),
@@ -20926,7 +20930,9 @@ async function gfcYarbiFocusedLocalContext(focus = {}) {
       siguiente_accion:dossier.next_action || ''
     };
     gfcChatDiag('yarbi-text-local-context', { client:facts.cliente, messages:recent.length, source:local.source || 'local' });
-    return 'EXPEDIENTE LOCAL ESTRUCTURADO: ' + JSON.stringify(facts) + (recent.length ? '\nMENSAJES RECIENTES LOCALES:\n' + recent.join('\n') : '');
+    return 'EXPEDIENTE LOCAL ESTRUCTURADO: ' + JSON.stringify(facts)
+      + (recent.length ? '\nMENSAJES RECIENTES LOCALES:\n' + recent.join('\n') : '')
+      + (replyStyle.length ? '\nESTILO APROBADO DEL PROPIETARIO (úsalo solo como forma, nunca copies hechos de otro chat):\n- ' + replyStyle.join('\n- ') : '');
   } catch (error) {
     gfcChatDiag('yarbi-text-local-context-error', { message:error?.message || String(error) });
     return '';
@@ -20958,6 +20964,11 @@ async function gfcSendCopilotChatMessage(promptText) {
     if (typeof toast === 'function') toast('No se pudo guardar el mensaje. Se conserva para reintentar.', 'warning');
     return;
   }
+  if (persistedUser.duplicate) {
+    window._gfcYarbiTextRequestActive = false;
+    gfcYarbiSetProcessStatus('ready', 'Mensaje ya recibido');
+    return;
+  }
   if (typeof window.gfcClearYarbiConversationDraft === 'function') window.gfcClearYarbiConversationDraft();
 
   // Solo una solicitud explícita a la biblioteca usa citas locales aprobadas.
@@ -20970,6 +20981,19 @@ async function gfcSendCopilotChatMessage(promptText) {
     await gfcAppendCopilotChatMessage('assistant', knowledgeReply.reply);
     if (window._gfcMascot) window._gfcMascot.setState('reposo', knowledgeReply.reply);
     gfcSpeakText(knowledgeReply.reply);
+    return;
+  }
+
+  // Los PDF, documentos, imágenes, audios y videos aprobados viven en la
+  // biblioteca multimodal. El mismo cerebro del chat los consulta aquí; no se
+  // crea un tutor paralelo ni se vuelve a procesar el archivo en cada pregunta.
+  const multimodalKnowledgeReply = typeof window.gfcYarbiMultimodalAnswer === 'function'
+    ? await window.gfcYarbiMultimodalAnswer(text)
+    : null;
+  if (multimodalKnowledgeReply?.handled) {
+    await gfcAppendCopilotChatMessage('assistant', multimodalKnowledgeReply.reply);
+    if (window._gfcMascot) window._gfcMascot.setState('reposo', multimodalKnowledgeReply.reply);
+    gfcSpeakText(multimodalKnowledgeReply.reply);
     return;
   }
 
