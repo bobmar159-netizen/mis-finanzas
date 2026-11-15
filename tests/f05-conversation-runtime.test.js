@@ -74,8 +74,16 @@ test('F05 continuidad es firmada, aislada por owner y no convierte ordinales en 
   const selected = await runOwnerConversation({ utterance: 'El segundo cliente', candidates: valid.candidate_ids, now: NOW });
   assert.equal(selected.outcome, 'continuation_selected');
   assert.equal(selected.selected_contact_id, 72);
+  assert.deepEqual(selected.state.selected_entity, { contact_id: 72 });
   assert.equal(selected.proposal.execute, false);
   assert.equal(selected.commercial_effects_allowed, false);
+
+  const dossierReply = await runOwnerConversation({
+    utterance: '¿Cuánto debe?', state: selected.state, now: NOW,
+    dossier: { contact_id: 72, dossier: { client_name:'Cliente sintético' }, finance: { summary: { pending_amount: 180 } }, timeline: [] }
+  });
+  assert.equal(dossierReply.outcome, 'fast_local_contact_context');
+  assert.match(dossierReply.reply, /S\/ 180\.00/);
 });
 
 test('F05 falla de proveedor sin inventar datos ni perder el estado conversacional', async () => {
