@@ -82,6 +82,48 @@ test('BKE multimodal: recupera sinónimos técnicos sin convertir el chat en com
   assert.deepEqual(api.retrievalGroups('válvula artefactos').map(group => group.term), ['valvula','artefactos']);
 });
 
+test('BKE semántico: recupera la idea aunque la consulta no comparta palabras con la norma', async () => {
+  const previousToken = global.gfcAccountFreshAccessToken;
+  const previousOrigin = global.gfcRuntimeApiOrigin;
+  const previousFetch = global.fetch;
+  const documentVector = Array(768).fill(0); documentVector[3] = 0.8; documentVector[27] = 0.6;
+  const queryVector = Array(768).fill(0); queryVector[3] = 0.79; queryVector[27] = 0.61;
+  const unrelatedVector = Array(768).fill(0); unrelatedVector[90] = 1;
+  global.gfcAccountFreshAccessToken = async () => 'synthetic-token';
+  global.gfcRuntimeApiOrigin = () => 'https://synthetic.invalid';
+  global.fetch = async (_url, options) => {
+    const payload = JSON.parse(options.body);
+    assert.equal(payload.operation, 'embed');
+    assert.equal(payload.taskType, 'RETRIEVAL_QUERY');
+    return { ok:true, json:async () => ({ embeddings:[queryVector], model:'gemini-embedding-001', dimensions:768 }) };
+  };
+  try {
+    const assets = [{
+      id:'ntp', title:'NTP técnica', kind:'pdf', status:'approved', learningEnabled:true,
+      sections:[
+        { id:'p8', label:'Numeral 8.4 · Página 22', text:'Una válvula común podrá alimentar dos artefactos bajo estas condiciones.', semantic:{ version:api.SEMANTIC_INDEX_VERSION, vector:api.encodeEmbedding(documentVector) } },
+        { id:'p2', label:'Página 2', text:'Definiciones administrativas generales.', semantic:{ version:api.SEMANTIC_INDEX_VERSION, vector:api.encodeEmbedding(unrelatedVector) } }
+      ]
+    }];
+    const result = await api.semanticSearchApproved(assets, '¿se admite concentrar el aislamiento de varios consumos?');
+    assert.equal(result.mode, 'semantic');
+    assert.equal(result.evidence[0].sectionId, 'p8');
+    assert.ok(result.evidence[0].semanticScore > 0.98);
+  } finally {
+    global.gfcAccountFreshAccessToken = previousToken;
+    global.gfcRuntimeApiOrigin = previousOrigin;
+    global.fetch = previousFetch;
+  }
+});
+
+test('BKE semántico: cuantiza vectores sin alterar su orden de similitud', () => {
+  const base = api.encodeEmbedding([1, 0, 0, 0]);
+  const close = api.encodeEmbedding([0.98, 0.1, 0, 0]);
+  const far = api.encodeEmbedding([0, 0, 1, 0]);
+  assert.ok(api.quantizedCosine(base, close) > 0.98);
+  assert.ok(api.quantizedCosine(base, far) < 0.05);
+});
+
 test('BKE multimodal: indexa páginas de PDF con referencia visible y límites explícitos', () => {
   const state = { characters:0, sections:0 };
   const rows = api.pdfPageSections(12, 'Numeral 6.2.5.4\nEl área libre de la rejilla será setenta y cinco por ciento.', state);
@@ -219,7 +261,10 @@ test('BKE multimodal: el chat principal consulta la misma biblioteca aprobada', 
   assert.match(source, /Busca la respuesta exclusivamente dentro del PDF adjunto/);
   assert.match(source, /responseMimeType:'application\/json'/);
   assert.match(source, /queryCache/);
-  assert.match(source, /queryApprovedLibrary\(assets, text\)/);
+  assert.match(source, /queryApprovedLibrary\(assets, text, semantic\)/);
+  assert.match(source, /Interpretando el significado de tu pregunta/);
+  assert.match(source, /RETRIEVAL_DOCUMENT/);
+  assert.match(source, /RETRIEVAL_QUERY/);
   assert.match(source, /La consulta tardó demasiado y la detuve/);
   assert.match(source, /fetchJsonWithTimeout/);
   assert.match(source, /conclusión directa en máximo 45 palabras/);
@@ -295,4 +340,15 @@ test('pasarela Gemini: admite PDF, audio y video inline sin aceptar tipos arbitr
   assert.equal(contents.length, 1);
   assert.equal(contents[0].parts.length, 3);
   assert.deepEqual(contents[0].parts.map(part => part.inline_data.mime_type), ['application/pdf','audio/mp4','video/mp4']);
+});
+
+test('pasarela Gemini: limita embeddings y acepta solo tareas de recuperación documentadas', () => {
+  const valid = gemini.sanitizeEmbeddingRequest({ operation:'embed', taskType:'RETRIEVAL_DOCUMENT', title:'Norma técnica', texts:['Fragmento uno', 'Fragmento dos'] });
+  const invalid = gemini.sanitizeEmbeddingRequest({ operation:'embed', texts:[] });
+  const coerced = gemini.sanitizeEmbeddingRequest({ operation:'embed', taskType:'ADMIN_OVERRIDE', texts:['Consulta'] });
+  assert.equal(valid.taskType, 'RETRIEVAL_DOCUMENT');
+  assert.equal(valid.outputDimensionality, 768);
+  assert.deepEqual(valid.texts, ['Fragmento uno', 'Fragmento dos']);
+  assert.equal(invalid, null);
+  assert.equal(coerced.taskType, 'RETRIEVAL_QUERY');
 });

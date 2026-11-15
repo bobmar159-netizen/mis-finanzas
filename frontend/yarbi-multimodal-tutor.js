@@ -8,6 +8,7 @@
     root.gfcYarbiMultimodalImport = () => api.importFromUi(true);
     root.gfcYarbiMultimodalSaveOnly = () => api.importFromUi(false);
     root.gfcYarbiMultimodalAnalyze = api.analyzeFromUi;
+    root.gfcYarbiMultimodalSemanticIndex = api.semanticIndexFromUi;
     root.gfcYarbiMultimodalApprove = api.approveFromUi;
     root.gfcYarbiMultimodalToggleLearning = api.toggleLearningFromUi;
     root.gfcYarbiMultimodalDelete = api.deleteFromUi;
@@ -29,9 +30,15 @@
   const MAX_PDF_INDEX_CHARS = 12 * 1024 * 1024;
   const MAX_PDF_SECTIONS = 8000;
   const GEMINI_REQUEST_TIMEOUT_MS = 18000;
+  const SEMANTIC_QUERY_TIMEOUT_MS = 7000;
+  const SEMANTIC_INDEX_VERSION = 'gemini-embedding-001@768-r1';
+  const SEMANTIC_BATCH_SIZE = 24;
+  const SEMANTIC_DIMENSIONS = 768;
   let dbPromise = null;
   let progressTimer = null;
   let pdfJsPromise = null;
+  let semanticUpgradeRunning = false;
+  const semanticQueryCache = new Map();
 
   function clean(value, limit = 240) {
     return String(value == null ? '' : value).replace(/\u0000/g, '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, limit);
@@ -83,8 +90,54 @@
   function matchRetrievalGroups(haystack, groups) {
     return (Array.isArray(groups) ? groups : []).filter(group => group.variants.some(variant => haystack.includes(variant)));
   }
+  function normalizeEmbedding(values) {
+    const rows = (Array.isArray(values) ? values : []).map(Number).filter(Number.isFinite);
+    const norm = Math.sqrt(rows.reduce((sum, value) => sum + value * value, 0));
+    return norm > 0 ? rows.map(value => value / norm) : [];
+  }
+  function bytesToBase64(bytes) {
+    if (typeof root?.btoa === 'function') {
+      let binary = '';
+      for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+      return root.btoa(binary);
+    }
+    return typeof Buffer !== 'undefined' ? Buffer.from(bytes).toString('base64') : '';
+  }
+  function base64ToBytes(value) {
+    const encoded = String(value || '');
+    if (!encoded) return new Uint8Array(0);
+    if (typeof root?.atob === 'function') {
+      const binary = root.atob(encoded); const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+      return bytes;
+    }
+    return typeof Buffer !== 'undefined' ? new Uint8Array(Buffer.from(encoded, 'base64')) : new Uint8Array(0);
+  }
+  function encodeEmbedding(values) {
+    const normalized = normalizeEmbedding(values);
+    if (!normalized.length) return '';
+    const bytes = new Uint8Array(normalized.length);
+    normalized.forEach((value, index) => { bytes[index] = Math.max(1, Math.min(255, Math.round(value * 127) + 128)); });
+    return bytesToBase64(bytes);
+  }
+  function quantizedCosine(left, right) {
+    const a = base64ToBytes(left); const b = base64ToBytes(right);
+    if (!a.length || a.length !== b.length) return -1;
+    let dot = 0; let aNorm = 0; let bNorm = 0;
+    for (let index = 0; index < a.length; index += 1) {
+      const av = a[index] - 128; const bv = b[index] - 128;
+      dot += av * bv; aNorm += av * av; bNorm += bv * bv;
+    }
+    return aNorm && bNorm ? dot / Math.sqrt(aNorm * bNorm) : -1;
+  }
+  function semanticReady(section) {
+    return section?.semantic?.version === SEMANTIC_INDEX_VERSION && typeof section?.semantic?.vector === 'string' && !!section.semantic.vector;
+  }
   function knowledgeIntent(value) {
     return /\b(?:norma|ntp|iso|manual|pdf|documento|archivo|fuente|biblioteca|cap[ií]tulo|numeral|art[ií]culo|anexo|tabla|procedimiento|reglamento|ficha\s+t[eé]cnica)\b/i.test(String(value || ''));
+  }
+  function obviousBusinessIntent(value) {
+    return /\b(?:cliente|crm|agenda|visita|cita|mensaje|whatsapp|cobro|cobrar|deuda|balance|ingreso|gasto|movimiento|stock|cotizaci[oó]n|recordatorio|llamar|hoy|ma[ñn]ana|ayer)\b/i.test(String(value || ''));
   }
   function referenceLabel(value, fallback) {
     const candidate = clean(value, 240);
@@ -212,6 +265,85 @@
       throw error;
     } finally {
       if (timer) (root.clearTimeout || clearTimeout)(timer);
+    }
+  }
+  async function requestEmbeddings(texts, taskType, title, timeoutMs) {
+    const rows = (Array.isArray(texts) ? texts : []).map(value => clean(value, 4000)).filter(Boolean).slice(0, 24);
+    if (!rows.length) throw new Error('semantic_input_required');
+    const token = typeof root.gfcAccountFreshAccessToken === 'function' ? await root.gfcAccountFreshAccessToken() : '';
+    if (!token) throw new Error('session_required');
+    const { response, data } = await fetchJsonWithTimeout((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
+      body:JSON.stringify({ operation:'embed', texts:rows, taskType, title:clean(title, 240) })
+    }, timeoutMs || GEMINI_REQUEST_TIMEOUT_MS);
+    if (!response.ok) {
+      const error = new Error(response.status === 504 ? 'multimodal_request_timeout' : 'semantic_provider_unavailable');
+      error.status = response.status;
+      throw error;
+    }
+    const embeddings = Array.isArray(data?.embeddings) ? data.embeddings : [];
+    if (embeddings.length !== rows.length || embeddings.some(values => !Array.isArray(values) || values.length !== SEMANTIC_DIMENSIONS)) throw new Error('semantic_response_invalid');
+    return embeddings;
+  }
+  function lexicalEvidenceKey(row) { return String(row?.assetId || '') + '|' + String(row?.sectionId || ''); }
+  function semanticEvidence(assets, queryVector, lexicalRows, options) {
+    const lexical = new Map((Array.isArray(lexicalRows) ? lexicalRows : []).map(row => [lexicalEvidenceKey(row), row]));
+    const queryEncoded = encodeEmbedding(queryVector);
+    if (!queryEncoded) return [];
+    const candidates = [];
+    (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && asset.learningEnabled !== false).forEach(asset => {
+      (Array.isArray(asset.sections) ? asset.sections : []).forEach(section => {
+        if (!semanticReady(section)) return;
+        const key = String(asset.id || '') + '|' + String(section.id || '');
+        const lexicalRow = lexical.get(key);
+        const semanticScore = quantizedCosine(queryEncoded, section.semantic.vector);
+        const lexicalScore = lexicalRow ? Math.min(1, Number(lexicalRow.score || 0) / 24) : 0;
+        const hybridScore = semanticScore * 0.82 + lexicalScore * 0.18;
+        if (semanticScore < 0.18 && !lexicalRow) return;
+        candidates.push({
+          assetId:asset.id,
+          title:asset.title,
+          kind:asset.kind,
+          sourceHash:asset.sha256 || '',
+          sectionId:section.id || '',
+          sectionLabel:clean(section.label || 'Fragmento sin referencia', 240),
+          excerpt:String(section.text || '').slice(0, 1200),
+          hits:lexicalRow?.hits || [],
+          score:Math.round(hybridScore * 100),
+          semanticScore,
+          hybridScore
+        });
+      });
+    });
+    candidates.sort((a,b) => b.hybridScore - a.hybridScore || b.semanticScore - a.semanticScore);
+    const limit = Math.max(1, Math.min(20, Number(options?.limit) || 12));
+    const selected = []; const perAsset = new Map(); const pageKeys = new Set();
+    for (const row of candidates) {
+      const count = perAsset.get(String(row.assetId)) || 0;
+      const pageKey = String(row.assetId) + '|' + String(row.sectionLabel);
+      if (count >= 5 || pageKeys.has(pageKey) && count >= 3) continue;
+      selected.push(row); perAsset.set(String(row.assetId), count + 1); pageKeys.add(pageKey);
+      if (selected.length >= limit) break;
+    }
+    return selected;
+  }
+  async function semanticSearchApproved(assets, question, options) {
+    const approved = (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && asset.learningEnabled !== false);
+    const lexical = searchApproved(approved, question, { limit:36 });
+    if (!approved.some(asset => (asset.sections || []).some(semanticReady))) return { evidence:lexical, mode:'lexical' };
+    const key = normalize(question).slice(0, 1400);
+    let queryVector = semanticQueryCache.get(key);
+    try {
+      if (!queryVector) {
+        [queryVector] = await requestEmbeddings([question], 'RETRIEVAL_QUERY', '', SEMANTIC_QUERY_TIMEOUT_MS);
+        semanticQueryCache.set(key, queryVector);
+        while (semanticQueryCache.size > 40) semanticQueryCache.delete(semanticQueryCache.keys().next().value);
+      }
+      const evidence = semanticEvidence(approved, queryVector, lexical, options);
+      return { evidence:evidence.length ? evidence : lexical, mode:evidence.length ? 'semantic' : 'lexical' };
+    } catch (_) {
+      return { evidence:lexical, mode:'lexical_fallback' };
     }
   }
   function setChatProcess(phase, label) {
@@ -427,6 +559,55 @@
     }
     return created;
   }
+  async function indexSemanticAsset(id, onProgress) {
+    let asset = await get(id);
+    if (!asset) throw new Error('multimodal_asset_not_found');
+    const sections = Array.isArray(asset.sections) ? asset.sections.map(section => ({ ...section })) : [];
+    if (!sections.length) throw new Error('semantic_sections_required');
+    const pending = sections.map((section, index) => ({ section, index })).filter(row => !semanticReady(row.section));
+    if (!pending.length && asset.semanticIndex?.version === SEMANTIC_INDEX_VERSION) return { ok:true, cached:true, indexed:sections.length };
+    const total = sections.length;
+    let indexed = total - pending.length;
+    asset = { ...asset, semanticIndex:{ version:SEMANTIC_INDEX_VERSION, model:'gemini-embedding-001', dimensions:SEMANTIC_DIMENSIONS, status:'indexing', indexedSections:indexed, totalSections:total, updatedAt:Date.now() } };
+    await put(asset);
+    try {
+      for (let offset = 0; offset < pending.length; offset += SEMANTIC_BATCH_SIZE) {
+        const batch = pending.slice(offset, offset + SEMANTIC_BATCH_SIZE);
+        const vectors = await requestEmbeddings(batch.map(row => '[' + clean(row.section.label || 'Fragmento', 240) + ']\n' + String(row.section.text || '')), 'RETRIEVAL_DOCUMENT', asset.title, 22000);
+        batch.forEach((row, position) => {
+          sections[row.index] = { ...row.section, semantic:{ version:SEMANTIC_INDEX_VERSION, vector:encodeEmbedding(vectors[position]) } };
+        });
+        indexed += batch.length;
+        asset = { ...asset, sections, semanticIndex:{ ...asset.semanticIndex, status:'indexing', indexedSections:indexed, totalSections:total, updatedAt:Date.now() }, updatedAt:Date.now() };
+        const batchNumber = Math.floor(offset / SEMANTIC_BATCH_SIZE) + 1;
+        if (batchNumber % 4 === 0 || offset + batch.length >= pending.length) await put(asset);
+        if (typeof onProgress === 'function') onProgress({ indexed, total, fraction:indexed / Math.max(1, total) });
+      }
+      asset = { ...asset, sections, semanticIndex:{ ...asset.semanticIndex, status:'ready', indexedSections:total, totalSections:total, indexedAt:Date.now(), updatedAt:Date.now() }, updatedAt:Date.now() };
+      await put(asset);
+      return { ok:true, cached:false, indexed:total };
+    } catch (error) {
+      await put({ ...asset, sections, semanticIndex:{ ...asset.semanticIndex, status:indexed ? 'partial' : 'failed', indexedSections:indexed, totalSections:total, errorCode:clean(error?.message || 'semantic_index_failed', 80), updatedAt:Date.now() }, updatedAt:Date.now() });
+      throw error;
+    }
+  }
+  async function upgradeSemanticIndexesInBackground() {
+    if (semanticUpgradeRunning) return false;
+    semanticUpgradeRunning = true;
+    try {
+      const token = typeof root.gfcAccountFreshAccessToken === 'function' ? await root.gfcAccountFreshAccessToken() : '';
+      if (!token) return false;
+      const assets = await list();
+      const pending = assets.filter(asset => asset.status === 'approved' && asset.learningEnabled !== false && asset.sections?.length && asset.semanticIndex?.version !== SEMANTIC_INDEX_VERSION);
+      for (const asset of pending) {
+        try { await indexSemanticAsset(asset.id); } catch (_) { break; }
+      }
+      await render();
+      return true;
+    } finally {
+      semanticUpgradeRunning = false;
+    }
+  }
   async function analyze(id) {
     const asset = await get(id); if (!asset) throw new Error('multimodal_asset_not_found');
     if ((asset.status === 'analyzed_draft' || asset.status === 'approved') && asset.analysis?.text) {
@@ -592,10 +773,20 @@
     if (!selectedAssetId || !allowed.has(selectedAssetId)) return { ok:true, selectedAssetId:'', found:false, caveat:clean(parsed?.caveat || 'No fue posible identificar una fuente suficiente.', 400) };
     return { ...parseDirectedAnswer(raw), selectedAssetId };
   }
-  async function queryApprovedLibrary(assets, question) {
+  async function queryApprovedLibrary(assets, question, prepared) {
     const candidates = approvedPdfAssets(assets);
     if (!candidates.length) return { ok:false, code:'no_approved_pdf' };
-    const rankings = rankApprovedSources(candidates, question);
+    const preparedEvidence = Array.isArray(prepared?.evidence) ? prepared.evidence : [];
+    const rankings = rankApprovedSources(candidates, question).map(row => {
+      const semanticRows = preparedEvidence.filter(item => String(item.assetId) === String(row.asset.id));
+      if (!semanticRows.length) return row;
+      return {
+        ...row,
+        evidence:semanticRows,
+        coverage:Math.max(Number(row.coverage || 0), 0.86),
+        score:Math.max(Number(row.score || 0), Math.round(Number(semanticRows[0]?.hybridScore || 0.5) * 220))
+      };
+    }).sort((a,b) => b.score - a.score || String(a.asset.title || '').localeCompare(String(b.asset.title || ''), 'es-PE'));
     const explicitMatches = explicitSourceMatches(candidates, question);
     const deterministic = explicitMatches.length === 1
       ? rankings.find(row => String(row.asset.id) === String(explicitMatches[0].id)) || { asset:explicitMatches[0], evidence:searchApproved(explicitMatches, question, { limit:10 }) }
@@ -605,12 +796,22 @@
 
     if (deterministic?.asset) {
       setChatProcess('consulting', 'Revisando ' + clean(deterministic.asset.title, 54));
-      if (deterministic.asset.dataUrl) return queryApprovedSource(deterministic.asset, question);
       const evidence = deterministic.evidence?.length ? deterministic.evidence : searchApproved([deterministic.asset], question, { limit:12 });
       if (evidence.length) {
+        const queryKey = 'library-v4|' + normalize(question).slice(0, 1200);
+        const cached = (Array.isArray(deterministic.asset.queryCache) ? deterministic.asset.queryCache : []).find(item => item?.key === queryKey && item?.result?.ok);
+        if (cached) return { ok:true, cached:true, reply:formatDirectedAnswer(cached.result, deterministic.asset), result:cached.result, asset:deterministic.asset };
         const result = await askTutor(question, { assets:[deterministic.asset], evidence });
-        return result.ok ? { ok:true, reply:result.text, result, asset:deterministic.asset } : { ok:false, code:'library_provider_unavailable' };
+        if (!result.ok) return { ok:false, code:'library_provider_unavailable' };
+        const refreshed = await get(deterministic.asset.id) || deterministic.asset;
+        const parsed = result.result || null;
+        if (parsed?.ok) {
+          const queryCache = [...(Array.isArray(refreshed.queryCache) ? refreshed.queryCache : []).filter(item => item?.key !== queryKey), { key:queryKey, result:parsed, at:Date.now() }].slice(-60);
+          await put({ ...refreshed, queryCache });
+        }
+        return { ok:true, reply:result.text, result, asset:deterministic.asset };
       }
+      if (deterministic.asset.dataUrl) return queryApprovedSource(deterministic.asset, question);
       return { ok:false, code:'library_evidence_missing', candidates:[deterministic.asset] };
     }
 
@@ -640,7 +841,7 @@
     if (result.found && !quoteSupportedByAsset(result, selected)) {
       result = { ok:true, selectedAssetId:selected.id, found:false, answer:'', quote:'', reference:'', plain:'', caveat:'La cita recibida no coincide literalmente con el índice local de la fuente seleccionada.' };
     }
-    const queryKey = 'library-v3|' + normalize(question).slice(0, 1200);
+    const queryKey = 'library-v4|' + normalize(question).slice(0, 1200);
     const queryCache = [...(Array.isArray(selected.queryCache) ? selected.queryCache : []).filter(item => item?.key !== queryKey), { key:queryKey, result, at:Date.now() }].slice(-40);
     await put({ ...selected, queryCache });
     return { ok:true, reply:formatDirectedAnswer(result, selected), result, asset:selected };
@@ -660,7 +861,7 @@
     if (!parsed.ok || parsed.found && !quoteSupportedByEvidence(parsed, evidence)) {
       return { ok:true, text:formatDirectedAnswer({ found:false, caveat:'La respuesta recibida no pudo verificarse literalmente contra los fragmentos recuperados.' }, sourceAsset), evidence:[] };
     }
-    return { ok:true, text:formatDirectedAnswer(parsed, sourceAsset), evidence:evidence.map(row => ({ title:row.title, assetId:row.assetId, sectionLabel:row.sectionLabel })) };
+    return { ok:true, text:formatDirectedAnswer(parsed, sourceAsset), result:parsed, evidence:evidence.map(row => ({ title:row.title, assetId:row.assetId, sectionLabel:row.sectionLabel })) };
   }
   async function answerFromChat(question) {
     const text = clean(question, 1200);
@@ -673,11 +874,16 @@
     const terms = contentTokens(text);
     const minimumHits = terms.length > 1 ? 2 : 1;
     const strongMatch = evidence.some(row => Number(row.score || 0) >= minimumHits);
+    const semanticAvailable = assets.some(asset => asset.status === 'approved' && asset.learningEnabled !== false && (asset.sections || []).some(semanticReady));
     if (!evidence.length && explicit && terms.length === 0) evidence = firstApprovedEvidence(assets);
-    if (!explicit && !strongMatch) return { handled:false };
-    if (explicit || strongMatch) {
+    if (!explicit && !strongMatch && (!semanticAvailable || obviousBusinessIntent(text))) return { handled:false };
+    if (explicit || strongMatch || semanticAvailable) {
       try {
-        const libraryResult = await queryApprovedLibrary(assets, text);
+        setChatProcess('consulting', 'Interpretando el significado de tu pregunta');
+        const semantic = await semanticSearchApproved(assets, text, { limit:14 });
+        const semanticStrong = semantic.mode === 'semantic' && Number(semantic.evidence?.[0]?.semanticScore || -1) >= 0.48;
+        if (!explicit && !strongMatch && !semanticStrong) return { handled:false };
+        const libraryResult = await queryApprovedLibrary(assets, text, semantic);
         if (libraryResult.ok) {
           setChatProcess('writing', 'Ordenando la respuesta verificada');
           return { handled:true, reply:libraryResult.reply, directSource:true, cached:!!libraryResult.cached, sourceRouted:true };
@@ -718,7 +924,7 @@
       degraded:true
     };
   }
-  function statusText(error) { return ({ unsupported_multimodal_type:'Formato no compatible.', multimodal_file_too_large:'El archivo supera el límite local de 40 MB para audio, video o imagen.', multimodal_pdf_too_large:'El PDF supera el límite seguro de 120 MB para este dispositivo.', multimodal_pdf_page_limit:'El PDF supera 2.500 páginas y no se procesó para proteger la memoria del teléfono.', multimodal_pdf_index_limit:'El texto del PDF supera el límite seguro de indexación local.', multimodal_pdf_no_text:'El PDF no contiene texto extraíble. Puede ser un escaneo y necesita OCR.', multimodal_asset_limit:'La biblioteca local alcanzó 80 fuentes.', multimodal_storage_unavailable:'El almacenamiento local no está disponible.', extractor_required:'Este archivo necesita un extractor autorizado.' }[error?.message] || error?.message || 'No pude procesar la fuente.'); }
+  function statusText(error) { return ({ unsupported_multimodal_type:'Formato no compatible.', multimodal_file_too_large:'El archivo supera el límite local de 40 MB para audio, video o imagen.', multimodal_pdf_too_large:'El PDF supera el límite seguro de 120 MB para este dispositivo.', multimodal_pdf_page_limit:'El PDF supera 2.500 páginas y no se procesó para proteger la memoria del teléfono.', multimodal_pdf_index_limit:'El texto del PDF supera el límite seguro de indexación local.', multimodal_pdf_no_text:'El PDF no contiene texto extraíble. Puede ser un escaneo y necesita OCR.', multimodal_asset_limit:'La biblioteca local alcanzó 80 fuentes.', multimodal_storage_unavailable:'El almacenamiento local no está disponible.', extractor_required:'Este archivo necesita un extractor autorizado.', session_required:'Inicia sesión para crear el índice semántico.', semantic_provider_unavailable:'La comprensión semántica no está disponible ahora. El avance local permanece guardado.', semantic_response_invalid:'El proveedor devolvió un índice incompleto. No se usó.', semantic_sections_required:'Esta fuente aún no tiene fragmentos de texto para indexar.' }[error?.message] || error?.message || 'No pude procesar la fuente.'); }
   function progressTone(phase) {
     if (phase === 'error') return 'error';
     if (phase === 'complete' || phase === 'approved') return 'success';
@@ -771,12 +977,17 @@
     const statusTone = enabled ? 'approved' : asset.status === 'approved' ? 'paused' : 'pending';
     const analysis = asset.analysis?.text ? '<div class="gfc-mm-detail-copy"><b>Resumen revisable</b><p>' + escapeHtml(asset.analysis.text) + '</p>' + ((asset.analysis?.citations || []).length ? '<small>' + asset.analysis.citations.length + ' cita(s) extraída(s).</small>' : '') + '</div>' : '';
     const extraction = asset.extraction?.pages ? '<div class="gfc-mm-index-meta">' + Number(asset.extraction.pages) + ' páginas · ' + Number(asset.sections?.length || 0) + ' fragmentos indexados</div>' : '';
+    const semanticReadyState = asset.semanticIndex?.version === SEMANTIC_INDEX_VERSION && asset.semanticIndex?.status === 'ready';
+    const semantic = asset.sections?.length
+      ? '<div class="gfc-mm-index-meta">' + (semanticReadyState ? '🧠 Índice semántico listo · interpreta significado' : asset.semanticIndex?.status === 'partial' ? '🟠 Índice semántico parcial · puede reanudarse' : '⚪ Índice semántico pendiente') + '</div>'
+      : '';
     const primaryAction = asset.status === 'analyzed_draft'
       ? '<button class="gfc-mm-btn primary" onclick="gfcYarbiMultimodalApprove(\'' + id + '\')">Aprobar</button>'
       : asset.status === 'approved'
         ? '<button class="gfc-mm-btn" onclick="gfcYarbiMultimodalToggleLearning(\'' + id + '\',' + (!enabled) + ')">' + (enabled ? 'Pausar uso' : 'Volver a usar') + '</button>'
         : '<button class="gfc-mm-btn primary" onclick="gfcYarbiMultimodalAnalyze(\'' + id + '\')">Analizar</button>';
-    return '<article class="gfc-mm-card"><div class="gfc-mm-card-head"><span class="gfc-mm-kind">' + ({ text:'📝', pdf:'📕', image:'🖼️', audio:'🎙️', video:'🎬' }[asset.kind] || '📎') + '</span><div class="gfc-mm-file-main"><b title="' + escapeHtml(asset.title) + '">' + escapeHtml(asset.title) + '</b><small>' + kindLabel(asset.kind) + ' · ' + formatBytes(asset.bytes) + '</small></div><span class="gfc-mm-state ' + statusTone + '">' + escapeHtml(status) + '</span></div><div class="gfc-mm-actions">' + primaryAction + '<button class="gfc-mm-btn danger" onclick="gfcYarbiMultimodalDelete(\'' + id + '\')" aria-label="Borrar ' + escapeHtml(asset.title) + '">Borrar</button><details class="gfc-mm-more"><summary>Detalles</summary><div class="gfc-mm-details-body">' + extraction + analysis + '<small>SHA-256 ' + escapeHtml(String(asset.sha256 || '').slice(0, 16)) + '…</small></div></details></div></article>';
+    const semanticAction = asset.sections?.length && !semanticReadyState ? '<button class="gfc-mm-btn" onclick="gfcYarbiMultimodalSemanticIndex(\'' + id + '\')">Mejorar búsqueda</button>' : '';
+    return '<article class="gfc-mm-card"><div class="gfc-mm-card-head"><span class="gfc-mm-kind">' + ({ text:'📝', pdf:'📕', image:'🖼️', audio:'🎙️', video:'🎬' }[asset.kind] || '📎') + '</span><div class="gfc-mm-file-main"><b title="' + escapeHtml(asset.title) + '">' + escapeHtml(asset.title) + '</b><small>' + kindLabel(asset.kind) + ' · ' + formatBytes(asset.bytes) + '</small></div><span class="gfc-mm-state ' + statusTone + '">' + escapeHtml(status) + '</span></div>' + semantic + '<div class="gfc-mm-actions">' + primaryAction + semanticAction + '<button class="gfc-mm-btn danger" onclick="gfcYarbiMultimodalDelete(\'' + id + '\')" aria-label="Borrar ' + escapeHtml(asset.title) + '">Borrar</button><details class="gfc-mm-more"><summary>Detalles</summary><div class="gfc-mm-details-body">' + extraction + analysis + '<small>SHA-256 ' + escapeHtml(String(asset.sha256 || '').slice(0, 16)) + '…</small></div></details></div></article>';
   }
   async function render() { const target = root?.document?.getElementById('gfc-mm-list'); if (!target) return; try { const rows = await list(); target.innerHTML = rows.length ? rows.map(card).join('') : '<p>Aún no hay fuentes multimodales. Puedes cargar documentos, imágenes, audios o videos.</p>'; } catch (_) { target.innerHTML = '<p>No se pudo abrir la biblioteca local.</p>'; } }
   function setStatus(message, error) { const target = root?.document?.getElementById('gfc-mm-status'); if (target) { target.textContent = message; target.dataset.tone = error ? 'error' : 'normal'; } }
@@ -799,10 +1010,20 @@
         for (let index = 0; index < rows.length; index += 1) {
           const asset = rows[index];
           if (asset.status === 'blocked') { pending += 1; continue; }
+          let sourcePending = false;
+          if (asset.sections?.length) {
+            try {
+              await indexSemanticAsset(asset.id, state => {
+                const sourceProgress = (index + Number(state?.fraction || 0) * 0.55) / Math.max(1, rows.length);
+                setProgress(72 + sourceProgress * 16, 'Comprendiendo significado', 'Fragmento ' + state.indexed + ' de ' + state.total + ' · ' + clean(asset.title, 80), 'working');
+              });
+            } catch (_) { sourcePending = true; }
+          }
           startEstimatedAnalysis(asset.title, 24 + Math.round(index / Math.max(1, rows.length) * 24));
           const result = await analyze(asset.id);
           clearProgressTimer();
-          if (result.ok) analyzed += 1; else pending += 1;
+          if (result.ok) analyzed += 1; else sourcePending = true;
+          if (sourcePending) pending += 1;
         }
         await render();
         if (pending) {
@@ -835,6 +1056,24 @@
       await render(); return result;
     } catch (error) { clearProgressTimer(); setProgress(0, 'Análisis interrumpido', statusText(error), 'error'); setStatus(statusText(error), true); return { ok:false, message:statusText(error) }; }
   }
+  async function semanticIndexFromUi(id) {
+    const asset = await get(id).catch(() => null);
+    if (!asset) return { ok:false };
+    setProgress(1, 'Preparando comprensión semántica', clean(asset.title, 90), 'working');
+    setStatus('Yarbi convertirá cada fragmento en un índice de significado. Este proceso se realiza una vez.', false);
+    try {
+      const result = await indexSemanticAsset(id, state => setProgress(Math.max(2, Number(state?.fraction || 0) * 100), 'Comprendiendo significado', 'Fragmento ' + state.indexed + ' de ' + state.total, 'working'));
+      setProgress(100, result.cached ? 'Índice ya disponible' : 'Índice semántico listo', result.indexed + ' fragmentos preparados para consultas por significado.', 'complete');
+      setStatus('Yarbi ya puede encontrar ideas equivalentes aunque uses palabras diferentes.', false);
+      await render();
+      return result;
+    } catch (error) {
+      setProgress(0, 'Índice incompleto', statusText(error), 'error');
+      setStatus('El avance quedó guardado y puede reanudarse. ' + statusText(error), true);
+      await render();
+      return { ok:false, message:statusText(error) };
+    }
+  }
   async function approveFromUi(id) { try { setProgress(92, 'Guardando aprobación', 'Vinculando la revisión a esta fuente.', 'working'); await approve(id); setProgress(100, 'Fuente aprobada', 'Disponible para respuestas del tutor con citas verificables.', 'approved'); setStatus('Fuente aprobada para tutoría. No modifica CRM ni instrucciones permanentes.'); } catch (error) { setProgress(0, 'No se aprobó', statusText(error), 'error'); setStatus(statusText(error), true); } }
   async function toggleLearningFromUi(id, enabled) {
     try {
@@ -853,7 +1092,7 @@
     return true;
   }
   async function askTutorFromUi() { const input = root.document.getElementById('gfc-mm-tutor-question'); const out = root.document.getElementById('gfc-mm-tutor-answer'); if (!out) return; out.textContent = 'El tutor está preparando una explicación…'; try { const result = await askTutor(input?.value || ''); out.textContent = result.ok ? result.text : (result.message || 'No pude responder sin inventar información.'); } catch (error) { out.textContent = statusText(error); } }
-  function html() { return '<main class="gfc-yarbi-tool-page gfc-mm-page"><section class="gfc-mm-hero"><span>📚</span><div><h2>Conocimiento y Tutor</h2><p>Selecciona una fuente, observa su procesamiento y decide cuándo puede usarla Yarbi.</p></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Procesar</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div><label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>PDF de hasta 120 MB: Yarbi los indexa por páginas en el teléfono. Los PDF escaneados sin texto requieren OCR.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div><section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section><div id="gfc-mm-status" class="gfc-yarbi-import-summary">Tus fuentes aprobadas quedan indexadas localmente para responder rápido. La aprobación es obligatoria antes de usarlas como conocimiento. No se ejecutan acciones comerciales durante este proceso.</div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">🎓 Preguntar al Tutor</div><div class="gfc-yarbi-tool-copy">Yarbi responde primero de forma breve y muestra una sola cita literal con su capítulo, numeral o página. Si falta evidencia, se abstiene.</div><textarea id="gfc-mm-tutor-question" rows="4" placeholder="Ejemplo: ¿Qué exige esta norma y qué significa en palabras sencillas?"></textarea><button class="gfc-yarbi-primary" onclick="gfcYarbiTutorAsk()">Preguntar al tutor</button><article id="gfc-mm-tutor-answer" class="gfc-mm-tutor-answer">Aquí aparecerá una explicación respaldada por tus fuentes aprobadas.</article></section></main>'; }
-  function attach() { void render(); }
-  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, buildAsset, importFiles, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS });
+  function html() { return '<main class="gfc-yarbi-tool-page gfc-mm-page"><section class="gfc-mm-hero"><span>📚</span><div><h2>Conocimiento y Tutor</h2><p>Yarbi procesa cada fuente una vez y luego busca por significado, no solo por palabras.</p></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Comprender</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div><label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>PDF de hasta 120 MB: Yarbi extrae páginas y crea un índice semántico persistente. Los PDF escaneados sin texto requieren OCR.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div><section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section><div id="gfc-mm-status" class="gfc-yarbi-import-summary">El índice semántico queda en este teléfono para consultas rápidas. La aprobación es obligatoria antes de usar una fuente y no se ejecutan acciones comerciales durante el procesamiento.</div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">🎓 Preguntar al Tutor</div><div class="gfc-yarbi-tool-copy">Pregunta con tus propias palabras. Yarbi interpreta la intención, responde primero de forma breve y muestra la cita con capítulo, numeral o página.</div><textarea id="gfc-mm-tutor-question" rows="3" placeholder="Ejemplo: ¿Puedo usar una sola llave para alimentar dos equipos?"></textarea><button class="gfc-yarbi-primary" onclick="gfcYarbiTutorAsk()">Preguntar al tutor</button><article id="gfc-mm-tutor-answer" class="gfc-mm-tutor-answer">Aquí aparecerá una explicación respaldada por tus fuentes aprobadas.</article></section></main>'; }
+  function attach() { void render(); if (root?.setTimeout) root.setTimeout(() => { void upgradeSemanticIndexesInBackground(); }, 900); }
+  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
 }));

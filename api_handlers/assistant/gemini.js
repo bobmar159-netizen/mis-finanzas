@@ -8,8 +8,13 @@ const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || process.env.GEMINI_CHAT_MODEL || 'gemini-3.5-flash-lite';
+const GEMINI_EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001';
 const MAX_TEXT = 16000;
 const MAX_INLINE_BYTES = 3 * 1024 * 1024;
+const MAX_EMBED_INPUTS = 24;
+const MAX_EMBED_TEXT = 4000;
+const MAX_EMBED_TOTAL_TEXT = 64000;
+const EMBEDDING_DIMENSIONS = 768;
 const GEMINI_TIMEOUT_MS = Math.max(3000, Math.min(25000, Number(process.env.GEMINI_REQUEST_TIMEOUT_MS) || 17000));
 
 function cors(res) {
@@ -51,6 +56,34 @@ function generationConfig(value) {
   if (source.responseMimeType === 'application/json') result.responseMimeType = 'application/json';
   return result;
 }
+function sanitizeEmbeddingRequest(input) {
+  if (input?.operation !== 'embed') return null;
+  const taskType = ['RETRIEVAL_DOCUMENT', 'RETRIEVAL_QUERY', 'QUESTION_ANSWERING', 'FACT_VERIFICATION'].includes(String(input.taskType || ''))
+    ? String(input.taskType)
+    : 'RETRIEVAL_QUERY';
+  const texts = (Array.isArray(input.texts) ? input.texts : [])
+    .slice(0, MAX_EMBED_INPUTS)
+    .map(value => text(value, MAX_EMBED_TEXT).trim())
+    .filter(Boolean);
+  if (!texts.length || texts.reduce((sum, value) => sum + value.length, 0) > MAX_EMBED_TOTAL_TEXT) return null;
+  return {
+    taskType,
+    texts,
+    title: taskType === 'RETRIEVAL_DOCUMENT' ? text(input.title, 240).trim() : '',
+    outputDimensionality: EMBEDDING_DIMENSIONS
+  };
+}
+async function fetchWithTimeout(url, body) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+  try {
+    return await fetch(url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 module.exports = async function geminiHandler(req, res) {
   cors(res);
@@ -63,22 +96,44 @@ module.exports = async function geminiHandler(req, res) {
   if (!identity.ok) return res.status(identity.status).json({ error: identity.code });
   try {
     const input = bodyOf(req);
+    if (input.operation === 'embed') {
+      const embedding = sanitizeEmbeddingRequest(input);
+      if (!embedding) return res.status(400).json({ error: 'embedding_request_invalid' });
+      const modelName = `models/${GEMINI_EMBEDDING_MODEL}`;
+      const requests = embedding.texts.map(value => ({
+        model: modelName,
+        content: { parts: [{ text: value }] },
+        taskType: embedding.taskType,
+        ...(embedding.title ? { title: embedding.title } : {}),
+        outputDimensionality: embedding.outputDimensionality
+      }));
+      const response = await fetchWithTimeout(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_EMBEDDING_MODEL)}:batchEmbedContents?key=${encodeURIComponent(GEMINI_KEY)}`,
+        { requests }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        console.error('[ASSISTANT GEMINI EMBEDDINGS]', JSON.stringify({ status: response.status, category: 'provider_rejected' }));
+        return res.status(502).json({ error: 'embedding_unavailable', provider_status: response.status });
+      }
+      const embeddings = (Array.isArray(data.embeddings) ? data.embeddings : []).map(item =>
+        (Array.isArray(item?.values) ? item.values : []).map(Number).filter(Number.isFinite)
+      );
+      if (embeddings.length !== requests.length || embeddings.some(values => values.length !== EMBEDDING_DIMENSIONS)) {
+        return res.status(502).json({ error: 'embedding_response_invalid' });
+      }
+      return res.status(200).json({ embeddings, model: GEMINI_EMBEDDING_MODEL, dimensions: EMBEDDING_DIMENSIONS });
+    }
     const contents = sanitizeContents(input.contents);
     if (!contents) return res.status(400).json({ error: 'gemini_request_invalid' });
     const request = { contents, generationConfig: generationConfig(input.generationConfig) };
     const systemInstruction = input.system_instruction || input.systemInstruction;
     const systemParts = Array.isArray(systemInstruction?.parts) ? systemInstruction.parts.map(sanitizePart).filter(Boolean).slice(0, 4) : [];
     if (systemParts.length) request.system_instruction = { parts: systemParts };
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
-    let response;
-    try {
-      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request), signal: controller.signal
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
+    const response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`,
+      request
+    );
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       console.error('[ASSISTANT GEMINI PROXY]', JSON.stringify({ status: response.status, category: 'provider_rejected' }));
@@ -97,3 +152,4 @@ module.exports = async function geminiHandler(req, res) {
 
 module.exports.sanitizeContents = sanitizeContents;
 module.exports.generationConfig = generationConfig;
+module.exports.sanitizeEmbeddingRequest = sanitizeEmbeddingRequest;
