@@ -116,10 +116,42 @@
     }).filter(Boolean).slice(0, 80);
     return { summary:clean(parsed?.summary || '', 12000), citations };
   }
+  function parseDirectedAnswer(value) {
+    const raw = String(value || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (_) { return { ok:false, found:false }; }
+    const answer = clean(parsed?.answer, 900);
+    const quote = clean(parsed?.exact_quote, 900);
+    const reference = clean(parsed?.reference, 240);
+    const plain = clean(parsed?.plain_explanation, 900);
+    const caveat = clean(parsed?.caveat, 400);
+    const found = parsed?.found === true && !!quote && !!reference;
+    return { ok:true, found, answer, quote, reference, plain, caveat };
+  }
+  function formatDirectedAnswer(result, asset) {
+    const title = clean(asset?.title || 'Fuente aprobada', 140);
+    if (!result?.found) {
+      return '## 🔎 No encontré esa regla en la fuente\n\nBusqué la consulta directamente en **' + title + '** y no encontré un fragmento que la respalde de forma literal.\n\n' + (result?.caveat ? result.caveat + '\n\n' : '') + 'No concluiré que está permitido o prohibido sin una cita verificable.';
+    }
+    return '## ✅ Respuesta directa\n\n' + (result.answer ? '**' + result.answer + '**\n\n' : '')
+      + '### 📖 Qué dice la fuente\n\n> ' + result.quote + '\n\n'
+      + '**Ubicación:** ' + result.reference + '\n\n'
+      + (result.plain ? '### 💡 En palabras sencillas\n\n' + result.plain + '\n\n' : '')
+      + (result.caveat ? '⚠️ **Importante:** ' + result.caveat + '\n\n' : '')
+      + '_Fuente aprobada: ' + title + ' · SHA-256 ' + clean(String(asset?.sha256 || '').slice(0, 12)) + '…_';
+  }
   function citationMarkdown(evidence) {
-    return (Array.isArray(evidence) ? evidence : []).slice(0, 4).map(row =>
-      '### ' + clean(row.title, 140) + '\n\n**Referencia:** ' + clean(row.sectionLabel || 'Fragmento sin referencia', 240) + '\n\n> ' + clean(row.excerpt, 800) + '\n\n_Fuente aprobada · SHA-256 ' + clean(String(row.sourceHash || '').slice(0, 12)) + '…_'
+    return (Array.isArray(evidence) ? evidence : []).slice(0, 3).map(row =>
+      '### ' + clean(row.title, 140) + '\n\n**Referencia:** ' + clean(row.sectionLabel || 'Fragmento sin referencia', 240) + '\n\n> ' + clean(row.excerpt, 360) + '\n\n_Fuente aprobada · SHA-256 ' + clean(String(row.sourceHash || '').slice(0, 12)) + '…_'
     ).join('\n\n');
+  }
+  function citationListMarkdown(evidence) {
+    const seen = new Set();
+    return (Array.isArray(evidence) ? evidence : []).filter(row => {
+      const key = String(row.assetId || '') + '|' + String(row.sectionLabel || '');
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    }).slice(0, 3).map(row => '- **' + clean(row.title, 140) + '** — ' + clean(row.sectionLabel || 'Referencia no localizada', 240)).join('\n');
   }
   function localUnavailableReply() {
     return 'No puedo analizar esa fuente sin el servicio de comprensión configurado. La dejé guardada localmente como pendiente; no inventé su contenido ni la marqué como aprendida.';
@@ -219,15 +251,55 @@
     await render(); return { ok:true, assetId:asset.id, analysis };
   }
   async function approve(id) { const asset = await get(id); if (!asset || !asset.analysis?.text) throw new Error('multimodal_analysis_required'); await put({ ...asset, status:'approved', updatedAt:Date.now(), analysis:{ ...asset.analysis, reviewed:true, approvedAt:Date.now() } }); await render(); return true; }
+  function selectApprovedDirectAsset(assets, evidence, question) {
+    const candidates = (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && asset.kind === 'pdf' && asset.dataUrl);
+    if (candidates.length === 1) return candidates[0];
+    const evidenceIds = [...new Set((Array.isArray(evidence) ? evidence : []).map(row => String(row.assetId || '')).filter(Boolean))];
+    if (evidenceIds.length === 1) return candidates.find(asset => String(asset.id) === evidenceIds[0]) || null;
+    const terms = contentTokens(question);
+    const titleMatches = candidates.filter(asset => {
+      const title = normalize(asset.title);
+      return terms.some(term => title.includes(term));
+    });
+    return titleMatches.length === 1 ? titleMatches[0] : null;
+  }
+  async function queryApprovedSource(asset, question) {
+    if (!asset?.dataUrl || asset.status !== 'approved') return { ok:false, code:'approved_source_binary_unavailable' };
+    const queryKey = normalize(question).slice(0, 1200);
+    const cached = (Array.isArray(asset.queryCache) ? asset.queryCache : []).find(item => item?.key === queryKey && item?.result?.ok);
+    if (cached) return { ok:true, cached:true, reply:formatDirectedAnswer(cached.result, asset), result:cached.result };
+    const token = typeof root.gfcAccountFreshAccessToken === 'function' ? await root.gfcAccountFreshAccessToken() : '';
+    if (!token) return { ok:false, code:'session_required' };
+    const instruction = 'Busca la respuesta exclusivamente dentro del PDF adjunto. La consulta puede usar sinónimos o describir una configuración técnica sin repetir el vocabulario exacto. Revisa todo el documento antes de responder. Devuelve SOLO JSON válido con esta forma: {"found":true|false,"answer":"respuesta directa y breve","exact_quote":"cita literal que sustenta exactamente la respuesta","reference":"norma, capítulo, numeral, artículo o página visible","plain_explanation":"significado sencillo en máximo 80 palabras","caveat":"condición, excepción o dato faltante"}. Usa found=true únicamente si la cita literal responde la consulta. Si el PDF no lo dice, usa found=false y explica brevemente qué término o condición podría faltar. No uses conocimiento general, no inventes numerales ni concluyas que algo está permitido por ausencia de prohibición.';
+    const response = await root.fetch((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
+      body:JSON.stringify({
+        system_instruction:{ parts:[{ text:'Eres el buscador técnico de la biblioteca aprobada de Yarbi. Prioriza exactitud y brevedad. No ejecutas acciones comerciales ni modificas la fuente.' }] },
+        contents:[{ role:'user', parts:[
+          { text:instruction + '\n\nCONSULTA:\n' + clean(question, 1200) },
+          { inline_data:{ mime_type:asset.mime || 'application/pdf', data:asset.dataUrl.split(',')[1] || '' } }
+        ] }],
+        generationConfig:{ temperature:0.1, maxOutputTokens:1000, responseMimeType:'application/json' }
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { ok:false, code:'direct_source_provider_unavailable' };
+    const result = parseDirectedAnswer(responseText(data));
+    if (!result.ok) return { ok:false, code:'direct_source_invalid_response' };
+    const queryCache = [...(Array.isArray(asset.queryCache) ? asset.queryCache : []).filter(item => item?.key !== queryKey), { key:queryKey, result, at:Date.now() }].slice(-40);
+    await put({ ...asset, queryCache });
+    return { ok:true, cached:false, reply:formatDirectedAnswer(result, asset), result };
+  }
   async function askTutor(question, prepared) {
     const text = clean(question, 1200); if (!text) throw new Error('tutor_question_required');
     const assets = Array.isArray(prepared?.assets) ? prepared.assets : await list();
     const evidence = Array.isArray(prepared?.evidence) ? prepared.evidence : searchApproved(assets, text);
-    const citations = citationMarkdown(evidence); const context = evidence.map(row => '[' + row.title + ' · ' + row.sectionLabel + '] ' + row.excerpt).join('\n');
+    const citations = citationListMarkdown(evidence); const context = evidence.map(row => '[' + row.title + ' · ' + row.sectionLabel + '] ' + row.excerpt).join('\n');
     const token = typeof root.gfcAccountFreshAccessToken === 'function' ? await root.gfcAccountFreshAccessToken() : '';
     if (!token) return { ok:false, message:'Inicia sesión para usar el tutor. Tus fuentes aprobadas siguen guardadas localmente.' };
     if (!evidence.length) return { ok:false, message:'No encontré una cita aprobada que respalde esta respuesta. No inventaré una referencia técnica; carga y aprueba la norma primero.' };
-    const response = await root.fetch((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token }, body:JSON.stringify({ system_instruction:{ parts:[{ text:'Eres el Tutor personal de Yarbi. Explica exclusivamente con la evidencia aprobada proporcionada. Usa títulos, pasos y checks. Separa: 1) qué dice textualmente la fuente, 2) qué significa en palabras sencillas, 3) límites o datos faltantes. No cites capítulo, numeral, página ni norma que no figure exactamente en la evidencia. Nunca ejecutes acciones ni guardes aprendizajes automáticamente.' }] }, contents:[{ role:'user', parts:[{ text:'Pregunta del propietario:\n' + text + '\n\nEvidencia aprobada disponible:\n' + context }] }], generationConfig:{ temperature:0.35, maxOutputTokens:2048 } }) });
+    const response = await root.fetch((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token }, body:JSON.stringify({ system_instruction:{ parts:[{ text:'Eres el Tutor personal de Yarbi. Explica exclusivamente con la evidencia aprobada proporcionada. Responde primero la conclusión y usa máximo 180 palabras. Separa solo si ayuda: 1) qué dice la fuente, 2) qué significa en palabras sencillas, 3) límite o dato faltante. No cites capítulo, numeral, página ni norma que no figure exactamente en la evidencia. Nunca ejecutes acciones ni guardes aprendizajes automáticamente.' }] }, contents:[{ role:'user', parts:[{ text:'Pregunta del propietario:\n' + text + '\n\nEvidencia aprobada disponible:\n' + context }] }], generationConfig:{ temperature:0.2, maxOutputTokens:900 } }) });
     const data = await response.json().catch(() => ({})); if (!response.ok) return { ok:false, message:'El tutor no está disponible ahora. No inventé una explicación.' };
     return { ok:true, text:responseText(data) + '\n\n---\n\n## Referencias verificadas\n\n' + citations, evidence:evidence.map(row => ({ title:row.title, assetId:row.assetId, sectionLabel:row.sectionLabel })) };
   }
@@ -244,6 +316,19 @@
     const strongMatch = evidence.some(row => Number(row.score || 0) >= minimumHits);
     if (!evidence.length && explicit && terms.length === 0) evidence = firstApprovedEvidence(assets);
     if (!explicit && !strongMatch) return { handled:false };
+    if (explicit) {
+      const directAsset = selectApprovedDirectAsset(assets, evidence, text);
+      if (directAsset) {
+        const directed = await queryApprovedSource(directAsset, text);
+        if (directed.ok) return { handled:true, reply:directed.reply, directSource:true, cached:!!directed.cached };
+        return { handled:true, reply:'## ⚠️ No pude revisar el PDF completo\n\nLa fuente aprobada está guardada, pero la búsqueda dirigida no terminó ahora. No mostraré fragmentos generales como si respondieran tu consulta. Inténtalo nuevamente cuando la conexión de Yarbi esté disponible.' };
+      }
+      const approvedPdfCount = assets.filter(asset => asset.status === 'approved' && asset.kind === 'pdf' && asset.dataUrl).length;
+      if (approvedPdfCount > 1) {
+        const names = assets.filter(asset => asset.status === 'approved' && asset.kind === 'pdf' && asset.dataUrl).slice(0, 4).map(asset => '**' + clean(asset.title, 100) + '**').join(', ');
+        return { handled:true, reply:'## 📚 ¿En cuál norma busco?\n\nTienes varias fuentes aprobadas: ' + names + '. Dime el nombre de la norma o el archivo para buscar la cita exacta sin mezclar documentos.' };
+      }
+    }
     if (!evidence.length) {
       const approved = assets.filter(asset => asset.status === 'approved');
       if (explicit && approved.length > 1) {
@@ -373,5 +458,5 @@
   async function askTutorFromUi() { const input = root.document.getElementById('gfc-mm-tutor-question'); const out = root.document.getElementById('gfc-mm-tutor-answer'); if (!out) return; out.textContent = 'El tutor está preparando una explicación…'; try { const result = await askTutor(input?.value || ''); out.textContent = result.ok ? result.text : (result.message || 'No pude responder sin inventar información.'); } catch (error) { out.textContent = statusText(error); } }
   function html() { return '<main class="gfc-yarbi-tool-page gfc-mm-page"><section class="gfc-mm-hero"><span>📚</span><div><h2>Conocimiento y Tutor</h2><p>Selecciona una fuente, observa su procesamiento y decide cuándo puede usarla Yarbi.</p></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Procesar</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div><label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>Abre el explorador de Android: Recientes, Descargas, almacenamiento y proveedores como Drive.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div><section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section><div id="gfc-mm-status" class="gfc-yarbi-import-summary">Tus fuentes aprobadas quedan indexadas localmente para responder rápido. La aprobación es obligatoria antes de usarlas como conocimiento. No se ejecutan acciones comerciales durante este proceso.</div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">🎓 Preguntar al Tutor</div><div class="gfc-yarbi-tool-copy">Yarbi responde con la cita disponible, la referencia visible y una explicación sencilla. Si falta evidencia, se abstiene.</div><textarea id="gfc-mm-tutor-question" rows="4" placeholder="Ejemplo: ¿Qué exige esta norma y qué significa en palabras sencillas?"></textarea><button class="gfc-yarbi-primary" onclick="gfcYarbiTutorAsk()">Preguntar al tutor</button><article id="gfc-mm-tutor-answer" class="gfc-mm-tutor-answer">Aquí aparecerá una explicación respaldada por tus fuentes aprobadas.</article></section></main>'; }
   function attach() { void render(); }
-  return Object.freeze({ classifyFile, normalize, contentTokens, knowledgeIntent, sectionsFromText, searchApproved, firstApprovedEvidence, responseText, parseStructuredAnalysis, citationMarkdown, buildAsset, importFiles, list, analyze, approve, askTutor, answerFromChat, html, attach, render, analyzeFromUi, approveFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, MAX_INLINE_BYTES });
+  return Object.freeze({ classifyFile, normalize, contentTokens, knowledgeIntent, sectionsFromText, searchApproved, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, formatDirectedAnswer, citationMarkdown, citationListMarkdown, selectApprovedDirectAsset, queryApprovedSource, buildAsset, importFiles, list, analyze, approve, askTutor, answerFromChat, html, attach, render, analyzeFromUi, approveFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, MAX_INLINE_BYTES });
 }));

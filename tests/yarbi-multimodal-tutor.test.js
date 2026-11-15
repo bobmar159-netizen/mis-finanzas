@@ -42,6 +42,23 @@ test('BKE multimodal: una extracción estructurada no inventa referencia cuando 
   assert.equal(result.citations[0].label, 'Fragmento extraído 1');
 });
 
+test('BKE multimodal: la búsqueda dirigida exige cita y ubicación antes de afirmar que encontró la regla', () => {
+  const found = api.parseDirectedAnswer('{"found":true,"answer":"Se admite bajo condiciones.","exact_quote":"La válvula podrá alimentar dos artefactos.","reference":"Numeral 7.3","plain_explanation":"Debe cumplirse la condición indicada.","caveat":"Verificar capacidad."}');
+  const unsafe = api.parseDirectedAnswer('{"found":true,"answer":"Sí.","exact_quote":"","reference":"","plain_explanation":"","caveat":""}');
+  assert.equal(found.found, true);
+  assert.equal(unsafe.found, false);
+  assert.match(api.formatDirectedAnswer(found, { title:'Norma técnica.pdf', sha256:'d'.repeat(64) }), /Numeral 7\.3/);
+  assert.match(api.formatDirectedAnswer(unsafe, { title:'Norma técnica.pdf' }), /No encontré esa regla/);
+});
+
+test('BKE multimodal: selecciona el PDF aprobado sin mezclar varias normas', () => {
+  const one = { id:'pdf-a', title:'Norma A', kind:'pdf', status:'approved', dataUrl:'data:application/pdf;base64,QQ==' };
+  const other = { id:'pdf-b', title:'Norma B', kind:'pdf', status:'approved', dataUrl:'data:application/pdf;base64,Qg==' };
+  assert.equal(api.selectApprovedDirectAsset([one], [], 'válvula para artefactos').id, 'pdf-a');
+  assert.equal(api.selectApprovedDirectAsset([one, other], [{ assetId:'pdf-b' }], 'según la norma').id, 'pdf-b');
+  assert.equal(api.selectApprovedDirectAsset([one, other], [], 'según la norma'), null);
+});
+
 test('BKE multimodal: solo usa fuentes aprobadas como evidencia del tutor', () => {
   const results = api.searchApproved([
     { id:'ok', title:'Manual de visitas', kind:'pdf', status:'approved', sections:[{ text:'Confirmar la visita y explicar los pasos.' }] },
@@ -64,6 +81,10 @@ test('BKE multimodal: el chat principal consulta la misma biblioteca aprobada', 
   assert.match(source, /No usaré su contenido como conocimiento definitivo/);
   assert.match(index, /window\.gfcYarbiMultimodalAnswer/);
   assert.match(index, /const multimodalKnowledgeReply/);
+  assert.match(source, /Busca la respuesta exclusivamente dentro del PDF adjunto/);
+  assert.match(source, /responseMimeType:'application\/json'/);
+  assert.match(source, /queryCache/);
+  assert.match(source, /máximo 180 palabras/);
 });
 
 test('BKE multimodal: el resultado analizado queda indexado y no obliga a reprocesar la fuente', () => {
