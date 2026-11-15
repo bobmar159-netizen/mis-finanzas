@@ -20972,22 +20972,10 @@ async function gfcSendCopilotChatMessage(promptText) {
   }
   if (typeof window.gfcClearYarbiConversationDraft === 'function') window.gfcClearYarbiConversationDraft();
 
-  // Solo una solicitud explícita a la biblioteca usa citas locales aprobadas.
-  // No requieren Gemini ni activan ninguna acción comercial.
+  // La biblioteca multimodal es la fuente canónica para PDF y normas. Debe
+  // ejecutarse antes que la biblioteca textual heredada para que una consulta
+  // documental no quede interceptada por el buscador literal antiguo.
   gfcYarbiSetProcessStatus('consulting', 'Consultando información verificada');
-  const knowledgeReply = typeof window.gfcYarbiKnowledgeAnswer === 'function'
-    ? await window.gfcYarbiKnowledgeAnswer(text)
-    : null;
-  if (knowledgeReply?.handled) {
-    await gfcAppendCopilotChatMessage('assistant', knowledgeReply.reply);
-    if (window._gfcMascot) window._gfcMascot.setState('reposo', knowledgeReply.reply);
-    gfcSpeakText(knowledgeReply.reply);
-    return;
-  }
-
-  // Los PDF, documentos, imágenes, audios y videos aprobados viven en la
-  // biblioteca multimodal. El mismo cerebro del chat los consulta aquí; no se
-  // crea un tutor paralelo ni se vuelve a procesar el archivo en cada pregunta.
   let multimodalKnowledgeReply = null;
   if (typeof window.gfcYarbiMultimodalAnswer === 'function') {
     try {
@@ -21004,6 +20992,19 @@ async function gfcSendCopilotChatMessage(promptText) {
     await gfcAppendCopilotChatMessage('assistant', multimodalKnowledgeReply.reply);
     if (window._gfcMascot) window._gfcMascot.setState('reposo', multimodalKnowledgeReply.reply);
     gfcSpeakText(multimodalKnowledgeReply.reply);
+    return;
+  }
+
+  // La biblioteca textual heredada queda como respaldo para fuentes de texto
+  // creadas antes del tutor multimodal. No requiere Gemini ni activa acciones
+  // comerciales, pero nunca debe desplazar una fuente PDF aprobada.
+  const knowledgeReply = typeof window.gfcYarbiKnowledgeAnswer === 'function'
+    ? await window.gfcYarbiKnowledgeAnswer(text)
+    : null;
+  if (knowledgeReply?.handled) {
+    await gfcAppendCopilotChatMessage('assistant', knowledgeReply.reply);
+    if (window._gfcMascot) window._gfcMascot.setState('reposo', knowledgeReply.reply);
+    gfcSpeakText(knowledgeReply.reply);
     return;
   }
 

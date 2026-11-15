@@ -257,6 +257,7 @@ test('BKE multimodal: el chat principal consulta la misma biblioteca aprobada', 
   assert.match(source, /No usaré su contenido como conocimiento definitivo/);
   assert.match(index, /window\.gfcYarbiMultimodalAnswer/);
   assert.match(index, /let multimodalKnowledgeReply = null/);
+  assert.ok(index.indexOf('let multimodalKnowledgeReply = null') < index.indexOf('const knowledgeReply = typeof window.gfcYarbiKnowledgeAnswer'), 'la biblioteca PDF debe preceder a la biblioteca textual heredada');
   assert.match(index, /multimodal-knowledge-error/);
   assert.match(source, /Busca la respuesta exclusivamente dentro del PDF adjunto/);
   assert.match(source, /responseMimeType:'application\/json'/);
@@ -269,6 +270,18 @@ test('BKE multimodal: el chat principal consulta la misma biblioteca aprobada', 
   assert.match(source, /fetchJsonWithTimeout/);
   assert.match(source, /conclusión directa en máximo 45 palabras/);
   assert.match(source, /explicación sencilla en máximo 55 palabras/);
+});
+
+test('BKE multimodal: explica el estado real del PDF sin pedir borrarlo o recargarlo', () => {
+  const draft = api.libraryAvailabilityReply([{ kind:'pdf', status:'analyzed_draft', title:'NTP 111.011.pdf' }]);
+  assert.match(draft, /falta aprobarlos/i);
+  assert.match(draft, /No los borres ni los vuelvas a cargar/i);
+  const pending = api.libraryAvailabilityReply([{ kind:'pdf', status:'local_ready', title:'Manual.pdf' }]);
+  assert.match(pending, /pulsa \*\*Analizar\*\*/);
+  const paused = api.libraryAvailabilityReply([{ kind:'pdf', status:'approved', learningEnabled:false, title:'Norma.pdf' }]);
+  assert.match(paused, /uso está pausado/i);
+  const missing = api.libraryAvailabilityReply([]);
+  assert.match(missing, /No encuentro PDF guardados en esta instalación/);
 });
 
 test('BKE multimodal: el resultado analizado queda indexado y no obliga a reprocesar la fuente', () => {

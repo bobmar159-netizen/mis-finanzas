@@ -237,6 +237,33 @@
       + (result.caveat ? '⚠️ **Ten en cuenta:** ' + brief(result.caveat, 30) + '\n\n' : '')
       + '_Fuente: ' + title + '_';
   }
+  function sourceNames(rows) {
+    return (Array.isArray(rows) ? rows : []).slice(0, 3).map(asset => '**' + clean(asset?.title || 'Fuente sin nombre', 100) + '**').join(', ');
+  }
+  function libraryAvailabilityReply(assets) {
+    const rows = Array.isArray(assets) ? assets : [];
+    const drafts = rows.filter(asset => asset.kind === 'pdf' && asset.status === 'analyzed_draft');
+    if (drafts.length) {
+      return '**Tus PDF sí están procesados, pero falta aprobarlos.**\n\n> [🟠 Estado]\n> ' + sourceNames(drafts) + '\n\nEntra a **⋮ → Conocimiento y Tutor** y pulsa **Aprobar**. No los borres ni los vuelvas a cargar.';
+    }
+    const pending = rows.filter(asset => asset.kind === 'pdf' && (asset.status === 'local_ready' || asset.status === 'pending_analysis'));
+    if (pending.length) {
+      return '**Tus PDF están guardados, pero aún no terminaron de prepararse.**\n\n> [⏳ Estado]\n> ' + sourceNames(pending) + '\n\nEntra a **⋮ → Conocimiento y Tutor** y pulsa **Analizar**. No necesitas volver a cargarlos.';
+    }
+    const paused = rows.filter(asset => asset.kind === 'pdf' && asset.status === 'approved' && asset.learningEnabled === false);
+    if (paused.length) {
+      return '**Tus PDF están aprobados, pero su uso está pausado.**\n\n> [⏸️ Estado]\n> ' + sourceNames(paused) + '\n\nEntra a **⋮ → Conocimiento y Tutor** y pulsa **Volver a usar**.';
+    }
+    const blocked = rows.filter(asset => asset.kind === 'pdf' && asset.status === 'blocked');
+    if (blocked.length) {
+      return '**Encontré el PDF, pero no pude extraer su texto.**\n\n> [⚠️ Requiere OCR o extractor]\n> ' + sourceNames(blocked) + '\n\nNo lo borraré ni fingiré que conozco su contenido.';
+    }
+    const pdfs = rows.filter(asset => asset.kind === 'pdf');
+    if (pdfs.length) {
+      return '**Encontré tus PDF, pero ninguno está disponible para responder todavía.**\n\n> [🔎 Revisión necesaria]\n> ' + sourceNames(pdfs) + '\n\nAbre **⋮ → Conocimiento y Tutor** para ver el estado exacto. No los elimines.';
+    }
+    return '**No encuentro PDF guardados en esta instalación.**\n\nEntra a **⋮ → Conocimiento y Tutor** para comprobar la biblioteca. Si allí tampoco aparecen, la versión anterior no conservó el contenido y recién entonces será necesario cargarlos otra vez.';
+  }
 
   function requestTimeoutError() {
     const error = new Error('multimodal_request_timeout');
@@ -892,6 +919,7 @@
           const names = (libraryResult.candidates || []).slice(0, 4).map(asset => '**' + clean(asset.title, 100) + '**').join(', ');
           return { handled:true, reply:'**Necesito una pista para elegir la norma correcta.**\n\n' + (names ? '> [📚 Fuentes posibles]\n> ' + names + '\n\n' : '') + 'Dime el nombre de la norma, el tema o un numeral. No mezclaré documentos por una coincidencia débil.' };
         }
+        if (libraryResult.code === 'no_approved_pdf') return { handled:true, reply:libraryAvailabilityReply(assets) };
         if (libraryResult.code === 'session_required') return { handled:true, reply:'**Inicia sesión para consultar tus normas.**\n\nLa biblioteca local permanece guardada y no se usó otro entorno.' };
         if (libraryResult.code === 'multimodal_request_timeout') return { handled:true, reply:'**La consulta tardó demasiado y la detuve.**\n\n> [⏱️ Límite seguro]\n> Tus PDF siguen guardados. Yarbi no quedó bloqueado, no cambió de fuente y no inventó una respuesta.' };
         return { handled:true, reply:'**No pude terminar la consulta documental ahora.**\n\n> [⏱️ Respuesta segura]\n> La búsqueda se detuvo sin cambiar de norma ni inventar una cita. Puedes reintentar; tus PDF siguen guardados.' };
@@ -913,7 +941,7 @@
         const names = drafts.slice(0, 3).map(asset => '**' + clean(asset.title, 100) + '**').join(', ');
         return { handled:true, reply:'**Fuente procesada, aprobación pendiente.**\n\nEncontré ' + names + '. Para usarla aquí: **⋮ → Conocimiento y Tutor → Aprobar para tutoría**. No usaré su contenido como conocimiento definitivo hasta que lo apruebes.' };
       }
-      return { handled:true, reply:'**No encontré evidencia aprobada.**\n\nEntra a **⋮ → Conocimiento y Tutor**, procesa el documento y pulsa **Aprobar para tutoría**. No inventaré una norma, capítulo ni numeral.' };
+      return { handled:true, reply:libraryAvailabilityReply(assets) };
     }
     const result = await askTutor(text, { assets, evidence });
     if (result.ok) return { handled:true, reply:result.text, evidence:result.evidence };
@@ -1094,5 +1122,5 @@
   async function askTutorFromUi() { const input = root.document.getElementById('gfc-mm-tutor-question'); const out = root.document.getElementById('gfc-mm-tutor-answer'); if (!out) return; out.textContent = 'El tutor está preparando una explicación…'; try { const result = await askTutor(input?.value || ''); out.textContent = result.ok ? result.text : (result.message || 'No pude responder sin inventar información.'); } catch (error) { out.textContent = statusText(error); } }
   function html() { return '<main class="gfc-yarbi-tool-page gfc-mm-page"><section class="gfc-mm-hero"><span>📚</span><div><h2>Conocimiento y Tutor</h2><p>Yarbi procesa cada fuente una vez y luego busca por significado, no solo por palabras.</p></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Comprender</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div><label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>PDF de hasta 120 MB: Yarbi extrae páginas y crea un índice semántico persistente. Los PDF escaneados sin texto requieren OCR.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div><section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section><div id="gfc-mm-status" class="gfc-yarbi-import-summary">El índice semántico queda en este teléfono para consultas rápidas. La aprobación es obligatoria antes de usar una fuente y no se ejecutan acciones comerciales durante el procesamiento.</div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">🎓 Preguntar al Tutor</div><div class="gfc-yarbi-tool-copy">Pregunta con tus propias palabras. Yarbi interpreta la intención, responde primero de forma breve y muestra la cita con capítulo, numeral o página.</div><textarea id="gfc-mm-tutor-question" rows="3" placeholder="Ejemplo: ¿Puedo usar una sola llave para alimentar dos equipos?"></textarea><button class="gfc-yarbi-primary" onclick="gfcYarbiTutorAsk()">Preguntar al tutor</button><article id="gfc-mm-tutor-answer" class="gfc-mm-tutor-answer">Aquí aparecerá una explicación respaldada por tus fuentes aprobadas.</article></section></main>'; }
   function attach() { void render(); if (root?.setTimeout) root.setTimeout(() => { void upgradeSemanticIndexesInBackground(); }, 900); }
-  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
+  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, libraryAvailabilityReply, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
 }));

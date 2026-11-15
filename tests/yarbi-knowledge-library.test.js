@@ -70,8 +70,8 @@ test('BKE local: el centro de Yarbi abre la biblioteca sin convertirla en una ru
   assert.match(center, /gfcYarbiKnowledgeAttach/);
 });
 
-test('BKE local: el chat solo conecta la biblioteca de forma explícita y sin Gemini', () => {
+test('BKE local: el chat conserva la biblioteca textual explícita como respaldo sin Gemini', () => {
   const frontend = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
   assert.match(frontend, /gfcYarbiKnowledgeAnswer/);
-  assert.match(frontend, /No requieren Gemini ni activan ninguna acción comercial/);
+  assert.match(frontend, /No requiere Gemini ni activa acciones/);
 });
