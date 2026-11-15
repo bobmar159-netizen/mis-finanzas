@@ -13,6 +13,7 @@
     root.gfcYarbiMultimodalToggleLearning = api.toggleLearningFromUi;
     root.gfcYarbiMultimodalDelete = api.deleteFromUi;
     root.gfcYarbiMultimodalFilesChosen = api.filesChosen;
+    root.gfcYarbiMultimodalImportText = api.importTextFromUi;
     root.gfcYarbiTutorAsk = api.askTutorFromUi;
     root.gfcYarbiMultimodalAnswer = api.answerFromChat;
   }
@@ -38,6 +39,7 @@
   let progressTimer = null;
   let pdfJsPromise = null;
   let semanticUpgradeRunning = false;
+  let legacyMigrationPromise = null;
   const semanticQueryCache = new Map();
 
   function clean(value, limit = 240) {
@@ -242,27 +244,80 @@
   }
   function libraryAvailabilityReply(assets) {
     const rows = Array.isArray(assets) ? assets : [];
-    const drafts = rows.filter(asset => asset.kind === 'pdf' && asset.status === 'analyzed_draft');
+    const drafts = rows.filter(asset => asset.status === 'analyzed_draft');
     if (drafts.length) {
-      return '**Tus PDF sí están procesados, pero falta aprobarlos.**\n\n> [🟠 Estado]\n> ' + sourceNames(drafts) + '\n\nEntra a **⋮ → Conocimiento y Tutor** y pulsa **Aprobar**. No los borres ni los vuelvas a cargar.';
+      return '**Tus fuentes sí están procesadas, pero falta aprobarlas.**\n\n> [🟠 Estado]\n> ' + sourceNames(drafts) + '\n\nEntra a **⋮ → Conocimiento y Tutor** y pulsa **Aprobar**. No las borres ni las vuelvas a cargar.';
     }
-    const pending = rows.filter(asset => asset.kind === 'pdf' && (asset.status === 'local_ready' || asset.status === 'pending_analysis'));
+    const pending = rows.filter(asset => asset.status === 'local_ready' || asset.status === 'pending_analysis');
     if (pending.length) {
-      return '**Tus PDF están guardados, pero aún no terminaron de prepararse.**\n\n> [⏳ Estado]\n> ' + sourceNames(pending) + '\n\nEntra a **⋮ → Conocimiento y Tutor** y pulsa **Analizar**. No necesitas volver a cargarlos.';
+      return '**Tus fuentes están guardadas, pero aún no terminaron de prepararse.**\n\n> [⏳ Estado]\n> ' + sourceNames(pending) + '\n\nEntra a **⋮ → Conocimiento y Tutor** y pulsa **Analizar**. No necesitas volver a cargarlas.';
     }
-    const paused = rows.filter(asset => asset.kind === 'pdf' && asset.status === 'approved' && asset.learningEnabled === false);
+    const paused = rows.filter(asset => asset.status === 'approved' && asset.learningEnabled === false);
     if (paused.length) {
-      return '**Tus PDF están aprobados, pero su uso está pausado.**\n\n> [⏸️ Estado]\n> ' + sourceNames(paused) + '\n\nEntra a **⋮ → Conocimiento y Tutor** y pulsa **Volver a usar**.';
+      return '**Tus fuentes están aprobadas, pero su uso está pausado.**\n\n> [⏸️ Estado]\n> ' + sourceNames(paused) + '\n\nEntra a **⋮ → Conocimiento y Tutor** y pulsa **Volver a usar**.';
     }
     const blocked = rows.filter(asset => asset.kind === 'pdf' && asset.status === 'blocked');
     if (blocked.length) {
       return '**Encontré el PDF, pero no pude extraer su texto.**\n\n> [⚠️ Requiere OCR o extractor]\n> ' + sourceNames(blocked) + '\n\nNo lo borraré ni fingiré que conozco su contenido.';
     }
-    const pdfs = rows.filter(asset => asset.kind === 'pdf');
-    if (pdfs.length) {
-      return '**Encontré tus PDF, pero ninguno está disponible para responder todavía.**\n\n> [🔎 Revisión necesaria]\n> ' + sourceNames(pdfs) + '\n\nAbre **⋮ → Conocimiento y Tutor** para ver el estado exacto. No los elimines.';
+    if (rows.length) {
+      return '**Encontré tus fuentes, pero ninguna está disponible para responder todavía.**\n\n> [🔎 Revisión necesaria]\n> ' + sourceNames(rows) + '\n\nAbre **⋮ → Conocimiento y Tutor** para ver el estado exacto. No las elimines.';
     }
-    return '**No encuentro PDF guardados en esta instalación.**\n\nEntra a **⋮ → Conocimiento y Tutor** para comprobar la biblioteca. Si allí tampoco aparecen, la versión anterior no conservó el contenido y recién entonces será necesario cargarlos otra vez.';
+    return '**No encuentro fuentes guardadas en esta instalación.**\n\nEntra a **⋮ → Conocimiento y Tutor** para comprobar la biblioteca. Si allí tampoco aparecen, la versión anterior no conservó el contenido y recién entonces será necesario cargarlas otra vez.';
+  }
+  function legacySourceToAsset(source) {
+    const rows = (Array.isArray(source?.sections) ? source.sections : []).map((section, index) => ({
+      id:clean(section?.id || ('legacy-' + (index + 1)), 120),
+      label:clean(section?.label || ('Fragmento ' + (index + 1)), 240),
+      text:String(section?.text || '').replace(/\u0000/g, '').trim()
+    })).filter(section => section.text).slice(0, MAX_PDF_SECTIONS);
+    if (!rows.length) return null;
+    const approved = source?.status === 'approved';
+    const sourceId = clean(source?.id || source?.sha256 || ('source-' + Date.now()), 150);
+    const createdAt = Number(source?.createdAt || Date.now());
+    const approvedAt = Number(source?.approvedAt || source?.updatedAt || createdAt);
+    return {
+      id:'legacy_' + sourceId.replace(/[^a-zA-Z0-9_-]/g, '_'),
+      title:clean(source?.title || 'Texto migrado', 140),
+      kind:'text',
+      mime:clean(source?.mime || 'text/plain', 120),
+      bytes:Number(source?.charCount || rows.reduce((total, row) => total + row.text.length, 0)),
+      sha256:clean(source?.sha256 || '', 80),
+      sections:rows,
+      dataUrl:'',
+      extraction:{ type:'legacy_text', sections:rows.length, originalHandling:source?.originalHandling || 'not_copied' },
+      analysis:approved ? {
+        text:'Fuente textual revisada y aprobada por el propietario antes de consolidar la biblioteca.',
+        citations:rows.slice(0, 6).map(row => ({ label:row.label, text:row.text.slice(0, 500) })),
+        at:approvedAt,
+        provider:'legacy_local_migration',
+        reviewed:true,
+        approvedAt
+      } : null,
+      status:approved ? 'approved' : 'local_ready',
+      learningEnabled:approved,
+      provenance:{ source:'yarbi_knowledge_library_v1', sourceId, migratedAt:Date.now(), approvalPreserved:approved },
+      createdAt,
+      updatedAt:Number(source?.updatedAt || Date.now())
+    };
+  }
+  function planLegacyMigration(legacySources, currentAssets, limit) {
+    const existing = Array.isArray(currentAssets) ? currentAssets : [];
+    const knownHashes = new Set(existing.map(asset => String(asset?.sha256 || '')).filter(Boolean));
+    const knownLegacyIds = new Set(existing.map(asset => String(asset?.provenance?.sourceId || '')).filter(Boolean));
+    const capacity = Math.max(0, Number(limit || MAX_ASSETS) - existing.length);
+    const planned = [];
+    for (const source of Array.isArray(legacySources) ? legacySources : []) {
+      const asset = legacySourceToAsset(source);
+      if (!asset) continue;
+      if (asset.sha256 && knownHashes.has(asset.sha256)) continue;
+      if (knownLegacyIds.has(String(asset.provenance?.sourceId || ''))) continue;
+      if (planned.length >= capacity) break;
+      planned.push(asset);
+      if (asset.sha256) knownHashes.add(asset.sha256);
+      knownLegacyIds.add(String(asset.provenance?.sourceId || ''));
+    }
+    return planned;
   }
 
   function requestTimeoutError() {
@@ -424,6 +479,23 @@
   async function get(id) { return transaction('readonly', store => requestValue(store.get(String(id || '')))); }
   async function put(asset) { return transaction('readwrite', store => { store.put(asset); return asset; }); }
   async function removeAsset(id) { return transaction('readwrite', store => { store.delete(String(id || '')); return true; }); }
+  async function migrateLegacyKnowledge() {
+    if (legacyMigrationPromise) return legacyMigrationPromise;
+    legacyMigrationPromise = (async () => {
+      const legacyApi = root?.YarbiKnowledgeLibrary;
+      if (!legacyApi || typeof legacyApi.list !== 'function') return { migrated:0, approved:0, drafts:0, available:false };
+      const [legacySources, currentAssets] = await Promise.all([legacyApi.list(), list()]);
+      const planned = planLegacyMigration(legacySources, currentAssets, MAX_ASSETS);
+      for (const asset of planned) await put(asset);
+      return {
+        migrated:planned.length,
+        approved:planned.filter(asset => asset.status === 'approved').length,
+        drafts:planned.filter(asset => asset.status !== 'approved').length,
+        available:true
+      };
+    })().catch(error => ({ migrated:0, approved:0, drafts:0, available:false, error:clean(error?.message || 'legacy_migration_failed', 100) }));
+    return legacyMigrationPromise;
+  }
   async function digest(value) {
     if (!root?.crypto?.subtle || typeof root.TextEncoder === 'undefined') return null;
     const bytes = value instanceof ArrayBuffer ? value : new root.TextEncoder().encode(String(value));
@@ -586,6 +658,21 @@
     }
     return created;
   }
+  async function buildTextAsset(title, value) {
+    const text = String(value || '').replace(/\u0000/g, '').replace(/\r\n?/g, '\n').trim();
+    if (!text) throw new Error('text_source_required');
+    if (text.length > MAX_TEXT) throw new Error('multimodal_text_too_large');
+    const sections = sectionsFromText(text);
+    if (!sections.length) throw new Error('text_source_required');
+    return {
+      id:'bke_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+      title:clean(title, 140) || 'Nota de conocimiento',
+      kind:'text', mime:'text/plain', bytes:new root.TextEncoder().encode(text).byteLength,
+      sha256:await digest(text), sections, dataUrl:'',
+      extraction:{ type:'pasted_text', sections:sections.length, originalHandling:'owner_text' },
+      analysis:null, status:'local_ready', createdAt:Date.now(), updatedAt:Date.now()
+    };
+  }
   async function indexSemanticAsset(id, onProgress) {
     let asset = await get(id);
     if (!asset) throw new Error('multimodal_asset_not_found');
@@ -664,6 +751,9 @@
   function approvedPdfAssets(assets) {
     return (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && asset.learningEnabled !== false && asset.kind === 'pdf' && (asset.dataUrl || Array.isArray(asset.sections) && asset.sections.length));
   }
+  function approvedKnowledgeAssets(assets) {
+    return (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && asset.learningEnabled !== false && (asset.dataUrl || Array.isArray(asset.sections) && asset.sections.length));
+  }
   function sourceCodes(value) {
     return normalize(value).match(/\b(?:ntp|em|iso|rne)\s+\d+(?:\s+\d+){0,3}\b/g) || [];
   }
@@ -671,7 +761,7 @@
     const query = normalize(question);
     const queryTerms = new Set(contentTokens(question));
     const queryCodes = new Set(sourceCodes(question));
-    return approvedPdfAssets(assets).filter(asset => {
+    return approvedKnowledgeAssets(assets).filter(asset => {
       const title = normalize(String(asset.title || '').replace(/\.pdf$/i, ''));
       if (title.length >= 5 && query.includes(title)) return true;
       if (sourceCodes(asset.title).some(code => queryCodes.has(code))) return true;
@@ -683,7 +773,7 @@
   }
   function rankApprovedSources(assets, question) {
     const groups = retrievalGroups(question);
-    return approvedPdfAssets(assets).map(asset => {
+    return approvedKnowledgeAssets(assets).map(asset => {
       const titleHaystack = normalize(asset.title || '');
       const summary = clean(asset.analysis?.text || asset.analysis?.summary || '', 900);
       const titleHits = matchRetrievalGroups(titleHaystack, groups);
@@ -715,8 +805,8 @@
     return first;
   }
   async function routeApprovedSource(assets, question) {
-    const candidates = approvedPdfAssets(assets);
-    if (!candidates.length) return { asset:null, code:'no_approved_pdf', candidates:[] };
+    const candidates = approvedKnowledgeAssets(assets);
+    if (!candidates.length) return { asset:null, code:'no_approved_source', candidates:[] };
     if (candidates.length === 1) return { asset:candidates[0], confidence:'high', searchTerms:contentTokens(question), evidence:rankApprovedSources(candidates, question)[0]?.evidence || [] };
     const explicitMatches = explicitSourceMatches(candidates, question);
     if (explicitMatches.length === 1) return { asset:explicitMatches[0], confidence:'high', searchTerms:contentTokens(question), evidence:rankApprovedSources(explicitMatches, question)[0]?.evidence || [] };
@@ -801,8 +891,8 @@
     return { ...parseDirectedAnswer(raw), selectedAssetId };
   }
   async function queryApprovedLibrary(assets, question, prepared) {
-    const candidates = approvedPdfAssets(assets);
-    if (!candidates.length) return { ok:false, code:'no_approved_pdf' };
+    const candidates = approvedKnowledgeAssets(assets);
+    if (!candidates.length) return { ok:false, code:'no_approved_source' };
     const preparedEvidence = Array.isArray(prepared?.evidence) ? prepared.evidence : [];
     const rankings = rankApprovedSources(candidates, question).map(row => {
       const semanticRows = preparedEvidence.filter(item => String(item.assetId) === String(row.asset.id));
@@ -838,7 +928,7 @@
         }
         return { ok:true, reply:result.text, result, asset:deterministic.asset };
       }
-      if (deterministic.asset.dataUrl) return queryApprovedSource(deterministic.asset, question);
+      if (deterministic.asset.kind === 'pdf' && deterministic.asset.dataUrl) return queryApprovedSource(deterministic.asset, question);
       return { ok:false, code:'library_evidence_missing', candidates:[deterministic.asset] };
     }
 
@@ -894,7 +984,7 @@
     const text = clean(question, 1200);
     if (!text) return { handled:false };
     let assets;
-    try { assets = await list(); }
+    try { await migrateLegacyKnowledge(); assets = await list(); }
     catch (_) { return knowledgeIntent(text) ? { handled:true, reply:'## 📚 Biblioteca no disponible\n\nNo pude abrir ahora las fuentes guardadas en este dispositivo. No inventaré una respuesta ni consultaré otro entorno.' } : { handled:false }; }
     const explicit = knowledgeIntent(text);
     let evidence = searchApproved(assets, text);
@@ -919,7 +1009,7 @@
           const names = (libraryResult.candidates || []).slice(0, 4).map(asset => '**' + clean(asset.title, 100) + '**').join(', ');
           return { handled:true, reply:'**Necesito una pista para elegir la norma correcta.**\n\n' + (names ? '> [📚 Fuentes posibles]\n> ' + names + '\n\n' : '') + 'Dime el nombre de la norma, el tema o un numeral. No mezclaré documentos por una coincidencia débil.' };
         }
-        if (libraryResult.code === 'no_approved_pdf') return { handled:true, reply:libraryAvailabilityReply(assets) };
+        if (libraryResult.code === 'no_approved_source' || libraryResult.code === 'no_approved_pdf') return { handled:true, reply:libraryAvailabilityReply(assets) };
         if (libraryResult.code === 'session_required') return { handled:true, reply:'**Inicia sesión para consultar tus normas.**\n\nLa biblioteca local permanece guardada y no se usó otro entorno.' };
         if (libraryResult.code === 'multimodal_request_timeout') return { handled:true, reply:'**La consulta tardó demasiado y la detuve.**\n\n> [⏱️ Límite seguro]\n> Tus PDF siguen guardados. Yarbi no quedó bloqueado, no cambió de fuente y no inventó una respuesta.' };
         return { handled:true, reply:'**No pude terminar la consulta documental ahora.**\n\n> [⏱️ Respuesta segura]\n> La búsqueda se detuvo sin cambiar de norma ni inventar una cita. Puedes reintentar; tus PDF siguen guardados.' };
@@ -952,7 +1042,7 @@
       degraded:true
     };
   }
-  function statusText(error) { return ({ unsupported_multimodal_type:'Formato no compatible.', multimodal_file_too_large:'El archivo supera el límite local de 40 MB para audio, video o imagen.', multimodal_pdf_too_large:'El PDF supera el límite seguro de 120 MB para este dispositivo.', multimodal_pdf_page_limit:'El PDF supera 2.500 páginas y no se procesó para proteger la memoria del teléfono.', multimodal_pdf_index_limit:'El texto del PDF supera el límite seguro de indexación local.', multimodal_pdf_no_text:'El PDF no contiene texto extraíble. Puede ser un escaneo y necesita OCR.', multimodal_asset_limit:'La biblioteca local alcanzó 80 fuentes.', multimodal_storage_unavailable:'El almacenamiento local no está disponible.', extractor_required:'Este archivo necesita un extractor autorizado.', session_required:'Inicia sesión para crear el índice semántico.', semantic_provider_unavailable:'La comprensión semántica no está disponible ahora. El avance local permanece guardado.', semantic_response_invalid:'El proveedor devolvió un índice incompleto. No se usó.', semantic_sections_required:'Esta fuente aún no tiene fragmentos de texto para indexar.' }[error?.message] || error?.message || 'No pude procesar la fuente.'); }
+  function statusText(error) { return ({ unsupported_multimodal_type:'Formato no compatible.', text_source_required:'Escribe una nota o instrucción antes de guardarla.', multimodal_text_too_large:'El texto supera el límite local de 200.000 caracteres.', multimodal_file_too_large:'El archivo supera el límite local de 40 MB para audio, video o imagen.', multimodal_pdf_too_large:'El PDF supera el límite seguro de 120 MB para este dispositivo.', multimodal_pdf_page_limit:'El PDF supera 2.500 páginas y no se procesó para proteger la memoria del teléfono.', multimodal_pdf_index_limit:'El texto del PDF supera el límite seguro de indexación local.', multimodal_pdf_no_text:'El PDF no contiene texto extraíble. Puede ser un escaneo y necesita OCR.', multimodal_asset_limit:'La biblioteca local alcanzó 80 fuentes.', multimodal_storage_unavailable:'El almacenamiento local no está disponible.', extractor_required:'Este archivo necesita un extractor autorizado.', session_required:'Inicia sesión para crear el índice semántico.', semantic_provider_unavailable:'La comprensión semántica no está disponible ahora. El avance local permanece guardado.', semantic_response_invalid:'El proveedor devolvió un índice incompleto. No se usó.', semantic_sections_required:'Esta fuente aún no tiene fragmentos de texto para indexar.' }[error?.message] || error?.message || 'No pude procesar la fuente.'); }
   function progressTone(phase) {
     if (phase === 'error') return 'error';
     if (phase === 'complete' || phase === 'approved') return 'success';
@@ -1019,6 +1109,49 @@
   }
   async function render() { const target = root?.document?.getElementById('gfc-mm-list'); if (!target) return; try { const rows = await list(); target.innerHTML = rows.length ? rows.map(card).join('') : '<p>Aún no hay fuentes multimodales. Puedes cargar documentos, imágenes, audios o videos.</p>'; } catch (_) { target.innerHTML = '<p>No se pudo abrir la biblioteca local.</p>'; } }
   function setStatus(message, error) { const target = root?.document?.getElementById('gfc-mm-status'); if (target) { target.textContent = message; target.dataset.tone = error ? 'error' : 'normal'; } }
+  async function importTextFromUi(autoAnalyze = true) {
+    const titleInput = root?.document?.getElementById('gfc-mm-text-title');
+    const textInput = root?.document?.getElementById('gfc-mm-text-value');
+    try {
+      const asset = await buildTextAsset(titleInput?.value || 'Nota de conocimiento', textInput?.value || '');
+      const assets = await list();
+      if (assets.some(row => asset.sha256 && row.sha256 === asset.sha256)) {
+        setStatus('Ese texto ya existe en la biblioteca. No se creó un duplicado.', false);
+        return { ok:true, duplicate:true };
+      }
+      if (assets.length >= MAX_ASSETS) throw new Error('multimodal_asset_limit');
+      await put(asset);
+      if (textInput) textInput.value = '';
+      if (titleInput) titleInput.value = '';
+      await render();
+      if (!autoAnalyze) {
+        setProgress(100, 'Texto guardado', 'Quedó pendiente de análisis y aprobación.', 'complete');
+        setStatus('La nota está en la biblioteca canónica. Pulsa “Analizar” cuando quieras prepararla.', false);
+        return { ok:true, assetId:asset.id, analyzed:false };
+      }
+      let semanticPending = false;
+      try {
+        await indexSemanticAsset(asset.id, state => setProgress(Math.max(2, Number(state?.fraction || 0) * 55), 'Comprendiendo el texto', 'Fragmento ' + state.indexed + ' de ' + state.total, 'working'));
+      } catch (_) { semanticPending = true; }
+      startEstimatedAnalysis(asset.title, 58);
+      const result = await analyze(asset.id);
+      clearProgressTimer();
+      if (!result.ok) {
+        setProgress(100, 'Texto guardado', result.message || 'El análisis queda pendiente.', 'pending_review');
+        setStatus(result.message || 'La fuente quedó guardada y pendiente de análisis.', false);
+        return { ok:true, assetId:asset.id, analyzed:false, semanticPending };
+      }
+      setProgress(100, 'Borrador listo', 'Revisa el contenido y pulsa “Aprobar”.', 'pending_review');
+      setStatus('La nota se procesó una sola vez. Falta tu aprobación para que Yarbi la use.', false);
+      await render();
+      return { ok:true, assetId:asset.id, analyzed:true, semanticPending };
+    } catch (error) {
+      clearProgressTimer();
+      setProgress(0, 'No se pudo guardar', statusText(error), 'error');
+      setStatus(statusText(error), true);
+      return { ok:false, message:statusText(error) };
+    }
+  }
   async function importFromUi(autoAnalyze = true) {
     const input = root?.document?.getElementById('gfc-mm-input');
     const selectedFiles = [...(input?.files || [])];
@@ -1120,7 +1253,24 @@
     return true;
   }
   async function askTutorFromUi() { const input = root.document.getElementById('gfc-mm-tutor-question'); const out = root.document.getElementById('gfc-mm-tutor-answer'); if (!out) return; out.textContent = 'El tutor está preparando una explicación…'; try { const result = await askTutor(input?.value || ''); out.textContent = result.ok ? result.text : (result.message || 'No pude responder sin inventar información.'); } catch (error) { out.textContent = statusText(error); } }
+  function mountCanonicalTextImport() {
+    const anchor = root?.document?.getElementById('gfc-mm-status');
+    if (!anchor || root.document.getElementById('gfc-mm-text-import')) return;
+    anchor.insertAdjacentHTML('afterend', '<div id="gfc-mm-migration-status" class="gfc-yarbi-import-summary" hidden></div><details id="gfc-mm-text-import" class="gfc-mm-more gfc-mm-text-import"><summary>✍️ Agregar una nota o instrucción escrita</summary><div class="gfc-mm-details-body"><input id="gfc-mm-text-title" maxlength="140" placeholder="Título de la fuente"><textarea id="gfc-mm-text-value" rows="6" maxlength="200000" placeholder="Pega aquí un procedimiento, regla o material de referencia. Se guardará como borrador hasta que lo apruebes."></textarea><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImportText(true)">Guardar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalImportText(false)">Solo guardar</button></div></div></details>');
+  }
   function html() { return '<main class="gfc-yarbi-tool-page gfc-mm-page"><section class="gfc-mm-hero"><span>📚</span><div><h2>Conocimiento y Tutor</h2><p>Yarbi procesa cada fuente una vez y luego busca por significado, no solo por palabras.</p></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Comprender</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div><label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>PDF de hasta 120 MB: Yarbi extrae páginas y crea un índice semántico persistente. Los PDF escaneados sin texto requieren OCR.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div><section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section><div id="gfc-mm-status" class="gfc-yarbi-import-summary">El índice semántico queda en este teléfono para consultas rápidas. La aprobación es obligatoria antes de usar una fuente y no se ejecutan acciones comerciales durante el procesamiento.</div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">🎓 Preguntar al Tutor</div><div class="gfc-yarbi-tool-copy">Pregunta con tus propias palabras. Yarbi interpreta la intención, responde primero de forma breve y muestra la cita con capítulo, numeral o página.</div><textarea id="gfc-mm-tutor-question" rows="3" placeholder="Ejemplo: ¿Puedo usar una sola llave para alimentar dos equipos?"></textarea><button class="gfc-yarbi-primary" onclick="gfcYarbiTutorAsk()">Preguntar al tutor</button><article id="gfc-mm-tutor-answer" class="gfc-mm-tutor-answer">Aquí aparecerá una explicación respaldada por tus fuentes aprobadas.</article></section></main>'; }
-  function attach() { void render(); if (root?.setTimeout) root.setTimeout(() => { void upgradeSemanticIndexesInBackground(); }, 900); }
-  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, libraryAvailabilityReply, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
+  function attach() {
+    mountCanonicalTextImport();
+    void (async () => {
+      const migration = await migrateLegacyKnowledge();
+      const notice = root?.document?.getElementById('gfc-mm-migration-status');
+      if (notice && migration.migrated) {
+        notice.hidden = false;
+        notice.textContent = '✓ ' + migration.migrated + ' fuente(s) anterior(es) integradas sin duplicar ni borrar la biblioteca original.';
+      }
+      await render();
+      if (root?.setTimeout) root.setTimeout(() => { void upgradeSemanticIndexesInBackground(); }, 900);
+    })();
+  }
+  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, libraryAvailabilityReply, legacySourceToAsset, planLegacyMigration, migrateLegacyKnowledge, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, approvedKnowledgeAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, buildTextAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, importTextFromUi, askTutorFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
 }));

@@ -1251,9 +1251,8 @@
   function hubHtml() {
     return '<main class="gfc-yarbi-tool-page"><div class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Centro de Yarbi</div><div class="gfc-yarbi-tool-copy">Cada opción conserva su lugar. La flecha vuelve exactamente a la pantalla anterior y nunca cambia de sección por su cuenta.</div>' +
       '<div class="gfc-yarbi-grid">' +
-      '<button class="gfc-yarbi-hub-button gfc-yarbi-hub-featured" onclick="gfcOpenCopilotModal(\'memoria\')">📚<b>Conocimiento y Tutor</b><span>PDF, documentos, imágenes, audios y videos con avance, revisión y citas.</span></button>' +
+      '<button class="gfc-yarbi-hub-button gfc-yarbi-hub-featured" onclick="gfcOpenCopilotModal(\'memoria\')">📚<b>Conocimiento y Tutor</b><span>PDF, documentos, notas, imágenes, audios y videos en una sola biblioteca con revisión y citas.</span></button>' +
       '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'masivo\')">📦<b>Importar chats</b><span>Aprender tu forma de responder desde TXT o ZIP.</span></button>' +
-      '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'knowledge\')">📝<b>Notas y textos</b><span>Pega procedimientos breves y administra sus citas locales.</span></button>' +
       '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'ads\')">📣<b>Meta Ads</b><span>Métricas locales aprobadas, leads y ROAS sin conectar campañas.</span></button>' +
       '<button class="gfc-yarbi-hub-button" onclick="gfcOpenCopilotModal(\'ordenes\')">📜<b>Instrucciones</b><span>Reglas permanentes visibles, editables y sincronizadas.</span></button>' +
       '<button class="gfc-yarbi-hub-button" onclick="gfcSetYarbiInteractionMode(\'training\')">🎭<b>Entrenamiento</b><span>Entra al mismo chat de Yarbi, con voz Live y sin tocar datos reales.</span></button>' +
@@ -2528,6 +2527,9 @@
       localStorage.setItem(INTERACTION_MODE_KEY, 'training');
       initialTab = 'chat';
     }
+    // Compatibilidad con enlaces y botones anteriores: toda entrada de
+    // conocimiento desemboca en la biblioteca canónica multimodal.
+    if (initialTab === 'knowledge') initialTab = 'memoria';
     const tab = initialTab || 'chat';
     const screenWasOpen = document.body.classList.contains('gfc-yarbi-screen');
     const previousTab = String(window._gfcYarbiCurrentTab || '');
@@ -2556,9 +2558,9 @@
     }
     const content = document.getElementById('modal-content');
     if (!content) return;
-    const title = tab === 'chat' ? 'Yarbi' : ({ conversations:'Conversaciones', tools:'Centro de Yarbi', masivo:'Importar chats', knowledge:'Notas y textos', memoria:'Conocimiento y Tutor', ordenes:'Instrucciones', practice:'Cliente simulado', learning:'Aprendizaje histórico', status:'Estado y diagnóstico' }[tab] || 'Yarbi');
+    const title = tab === 'chat' ? 'Yarbi' : ({ conversations:'Conversaciones', tools:'Centro de Yarbi', masivo:'Importar chats', memoria:'Conocimiento y Tutor', ordenes:'Instrucciones', practice:'Cliente simulado', learning:'Aprendizaje histórico', status:'Estado y diagnóstico' }[tab] || 'Yarbi');
     content.innerHTML = '<section class="gfc-yarbi-shell">' + headerHtml(title, tab) +
-      (tab === 'chat' ? chatHtml() : tab === 'conversations' ? conversationHistoryHtml() : tab === 'tools' ? hubHtml() : tab === 'masivo' ? importHtml() : tab === 'knowledge' ? (typeof window.gfcYarbiKnowledgeHtml === 'function' ? window.gfcYarbiKnowledgeHtml() : '<main class="gfc-yarbi-tool-page"><p>La biblioteca de conocimiento no está disponible en esta copia.</p></main>') : tab === 'ads' ? (typeof window.gfcYarbiMetaAdsHtml === 'function' ? window.gfcYarbiMetaAdsHtml() : '<main class="gfc-yarbi-tool-page"><p>Meta Ads local no está disponible en esta copia.</p></main>') : tab === 'memoria' ? mediaHtml() : tab === 'ordenes' ? ordersHtml() : tab === 'practice' ? trainingHtml() : tab === 'learning' ? learningHtml() : statusHtml()) + '</section>';
+      (tab === 'chat' ? chatHtml() : tab === 'conversations' ? conversationHistoryHtml() : tab === 'tools' ? hubHtml() : tab === 'masivo' ? importHtml() : tab === 'ads' ? (typeof window.gfcYarbiMetaAdsHtml === 'function' ? window.gfcYarbiMetaAdsHtml() : '<main class="gfc-yarbi-tool-page"><p>Meta Ads local no está disponible en esta copia.</p></main>') : tab === 'memoria' ? mediaHtml() : tab === 'ordenes' ? ordersHtml() : tab === 'practice' ? trainingHtml() : tab === 'learning' ? learningHtml() : statusHtml()) + '</section>';
     document.body.classList.add('gfc-yarbi-screen');
     document.getElementById('modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -2587,7 +2589,6 @@
       }
     }
     if (tab === 'conversations') setTimeout(() => window.gfcRenderYarbiConversationHistory(), 0);
-    if (tab === 'knowledge') setTimeout(() => window.gfcYarbiKnowledgeAttach?.(), 0);
     if (tab === 'ads') setTimeout(() => window.gfcYarbiMetaAdsAttach?.(), 0);
     if (tab === 'memoria') setTimeout(() => {
       if (typeof window.gfcYarbiMultimodalAttach === 'function') window.gfcYarbiMultimodalAttach();

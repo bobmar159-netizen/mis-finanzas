@@ -64,10 +64,10 @@ test('BKE local: la interfaz exige revisión y no anuncia procesamiento de forma
   assert.doesNotMatch(source, /fetch\(/);
 });
 
-test('BKE local: el centro de Yarbi abre la biblioteca sin convertirla en una ruta comercial', () => {
-  assert.match(center, /gfcOpenCopilotModal\([^\n]{0,12}knowledge/);
-  assert.match(center, /gfcYarbiKnowledgeHtml/);
-  assert.match(center, /gfcYarbiKnowledgeAttach/);
+test('BKE local: los enlaces anteriores se redirigen a la biblioteca canónica', () => {
+  assert.match(center, /if \(initialTab === 'knowledge'\) initialTab = 'memoria'/);
+  assert.doesNotMatch(center, /<b>Notas y textos<\/b>/);
+  assert.match(center, /PDF, documentos, notas, imágenes, audios y videos en una sola biblioteca/);
 });
 
 test('BKE local: el chat conserva la biblioteca textual explícita como respaldo sin Gemini', () => {

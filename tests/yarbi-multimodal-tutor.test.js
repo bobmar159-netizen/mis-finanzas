@@ -154,6 +154,46 @@ test('BKE multimodal: reimportar un PDF actualiza una ficha antigua bloqueada si
   assert.equal(api.upgradeBlockedDuplicate({ status:'blocked' }, { status:'blocked' }), null);
 });
 
+test('BKE canónico: migra notas históricas sin perder aprobación ni duplicar huellas', () => {
+  const approved = api.legacySourceToAsset({
+    id:'old-approved', title:'Procedimiento de visitas', status:'approved', sha256:'a'.repeat(64),
+    approvedAt:120, sections:[{ id:'s1', label:'Regla 1', text:'Confirmar la visita antes de salir.' }]
+  });
+  const draft = api.legacySourceToAsset({
+    id:'old-draft', title:'Borrador', status:'draft', sha256:'b'.repeat(64),
+    sections:[{ id:'s1', label:'Fragmento 1', text:'Texto por revisar.' }]
+  });
+  assert.equal(approved.status, 'approved');
+  assert.equal(approved.learningEnabled, true);
+  assert.equal(approved.provenance.approvalPreserved, true);
+  assert.equal(draft.status, 'local_ready');
+  assert.equal(draft.learningEnabled, false);
+  const planned = api.planLegacyMigration([
+    { id:'duplicate', status:'approved', sha256:'a'.repeat(64), sections:[{ text:'Duplicado.' }] },
+    { id:'new', status:'draft', sha256:'c'.repeat(64), sections:[{ text:'Nueva nota.' }] }
+  ], [approved], 80);
+  assert.equal(planned.length, 1);
+  assert.equal(planned[0].provenance.sourceId, 'new');
+});
+
+test('BKE canónico: las notas aprobadas participan en el mismo ranking que los PDF', () => {
+  const assets = [
+    { id:'text', title:'Procedimiento interno', kind:'text', status:'approved', sections:[{ label:'Regla', text:'Confirmar siempre la visita con el cliente.' }] },
+    { id:'pdf', title:'Norma técnica', kind:'pdf', status:'approved', sections:[{ label:'Página 1', text:'Instalaciones generales.' }] },
+    { id:'paused', title:'Nota pausada', kind:'text', status:'approved', learningEnabled:false, sections:[{ label:'Regla', text:'Confirmar visita.' }] }
+  ];
+  assert.deepEqual(api.approvedKnowledgeAssets(assets).map(asset => asset.id), ['text','pdf']);
+  assert.equal(api.rankApprovedSources(assets, 'confirmar visita')[0].asset.id, 'text');
+});
+
+test('BKE canónico: permite pegar texto en la misma biblioteca con revisión obligatoria', () => {
+  assert.match(source, /gfcYarbiMultimodalImportText/);
+  assert.match(source, /gfc-mm-text-value/);
+  assert.match(source, /Pega aquí un procedimiento, regla o material de referencia/);
+  assert.match(source, /Falta tu aprobación|Falta tu aprobaci[oó]n|falta tu aprobación/i);
+  assert.match(memoryCenter, /una sola biblioteca/);
+});
+
 test('BKE multimodal: no elige una norma por una coincidencia débil', () => {
   const one = { id:'pdf-a', title:'NTP 111.011.pdf', kind:'pdf', status:'approved', dataUrl:'data:application/pdf;base64,QQ==' };
   const other = { id:'pdf-b', title:'EM.040 Instalaciones de gas.pdf', kind:'pdf', status:'approved', dataUrl:'data:application/pdf;base64,Qg==' };
@@ -272,16 +312,16 @@ test('BKE multimodal: el chat principal consulta la misma biblioteca aprobada', 
   assert.match(source, /explicación sencilla en máximo 55 palabras/);
 });
 
-test('BKE multimodal: explica el estado real del PDF sin pedir borrarlo o recargarlo', () => {
+test('BKE multimodal: explica el estado real de la fuente sin pedir borrarla o recargarla', () => {
   const draft = api.libraryAvailabilityReply([{ kind:'pdf', status:'analyzed_draft', title:'NTP 111.011.pdf' }]);
-  assert.match(draft, /falta aprobarlos/i);
-  assert.match(draft, /No los borres ni los vuelvas a cargar/i);
+  assert.match(draft, /falta aprobarla/i);
+  assert.match(draft, /No las borres ni las vuelvas a cargar/i);
   const pending = api.libraryAvailabilityReply([{ kind:'pdf', status:'local_ready', title:'Manual.pdf' }]);
   assert.match(pending, /pulsa \*\*Analizar\*\*/);
   const paused = api.libraryAvailabilityReply([{ kind:'pdf', status:'approved', learningEnabled:false, title:'Norma.pdf' }]);
   assert.match(paused, /uso está pausado/i);
   const missing = api.libraryAvailabilityReply([]);
-  assert.match(missing, /No encuentro PDF guardados en esta instalación/);
+  assert.match(missing, /No encuentro fuentes guardadas en esta instalación/);
 });
 
 test('BKE multimodal: el resultado analizado queda indexado y no obliga a reprocesar la fuente', () => {
@@ -339,7 +379,8 @@ test('BKE multimodal: la navegación conserva la pantalla anterior', () => {
   assert.match(memoryCenter, /_gfcYarbiNavigationStack/);
   assert.match(memoryCenter, /const previous = stack\.pop\(\)/);
   assert.match(memoryCenter, /Conocimiento y Tutor/);
-  assert.match(memoryCenter, /Notas y textos/);
+  assert.match(memoryCenter, /if \(initialTab === 'knowledge'\) initialTab = 'memoria'/);
+  assert.doesNotMatch(memoryCenter, /<b>Notas y textos<\/b>/);
 });
 
 test('pasarela Gemini: admite PDF, audio y video inline sin aceptar tipos arbitrarios', () => {
