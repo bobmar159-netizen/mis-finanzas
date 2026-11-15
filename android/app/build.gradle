@@ -7,8 +7,8 @@ android {
         applicationId "com.misfinanzas.app.yarbitest"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 125
-        versionName "3.4.34-stable-production"
+        versionCode 126
+        versionName "3.4.35-stable-production"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -22,7 +22,7 @@ android {
             // APK histórica 3.4.25, pero se actualiza sobre la instalación de
             // pruebas estable ya existente para no perder su sesión local.
             applicationIdSuffix ".debug.r3"
-            versionNameSuffix "-r6"
+            versionNameSuffix "-r7"
             resValue "string", "app_name", "Yarbi"
             resValue "string", "title_activity_main", "Yarbi"
         }
