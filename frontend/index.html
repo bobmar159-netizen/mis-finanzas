@@ -10878,7 +10878,8 @@ async function gfcCallAuthenticatedOwnerConversation(payload) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok !== true) return { ok:false, status:response.status, message:data.error || 'No se pudo consultar el contexto de Yarbi.' };
   if (data.conversation_token) gfcSetOwnerConversationToken(data.conversation_token);
-  return { ok:true, text:data.reply || 'No tengo una respuesta verificable todavía.', conversation:data };
+  const formatted = window.YarbiOwnerConversationUi?.formatReply?.(data);
+  return { ok:true, text:formatted || data.reply || 'No tengo una respuesta verificable todavía.', conversation:data };
 }
 async function gfcCallGeminiAPI(_apiKey, payload) {
   // En el Preview aislado el chat real se limita al owner autenticado y al
@@ -48529,6 +48530,7 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
 })();
 </script>
 <script src="./yarbi-owner-memory-ui.js"></script>
+<script src="./yarbi-owner-conversation-ui.js"></script>
 <script src="./yarbi-conversation-renderer.js"></script>
 <script src="./yarbi-app-voice.js"></script>
 <script src="./yarbi-financial-coach.js"></script>
