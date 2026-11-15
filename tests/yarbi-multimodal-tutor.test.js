@@ -119,6 +119,22 @@ test('BKE semántico: recupera la idea aunque la consulta no comparta palabras c
   }
 });
 
+test('BKE semántico: una coincidencia local fuerte evita una llamada redundante de embeddings', async () => {
+  const previousFetch = global.fetch;
+  let fetchCalls = 0;
+  global.fetch = async () => { fetchCalls += 1; throw new Error('no debe llamar embeddings'); };
+  try {
+    const vector = api.encodeEmbedding([1, ...Array(767).fill(0)]);
+    const result = await api.semanticSearchApproved([{
+      id:'ntp-local', title:'NTP local', kind:'pdf', status:'approved', learningEnabled:true,
+      sections:[{ id:'p1', label:'Numeral 8.4', text:'Una válvula común podrá alimentar dos artefactos bajo condiciones verificadas.', semantic:{ version:api.SEMANTIC_INDEX_VERSION, vector } }]
+    }], '¿puedo usar una sola válvula para dos artefactos?');
+    assert.equal(result.mode, 'lexical_confident');
+    assert.equal(result.evidence[0].sectionId, 'p1');
+    assert.equal(fetchCalls, 0);
+  } finally { global.fetch = previousFetch; }
+});
+
 test('BKE semántico: cuantiza vectores sin alterar su orden de similitud', () => {
   const base = api.encodeEmbedding([1, 0, 0, 0]);
   const close = api.encodeEmbedding([0.98, 0.1, 0, 0]);
@@ -302,6 +318,9 @@ test('BKE multimodal: el chat principal consulta la misma biblioteca aprobada', 
   assert.match(index, /let multimodalKnowledgeReply = null/);
   assert.ok(index.indexOf('let multimodalKnowledgeReply = null') < index.indexOf('const knowledgeReply = typeof window.gfcYarbiKnowledgeAnswer'), 'la biblioteca PDF debe preceder a la biblioteca textual heredada');
   assert.match(index, /multimodal-knowledge-error/);
+  assert.match(index, /gfcAwaitYarbiKnowledgeReply/);
+  assert.match(index, /knowledge_deadline/);
+  assert.match(index, /multimodal-knowledge-complete/);
   assert.match(source, /Busca la respuesta exclusivamente dentro del PDF adjunto/);
   assert.match(source, /responseMimeType:'application\/json'/);
   assert.match(source, /queryCache/);

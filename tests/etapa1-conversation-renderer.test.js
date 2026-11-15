@@ -94,6 +94,21 @@ test('Etapa 1.1: el punto de entrada real usa el renderer una sola vez para un m
   assert.equal(result.ok, true);
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].message, { role:'assistant', text:'Respuesta real', status:'complete' });
+  assert.equal(windowMock._gfcYarbiTextRequestActive, false);
+});
+
+test('chat documental: el watchdog siempre cierra una consulta remota bloqueada', async () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  const start = html.indexOf('async function gfcAwaitYarbiKnowledgeReply');
+  const end = html.indexOf('\nasync function gfcSendCopilotChatMessage', start);
+  assert.ok(start >= 0 && end > start);
+  const source = html.slice(start, end);
+  const windowMock = { setTimeout, clearTimeout };
+  const wait = new Function('window', source + '; return gfcAwaitYarbiKnowledgeReply;')(windowMock);
+  const result = await wait(new Promise(() => {}), 50);
+  assert.equal(result.handled, true);
+  assert.equal(result.code, 'knowledge_deadline');
+  assert.match(result.reply, /cerró el proceso/i);
 });
 
 test('Etapa 1.1: contenido vacío no fabrica una respuesta ni crea una burbuja', () => {

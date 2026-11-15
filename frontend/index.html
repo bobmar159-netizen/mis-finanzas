@@ -10814,13 +10814,20 @@ function gfcRefreshVoicePipelinePanel() {
 async function gfcAppendCopilotChatMessage(role, text) {
   if (typeof text !== 'string' || !text.trim()) return { ok:false, code:'content_empty' };
   const isUser = role === 'user';
+  const complete = result => {
+    if (!isUser && result?.ok) {
+      window._gfcYarbiTextRequestActive = false;
+      if (typeof gfcYarbiSetProcessStatus === 'function') gfcYarbiSetProcessStatus('ready', 'Respuesta lista');
+    }
+    return result;
+  };
   // Timeline persistence is registered by yarbi-memory-center.js. It is a hook,
   // not a replacement: this remains the only global chat entry point.
   if (typeof window.gfcAppendCopilotTimelineMessage === 'function') {
     const timelineResult = await window.gfcAppendCopilotTimelineMessage(isUser ? 'user' : 'assistant', text);
     if (timelineResult && timelineResult.handled) {
       if (window._gfcMascot && typeof window._gfcMascot.syncDialogueMessage === 'function') window._gfcMascot.syncDialogueMessage(isUser ? 'user' : 'assistant', String(text));
-      return timelineResult.result || { ok:true };
+      return complete(timelineResult.result || { ok:true });
     }
     // En el flujo canónico la ausencia del repositorio no habilita un fallback
     // con escritura local no transaccional. El llamador conserva el borrador.
@@ -10832,7 +10839,7 @@ async function gfcAppendCopilotChatMessage(role, text) {
     const rendered = window.YarbiConversationRenderer.appendMessage(box, { role:isUser ? 'user' : 'assistant', text:String(text), status:'complete' });
     if (rendered.ok) {
       if (window._gfcMascot && typeof window._gfcMascot.syncDialogueMessage === 'function') window._gfcMascot.syncDialogueMessage(isUser ? 'user' : 'assistant', String(text));
-      return rendered;
+      return complete(rendered);
     }
     if (rendered.code === 'content_empty') return rendered;
   }
@@ -10850,7 +10857,7 @@ async function gfcAppendCopilotChatMessage(role, text) {
   if (window._gfcMascot && typeof window._gfcMascot.syncDialogueMessage === 'function') {
     window._gfcMascot.syncDialogueMessage(isUser ? 'user' : 'assistant', String(text));
   }
-  return { ok:true, legacy:true };
+  return complete({ ok:true, legacy:true });
 }
 const GFC_OWNER_CONVERSATION_TOKEN_KEY = 'gfc_owner_conversation_token_v1';
 function gfcOwnerConversationToken() {
@@ -12163,10 +12170,16 @@ async function gfcSupabaseAuthConfig() {
 }
 async function gfcSupabaseAuthRequest(path, body) {
   const config = await gfcSupabaseAuthConfig();
-  const response = await fetch(config.supabaseUrl.replace(/\/$/, '') + '/auth/v1/' + path, { method: 'POST', headers: { apikey: config.publishableKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error_description || data.msg || data.message || 'Supabase Auth HTTP ' + response.status);
-  return { config, data };
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeoutId = controller ? window.setTimeout(() => controller.abort(), 9000) : 0;
+  try {
+    const response = await fetch(config.supabaseUrl.replace(/\/$/, '') + '/auth/v1/' + path, { method: 'POST', headers: { apikey: config.publishableKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body), ...(controller ? { signal:controller.signal } : {}) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error_description || data.msg || data.message || 'Supabase Auth HTTP ' + response.status);
+    return { config, data };
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
 }
 function gfcAccountAccessToken() {
   try {
@@ -20939,6 +20952,19 @@ async function gfcYarbiFocusedLocalContext(focus = {}) {
   }
 }
 
+async function gfcAwaitYarbiKnowledgeReply(task, timeoutMs = 22000) {
+  let timeoutId = 0;
+  const deadline = new Promise(resolve => {
+    timeoutId = window.setTimeout(() => resolve({
+      handled:true,
+      code:'knowledge_deadline',
+      reply:'## ⏱️ Consulta documental detenida\n\nLa búsqueda superó el límite seguro. Tus fuentes siguen guardadas; Yarbi cerró el proceso y no inventó una respuesta.'
+    }), Math.max(50, Number(timeoutMs) || 22000));
+  });
+  try { return await Promise.race([Promise.resolve(task), deadline]); }
+  finally { if (timeoutId) window.clearTimeout(timeoutId); }
+}
+
 async function gfcSendCopilotChatMessage(promptText) {
   try {
     if (window._gfcMascot) window._gfcMascot.setState('procesando', 'Analizando conversación...');
@@ -20979,7 +21005,7 @@ async function gfcSendCopilotChatMessage(promptText) {
   let multimodalKnowledgeReply = null;
   if (typeof window.gfcYarbiMultimodalAnswer === 'function') {
     try {
-      multimodalKnowledgeReply = await window.gfcYarbiMultimodalAnswer(text);
+      multimodalKnowledgeReply = await gfcAwaitYarbiKnowledgeReply(window.gfcYarbiMultimodalAnswer(text));
     } catch (error) {
       gfcChatDiag('multimodal-knowledge-error', { code:error?.code || error?.message || 'unknown' });
       multimodalKnowledgeReply = {
@@ -20989,7 +21015,12 @@ async function gfcSendCopilotChatMessage(promptText) {
     }
   }
   if (multimodalKnowledgeReply?.handled) {
-    await gfcAppendCopilotChatMessage('assistant', multimodalKnowledgeReply.reply);
+    const appendedKnowledgeReply = await gfcAppendCopilotChatMessage('assistant', multimodalKnowledgeReply.reply);
+    gfcChatDiag('multimodal-knowledge-complete', { code:multimodalKnowledgeReply.code || 'ok', saved:!!appendedKnowledgeReply?.ok, degraded:!!multimodalKnowledgeReply.degraded });
+    if (!appendedKnowledgeReply?.ok) {
+      window._gfcYarbiTextRequestActive = false;
+      gfcYarbiSetProcessStatus('error', 'No se pudo mostrar la respuesta');
+    }
     if (window._gfcMascot) window._gfcMascot.setState('reposo', multimodalKnowledgeReply.reply);
     gfcSpeakText(multimodalKnowledgeReply.reply);
     return;

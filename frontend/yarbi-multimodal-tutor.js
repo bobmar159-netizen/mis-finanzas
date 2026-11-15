@@ -418,6 +418,12 @@
   async function semanticSearchApproved(assets, question, options) {
     const approved = (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && asset.learningEnabled !== false);
     const lexical = searchApproved(approved, question, { limit:36 });
+    // Si dos o más conceptos coinciden localmente, el fragmento ya está bien
+    // identificado. Evitar embeddings aquí reduce una espera remota completa.
+    const lexicalLead = lexical[0];
+    if (Number(lexicalLead?.score || 0) >= 10 && new Set(lexicalLead?.hits || []).size >= 2) {
+      return { evidence:lexical, mode:'lexical_confident' };
+    }
     if (!approved.some(asset => (asset.sections || []).some(semanticReady))) return { evidence:lexical, mode:'lexical' };
     const key = normalize(question).slice(0, 1400);
     let queryVector = semanticQueryCache.get(key);
@@ -924,7 +930,7 @@
         const cached = (Array.isArray(deterministic.asset.queryCache) ? deterministic.asset.queryCache : []).find(item => item?.key === queryKey && item?.result?.ok);
         if (cached) return { ok:true, cached:true, reply:formatDirectedAnswer(cached.result, deterministic.asset), result:cached.result, asset:deterministic.asset };
         const result = await askTutor(question, { assets:[deterministic.asset], evidence });
-        if (!result.ok) return { ok:false, code:'library_provider_unavailable' };
+        if (!result.ok) return { ok:false, code:'library_provider_unavailable', evidence, candidates:[deterministic.asset] };
         const refreshed = await get(deterministic.asset.id) || deterministic.asset;
         const parsed = result.result || null;
         if (parsed?.ok) {
@@ -1017,6 +1023,13 @@
         if (libraryResult.code === 'no_approved_source' || libraryResult.code === 'no_approved_pdf') return { handled:true, reply:libraryAvailabilityReply(assets) };
         if (libraryResult.code === 'session_required') return { handled:true, reply:'**Inicia sesión para consultar tus normas.**\n\nLa biblioteca local permanece guardada y no se usó otro entorno.' };
         if (libraryResult.code === 'multimodal_request_timeout') return { handled:true, reply:'**La consulta tardó demasiado y la detuve.**\n\n> [⏱️ Límite seguro]\n> Tus PDF siguen guardados. Yarbi no quedó bloqueado, no cambió de fuente y no inventó una respuesta.' };
+        if (libraryResult.code === 'library_provider_unavailable' && libraryResult.evidence?.length) {
+          return {
+            handled:true,
+            reply:'## 📚 Evidencia local encontrada\n\nNo pude completar ahora la interpretación con Gemini, pero cerré el proceso y conservé la evidencia literal:\n\n' + citationMarkdown(libraryResult.evidence.slice(0, 2)) + '\n\n_No convertiré estos fragmentos en una conclusión hasta poder verificarlos._',
+            degraded:true
+          };
+        }
         return { handled:true, reply:'**No pude terminar la consulta documental ahora.**\n\n> [⏱️ Respuesta segura]\n> La búsqueda se detuvo sin cambiar de norma ni inventar una cita. Puedes reintentar; tus PDF siguen guardados.' };
       } catch (error) {
         if (error?.code === 'multimodal_request_timeout' || error?.message === 'multimodal_request_timeout') {
