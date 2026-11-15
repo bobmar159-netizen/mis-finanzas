@@ -20988,9 +20988,18 @@ async function gfcSendCopilotChatMessage(promptText) {
   // Los PDF, documentos, imágenes, audios y videos aprobados viven en la
   // biblioteca multimodal. El mismo cerebro del chat los consulta aquí; no se
   // crea un tutor paralelo ni se vuelve a procesar el archivo en cada pregunta.
-  const multimodalKnowledgeReply = typeof window.gfcYarbiMultimodalAnswer === 'function'
-    ? await window.gfcYarbiMultimodalAnswer(text)
-    : null;
+  let multimodalKnowledgeReply = null;
+  if (typeof window.gfcYarbiMultimodalAnswer === 'function') {
+    try {
+      multimodalKnowledgeReply = await window.gfcYarbiMultimodalAnswer(text);
+    } catch (error) {
+      gfcChatDiag('multimodal-knowledge-error', { code:error?.code || error?.message || 'unknown' });
+      multimodalKnowledgeReply = {
+        handled:true,
+        reply:'**No pude completar la consulta documental.**\n\n> [⚠️ Proceso cerrado]\n> Tus fuentes siguen guardadas y Yarbi no quedó bloqueado ni inventó una respuesta.'
+      };
+    }
+  }
   if (multimodalKnowledgeReply?.handled) {
     await gfcAppendCopilotChatMessage('assistant', multimodalKnowledgeReply.reply);
     if (window._gfcMascot) window._gfcMascot.setState('reposo', multimodalKnowledgeReply.reply);
@@ -47392,35 +47401,35 @@ body.gfc-yarbi-screen #modal-box,.gfc-yarbi-shell{background:#FFFFFF !important}
 .gfc-yarbi-chat,.gfc-yarbi-training-chat{padding:18px max(14px,calc((100% - 760px)/2)) 28px;background:#FFFFFF !important;scroll-padding-bottom:28px}
 .gfc-yarbi-day{margin:5px 0 18px;padding:3px 9px;border:0;background:transparent;color:#9AA39F;font-size:10px;font-weight:700}
 .gfc-yarbi-message{word-break:break-word;overflow-wrap:anywhere;white-space:normal}
-.gfc-yarbi-message.assistant,.gfc-yarbi-chat .yarbi-conversation-message:not([data-role="user"]){align-self:stretch!important;width:100%!important;max-width:760px!important;box-sizing:border-box;margin:0 auto 22px!important;padding:0 2px!important;border:0!important;border-radius:0!important;background:transparent!important;color:#24312B!important;box-shadow:none!important}
+.gfc-yarbi-message.assistant,.gfc-yarbi-chat .yarbi-conversation-message:not([data-role="user"]){align-self:stretch!important;width:100%!important;max-width:760px!important;box-sizing:border-box;margin:0 auto 16px!important;padding:0 2px!important;border:0!important;border-radius:0!important;background:transparent!important;color:#24312B!important;box-shadow:none!important}
 .gfc-yarbi-message.user,.gfc-yarbi-chat .yarbi-conversation-message[data-role="user"]{align-self:flex-end;width:auto;max-width:min(86%,620px);box-sizing:border-box;margin:0 0 20px;padding:11px 15px;border:1px solid #E1E7E4;border-radius:20px 20px 5px 20px;background:#F2F5F3;color:#26332D;box-shadow:none}
-.gfc-yarbi-message-label,.gfc-yarbi-chat .yarbi-conversation-label{display:flex;align-items:center;gap:7px;margin:0 0 9px;color:#456B5B;font-size:11px;font-weight:850;letter-spacing:.02em;text-transform:none}
+.gfc-yarbi-message-label,.gfc-yarbi-chat .yarbi-conversation-label{display:flex;align-items:center;gap:7px;margin:0 0 6px;color:#456B5B;font-size:11px;font-weight:850;letter-spacing:.02em;text-transform:none}
 .gfc-yarbi-message.assistant>.gfc-yarbi-message-label::before,.gfc-yarbi-chat .yarbi-conversation-message:not([data-role="user"])>.yarbi-conversation-label::before{content:"Y";width:23px;height:23px;display:grid;place-items:center;flex:0 0 23px;border-radius:8px;background:#507A68;color:#fff;font-size:11px;font-weight:900}
 .gfc-yarbi-message.user .gfc-yarbi-message-label,.gfc-yarbi-chat .yarbi-conversation-message[data-role="user"] .yarbi-conversation-label{margin-bottom:5px;color:#727C77;font-size:10px}
-.gfc-yarbi-message-body,.gfc-yarbi-chat .yarbi-content-paragraph{font-size:16px;line-height:1.62;color:inherit}
+.gfc-yarbi-message-body,.gfc-yarbi-chat .yarbi-content-paragraph{font-size:15.5px;line-height:1.52;color:inherit}
 .gfc-yarbi-message-body{white-space:pre-wrap}
 .gfc-yarbi-message-time{margin-top:7px;color:#9AA39F;font-size:10px;text-align:right}
-.gfc-yarbi-chat .yarbi-content-paragraph{margin:0 0 12px}
-.gfc-yarbi-chat .yarbi-content-heading{margin:21px 0 9px;color:#1F2E27;line-height:1.22;letter-spacing:-.025em}
+.gfc-yarbi-chat .yarbi-content-paragraph{margin:0 0 8px}
+.gfc-yarbi-chat .yarbi-content-heading{margin:14px 0 6px;color:#1F2E27;line-height:1.22;letter-spacing:-.02em}
 .gfc-yarbi-chat .yarbi-content-heading:first-child{margin-top:2px}
-.gfc-yarbi-chat .yarbi-content-heading-1{font-size:25px;font-weight:850}
-.gfc-yarbi-chat .yarbi-content-heading-2{font-size:21px;font-weight:820}
-.gfc-yarbi-chat .yarbi-content-heading-3{font-size:17px;font-weight:800}
-.gfc-yarbi-chat .yarbi-content-list{margin:9px 0 15px;padding-left:24px;font-size:15px;line-height:1.58}
-.gfc-yarbi-chat .yarbi-content-list li{margin:5px 0;padding-left:2px}
+.gfc-yarbi-chat .yarbi-content-heading-1{font-size:22px;font-weight:850}
+.gfc-yarbi-chat .yarbi-content-heading-2{font-size:18px;font-weight:820}
+.gfc-yarbi-chat .yarbi-content-heading-3{font-size:16.5px;font-weight:800}
+.gfc-yarbi-chat .yarbi-content-list{margin:6px 0 10px;padding-left:22px;font-size:14.5px;line-height:1.5}
+.gfc-yarbi-chat .yarbi-content-list li{margin:3px 0;padding-left:1px}
 .gfc-yarbi-chat .yarbi-content-checklist{list-style:"✓  ";padding-left:25px}
 .gfc-yarbi-chat .yarbi-content-checklist li::marker{color:#2F8A64;font-weight:900}
-.gfc-yarbi-chat .yarbi-content-panel{margin:14px 0;padding:14px 15px;border:1px solid #DCE9E2;border-left:4px solid #5C9277;border-radius:15px;background:#F7FAF8;box-shadow:0 4px 14px rgba(37,55,46,.045)}
+.gfc-yarbi-chat .yarbi-content-panel{margin:8px 0;padding:9px 11px;border:1px solid #DCE9E2;border-left:3px solid #6E9A84;border-radius:12px;background:#F8FAF9;box-shadow:0 2px 8px rgba(37,55,46,.035)}
 .gfc-yarbi-chat .yarbi-content-panel-warning{border-color:#F0DCAA;border-left-color:#C58A22;background:#FFF9EA}
-.gfc-yarbi-chat .yarbi-content-panel-title{font-size:14px;font-weight:850}
-.gfc-yarbi-chat .yarbi-content-panel p{font-size:14.5px;line-height:1.6;white-space:pre-wrap}
+.gfc-yarbi-chat .yarbi-content-panel-title{font-size:12.5px;font-weight:850}
+.gfc-yarbi-chat .yarbi-content-panel p{margin-top:3px;font-size:13.5px;line-height:1.48;white-space:pre-wrap}
 .gfc-yarbi-chat .yarbi-content-table-wrap{max-width:100%;overflow-x:auto;margin:15px 0;border:1px solid #DFE8E3;border-radius:12px;background:#fff}
 .gfc-yarbi-chat .yarbi-content-table{min-width:480px}
 .gfc-yarbi-chat .yarbi-content-table th{background:#F1F7F3;color:#315A49}
 .gfc-yarbi-chat .yarbi-content-table th,.gfc-yarbi-chat .yarbi-content-table td{padding:10px;font-size:13px}
 .gfc-yarbi-chat .yarbi-content-chip{margin:3px 5px 3px 0;padding:6px 10px;border-radius:999px;background:#EAF5EF;color:#315E4B;font-size:12px}
-.gfc-yarbi-chat .yarbi-content-source{margin-top:15px;padding-top:10px;border-top:1px solid #E4EAE7;color:#718078;font-size:12px}
-.gfc-yarbi-message-actions{justify-content:flex-start;margin:7px 0 0;min-height:26px}
+.gfc-yarbi-chat .yarbi-content-source{margin-top:8px;padding-top:7px;border-top:1px solid #E4EAE7;color:#718078;font-size:11px}
+.gfc-yarbi-message-actions{justify-content:flex-start;margin:4px 0 0;min-height:24px}
 .gfc-yarbi-message-copy{min-height:30px;padding:5px 8px;border-radius:8px;color:#78837E;font-size:11px}
 .gfc-yarbi-load-history{align-self:center;margin:2px auto 20px;border:1px solid #D9E6DF;border-radius:999px;background:#F5FAF7;color:#35624E;min-height:36px;padding:7px 13px;font:750 12px/1.15 var(--gfc-ui-font,inherit);cursor:pointer}.gfc-yarbi-load-history:focus-visible,.gfc-yarbi-load-history:hover{outline:none;border-color:#79A88F;background:#EDF6F0}
 .gfc-yarbi-chat-welcome{width:min(100%,680px);margin:auto;padding:30px 10px 26px}
@@ -47466,7 +47475,7 @@ body.gfc-yarbi-screen .gfc-pc-launch{display:none !important}
 @media(max-width:430px){
   .gfc-yarbi-header{gap:7px;padding-left:8px;padding-right:8px}.gfc-yarbi-back,.gfc-yarbi-icon-btn{width:38px;height:38px;flex-basis:38px}.gfc-yarbi-avatar{width:38px;height:38px;flex-basis:38px}.gfc-yarbi-brand-title{font-size:18px}.gfc-yarbi-mode-pill{max-width:75px;padding:7px 9px}
   .gfc-yarbi-chat,.gfc-yarbi-training-chat{padding-left:14px;padding-right:14px}.gfc-yarbi-message.assistant,.gfc-yarbi-chat .yarbi-conversation-message:not([data-role="user"]){padding-left:1px;padding-right:1px}.gfc-yarbi-message.user,.gfc-yarbi-chat .yarbi-conversation-message[data-role="user"]{max-width:88%}
-  .gfc-yarbi-chat .yarbi-content-heading-1{font-size:23px}.gfc-yarbi-chat .yarbi-content-heading-2{font-size:20px}.gfc-yarbi-composer-wrap{padding-left:10px;padding-right:10px}.gfc-yarbi-composer-hint{display:none}
+  .gfc-yarbi-chat .yarbi-content-heading-1{font-size:21px}.gfc-yarbi-chat .yarbi-content-heading-2{font-size:18px}.gfc-yarbi-composer-wrap{padding-left:10px;padding-right:10px}.gfc-yarbi-composer-hint{display:none}
 }
 @media(max-width:360px){.gfc-yarbi-mode-pill{display:none}.gfc-yarbi-welcome-actions{grid-template-columns:1fr}.gfc-yarbi-welcome-action{min-height:78px}.gfc-yarbi-live-btn{min-width:76px}.gfc-yarbi-chat-welcome h1{font-size:24px}}
 

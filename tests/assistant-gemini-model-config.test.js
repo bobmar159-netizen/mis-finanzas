@@ -22,3 +22,11 @@ test('Gemini endpoints keep the validated lightweight model as the explicit fall
     assert.equal(source.includes('gemini-3.6-flash'), false, file);
   }
 });
+
+test('Gemini proxy caps provider latency and distinguishes timeout from provider rejection', () => {
+  const source = read('api_handlers/assistant/gemini.js');
+  assert.match(source, /GEMINI_REQUEST_TIMEOUT_MS/);
+  assert.match(source, /new AbortController\(\)/);
+  assert.match(source, /signal: controller\.signal/);
+  assert.match(source, /res\.status\(504\)\.json\(\{ error: 'gemini_timeout' \}\)/);
+});

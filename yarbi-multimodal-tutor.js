@@ -28,6 +28,7 @@
   const MAX_PDF_PAGES = 2500;
   const MAX_PDF_INDEX_CHARS = 12 * 1024 * 1024;
   const MAX_PDF_SECTIONS = 8000;
+  const GEMINI_REQUEST_TIMEOUT_MS = 18000;
   let dbPromise = null;
   let progressTimer = null;
   let pdfJsPromise = null;
@@ -59,6 +60,29 @@
   function contentTokens(value) {
     return tokens(value).filter(token => token.length > 2 && !KNOWLEDGE_STOP_WORDS.has(token));
   }
+  const RETRIEVAL_EQUIVALENTS = [
+    ['valvula','valvulas','llave','llaves','corte'],
+    ['artefacto','artefactos','aparato','aparatos','equipo','equipos'],
+    ['permitir','permitido','permite','puede','podra','admitir','admite','autorizado'],
+    ['unica','unico','sola','solo','misma','mismo','comun'],
+    ['dos','doble','ambos','ambas','2'],
+    ['capitulo','seccion','numeral','articulo','apartado'],
+    ['tuberia','tuberias','conducto','conductos'],
+    ['ventilacion','ventilar','aireacion','abertura','rejilla']
+  ];
+  function retrievalGroups(value) {
+    return contentTokens(value).map(term => {
+      const equivalent = RETRIEVAL_EQUIVALENTS.find(group => group.includes(term));
+      const variants = new Set(equivalent || [term]);
+      variants.add(term);
+      if (term.endsWith('es') && term.length > 5) variants.add(term.slice(0, -2));
+      if (term.endsWith('s') && term.length > 4) variants.add(term.slice(0, -1));
+      return { term, variants:[...variants] };
+    });
+  }
+  function matchRetrievalGroups(haystack, groups) {
+    return (Array.isArray(groups) ? groups : []).filter(group => group.variants.some(variant => haystack.includes(variant)));
+  }
   function knowledgeIntent(value) {
     return /\b(?:norma|ntp|iso|manual|pdf|documento|archivo|fuente|biblioteca|cap[ií]tulo|numeral|art[ií]culo|anexo|tabla|procedimiento|reglamento|ficha\s+t[eé]cnica)\b/i.test(String(value || ''));
   }
@@ -82,14 +106,23 @@
     return sections.filter(item => item.text);
   }
   function searchApproved(assets, query, options) {
-    const terms = contentTokens(query);
+    const groups = retrievalGroups(query);
     const limit = Math.max(1, Math.min(80, Number(options?.limit) || 36));
     return (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && asset.learningEnabled !== false).flatMap(asset => {
       const sections = Array.isArray(asset.sections) ? asset.sections : [];
       return sections.map(section => {
-        const haystack = normalize([asset.title, section.label, section.text, asset.analysis?.summary].join(' '));
-        const hits = terms.filter(term => haystack.includes(term));
-        return hits.length ? { assetId:asset.id, title:asset.title, kind:asset.kind, sourceHash:asset.sha256 || '', sectionId:section.id || '', sectionLabel:clean(section.label || 'Fragmento sin referencia', 240), excerpt:section.text.slice(0, 800), hits, score:hits.length } : null;
+        const title = normalize(asset.title || '');
+        const reference = normalize(section.label || '');
+        const body = normalize(section.text || '');
+        const titleGroups = matchRetrievalGroups(title, groups);
+        const referenceGroups = matchRetrievalGroups(reference, groups);
+        const bodyGroups = matchRetrievalGroups(body, groups);
+        const matched = new Map();
+        [...bodyGroups, ...referenceGroups].forEach(group => matched.set(group.term, group));
+        if (!matched.size) return null;
+        const exactHits = [...matched.values()].filter(group => body.includes(group.term) || reference.includes(group.term));
+        const score = matched.size * 3 + exactHits.length * 2 + titleGroups.length * 2 + referenceGroups.length;
+        return { assetId:asset.id, title:asset.title, kind:asset.kind, sourceHash:asset.sha256 || '', sectionId:section.id || '', sectionLabel:clean(section.label || 'Fragmento sin referencia', 240), excerpt:section.text.slice(0, 900), hits:[...matched.keys()], score };
       }).filter(Boolean);
     }).sort((a,b) => b.score - a.score || a.title.localeCompare(b.title, 'es-PE')).slice(0, limit);
   }
@@ -143,13 +176,46 @@
   function formatDirectedAnswer(result, asset) {
     const title = clean(asset?.title || 'Fuente aprobada', 140);
     if (!result?.found) {
-      return '## 🔎 Respuesta breve\n\nNo encontré en **' + title + '** una cita literal que responda esa pregunta.\n\n' + (result?.caveat ? '> [Qué falta verificar]\n> ' + result.caveat + '\n\n' : '') + 'No afirmaré que está permitido o prohibido sin evidencia.';
+      return '**No encontré una cita que responda eso en ' + title + '.**\n\n' + (result?.caveat ? '> [🔎 Qué falta verificar]\n> ' + brief(result.caveat, 42) + '\n\n' : '') + 'No afirmaré que está permitido o prohibido sin evidencia.';
     }
-    return '## ✅ Respuesta breve\n\n' + (result.answer ? '**' + brief(result.answer, 45) + '**\n\n' : '')
-      + '> [📖 ' + result.reference + ']\n> “' + brief(result.quote, 70) + '”\n\n'
-      + (result.plain ? '**En sencillo:** ' + brief(result.plain, 55) + '\n\n' : '')
-      + (result.caveat ? '⚠️ **Importante:** ' + brief(result.caveat, 40) + '\n\n' : '')
-      + '_Fuente aprobada: ' + title + ' · SHA-256 ' + clean(String(asset?.sha256 || '').slice(0, 12)) + '…_';
+    return (result.answer ? '**✅ ' + brief(result.answer, 38) + '**\n\n' : '')
+      + '> [📖 ' + result.reference + ']\n> “' + brief(result.quote, 54) + '”\n\n'
+      + (result.plain ? '**En fácil:** ' + brief(result.plain, 42) + '\n\n' : '')
+      + (result.caveat ? '⚠️ **Ten en cuenta:** ' + brief(result.caveat, 30) + '\n\n' : '')
+      + '_Fuente: ' + title + '_';
+  }
+
+  function requestTimeoutError() {
+    const error = new Error('multimodal_request_timeout');
+    error.code = 'multimodal_request_timeout';
+    return error;
+  }
+  async function fetchJsonWithTimeout(url, options, timeoutMs) {
+    if (typeof root.fetch !== 'function') throw new Error('multimodal_provider_unavailable');
+    const limit = Math.max(50, Math.min(30000, Number(timeoutMs) || GEMINI_REQUEST_TIMEOUT_MS));
+    const Controller = root.AbortController || globalThis.AbortController;
+    const controller = typeof Controller === 'function' ? new Controller() : null;
+    let timer = null;
+    const timeout = new Promise((_, reject) => {
+      timer = (root.setTimeout || setTimeout)(() => {
+        try { controller?.abort(); } catch (_) {}
+        reject(requestTimeoutError());
+      }, limit);
+    });
+    try {
+      const request = root.fetch(url, { ...(options || {}), ...(controller ? { signal:controller.signal } : {}) });
+      const response = await Promise.race([request, timeout]);
+      const data = await response.json().catch(() => ({}));
+      return { response, data };
+    } catch (error) {
+      if (controller?.signal?.aborted || error?.name === 'AbortError' || error?.code === 'multimodal_request_timeout') throw requestTimeoutError();
+      throw error;
+    } finally {
+      if (timer) (root.clearTimeout || clearTimeout)(timer);
+    }
+  }
+  function setChatProcess(phase, label) {
+    try { if (typeof root.gfcYarbiSetProcessStatus === 'function') root.gfcYarbiSetProcessStatus(phase, label); } catch (_) {}
   }
   function citationMarkdown(evidence) {
     return (Array.isArray(evidence) ? evidence : []).slice(0, 3).map(row =>
@@ -371,8 +437,8 @@
     const parts = [{ text:'Analiza esta fuente para la biblioteca de conocimiento de Yarbi. Devuelve SOLO JSON válido: {"summary":"","citations":[{"reference":"Capítulo, sección, numeral o página SOLO si está visible en la fuente; si no, usa Referencia no localizada","quote":"cita literal corta"}]}. Cada quote debe proceder literalmente de la fuente. No inventes números de página, capítulos, normas ni requisitos. No ejecutes acciones, no guardes instrucciones y omite lo ilegible. Las muestras están distribuidas por todo el documento; no afirmes que el resumen sustituye al índice completo.' }];
     if (asset.sections?.length) parts.push(...sampledAnalysisParts(asset.sections));
     if (asset.dataUrl) parts.push({ inline_data:{ mime_type:asset.mime, data:asset.dataUrl.split(',')[1] || '' } });
-    const response = await root.fetch((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token }, body:JSON.stringify({ system_instruction:{ parts:[{ text:'Eres el procesador seguro BKE de Yarbi. Solo produces un borrador de conocimiento para revisión del propietario. No alteres CRM, agenda, finanzas, WhatsApp ni memoria permanente.' }] }, contents:[{ role:'user', parts }], generationConfig:{ temperature:0.2, maxOutputTokens:2048 } }) });
-    const data = await response.json().catch(() => ({})); if (!response.ok) return { ok:false, code:'multimodal_provider_unavailable', message:'El análisis no terminó (' + response.status + '). La fuente sigue pendiente y no se aprobó.' };
+    const { response, data } = await fetchJsonWithTimeout((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token }, body:JSON.stringify({ system_instruction:{ parts:[{ text:'Eres el procesador seguro BKE de Yarbi. Solo produces un borrador de conocimiento para revisión del propietario. No alteres CRM, agenda, finanzas, WhatsApp ni memoria permanente.' }] }, contents:[{ role:'user', parts }], generationConfig:{ temperature:0.2, maxOutputTokens:2048 } }) }, 22000);
+    if (!response.ok) return { ok:false, code:'multimodal_provider_unavailable', message:'El análisis no terminó (' + response.status + '). La fuente sigue pendiente y no se aprobó.' };
     const extracted = parseStructuredAnalysis(responseText(data));
     const analysis = { text:extracted.summary, citations:extracted.citations, at:Date.now(), provider:'gemini_safe_proxy', reviewed:false };
     const learnedSections = asset.sections?.length ? asset.sections : (analysis.citations.length ? analysis.citations : sectionsFromText(analysis.text));
@@ -408,20 +474,18 @@
     });
   }
   function rankApprovedSources(assets, question) {
-    const terms = contentTokens(question);
+    const groups = retrievalGroups(question);
     return approvedPdfAssets(assets).map(asset => {
       const titleHaystack = normalize(asset.title || '');
-      const titleHits = terms.filter(term => titleHaystack.includes(term));
-      const rows = (Array.isArray(asset.sections) ? asset.sections : []).map(section => {
-        const haystack = normalize([section.label, section.text].join(' '));
-        const hits = terms.filter(term => haystack.includes(term));
-        return { assetId:asset.id, title:asset.title, kind:asset.kind, sourceHash:asset.sha256 || '', sectionId:section.id || '', sectionLabel:clean(section.label || 'Fragmento sin referencia', 240), excerpt:String(section.text || '').slice(0, 900), hits, score:hits.length };
-      }).filter(row => row.score).sort((a,b) => b.score - a.score).slice(0, 4);
-      const covered = new Set([...titleHits, ...rows.flatMap(row => row.hits)]);
-      const coverage = terms.length ? covered.size / terms.length : 0;
+      const summary = clean(asset.analysis?.text || asset.analysis?.summary || '', 900);
+      const titleHits = matchRetrievalGroups(titleHaystack, groups);
+      const summaryHits = matchRetrievalGroups(normalize(summary), groups);
+      const rows = searchApproved([asset], question, { limit:6 });
+      const covered = new Set([...titleHits.map(group => group.term), ...summaryHits.map(group => group.term), ...rows.flatMap(row => row.hits)]);
+      const coverage = groups.length ? covered.size / groups.length : 0;
       const best = Number(rows[0]?.score || 0);
-      const score = Math.round(coverage * 100 + best * 12 + titleHits.length * 20);
-      return { asset, score, coverage, evidence:rows, summary:clean(asset.analysis?.text || asset.analysis?.summary || '', 900) };
+      const score = Math.round(coverage * 100 + best * 5 + titleHits.length * 16 + summaryHits.length * 5);
+      return { asset, score, coverage, evidence:rows, summary };
     }).sort((a,b) => b.score - a.score || String(a.asset.title || '').localeCompare(String(b.asset.title || ''), 'es-PE'));
   }
   function parseSourceRoute(value, allowedIds) {
@@ -460,7 +524,7 @@
         relevant_fragments:row.evidence.slice(0, 3).map(item => ({ reference:item.sectionLabel, text:clean(item.excerpt, 620) }))
       }));
       try {
-        const response = await root.fetch((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', {
+        const { response, data } = await fetchJsonWithTimeout((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', {
           method:'POST',
           headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
           body:JSON.stringify({
@@ -468,8 +532,7 @@
             contents:[{ role:'user', parts:[{ text:'CONSULTA:\n' + clean(question, 1200) + '\n\nCATÁLOGO DE FUENTES APROBADAS:\n' + JSON.stringify(catalog) + '\n\nDevuelve: {"selected_asset_id":"id exacto o vacío","confidence":"high|medium|low","search_terms":["sinónimos técnicos útiles"],"reason":"motivo breve"}. Elige high o medium solo si el título, resumen o fragmentos son temáticamente pertinentes.' }] }],
             generationConfig:{ temperature:0, maxOutputTokens:400, responseMimeType:'application/json' }
           })
-        });
-        const data = await response.json().catch(() => ({}));
+        }, 12000);
         if (response.ok) {
           const routed = parseSourceRoute(responseText(data), candidates.map(asset => asset.id));
           if (routed.selectedAssetId && routed.confidence !== 'low') {
@@ -498,7 +561,7 @@
     const token = typeof root.gfcAccountFreshAccessToken === 'function' ? await root.gfcAccountFreshAccessToken() : '';
     if (!token) return { ok:false, code:'session_required' };
     const instruction = 'Busca la respuesta exclusivamente dentro del PDF adjunto. La consulta puede usar sinónimos o describir una configuración técnica sin repetir el vocabulario exacto. Revisa todo el documento antes de responder. Devuelve SOLO JSON válido con esta forma: {"found":true|false,"answer":"respuesta directa y breve","exact_quote":"cita literal que sustenta exactamente la respuesta","reference":"norma, capítulo, numeral, artículo o página visible","plain_explanation":"significado sencillo en máximo 80 palabras","caveat":"condición, excepción o dato faltante"}. Usa found=true únicamente si la cita literal responde la consulta. Si el PDF no lo dice, usa found=false y explica brevemente qué término o condición podría faltar. No uses conocimiento general, no inventes numerales ni concluyas que algo está permitido por ausencia de prohibición.';
-    const response = await root.fetch((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', {
+    const { response, data } = await fetchJsonWithTimeout((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', {
       method:'POST',
       headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
       body:JSON.stringify({
@@ -509,9 +572,8 @@
         ] }],
         generationConfig:{ temperature:0.1, maxOutputTokens:1000, responseMimeType:'application/json' }
       })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) return { ok:false, code:'direct_source_provider_unavailable' };
+    }, GEMINI_REQUEST_TIMEOUT_MS);
+    if (!response.ok) return { ok:false, code:response.status === 504 ? 'multimodal_request_timeout' : 'direct_source_provider_unavailable' };
     let result = parseDirectedAnswer(responseText(data));
     if (!result.ok) return { ok:false, code:'direct_source_invalid_response' };
     if (result.found && Array.isArray(asset.sections) && asset.sections.length && !quoteSupportedByAsset(result, asset)) {
@@ -521,6 +583,68 @@
     await put({ ...asset, queryCache });
     return { ok:true, cached:false, reply:formatDirectedAnswer(result, asset), result };
   }
+  function parseLibraryAnswer(value, allowedIds) {
+    const raw = String(value || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (_) { return { ok:false, selectedAssetId:'', found:false }; }
+    const selectedAssetId = clean(parsed?.selected_asset_id, 180);
+    const allowed = new Set((Array.isArray(allowedIds) ? allowedIds : []).map(String));
+    if (!selectedAssetId || !allowed.has(selectedAssetId)) return { ok:true, selectedAssetId:'', found:false, caveat:clean(parsed?.caveat || 'No fue posible identificar una fuente suficiente.', 400) };
+    return { ...parseDirectedAnswer(raw), selectedAssetId };
+  }
+  async function queryApprovedLibrary(assets, question) {
+    const candidates = approvedPdfAssets(assets);
+    if (!candidates.length) return { ok:false, code:'no_approved_pdf' };
+    const rankings = rankApprovedSources(candidates, question);
+    const explicitMatches = explicitSourceMatches(candidates, question);
+    const deterministic = explicitMatches.length === 1
+      ? rankings.find(row => String(row.asset.id) === String(explicitMatches[0].id)) || { asset:explicitMatches[0], evidence:searchApproved(explicitMatches, question, { limit:10 }) }
+      : candidates.length === 1
+        ? rankings[0]
+        : localSourceDecision(rankings);
+
+    if (deterministic?.asset) {
+      setChatProcess('consulting', 'Revisando ' + clean(deterministic.asset.title, 54));
+      if (deterministic.asset.dataUrl) return queryApprovedSource(deterministic.asset, question);
+      const evidence = deterministic.evidence?.length ? deterministic.evidence : searchApproved([deterministic.asset], question, { limit:12 });
+      if (evidence.length) {
+        const result = await askTutor(question, { assets:[deterministic.asset], evidence });
+        return result.ok ? { ok:true, reply:result.text, result, asset:deterministic.asset } : { ok:false, code:'library_provider_unavailable' };
+      }
+      return { ok:false, code:'library_evidence_missing', candidates:[deterministic.asset] };
+    }
+
+    const rows = rankings.slice(0, 5).filter(row => row.evidence?.length);
+    if (!rows.length) return { ok:false, code:'source_ambiguous', candidates:rankings.slice(0, 4).map(row => row.asset) };
+    const token = typeof root.gfcAccountFreshAccessToken === 'function' ? await root.gfcAccountFreshAccessToken() : '';
+    if (!token) return { ok:false, code:'session_required' };
+    const catalog = rows.map(row => ({
+      asset_id:String(row.asset.id || ''),
+      title:clean(row.asset.title, 160),
+      fragments:row.evidence.slice(0, 3).map(item => ({ reference:item.sectionLabel, text:clean(item.excerpt, 600) }))
+    }));
+    setChatProcess('consulting', 'Buscando la cita exacta en tus normas');
+    const { response, data } = await fetchJsonWithTimeout((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
+      body:JSON.stringify({
+        system_instruction:{ parts:[{ text:'Eres el buscador documental de Yarbi. Resuelve la consulta en una sola pasada usando exclusivamente los fragmentos aprobados. Primero identifica la fuente correcta y luego responde. Devuelve SOLO JSON válido. No mezcles normas, no uses conocimiento externo y no inventes citas ni numerales.' }] },
+        contents:[{ role:'user', parts:[{ text:('CONSULTA:\n' + clean(question, 1200) + '\n\nFUENTES Y FRAGMENTOS APROBADOS:\n' + JSON.stringify(catalog) + '\n\nDevuelve {"selected_asset_id":"id exacto o vacío","found":true|false,"answer":"respuesta directa en máximo 38 palabras","exact_quote":"cita literal única","reference":"capítulo, numeral o página","plain_explanation":"explicación sencilla en máximo 42 palabras","caveat":"condición relevante o vacío"}. found=true exige una cita literal presente en los fragmentos de la fuente elegida.').slice(0, 15800) }] }],
+        generationConfig:{ temperature:0, maxOutputTokens:750, responseMimeType:'application/json' }
+      })
+    }, GEMINI_REQUEST_TIMEOUT_MS);
+    if (!response.ok) return { ok:false, code:response.status === 504 ? 'multimodal_request_timeout' : 'library_provider_unavailable' };
+    let result = parseLibraryAnswer(responseText(data), candidates.map(asset => asset.id));
+    const selected = candidates.find(asset => String(asset.id) === String(result.selectedAssetId));
+    if (!result.ok || !selected) return { ok:false, code:'source_ambiguous', candidates:rankings.slice(0, 4).map(row => row.asset) };
+    if (result.found && !quoteSupportedByAsset(result, selected)) {
+      result = { ok:true, selectedAssetId:selected.id, found:false, answer:'', quote:'', reference:'', plain:'', caveat:'La cita recibida no coincide literalmente con el índice local de la fuente seleccionada.' };
+    }
+    const queryKey = 'library-v3|' + normalize(question).slice(0, 1200);
+    const queryCache = [...(Array.isArray(selected.queryCache) ? selected.queryCache : []).filter(item => item?.key !== queryKey), { key:queryKey, result, at:Date.now() }].slice(-40);
+    await put({ ...selected, queryCache });
+    return { ok:true, reply:formatDirectedAnswer(result, selected), result, asset:selected };
+  }
   async function askTutor(question, prepared) {
     const text = clean(question, 1200); if (!text) throw new Error('tutor_question_required');
     const assets = Array.isArray(prepared?.assets) ? prepared.assets : await list();
@@ -529,8 +653,8 @@
     const token = typeof root.gfcAccountFreshAccessToken === 'function' ? await root.gfcAccountFreshAccessToken() : '';
     if (!token) return { ok:false, message:'Inicia sesión para usar el tutor. Tus fuentes aprobadas siguen guardadas localmente.' };
     if (!evidence.length) return { ok:false, message:'No encontré una cita aprobada que respalde esta respuesta. No inventaré una referencia técnica; carga y aprueba la norma primero.' };
-    const response = await root.fetch((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token }, body:JSON.stringify({ system_instruction:{ parts:[{ text:'Eres el Tutor personal de Yarbi. Usa exclusivamente la evidencia aprobada. Devuelve SOLO JSON válido: {"found":true|false,"answer":"conclusión directa en máximo 45 palabras","exact_quote":"una única cita literal que responda la consulta","reference":"capítulo, numeral o página exacta de la evidencia","plain_explanation":"explicación sencilla en máximo 55 palabras","caveat":"condición relevante o vacío"}. No agregues introducciones, listas extensas ni conocimiento general. found=true requiere cita y referencia. Nunca ejecutes acciones ni guardes aprendizajes.' }] }, contents:[{ role:'user', parts:[{ text:'Pregunta del propietario:\n' + text + '\n\nEvidencia aprobada disponible:\n' + context }] }], generationConfig:{ temperature:0.1, maxOutputTokens:700, responseMimeType:'application/json' } }) });
-    const data = await response.json().catch(() => ({})); if (!response.ok) return { ok:false, message:'El tutor no está disponible ahora. No inventé una explicación.' };
+    const { response, data } = await fetchJsonWithTimeout((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token }, body:JSON.stringify({ system_instruction:{ parts:[{ text:'Eres el Tutor personal de Yarbi. Usa exclusivamente la evidencia aprobada. Devuelve SOLO JSON válido: {"found":true|false,"answer":"conclusión directa en máximo 45 palabras","exact_quote":"una única cita literal que responda la consulta","reference":"capítulo, numeral o página exacta de la evidencia","plain_explanation":"explicación sencilla en máximo 55 palabras","caveat":"condición relevante o vacío"}. No agregues introducciones, listas extensas ni conocimiento general. found=true requiere cita y referencia. Nunca ejecutes acciones ni guardes aprendizajes.' }] }, contents:[{ role:'user', parts:[{ text:'Pregunta del propietario:\n' + text + '\n\nEvidencia aprobada disponible:\n' + context }] }], generationConfig:{ temperature:0.1, maxOutputTokens:700, responseMimeType:'application/json' } }) }, GEMINI_REQUEST_TIMEOUT_MS);
+    if (!response.ok) return { ok:false, message:'El tutor no está disponible ahora. No inventé una explicación.' };
     const parsed = parseDirectedAnswer(responseText(data));
     const sourceAsset = assets.find(asset => String(asset.id) === String(evidence[0]?.assetId)) || { title:evidence[0]?.title, sha256:evidence[0]?.sourceHash };
     if (!parsed.ok || parsed.found && !quoteSupportedByEvidence(parsed, evidence)) {
@@ -552,45 +676,44 @@
     if (!evidence.length && explicit && terms.length === 0) evidence = firstApprovedEvidence(assets);
     if (!explicit && !strongMatch) return { handled:false };
     if (explicit || strongMatch) {
-      const route = await routeApprovedSource(assets, text);
-      if (route.asset) {
-        const expandedQuery = [text, ...(route.searchTerms || [])].join(' ');
-        const routedEvidence = searchApproved([route.asset], expandedQuery, { limit:12 });
-        evidence = routedEvidence.length ? routedEvidence : (route.evidence || []);
-        if (route.asset.dataUrl) {
-          const directed = await queryApprovedSource(route.asset, text);
-          if (directed.ok) return { handled:true, reply:directed.reply, directSource:true, cached:!!directed.cached, sourceRouted:true };
-          if (!evidence.length) return { handled:true, reply:'## ⚠️ No pude revisar el PDF completo\n\nLa fuente correcta está identificada, pero la consulta del documento no terminó ahora. No usaré otra norma como sustituto ni inventaré una respuesta.' };
+      try {
+        const libraryResult = await queryApprovedLibrary(assets, text);
+        if (libraryResult.ok) {
+          setChatProcess('writing', 'Ordenando la respuesta verificada');
+          return { handled:true, reply:libraryResult.reply, directSource:true, cached:!!libraryResult.cached, sourceRouted:true };
         }
-        if (evidence.length) {
-          const routedResult = await askTutor(text, { assets:[route.asset], evidence });
-          if (routedResult.ok) return { handled:true, reply:routedResult.text, evidence:routedResult.evidence, sourceRouted:true };
+        if (libraryResult.code === 'source_ambiguous' || libraryResult.code === 'library_evidence_missing') {
+          const names = (libraryResult.candidates || []).slice(0, 4).map(asset => '**' + clean(asset.title, 100) + '**').join(', ');
+          return { handled:true, reply:'**Necesito una pista para elegir la norma correcta.**\n\n' + (names ? '> [📚 Fuentes posibles]\n> ' + names + '\n\n' : '') + 'Dime el nombre de la norma, el tema o un numeral. No mezclaré documentos por una coincidencia débil.' };
         }
-        return { handled:true, reply:formatDirectedAnswer({ found:false, caveat:'La fuente fue seleccionada, pero el índice aprobado no contiene una cita literal verificable para esta consulta.' }, route.asset) };
-      }
-      if (route.code === 'source_ambiguous') {
-        const names = (route.candidates || []).slice(0, 4).map(asset => '**' + clean(asset.title, 100) + '**').join(', ');
-        return { handled:true, reply:'## 📚 Necesito identificar la norma correcta\n\nLa consulta puede corresponder a más de una fuente aprobada' + (names ? ': ' + names : '') + '. Indícame el nombre de la norma o un dato adicional. No elegiré un PDF por una coincidencia débil.' };
+        if (libraryResult.code === 'session_required') return { handled:true, reply:'**Inicia sesión para consultar tus normas.**\n\nLa biblioteca local permanece guardada y no se usó otro entorno.' };
+        if (libraryResult.code === 'multimodal_request_timeout') return { handled:true, reply:'**La consulta tardó demasiado y la detuve.**\n\n> [⏱️ Límite seguro]\n> Tus PDF siguen guardados. Yarbi no quedó bloqueado, no cambió de fuente y no inventó una respuesta.' };
+        return { handled:true, reply:'**No pude terminar la consulta documental ahora.**\n\n> [⏱️ Respuesta segura]\n> La búsqueda se detuvo sin cambiar de norma ni inventar una cita. Puedes reintentar; tus PDF siguen guardados.' };
+      } catch (error) {
+        if (error?.code === 'multimodal_request_timeout' || error?.message === 'multimodal_request_timeout') {
+          return { handled:true, reply:'**La consulta tardó demasiado y la detuve.**\n\n> [⏱️ Límite seguro]\n> Tus PDF siguen guardados. Yarbi no quedó bloqueado, no cambió de fuente y no inventó una respuesta.' };
+        }
+        return { handled:true, reply:'**No pude completar la búsqueda en tus normas.**\n\n> [⚠️ Sin respuesta inventada]\n> Conservé la biblioteca y cerré el proceso para que puedas seguir usando el chat.' };
       }
     }
     if (!evidence.length) {
       const approved = assets.filter(asset => asset.status === 'approved');
       if (explicit && approved.length > 1) {
         const names = approved.slice(0, 4).map(asset => '**' + clean(asset.title, 100) + '**').join(', ');
-        return { handled:true, reply:'## 📚 Necesito una pista sobre la fuente\n\nTienes varias fuentes aprobadas: ' + names + '. Indícame el nombre de la norma, el tema o el numeral para citar la correcta sin mezclar documentos.' };
+        return { handled:true, reply:'**Necesito una pista sobre la fuente.**\n\n> [📚 Fuentes aprobadas]\n> ' + names + '\n\nDime el nombre, el tema o el numeral para citar sin mezclar documentos.' };
       }
       const drafts = assets.filter(asset => asset.status === 'analyzed_draft');
       if (drafts.length) {
         const names = drafts.slice(0, 3).map(asset => '**' + clean(asset.title, 100) + '**').join(', ');
-        return { handled:true, reply:'## ⏳ Fuente procesada, aprobación pendiente\n\nEncontré ' + names + ', pero todavía está como **borrador**. Para que Yarbi la use en el chat: **⋮ → Conocimiento y Tutor → Aprobar para tutoría**.\n\nNo usaré su contenido como conocimiento definitivo hasta que lo revises.' };
+        return { handled:true, reply:'**Fuente procesada, aprobación pendiente.**\n\nEncontré ' + names + '. Para usarla aquí: **⋮ → Conocimiento y Tutor → Aprobar para tutoría**. No usaré su contenido como conocimiento definitivo hasta que lo apruebes.' };
       }
-      return { handled:true, reply:'## 📚 No encontré evidencia aprobada\n\nNo hay una fuente aprobada que respalde esta consulta. Entra a **⋮ → Conocimiento y Tutor**, procesa el documento y pulsa **Aprobar para tutoría**. No inventaré una norma, capítulo ni numeral.' };
+      return { handled:true, reply:'**No encontré evidencia aprobada.**\n\nEntra a **⋮ → Conocimiento y Tutor**, procesa el documento y pulsa **Aprobar para tutoría**. No inventaré una norma, capítulo ni numeral.' };
     }
     const result = await askTutor(text, { assets, evidence });
     if (result.ok) return { handled:true, reply:result.text, evidence:result.evidence };
     return {
       handled:true,
-      reply:'## 📚 Evidencia local encontrada\n\nYarbi encontró la fuente aprobada, pero no pudo generar ahora la explicación completa. Estas son las referencias verificadas; no se inventó contenido:\n\n' + citationMarkdown(evidence),
+      reply:'**Encontré evidencia local, pero no pude completar la explicación.**\n\n' + citationMarkdown(evidence),
       evidence:evidence.map(row => ({ title:row.title, assetId:row.assetId, sectionLabel:row.sectionLabel })),
       degraded:true
     };
@@ -732,5 +855,5 @@
   async function askTutorFromUi() { const input = root.document.getElementById('gfc-mm-tutor-question'); const out = root.document.getElementById('gfc-mm-tutor-answer'); if (!out) return; out.textContent = 'El tutor está preparando una explicación…'; try { const result = await askTutor(input?.value || ''); out.textContent = result.ok ? result.text : (result.message || 'No pude responder sin inventar información.'); } catch (error) { out.textContent = statusText(error); } }
   function html() { return '<main class="gfc-yarbi-tool-page gfc-mm-page"><section class="gfc-mm-hero"><span>📚</span><div><h2>Conocimiento y Tutor</h2><p>Selecciona una fuente, observa su procesamiento y decide cuándo puede usarla Yarbi.</p></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Procesar</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div><label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>PDF de hasta 120 MB: Yarbi los indexa por páginas en el teléfono. Los PDF escaneados sin texto requieren OCR.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div><section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section><div id="gfc-mm-status" class="gfc-yarbi-import-summary">Tus fuentes aprobadas quedan indexadas localmente para responder rápido. La aprobación es obligatoria antes de usarlas como conocimiento. No se ejecutan acciones comerciales durante este proceso.</div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">🎓 Preguntar al Tutor</div><div class="gfc-yarbi-tool-copy">Yarbi responde primero de forma breve y muestra una sola cita literal con su capítulo, numeral o página. Si falta evidencia, se abstiene.</div><textarea id="gfc-mm-tutor-question" rows="4" placeholder="Ejemplo: ¿Qué exige esta norma y qué significa en palabras sencillas?"></textarea><button class="gfc-yarbi-primary" onclick="gfcYarbiTutorAsk()">Preguntar al tutor</button><article id="gfc-mm-tutor-answer" class="gfc-mm-tutor-answer">Aquí aparecerá una explicación respaldada por tus fuentes aprobadas.</article></section></main>'; }
   function attach() { void render(); }
-  return Object.freeze({ classifyFile, normalize, contentTokens, knowledgeIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, formatDirectedAnswer, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, buildAsset, importFiles, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES });
+  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, buildAsset, importFiles, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS });
 }));

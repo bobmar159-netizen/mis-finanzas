@@ -10,6 +10,7 @@ const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || process.env.GEMINI_CHAT_MODEL || 'gemini-3.5-flash-lite';
 const MAX_TEXT = 16000;
 const MAX_INLINE_BYTES = 3 * 1024 * 1024;
+const GEMINI_TIMEOUT_MS = Math.max(3000, Math.min(25000, Number(process.env.GEMINI_REQUEST_TIMEOUT_MS) || 17000));
 
 function cors(res) {
   if (process.env.APP_ORIGIN) res.setHeader('Access-Control-Allow-Origin', process.env.APP_ORIGIN);
@@ -68,16 +69,27 @@ module.exports = async function geminiHandler(req, res) {
     const systemInstruction = input.system_instruction || input.systemInstruction;
     const systemParts = Array.isArray(systemInstruction?.parts) ? systemInstruction.parts.map(sanitizePart).filter(Boolean).slice(0, 4) : [];
     if (systemParts.length) request.system_instruction = { parts: systemParts };
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request)
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+    let response;
+    try {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request), signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       console.error('[ASSISTANT GEMINI PROXY]', JSON.stringify({ status: response.status, category: 'provider_rejected' }));
       return res.status(502).json({ error: 'gemini_unavailable', provider_status: response.status });
     }
     return res.status(200).json({ candidates: Array.isArray(data.candidates) ? data.candidates : [] });
-  } catch (_) {
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      console.error('[ASSISTANT GEMINI PROXY]', JSON.stringify({ category: 'provider_timeout' }));
+      return res.status(504).json({ error: 'gemini_timeout' });
+    }
     console.error('[ASSISTANT GEMINI PROXY]', JSON.stringify({ category: 'request_failed' }));
     return res.status(500).json({ error: 'gemini_proxy_failed' });
   }

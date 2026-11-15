@@ -65,10 +65,21 @@ test('BKE multimodal: la búsqueda dirigida exige cita y ubicación antes de afi
   assert.equal(found.found, true);
   assert.equal(unsafe.found, false);
   const formatted = api.formatDirectedAnswer(found, { title:'Norma técnica.pdf', sha256:'d'.repeat(64) });
-  assert.match(formatted, /## ✅ Respuesta breve/);
+  assert.match(formatted, /^\*\*✅ Se admite bajo condiciones\./);
   assert.match(formatted, /> \[📖 Numeral 7\.3\]/);
   assert.match(formatted, /“La válvula podrá alimentar dos artefactos\.”/);
   assert.match(api.formatDirectedAnswer(unsafe, { title:'Norma técnica.pdf' }), /No encontré/);
+});
+
+test('BKE multimodal: recupera sinónimos técnicos sin convertir el chat en comandos rígidos', () => {
+  const results = api.searchApproved([{
+    id:'ntp', title:'NTP 111.011', kind:'pdf', status:'approved',
+    sections:[{ label:'Numeral 8.4', text:'Una misma llave de corte podrá controlar dos aparatos bajo las condiciones indicadas.' }]
+  }], '¿puedo usar una sola válvula para dos artefactos?');
+  assert.equal(results.length, 1);
+  assert.equal(results[0].assetId, 'ntp');
+  assert.ok(results[0].score >= 10);
+  assert.deepEqual(api.retrievalGroups('válvula artefactos').map(group => group.term), ['valvula','artefactos']);
 });
 
 test('BKE multimodal: indexa páginas de PDF con referencia visible y límites explícitos', () => {
@@ -118,6 +129,31 @@ test('BKE multimodal: enruta fuentes con identificadores permitidos y rechaza ID
   assert.deepEqual(routed.searchTerms, ['llave de corte','artefactos']);
   assert.equal(invented.selectedAssetId, '');
   assert.equal(invented.confidence, 'low');
+});
+
+test('BKE multimodal: la respuesta unificada exige una fuente permitida y una cita verificable', () => {
+  const valid = api.parseLibraryAnswer('{"selected_asset_id":"ntp","found":true,"answer":"Sí, bajo condiciones.","exact_quote":"Una llave controla dos aparatos.","reference":"Numeral 8.4","plain_explanation":"Revisa las condiciones.","caveat":""}', ['ntp']);
+  const invented = api.parseLibraryAnswer('{"selected_asset_id":"otra","found":true,"answer":"Sí.","exact_quote":"Texto","reference":"1"}', ['ntp']);
+  assert.equal(valid.ok, true);
+  assert.equal(valid.selectedAssetId, 'ntp');
+  assert.equal(valid.found, true);
+  assert.equal(invented.selectedAssetId, '');
+  assert.equal(invented.found, false);
+});
+
+test('BKE multimodal: corta una consulta bloqueada y devuelve un timeout controlado', async () => {
+  const previousFetch = global.fetch;
+  global.fetch = (_url, options) => new Promise((_resolve, reject) => {
+    options.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name:'AbortError' })), { once:true });
+  });
+  try {
+    await assert.rejects(
+      api.fetchJsonWithTimeout('https://synthetic.invalid', { method:'POST' }, 50),
+      error => error?.code === 'multimodal_request_timeout'
+    );
+  } finally {
+    global.fetch = previousFetch;
+  }
 });
 
 test('BKE multimodal: el ranking conserva fuentes separadas y las pausadas no participan', () => {
@@ -178,10 +214,14 @@ test('BKE multimodal: el chat principal consulta la misma biblioteca aprobada', 
   assert.match(source, /Fuente procesada, aprobación pendiente/);
   assert.match(source, /No usaré su contenido como conocimiento definitivo/);
   assert.match(index, /window\.gfcYarbiMultimodalAnswer/);
-  assert.match(index, /const multimodalKnowledgeReply/);
+  assert.match(index, /let multimodalKnowledgeReply = null/);
+  assert.match(index, /multimodal-knowledge-error/);
   assert.match(source, /Busca la respuesta exclusivamente dentro del PDF adjunto/);
   assert.match(source, /responseMimeType:'application\/json'/);
   assert.match(source, /queryCache/);
+  assert.match(source, /queryApprovedLibrary\(assets, text\)/);
+  assert.match(source, /La consulta tardó demasiado y la detuve/);
+  assert.match(source, /fetchJsonWithTimeout/);
   assert.match(source, /conclusión directa en máximo 45 palabras/);
   assert.match(source, /explicación sencilla en máximo 55 palabras/);
 });
