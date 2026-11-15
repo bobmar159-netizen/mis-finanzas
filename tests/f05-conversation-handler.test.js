@@ -83,3 +83,34 @@ test('F05 handler answers a selected synthetic contact from scoped data without 
   assert.equal(res.state.body.execute, false);
   assert.equal(providerCalls, 0);
 }));
+
+test('la conversación de Producción conserva el mismo scope servidor sin abrir Gemini cuando FAST responde', async () => {
+  const before = Object.fromEntries(ENV_KEYS.concat(['YARBI_OWNER_CONVERSATION_ENABLED', 'YARBI_OWNER_CONVERSATION_PROJECT_REF', 'YARBI_OWNER_CONVERSATION_GEMINI_ENABLED']).map(key => [key, process.env[key]]));
+  Object.assign(process.env, {
+    VERCEL_ENV: 'production', SUPABASE_URL: 'https://haifktjvyhbsazmiyqps.supabase.co', SUPABASE_SECRET_KEY: 'production-service-key-not-real',
+    SUPABASE_PUBLISHABLE_KEY: 'production-publishable-key-not-real', YARBI_TRACE_HMAC_KEY: 'production-trace-hmac-key-not-real-12345678901234567890',
+    YARBI_OWNER_CONVERSATION_ENABLED: 'true', YARBI_OWNER_CONVERSATION_PROJECT_REF: 'haifktjvyhbsazmiyqps', YARBI_OWNER_CONVERSATION_GEMINI_ENABLED: 'false'
+  });
+  try {
+    const calls = [];
+    const fetchImpl = async (raw, options = {}) => {
+      const url = new URL(String(raw)); calls.push(url);
+      assert.equal(url.hostname, 'haifktjvyhbsazmiyqps.supabase.co');
+      if (url.pathname === '/auth/v1/user') return json({ id: OWNER });
+      if (url.pathname === '/rest/v1/yarbi_owner_contact_scope') return json([{ contact_id: 17 }]);
+      if (url.pathname === '/rest/v1/yarbi_agent_actions') return json([JSON.parse(options.body)[0]], 201);
+      if (url.pathname === '/rest/v1/agenda_events') return json([{ id: 'PROD-AGENDA-1', contact_id: 17, event_type: 'visita', status: 'scheduled', starts_at: '2026-11-06T15:00:00.000Z' }]);
+      if (url.pathname === '/rest/v1/crm_contacts') return json([{ id: 17, display_name: 'Owner scoped synthetic' }]);
+      if (['/rest/v1/contact_identifiers', '/rest/v1/yarbi_contact_operational_memory', '/rest/v1/whatsapp_messages', '/rest/v1/ai_message_analysis', '/rest/v1/yarbi_receivables'].includes(url.pathname)) return json([]);
+      throw new Error('unexpected_production_synthetic_request:' + url.pathname);
+    };
+    const handler = createConversationHandler({ fetchImpl, now: () => NOW, providerFactory: () => { throw new Error('gemini_must_not_initialize'); } });
+    const res = responseBox();
+    await handler({ method: 'POST', url: '/api/assistant/conversation', headers: { authorization: 'Bearer synthetic-owner-session' }, body: { utterance: '¿Qué tengo mañana?' } }, res);
+    assert.equal(res.state.status, 200, JSON.stringify(res.state.body));
+    assert.equal(res.state.body.intelligence.tier, 'FAST');
+    assert.equal(calls.some(call => /googleapis|gemini/i.test(call.hostname)), false);
+  } finally {
+    Object.entries(before).forEach(([key, value]) => value === undefined ? delete process.env[key] : process.env[key] = value);
+  }
+});

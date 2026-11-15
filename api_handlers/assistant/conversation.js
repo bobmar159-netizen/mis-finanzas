@@ -3,7 +3,7 @@
 // Conversación autenticada de solo lectura. El navegador aporta la frase y,
 // opcionalmente, un token de continuidad firmado; la identidad, el scope y
 // los datos comerciales se resuelven únicamente del lado servidor.
-const { configuration, decidePreviewOwnerReferenceRequest } = require('../../lib/preview-owner-reference-policy');
+const { configuration, decideOwnerConversationRequest } = require('../../lib/yarbi-owner-conversation-policy');
 const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 const { createCanonicalOwnerScopeResolver, verifiedOwnerId } = require('../../lib/yarbi-owner-scope');
 const { loadScopedCrmSources, recordsFromRows, searchScopedCrm, normalizeScope } = require('../../lib/yarbi-crm-search-runtime');
@@ -61,7 +61,7 @@ function safeResponse(result) {
 
 function createConversationHandler({ fetchImpl = fetch, providerFactory = createGeminiV4OwnerUnderstandingProvider, now = () => Date.now() } = {}) {
   return async function conversationHandler(req, res) {
-    const decision = decidePreviewOwnerReferenceRequest(req, process.env);
+    const decision = decideOwnerConversationRequest(req, process.env);
     if (!decision.allow) return res.status(decision.status).json({ ok: false, error: decision.code });
     const config = decision.state?.config || configuration(process.env).config;
     if (!config) return res.status(503).json({ ok: false, error: 'owner_conversation_preview_not_configured' });

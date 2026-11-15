@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
 const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 const { blockedOwnerInput } = require('../../lib/yarbi-authenticated-route');
+const { configuration: ownerConversationConfiguration } = require('../../lib/yarbi-owner-conversation-policy');
 
 let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
@@ -625,13 +626,17 @@ module.exports = async function handler(req, res) {
   const action = clean(req.query?.action || '', 40).toLowerCase();
   if (action === 'auth-callback' && req.method === 'GET') return authCallbackPage(res);
   if (action === 'auth-config' && req.method === 'GET') {
+    const ownerConversation = ownerConversationConfiguration(process.env);
     return res.status(200).json({
       ok: true,
       supabaseUrl: SUPABASE_URL,
       publishableKey: SUPABASE_PUBLISHABLE_KEY,
       // Solo habilita el formulario de contraseña sintética en el Preview
       // aislado de referencias. No concede permisos y no expone secretos.
-      previewOwnerReferencesOnly: process.env.VERCEL_ENV === 'preview' && String(process.env.YARBI_PREVIEW_OWNER_REFERENCES_ONLY || '').trim().toLowerCase() === 'true'
+      previewOwnerReferencesOnly: process.env.VERCEL_ENV === 'preview' && String(process.env.YARBI_PREVIEW_OWNER_REFERENCES_ONLY || '').trim().toLowerCase() === 'true',
+      // No aporta permisos ni secretos. Indica al frontend que debe usar el
+      // único recorrido propietario con scope servidor en vez del chat legado.
+      ownerConversationEnabled: ownerConversation.valid === true
     });
   }
   if (action === 'account-settings') {

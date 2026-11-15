@@ -10886,7 +10886,7 @@ async function gfcCallGeminiAPI(_apiKey, payload) {
   // reutiliza el chat legado como fallback hacia otro entorno.
   try {
     const config = await gfcSupabaseAuthConfig();
-    if (config.previewOwnerReferencesOnly === true) return await gfcCallAuthenticatedOwnerConversation(payload);
+    if (config.previewOwnerReferencesOnly === true || config.ownerConversationEnabled === true) return await gfcCallAuthenticatedOwnerConversation(payload);
   } catch (error) {
     return { ok:false, status:0, message:'No está disponible la configuración aislada de Yarbi.' };
   }
