@@ -46,13 +46,22 @@
     if (/\.(mp4|mov|webm)$/i.test(name) || type.startsWith('video/')) return 'video';
     return 'unsupported';
   }
+  function technicalReference(value, fallback) {
+    const heading = cleanText(value).replace(/\s+/g, ' ').trim();
+    if (/^(?:cap[ií]tulo|secci[oó]n|numeral|art[ií]culo|anexo|ntp|iso|tabla|figura)\b/i.test(heading) && heading.length <= 220) return heading;
+    return fallback;
+  }
   function extractSections(text) {
-    const chunks = cleanText(text).split(/\n\s*\n+/).map(value => value.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const chunks = cleanText(text).split(/\n\s*\n+/).map(value => ({ raw:value, text:value.replace(/\s+/g, ' ').trim() })).filter(value => value.text);
     const sections = [];
-    chunks.forEach(chunk => {
-      for (let offset = 0; offset < chunk.length && sections.length < MAX_SECTIONS; offset += 1300) {
-        const value = chunk.slice(offset, offset + 1300).trim();
-        if (value) sections.push({ id:'s' + (sections.length + 1), label:'Fragmento ' + (sections.length + 1), text:value });
+    let activeReference = '';
+    chunks.forEach(chunkValue => {
+      const firstLine = String(chunkValue.raw).split(/[\n:]/)[0] || '';
+      const detected = technicalReference(firstLine, '');
+      if (detected) activeReference = detected;
+      for (let offset = 0; offset < chunkValue.text.length && sections.length < MAX_SECTIONS; offset += 1300) {
+        const value = chunkValue.text.slice(offset, offset + 1300).trim();
+        if (value) sections.push({ id:'s' + (sections.length + 1), label:activeReference || ('Fragmento ' + (sections.length + 1)), text:value });
       }
     });
     return sections;
@@ -95,8 +104,8 @@
     if (!rows.length) {
       return '## 📚 Biblioteca local\n\nNo encontré una cita aprobada sobre **' + cleanText(query) + '**. No inventaré una norma, una página ni una conclusión documental. Puedes revisar o aprobar una fuente en **Funciones de Yarbi → Conocimiento**.';
     }
-    return '## 📚 Citas de tu biblioteca\n\nEstas son **coincidencias literales** de fuentes locales aprobadas; no son una interpretación automática.\n\n' + rows.map(row =>
-      '**' + cleanText(row.sourceTitle) + ' · ' + cleanText(row.sectionLabel) + '**\n> ' + cleanText(row.excerpt) + '\n\n_Coincidencias: ' + (Array.isArray(row.hits) ? row.hits.join(', ') : '') + ' · SHA-256 ' + cleanText(String(row.sourceHash || '').slice(0, 12)) + '…_'
+    return '## 📚 Respuesta respaldada por tu biblioteca\n\nBusqué coincidencias literales aprobadas sobre **' + cleanText(query) + '**. No son una interpretación automática, una norma inventada ni una fuente externa.\n\n' + rows.map(row =>
+      '### ' + cleanText(row.sourceTitle) + '\n\n**Referencia:** ' + cleanText(row.sectionLabel) + '\n\n> ' + cleanText(row.excerpt) + '\n\n**En palabras sencillas:** la fuente exige exactamente lo indicado en la cita. Para interpretar cómo aplicarlo a un caso técnico concreto, usa **“Explícame con mi tutor…”**; Yarbi conservará esta misma referencia y no añadirá requisitos que el documento no respalde.\n\n_Fuente aprobada · coincidencias: ' + (Array.isArray(row.hits) ? row.hits.join(', ') : '') + ' · SHA-256 ' + cleanText(String(row.sourceHash || '').slice(0, 12)) + '…_'
     ).join('\n\n');
   }
   async function sha256(text) {

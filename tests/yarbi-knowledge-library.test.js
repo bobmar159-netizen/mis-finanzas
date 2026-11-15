@@ -43,6 +43,17 @@ test('BKE local: responde con citas literales y procedencia, no con una conclusi
   assert.match(reply, /No son una interpretación automática/i);
 });
 
+test('BKE local: conserva una referencia técnica visible y separa cita de explicación sencilla', () => {
+  const sections = library.extractSections('CAPÍTULO 4\n\nLa instalación debe verificarse antes de operar.');
+  const reply = library.answerFromResults('verificar instalación', [{
+    sourceTitle:'NTP técnica', sectionLabel:'CAPÍTULO 4', sourceHash:'b'.repeat(64),
+    excerpt:'La instalación debe verificarse antes de operar.', hits:['verificar', 'instalación']
+  }]);
+  assert.equal(sections[0].label, 'CAPÍTULO 4');
+  assert.match(reply, /Referencia:\*\* CAPÍTULO 4/);
+  assert.match(reply, /En palabras sencillas/i);
+});
+
 test('BKE local: la interfaz exige revisión y no anuncia procesamiento de formatos no soportados', () => {
   assert.match(library.html(), /Revisa el contenido antes de aprobarlo/i);
   assert.match(source, /Borrador: requiere aprobación explícita/);

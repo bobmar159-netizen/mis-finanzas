@@ -24,6 +24,22 @@ test('BKE multimodal: fragmenta texto de manera determinista para tutoría', () 
   assert.deepEqual(sections.map(section => section.text), ['Primera regla.', 'Segunda regla con más detalle.']);
 });
 
+test('BKE multimodal: conserva la referencia visible y adjunta evidencia verificable al tutor', () => {
+  const sections = api.sectionsFromText('Numeral 5.2\n\nVerifique la instalación antes de operar.');
+  const evidence = api.searchApproved([{ id:'ntp', title:'NTP de prueba', sha256:'c'.repeat(64), kind:'pdf', status:'approved', sections }], 'verifique instalación');
+  const markdown = api.citationMarkdown(evidence);
+  assert.equal(sections[0].label, 'Numeral 5.2');
+  assert.equal(evidence[0].sectionLabel, 'Numeral 5.2');
+  assert.match(markdown, /Referencia:\*\* Numeral 5\.2/);
+  assert.match(markdown, /SHA-256/);
+});
+
+test('BKE multimodal: una extracción estructurada no inventa referencia cuando no viene indicada', () => {
+  const result = api.parseStructuredAnalysis('{"summary":"Resumen breve","citations":[{"reference":"","quote":"Texto literal"}]}');
+  assert.equal(result.summary, 'Resumen breve');
+  assert.equal(result.citations[0].label, 'Fragmento extraído 1');
+});
+
 test('BKE multimodal: solo usa fuentes aprobadas como evidencia del tutor', () => {
   const results = api.searchApproved([
     { id:'ok', title:'Manual de visitas', kind:'pdf', status:'approved', sections:[{ text:'Confirmar la visita y explicar los pasos.' }] },
@@ -40,7 +56,7 @@ test('BKE multimodal: el resultado analizado queda indexado y no obliga a reproc
   assert.equal(results[0].assetId, 'pdf-1');
   assert.match(source, /status === 'analyzed_draft' \|\| asset\.status === 'approved'/);
   assert.match(source, /cached:true/);
-  assert.match(source, /const learnedSections = asset\.sections\?\.length \? asset\.sections : sectionsFromText\(analysis\.text\)/);
+  assert.match(source, /const learnedSections = asset\.sections\?\.length \? asset\.sections : \(analysis\.citations\.length \? analysis\.citations : sectionsFromText\(analysis\.text\)\)/);
 });
 
 test('BKE multimodal: no anuncia aprendizaje automático ni acciones comerciales', () => {
