@@ -14,7 +14,6 @@
     root.gfcYarbiMultimodalDelete = api.deleteFromUi;
     root.gfcYarbiMultimodalFilesChosen = api.filesChosen;
     root.gfcYarbiMultimodalImportText = api.importTextFromUi;
-    root.gfcYarbiTutorAsk = api.askTutorFromUi;
     root.gfcYarbiMultimodalAnswer = api.answerFromChat;
   }
 }(typeof window === 'undefined' ? globalThis : window, function (root) {
@@ -63,7 +62,7 @@
   }
   function titleFor(file) { return clean(file?.name || 'Fuente sin nombre', 140) || 'Fuente sin nombre'; }
   function kindLabel(kind) { return ({ text:'Texto', pdf:'PDF', image:'Imagen', audio:'Audio', video:'Video' }[kind] || 'Archivo'); }
-  function statusLabel(status) { return ({ local_ready:'Listo localmente', pending_analysis:'Pendiente de análisis', analyzed_draft:'Borrador analizado', approved:'Aprobado para tutoría', blocked:'Requiere extractor' }[status] || 'Pendiente'); }
+  function statusLabel(status) { return ({ local_ready:'Listo localmente', pending_analysis:'Pendiente de análisis', analyzed_draft:'Borrador analizado', approved:'Disponible para Yarbi', blocked:'Requiere extractor' }[status] || 'Pendiente'); }
   function tokens(value) { return [...new Set(normalize(value).split(' ').filter(token => token.length > 1))]; }
   const KNOWLEDGE_STOP_WORDS = new Set(['que','qué','como','cómo','cual','cuál','cuales','cuáles','donde','dónde','cuando','cuándo','quien','quién','para','por','con','sin','sobre','entre','desde','hasta','una','uno','unos','unas','del','las','los','esta','este','esto','esa','ese','eso','sus','segun','según','dice','dime','explica','explicame','yarbi','yarbis','archivo','documento','pdf','norma']);
   function contentTokens(value) {
@@ -266,24 +265,24 @@
     const rows = Array.isArray(assets) ? assets : [];
     const drafts = rows.filter(asset => asset.status === 'analyzed_draft');
     if (drafts.length) {
-      return '**Tus fuentes sí están procesadas, pero falta aprobarlas.**\n\n> [🟠 Estado]\n> ' + sourceNames(drafts) + '\n\nEntra a **⋮ → Conocimiento y Tutor** y pulsa **Aprobar**. No las borres ni las vuelvas a cargar.';
+      return '**Tus fuentes sí están procesadas, pero falta aprobarlas.**\n\n> [🟠 Estado]\n> ' + sourceNames(drafts) + '\n\nEntra a **⋮ → Biblioteca de Yarbi** y pulsa **Aprobar**. No las borres ni las vuelvas a cargar.';
     }
     const pending = rows.filter(asset => asset.status === 'local_ready' || asset.status === 'pending_analysis');
     if (pending.length) {
-      return '**Tus fuentes están guardadas, pero aún no terminaron de prepararse.**\n\n> [⏳ Estado]\n> ' + sourceNames(pending) + '\n\nEntra a **⋮ → Conocimiento y Tutor** y pulsa **Analizar**. No necesitas volver a cargarlas.';
+      return '**Tus fuentes están guardadas, pero aún no terminaron de prepararse.**\n\n> [⏳ Estado]\n> ' + sourceNames(pending) + '\n\nEntra a **⋮ → Biblioteca de Yarbi** y pulsa **Preparar revisión** para documentos con texto o **Analizar** para otros formatos. No necesitas volver a cargarlos.';
     }
     const paused = rows.filter(asset => asset.status === 'approved' && asset.learningEnabled === false);
     if (paused.length) {
-      return '**Tus fuentes están aprobadas, pero su uso está pausado.**\n\n> [⏸️ Estado]\n> ' + sourceNames(paused) + '\n\nEntra a **⋮ → Conocimiento y Tutor** y pulsa **Volver a usar**.';
+      return '**Tus fuentes están aprobadas, pero su uso está pausado.**\n\n> [⏸️ Estado]\n> ' + sourceNames(paused) + '\n\nEntra a **⋮ → Biblioteca de Yarbi** y pulsa **Volver a usar**.';
     }
     const blocked = rows.filter(asset => asset.kind === 'pdf' && asset.status === 'blocked');
     if (blocked.length) {
       return '**Encontré el PDF, pero no pude extraer su texto.**\n\n> [⚠️ Requiere OCR o extractor]\n> ' + sourceNames(blocked) + '\n\nNo lo borraré ni fingiré que conozco su contenido.';
     }
     if (rows.length) {
-      return '**Encontré tus fuentes, pero ninguna está disponible para responder todavía.**\n\n> [🔎 Revisión necesaria]\n> ' + sourceNames(rows) + '\n\nAbre **⋮ → Conocimiento y Tutor** para ver el estado exacto. No las elimines.';
+      return '**Encontré tus fuentes, pero ninguna está disponible para responder todavía.**\n\n> [🔎 Revisión necesaria]\n> ' + sourceNames(rows) + '\n\nAbre **⋮ → Biblioteca de Yarbi** para ver el estado exacto. No las elimines.';
     }
-    return '**No encuentro fuentes guardadas en esta instalación.**\n\nEntra a **⋮ → Conocimiento y Tutor** para comprobar la biblioteca. Si allí tampoco aparecen, la versión anterior no conservó el contenido y recién entonces será necesario cargarlas otra vez.';
+    return '**No encuentro fuentes guardadas en esta instalación.**\n\nEntra a **⋮ → Biblioteca de Yarbi** para comprobar la biblioteca. Si allí tampoco aparecen, la versión anterior no conservó el contenido y recién entonces será necesario cargarlas otra vez.';
   }
   function legacySourceToAsset(source) {
     const rows = (Array.isArray(source?.sections) ? source.sections : []).map((section, index) => ({
@@ -1034,13 +1033,13 @@
     }
     return { ok:true, text:formatDirectedAnswer(parsed, sourceAsset), result:parsed, evidence:evidence.map(row => ({ title:row.title, assetId:row.assetId, sectionLabel:row.sectionLabel })) };
   }
-  async function answerFromChat(question, options) {
+  async function answerFromChat(question) {
     const text = clean(question, 1200);
     if (!text) return { handled:false };
     let assets;
     try { await migrateLegacyKnowledge(); assets = await list(); }
-    catch (_) { return options?.forceKnowledge === true || knowledgeIntent(text) ? { handled:true, reply:'## 📚 Biblioteca no disponible\n\nNo pude abrir ahora las fuentes guardadas en este dispositivo. No inventaré una respuesta ni consultaré otro entorno.' } : { handled:false }; }
-    const explicit = options?.forceKnowledge === true || knowledgeIntent(text);
+    catch (_) { return knowledgeIntent(text) ? { handled:true, reply:'## 📚 Biblioteca no disponible\n\nNo pude abrir ahora las fuentes guardadas en este dispositivo. No inventaré una respuesta ni consultaré otro entorno.' } : { handled:false }; }
+    const explicit = knowledgeIntent(text);
     let evidence = searchApproved(assets, text);
     const terms = contentTokens(text);
     const minimumHits = terms.length > 1 ? 2 : 1;
@@ -1090,7 +1089,7 @@
       const drafts = assets.filter(asset => asset.status === 'analyzed_draft');
       if (drafts.length) {
         const names = drafts.slice(0, 3).map(asset => '**' + clean(asset.title, 100) + '**').join(', ');
-        return { handled:true, reply:'**Fuente procesada, aprobación pendiente.**\n\nEncontré ' + names + '. Para usarla aquí: **⋮ → Conocimiento y Tutor → Aprobar para tutoría**. No usaré su contenido como conocimiento definitivo hasta que lo apruebes.' };
+        return { handled:true, reply:'**Fuente procesada, aprobación pendiente.**\n\nEncontré ' + names + '. Para usarla aquí: **⋮ → Biblioteca de Yarbi → Aprobar**. No usaré su contenido como conocimiento definitivo hasta que lo apruebes.' };
       }
       return { handled:true, reply:libraryAvailabilityReply(assets) };
     }
@@ -1287,7 +1286,7 @@
       return { ok:false, message:statusText(error) };
     }
   }
-  async function approveFromUi(id) { try { setProgress(92, 'Guardando aprobación', 'Vinculando la revisión a esta fuente.', 'working'); await approve(id); setProgress(100, 'Fuente aprobada', 'Disponible para respuestas del tutor con citas verificables.', 'approved'); setStatus('Fuente aprobada para tutoría. No modifica CRM ni instrucciones permanentes.'); } catch (error) { setProgress(0, 'No se aprobó', statusText(error), 'error'); setStatus(statusText(error), true); } }
+  async function approveFromUi(id) { try { setProgress(92, 'Guardando aprobación', 'Vinculando la revisión a esta fuente.', 'working'); await approve(id); setProgress(100, 'Fuente aprobada', 'Disponible para respuestas del chat de Yarbi con citas verificables.', 'approved'); setStatus('Fuente aprobada para el chat de Yarbi. No modifica CRM ni instrucciones permanentes.'); } catch (error) { setProgress(0, 'No se aprobó', statusText(error), 'error'); setStatus(statusText(error), true); } }
   async function toggleLearningFromUi(id, enabled) {
     try {
       await toggleLearning(id, enabled);
@@ -1304,27 +1303,21 @@
     setStatus('La fuente y su índice local fueron eliminados. Los demás documentos no cambiaron.', false);
     return true;
   }
-  async function askTutorFromUi() {
-    const input = root?.document?.getElementById('gfc-mm-tutor-question');
-    const out = root?.document?.getElementById('gfc-mm-tutor-answer');
-    if (!out) return;
-    const question = String(input?.value || '').trim();
-    if (!question) { out.textContent = 'Escribe una pregunta para buscar en tus fuentes aprobadas.'; return; }
-    out.textContent = 'Buscando evidencia en tus fuentes aprobadas…';
-    try {
-      const result = await answerFromChat(question, { forceKnowledge:true });
-      const reply = result?.reply || 'No pude completar esta consulta sin inventar información.';
-      const rendered = root?.YarbiConversationRenderer?.renderMessage?.({ role:'assistant', text:reply, status:'complete' });
-      if (rendered?.element && typeof out.replaceChildren === 'function') out.replaceChildren(rendered.element);
-      else out.textContent = reply;
-    } catch (error) { out.textContent = statusText(error); }
-  }
   function mountCanonicalTextImport() {
     const anchor = root?.document?.getElementById('gfc-mm-status');
     if (!anchor || root.document.getElementById('gfc-mm-text-import')) return;
     anchor.insertAdjacentHTML('afterend', '<div id="gfc-mm-migration-status" class="gfc-yarbi-import-summary" hidden></div><details id="gfc-mm-text-import" class="gfc-mm-more gfc-mm-text-import"><summary>✍️ Agregar una nota o instrucción escrita</summary><div class="gfc-mm-details-body"><input id="gfc-mm-text-title" maxlength="140" placeholder="Título de la fuente"><textarea id="gfc-mm-text-value" rows="6" maxlength="200000" placeholder="Pega aquí un procedimiento, regla o material de referencia. Se guardará como borrador hasta que lo apruebes."></textarea><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImportText(true)">Guardar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalImportText(false)">Solo guardar</button></div></div></details>');
   }
-  function html() { return '<main class="gfc-yarbi-tool-page gfc-mm-page"><section class="gfc-mm-hero"><span>📚</span><div><h2>Conocimiento y Tutor</h2><p>Yarbi guarda el texto local de tus fuentes. La mejora semántica es opcional.</p></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Extraer</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div><label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>PDF de hasta 120 MB: Yarbi extrae el texto página por página. La búsqueda semántica puede añadirse después. Los PDF escaneados sin texto requieren OCR.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div><section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section><div id="gfc-mm-status" class="gfc-yarbi-import-summary">Una fuente con texto extraído se puede aprobar sin esperar el índice semántico. La aprobación es obligatoria y no se ejecutan acciones comerciales durante el procesamiento.</div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">🎓 Preguntar al Tutor</div><div class="gfc-yarbi-tool-copy">Pregunta con tus propias palabras. Yarbi interpreta la intención, responde primero de forma breve y muestra la cita con capítulo, numeral o página.</div><textarea id="gfc-mm-tutor-question" rows="3" placeholder="Ejemplo: ¿Puedo usar una sola llave para alimentar dos equipos?"></textarea><button class="gfc-yarbi-primary" onclick="gfcYarbiTutorAsk()">Preguntar al tutor</button><article id="gfc-mm-tutor-answer" class="gfc-mm-tutor-answer">Aquí aparecerá una explicación respaldada por tus fuentes aprobadas.</article></section></main>'; }
+  function html() {
+    return '<main class="gfc-yarbi-tool-page gfc-mm-page">' +
+      '<section class="gfc-mm-hero"><span>📚</span><div><h2>Biblioteca de Yarbi</h2><p>Carga y revisa las fuentes aquí. Todas las preguntas se hacen en el chat de Yarbi.</p></div></section>' +
+      '<section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Extraer</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div>' +
+      '<label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>PDF de hasta 120 MB: Yarbi extrae el texto página por página. La búsqueda semántica puede añadirse después. Los PDF escaneados sin texto requieren OCR.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label>' +
+      '<div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div>' +
+      '<section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section>' +
+      '<div id="gfc-mm-status" class="gfc-yarbi-import-summary">Una fuente con texto extraído se puede aprobar sin esperar el índice semántico. La aprobación es obligatoria y no se ejecutan acciones comerciales durante el procesamiento.</div></section>' +
+      '<section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div><button class="gfc-yarbi-primary gfc-mm-chat-link" onclick="gfcSetYarbiInteractionMode(\'normal\')">Ir al chat de Yarbi</button></section></main>';
+  }
   function attach() {
     mountCanonicalTextImport();
     void (async () => {
@@ -1337,5 +1330,5 @@
       await render();
     })();
   }
-  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, libraryAvailabilityReply, legacySourceToAsset, planLegacyMigration, migrateLegacyKnowledge, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, approvedKnowledgeAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, buildTextAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, importTextFromUi, askTutorFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
+  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, libraryAvailabilityReply, legacySourceToAsset, planLegacyMigration, migrateLegacyKnowledge, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, approvedKnowledgeAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, buildTextAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, importTextFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
 }));

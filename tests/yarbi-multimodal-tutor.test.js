@@ -339,7 +339,7 @@ test('BKE multimodal: explica el estado real de la fuente sin pedir borrarla o r
   assert.match(draft, /falta aprobarla/i);
   assert.match(draft, /No las borres ni las vuelvas a cargar/i);
   const pending = api.libraryAvailabilityReply([{ kind:'pdf', status:'local_ready', title:'Manual.pdf' }]);
-  assert.match(pending, /pulsa \*\*Analizar\*\*/);
+  assert.match(pending, /pulsa \*\*Preparar revisión\*\*/);
   const paused = api.libraryAvailabilityReply([{ kind:'pdf', status:'approved', learningEnabled:false, title:'Norma.pdf' }]);
   assert.match(paused, /uso está pausado/i);
   const missing = api.libraryAvailabilityReply([]);
@@ -390,17 +390,19 @@ test('BKE multimodal: los controles visibles usan flujos UI con progreso y revis
   assert.match(source, /root\.gfcYarbiMultimodalImport = \(\) => api\.importFromUi\(true\)/);
   assert.match(source, /root\.gfcYarbiMultimodalAnalyze = api\.analyzeFromUi/);
   assert.match(source, /root\.gfcYarbiMultimodalApprove = api\.approveFromUi/);
-  assert.match(source, /root\.gfcYarbiTutorAsk = api\.askTutorFromUi/);
+  assert.doesNotMatch(source, /root\.gfcYarbiTutorAsk =/);
   assert.match(markup, /gfc-mm-progress-chip/);
   assert.match(markup, /gfc-mm-progress-percent/);
   assert.match(markup, /Agregar y procesar/);
   assert.match(markup, /Buscar archivos en el teléfono/);
+  assert.match(markup, /gfcSetYarbiInteractionMode\('normal'\)/);
+  assert.doesNotMatch(markup, /Preguntar al Tutor|gfc-mm-tutor-question|gfc-mm-tutor-answer/);
 });
 
 test('BKE multimodal: la navegación conserva la pantalla anterior', () => {
   assert.match(memoryCenter, /_gfcYarbiNavigationStack/);
   assert.match(memoryCenter, /const previous = stack\.pop\(\)/);
-  assert.match(memoryCenter, /Conocimiento y Tutor/);
+  assert.match(memoryCenter, /Biblioteca de Yarbi/);
   assert.match(memoryCenter, /if \(initialTab === 'knowledge'\) initialTab = 'memoria'/);
   assert.doesNotMatch(memoryCenter, /<b>Notas y textos<\/b>/);
 });

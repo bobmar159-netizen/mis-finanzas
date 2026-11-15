@@ -4,7 +4,6 @@ const { webcrypto } = require('node:crypto');
 
 const saved = {
   indexedDB:global.indexedDB, crypto:global.crypto, fetch:global.fetch,
-  document:global.document, YarbiConversationRenderer:global.YarbiConversationRenderer,
   gfcAccountFreshAccessToken:global.gfcAccountFreshAccessToken,
   gfcRuntimeApiOrigin:global.gfcRuntimeApiOrigin
 };
@@ -102,7 +101,7 @@ test('una norma aprobada con índice parcial entrega al modelo el fragmento dond
   assert.equal(calls, 1);
 });
 
-test('un no encontrado antiguo no bloquea una búsqueda nueva; el Tutor usa el mismo recorrido', async () => {
+test('un no encontrado antiguo no bloquea una búsqueda nueva en el chat único', async () => {
   rows.delete('wrong');
   const question = '¿Puedo usar una sola válvula para dos artefactos?';
   const asset = rows.get('correct');
@@ -124,12 +123,10 @@ test('un no encontrado antiguo no bloquea una búsqueda nueva; el Tutor usa el m
   assert.match(second.reply, /Hay una regla aplicable/);
   assert.equal(calls, 1, 'la respuesta positiva verificada sí se reutiliza');
 
-  const output = { textContent:'', replaceChildren(node) { this.child = node; } };
-  global.document = { getElementById:id => id === 'gfc-mm-tutor-question' ? { value:question } : id === 'gfc-mm-tutor-answer' ? output : null };
-  global.YarbiConversationRenderer = { renderMessage:message => ({ element:{ renderedText:message.text } }) };
-  await api.askTutorFromUi();
-  assert.match(output.child.renderedText, /Hay una regla aplicable/);
-  assert.equal(calls, 1, 'el Tutor no crea otra ruta ni otra llamada al proveedor');
+  const library = api.html();
+  assert.match(library, /Ir al chat de Yarbi/);
+  assert.doesNotMatch(library, /gfc-mm-tutor-question|gfc-mm-tutor-answer|Preguntar al Tutor/);
+  assert.equal(api.askTutorFromUi, undefined);
 });
 
 test.after(() => {
