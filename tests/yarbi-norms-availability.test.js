@@ -1,6 +1,9 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { webcrypto } = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 
 const saved = {
   indexedDB:global.indexedDB, crypto:global.crypto, fetch:global.fetch,
@@ -48,6 +51,7 @@ global.indexedDB = {
 };
 global.crypto = webcrypto;
 const api = require('../frontend/yarbi-multimodal-tutor.js');
+const frontendSource = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
 
 test('una fuente extraída se revisa y aprueba sin Gemini ni embeddings', async () => {
   let networkCalls = 0;
@@ -127,6 +131,52 @@ test('un no encontrado antiguo no bloquea una búsqueda nueva en el chat único'
   assert.match(library, /Ir al chat de Yarbi/);
   assert.doesNotMatch(library, /gfc-mm-tutor-question|gfc-mm-tutor-answer|Preguntar al Tutor/);
   assert.equal(api.askTutorFromUi, undefined);
+});
+
+test('la pregunta real sobre normas de gas enumera las fuentes aprobadas sin volver a cargarlas', async () => {
+  rows.clear();
+  rows.set('ntp', {
+    id:'ntp', title:'NTP 111.022.pdf', kind:'pdf', status:'approved', learningEnabled:true,
+    sections:[{ id:'p1', label:'Página 1', text:'Instalaciones de gas natural y ventilación.' }]
+  });
+  rows.set('em040', {
+    id:'em040', title:'EM.040 instalaciones de gas.pdf', kind:'pdf', status:'approved', learningEnabled:true,
+    sections:[{ id:'p1', label:'Página 1', text:'Disposiciones generales para instalaciones de gas.' }]
+  });
+  let networkCalls = 0;
+  global.fetch = async () => { networkCalls += 1; throw new Error('network forbidden'); };
+  const question = 'hola chat que sabes de las normas de gas';
+  assert.equal(api.knowledgeIntent(question), true);
+  const result = await api.answerFromChat(question);
+  assert.equal(result.handled, true);
+  assert.match(result.reply, /NTP 111\.022\.pdf/);
+  assert.match(result.reply, /EM\.040 instalaciones de gas\.pdf/);
+  assert.match(result.reply, /ya (?:tengo|están) (?:guardadas|guardados|disponibles)/i);
+  assert.equal(networkCalls, 0);
+});
+
+test('Live usa la misma biblioteca local aprobada y conserva su respuesta en el chat', async () => {
+  const start = frontendSource.indexOf('async function gfcExecuteLiveTool(call) {');
+  const end = frontendSource.indexOf('function gfcLiveToolTimeoutMs(name)', start);
+  assert.ok(start >= 0 && end > start, 'el ejecutor Live existe');
+  assert.match(frontendSource, /name: 'get_approved_knowledge'/);
+  assert.match(frontendSource, /liveStructuredReply = \{ turnId:Number\(liveSession\.liveTurnId \|\| 0\), tool:'get_approved_knowledge'/);
+  assert.match(frontendSource, /liveKnowledgeRule = 'BIBLIOTECA DE NORMAS:/);
+  const execute = vm.runInNewContext('(' + frontendSource.slice(start, end).trim() + ')', {
+    window:{ gfcYarbiMultimodalAnswer:api.answerFromChat },
+    gfcYarbiResolvePendingBeforeLookup:async () => null,
+    gfcYarbiApplyFocusToLiveToolCall:call => call,
+    gfcLiveInputNeedsClarification:() => false,
+    gfcCurrentLiveUserInput:() => 'hola chat que sabes de las normas de gas'
+  });
+  let networkCalls = 0;
+  global.fetch = async () => { networkCalls += 1; throw new Error('network forbidden'); };
+  const result = await execute({ name:'get_approved_knowledge', args:{ query:'hola chat que sabes de las normas de gas' } });
+  assert.equal(result.ok, true);
+  assert.match(result.reply, /NTP 111\.022\.pdf/);
+  assert.match(result.reply, /EM\.040 instalaciones de gas\.pdf/);
+  assert.equal(result.source, 'approved_local_library');
+  assert.equal(networkCalls, 0);
 });
 
 test.after(() => {

@@ -135,7 +135,24 @@
     return section?.semantic?.version === SEMANTIC_INDEX_VERSION && typeof section?.semantic?.vector === 'string' && !!section.semantic.vector;
   }
   function knowledgeIntent(value) {
-    return /\b(?:norma|ntp|iso|manual|pdf|documento|archivo|fuente|biblioteca|cap[ií]tulo|numeral|art[ií]culo|anexo|tabla|procedimiento|reglamento|ficha\s+t[eé]cnica)\b/i.test(String(value || ''));
+    return /\b(?:normas?|ntp|iso|manual(?:es)?|pdf|documentos?|archivos?|fuentes?|biblioteca|cap[ií]tulos?|numerales?|art[ií]culos?|anexos?|tablas?|procedimientos?|reglamentos?|fichas?\s+t[eé]cnicas?)\b/i.test(String(value || ''));
+  }
+  function libraryOverviewQuestion(value) {
+    const query = normalize(value);
+    if (!/\b(?:normas?|manual(?:es)?|pdf|documentos?|biblioteca)\b/.test(query)) return false;
+    if (!/\b(?:que sabes|que conoces|que tienes|que normas|cuales son|que hay|tienes normas)\b/.test(query)) return false;
+    const generic = new Set(['hola','chat','sabes','conoces','tienes','hay','son','norma','normas','manual','manuales','pdf','documento','documentos','biblioteca','gas','natural','tus','mis','guardadas','guardados','disponibles']);
+    return contentTokens(query).every(token => generic.has(token));
+  }
+  function libraryOverviewReply(assets) {
+    const approved = approvedKnowledgeAssets(assets);
+    if (!approved.length) return libraryAvailabilityReply(assets);
+    const listed = approved.slice(0, 5);
+    const remaining = approved.length - listed.length;
+    return '**Sí, ya tengo guardadas ' + approved.length + ' fuentes aprobadas en este teléfono.**\n\n'
+      + listed.map(asset => '- 📄 **' + clean(asset.title, 100) + '**').join('\n')
+      + (remaining ? '\n- Y ' + remaining + ' más.' : '')
+      + '\n\nPregúntame por un tema concreto, una norma o un numeral y buscaré la cita exacta antes de explicártela. No necesitas volver a cargar los PDF.';
   }
   function obviousBusinessIntent(value) {
     return /\b(?:cliente|crm|agenda|visita|cita|mensaje|whatsapp|cobro|cobrar|deuda|balance|ingreso|gasto|movimiento|stock|cotizaci[oó]n|recordatorio|llamar|hoy|ma[ñn]ana|ayer)\b/i.test(String(value || ''));
@@ -1039,6 +1056,7 @@
     let assets;
     try { await migrateLegacyKnowledge(); assets = await list(); }
     catch (_) { return knowledgeIntent(text) ? { handled:true, reply:'## 📚 Biblioteca no disponible\n\nNo pude abrir ahora las fuentes guardadas en este dispositivo. No inventaré una respuesta ni consultaré otro entorno.' } : { handled:false }; }
+    if (libraryOverviewQuestion(text)) return { handled:true, reply:libraryOverviewReply(assets), directSource:true };
     const explicit = knowledgeIntent(text);
     let evidence = searchApproved(assets, text);
     const terms = contentTokens(text);
@@ -1330,5 +1348,5 @@
       await render();
     })();
   }
-  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, libraryAvailabilityReply, legacySourceToAsset, planLegacyMigration, migrateLegacyKnowledge, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, approvedKnowledgeAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, buildTextAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, importTextFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
+  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, libraryOverviewQuestion, libraryOverviewReply, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, libraryAvailabilityReply, legacySourceToAsset, planLegacyMigration, migrateLegacyKnowledge, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, approvedKnowledgeAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, buildTextAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, importTextFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
 }));

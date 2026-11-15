@@ -15539,6 +15539,7 @@ function gfcFinancialSummaryRichText(result) {
 function gfcLiveToolDeclarations() {
   return [{ functionDeclarations: [
     { name: 'get_current_lima_time', description: 'Obtiene la fecha y hora actual y oficial de Lima desde el reloj interno de la aplicación.', parameters: { type: 'OBJECT', properties: {} } },
+    { name: 'get_approved_knowledge', description: 'Consulta la biblioteca PDF y documental aprobada en este teléfono. Úsala antes de responder sobre normas, manuales, capítulos, numerales o lo que Yarbi sabe de esas fuentes. No afirmes que no hay normas sin consultarla.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Pregunta completa del propietario, incluyendo el tema y las pistas.' } }, required: ['query'] } },
     { name: 'list_whatsapp_messages', description: 'Consulta mensajes entrantes y salientes reales de WhatsApp. Si menciona un cliente, usa query con nombre o telefono y busca la conversacion completa.', parameters: { type: 'OBJECT', properties: { period: { type: 'STRING', enum: ['today', 'yesterday', 'latest'], description: 'today para hoy, yesterday para ayer y latest para los ultimos mensajes.' }, direction: { type: 'STRING', enum: ['all', 'incoming', 'outgoing'], description: 'outgoing si el Maestro pregunta que escribio o envio; incoming si pregunta que recibio.' }, query: { type: 'STRING', description: 'Nombre parcial, telefono o texto del cliente.' } } } },
     { name: 'search_client_history_by_clues', description: 'Busca un cliente histórico cuando el Maestro no recuerda su nombre o teléfono y solo aporta pistas repartidas entre varios mensajes o la agenda: servicio, construcción o visita, día de semana, viaje, cancelación, ubicación o reprogramación. Agrupa toda la conversación por cliente; no exige que todas las pistas estén en un mismo mensaje. Úsala antes de afirmar que no existe historial.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Descripción completa del recuerdo del Maestro, conservando todas las pistas.' }, client_name: { type: 'STRING', description: 'Nombre parcial solo si fue recordado.' }, district: { type: 'STRING' }, service: { type: 'STRING' }, weekday: { type: 'STRING', description: 'Día recordado, por ejemplo sábado.' }, approximate_date: { type: 'STRING', description: 'Fecha o mes aproximado si existe.' } }, required: ['query'] } },
     { name: 'get_whatsapp_voice_notes', description: 'Busca la última nota de voz y devuelve únicamente su resumen CRM. Úsala obligatoriamente si preguntan qué dice un audio; reintenta resumirlo solo si quedó pendiente y el archivo aún es recuperable.', parameters: { type: 'OBJECT', properties: { client_name: { type: 'STRING', description: 'Nombre o parte del nombre del cliente.' }, phone: { type: 'STRING', description: 'Teléfono solo si ya está confirmado.' }, period: { type: 'STRING', enum: ['today', 'yesterday', 'latest'] } } } },
@@ -18476,7 +18477,7 @@ async function gfcExecuteLiveTool(call) {
   call = gfcYarbiApplyFocusToLiveToolCall(call || {});
   const name = String(call?.name || '');
   const ambiguousInput = gfcLiveInputNeedsClarification(gfcCurrentLiveUserInput());
-  const lookupTools = new Set(['list_whatsapp_messages','search_client_history_by_clues','get_whatsapp_voice_notes','find_whatsapp_client','resolve_client_candidate','get_client_memory','get_crm_overview','get_mentor_briefing','get_financial_summary','get_today_snapshot','get_conversation_inbox','get_next_best_actions','get_daily_close','get_proactive_alerts','get_agenda_summary','read_app_module']);
+  const lookupTools = new Set(['get_approved_knowledge','list_whatsapp_messages','search_client_history_by_clues','get_whatsapp_voice_notes','find_whatsapp_client','resolve_client_candidate','get_client_memory','get_crm_overview','get_mentor_briefing','get_financial_summary','get_today_snapshot','get_conversation_inbox','get_next_best_actions','get_daily_close','get_proactive_alerts','get_agenda_summary','read_app_module']);
   if (ambiguousInput && lookupTools.has(name)) {
     gfcChatDiag('live-ambiguous-input-tool-blocked', { input:gfcCurrentLiveUserInput().slice(0,120), tool:name });
     return { ok:false, ambiguous_input:true, tool_blocked:name, instruction:'La frase llegó incompleta o era solo un saludo. No consultes clientes, agenda ni mensajes y no uses resultados anteriores. Responde: “Hola, te escucho. ¿En qué te ayudo?”; si parece recortada, pide repetirla.' };
@@ -18489,6 +18490,14 @@ async function gfcExecuteLiveTool(call) {
       return { ok: true, requested: false, suppress_output: true, timezone: 'America/Lima', utc_offset: '-05:00', date: clock.date, time: clock.time, weekday: clock.weekday, date_label: clock.dateLabel, source: 'reloj interno del teléfono', instruction: 'El Maestro no pidió fecha ni hora. No menciones estos valores. Responde a su consulta actual o pide una aclaración breve si la frase quedó incompleta.' };
     }
     return { ok: true, requested: true, timezone: 'America/Lima', utc_offset: '-05:00', date: clock.date, time: clock.time, weekday: clock.weekday, date_label: clock.dateLabel, source: 'reloj interno del teléfono', instruction: 'Usa literalmente weekday y date_label. No calcules ni sustituyas el día de la semana.' };
+  }
+  if (name === 'get_approved_knowledge') {
+    const query = String(call?.args?.query || gfcCurrentLiveUserInput()).trim().slice(0, 1200);
+    if (!query || typeof window.gfcYarbiMultimodalAnswer !== 'function') return { ok:false, reply:'No pude abrir la biblioteca local. No afirmaré que faltan normas; repite la pregunta por escrito o inténtalo de nuevo.' };
+    const answer = await window.gfcYarbiMultimodalAnswer(query);
+    return answer?.handled
+      ? { ok:true, reply:String(answer.reply || '').slice(0, 2400), source:'approved_local_library', instruction:'Usa exclusivamente esta respuesta verificada. No inventes una cita ni digas que no hay normas.' }
+      : { ok:false, reply:'La consulta no encontró una evidencia documental específica. Pide un tema, una norma o un numeral; no afirmes que la biblioteca está vacía.' };
   }
   if (name === 'list_whatsapp_messages') return gfcFetchCloudWhatsAppMessages(String(call?.args?.period || 'today').toLowerCase(), String(call?.args?.direction || 'all').toLowerCase(), String(call?.args?.query || ''));
   if (name === 'search_client_history_by_clues') return gfcSearchClientHistoryByClues(call?.args || {});
@@ -18590,6 +18599,7 @@ async function gfcExecuteLiveTool(call) {
 
 function gfcLiveToolTimeoutMs(name) {
   const tool = String(name || '');
+  if(tool === 'get_approved_knowledge') return 20000;
   if(tool === 'get_whatsapp_voice_notes') return 10000;
   if(tool === 'send_prepared_whatsapp') return 15000;
   if(['get_client_memory','find_whatsapp_client','resolve_client_candidate','list_whatsapp_messages','search_client_history_by_clues'].includes(tool)) return tool === 'search_client_history_by_clues' ? 10000 : 6000;
@@ -18661,6 +18671,7 @@ async function gfcExecuteLiveToolBounded(call) {
 // BACKGROUND_PROCESSING_STATUS_V1: una lectura estructurada no se presenta como reprocesamiento pesado.
 function gfcLiveToolStatusLabel(calls) {
   const names = (calls || []).map(call => String(call?.name || ''));
+  if (names.includes('get_approved_knowledge')) return 'Consultando tus normas guardadas...';
   const fastReadTools = new Set(['get_current_lima_time', 'list_whatsapp_messages', 'search_client_history_by_clues', 'find_whatsapp_client', 'get_client_memory', 'resolve_client_candidate', 'cancel_client_search', 'prepare_whatsapp_draft', 'get_crm_overview', 'get_mentor_briefing', 'get_financial_summary', 'get_today_snapshot', 'get_conversation_inbox', 'get_next_best_actions', 'get_daily_close', 'get_proactive_alerts', 'get_agenda_summary', 'read_app_module']);
   return names.length && names.every(name => fastReadTools.has(name))
     ? 'Consultando datos ya procesados...'
@@ -18730,6 +18741,12 @@ async function gfcHandleLiveToolCalls(socket, calls) {
     liveSession.liveStructuredReply = { turnId:Number(liveSession.liveTurnId || 0), tool:'get_financial_summary', text:richText };
     if (typeof gfcUpdateLiveTranscriptDraft === 'function') gfcUpdateLiveTranscriptDraft('assistant', richText, liveSession.liveTurnId);
     gfcYarbiSetProcessStatus('writing', 'Organizando el balance del mes');
+  }
+  const knowledgeResponse = functionResponses.find(item => item.name === 'get_approved_knowledge');
+  if (knowledgeResponse?.response?.result?.reply) {
+    const verifiedText = String(knowledgeResponse.response.result.reply);
+    liveSession.liveStructuredReply = { turnId:Number(liveSession.liveTurnId || 0), tool:'get_approved_knowledge', text:verifiedText };
+    if (typeof gfcUpdateLiveTranscriptDraft === 'function') gfcUpdateLiveTranscriptDraft('assistant', verifiedText, liveSession.liveTurnId);
   }
   gfcVoicePipelineLatencyEnd('additional_processing', { tools: functionResponses.map(item => item.name) });
   if (!functionResponses.length || socket.readyState !== WebSocket.OPEN) return;
@@ -18920,7 +18937,8 @@ session.captureDiagnostics = gfcLiveCaptureDiagnostics(openedStream); gfcChatDia
       const liveAgendaEditRule = 'EDICION DE AGENDA: Una frase como "se hizo la visita hoy a las 9 y ponlo en seguimiento" modifica el registro existente; usa fecha y hora indicadas y estado seguimiento, nunca crea otra visita. Si el formulario ya está abierto y el Maestro corrige fecha, hora, estado, servicio, precio, ubicación o teléfono, llama update_open_agenda_form. Para hoy, mañana o ayer usa date_reference y nunca te limites a prometer el cambio. Entregar campos no significa guardar. Solo cuando diga guarda, guardar o guárdalo llama save_open_agenda_form.';
       const trainingSystemInstruction = 'MODO ENTRENAMIENTO SEGURO DE YARBI. Esta conversación sirve para practicar atención de clientes y enseñar el estilo de Omar. Conversa en español peruano natural usando la misma voz Live seleccionada. El usuario puede hablar como cliente, pedir una sugerencia, corregirte o dictar una instrucción. Si habla como cliente, responde como el negocio de servicios de gas natural. Si te corrige, resume exactamente qué cambió y cómo debería responder en el futuro. Si pide guardar, no afirmes que quedó guardado: di brevemente que la aplicación verificará el aprendizaje local y en Supabase. PROHIBIDO ejecutar acciones reales, enviar WhatsApp, abrir o guardar formularios, modificar clientes, agenda, CRM, Notion, deudas, ingresos o gastos. No inventes precios, fechas, disponibilidad, ubicaciones ni datos de clientes. Pide un solo dato útil cuando falte información. ' + (typeof gfcYarbiTrainingLiveContext === 'function' ? gfcYarbiTrainingLiveContext() : '');
       const liveEmojiSpeechRule = 'PRESENTACIÓN DE EMOJIS: puedes incluir emojis apropiados en el texto visible, pero jamás pronuncies sus nombres, los describas ni leas símbolos decorativos en el audio.';
-      const normalLiveInstruction = liveSystemInstruction + '\n\n' + liveEmojiSpeechRule + '\n\n' + liveSessionRules + '\n\n' + liveHistoricalClueRule + '\n\n' + liveAgendaEditRule + '\n\n' + liveDailyCloseRule + '\n\n' + liveCollectionRule + '\n\n' + liveFinancialSummaryRule + '\n\n' + liveServiceCloseRule + '\n\n' + liveProactiveAlertRule + '\n\n' + liveClockRule + '\n\n' + liveReliabilityRule + '\n\n' + liveRoutingRule + '\n\n' + liveContextualCrmRule + '\n\n' + liveNaturalIdentityRule + '\n\n' + liveConversationContinuityRule + '\n\n' + liveModeInstruction;
+      const liveKnowledgeRule = 'BIBLIOTECA DE NORMAS: Ante cualquier pregunta sobre normas, PDF, manuales, reglamentos, capítulos, numerales o qué documentos técnicos conoces, llama obligatoriamente get_approved_knowledge con la pregunta completa. Espera la respuesta de la biblioteca local antes de hablar. Si hay fuentes aprobadas, jamás digas que no tienes normas registradas. Lee en voz una síntesis breve de la respuesta verificada; el chat mostrará la cita y fuente completas. Si falta evidencia, pide un solo dato concreto sin inventar reglas.';
+      const normalLiveInstruction = liveSystemInstruction + '\n\n' + liveEmojiSpeechRule + '\n\n' + liveSessionRules + '\n\n' + liveHistoricalClueRule + '\n\n' + liveAgendaEditRule + '\n\n' + liveDailyCloseRule + '\n\n' + liveCollectionRule + '\n\n' + liveFinancialSummaryRule + '\n\n' + liveKnowledgeRule + '\n\n' + liveServiceCloseRule + '\n\n' + liveProactiveAlertRule + '\n\n' + liveClockRule + '\n\n' + liveReliabilityRule + '\n\n' + liveRoutingRule + '\n\n' + liveContextualCrmRule + '\n\n' + liveNaturalIdentityRule + '\n\n' + liveConversationContinuityRule + '\n\n' + liveModeInstruction;
       const effectiveLiveInstruction = trainingLiveMode ? trainingSystemInstruction + '\n\n' + liveEmojiSpeechRule : normalLiveInstruction;
       session.liveContextTokensBeforeSend = Math.ceil(effectiveLiveInstruction.length / 4);
       gfcVoicePipelineEvent('live-context-prepared', { contextTokensBeforeSend: session.liveContextTokensBeforeSend, memoryChars: liveMemoryContext.length, ownerInstructionChars: ownerInstructionContext.length, mode: activeYarbiMode.id, voice: activeYarbiMode.voice, model: GFC_YARBI_LIVE_MODEL });
