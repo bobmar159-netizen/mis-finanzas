@@ -18,7 +18,8 @@ import androidx.core.app.NotificationCompat;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 public class GfcNotificationListener extends NotificationListenerService {
 
@@ -155,8 +156,13 @@ public class GfcNotificationListener extends NotificationListenerService {
         try {
             // Crear el objeto de datos
             JSONObject item = new JSONObject();
-            String id = UUID.randomUUID().toString();
+            // Android no expone un ID de mensaje de WhatsApp. Conservamos una
+            // huella determinista de la notificación (con franja de tiempo)
+            // para que el WebView pueda reintentar su respaldo sin duplicarla.
+            // No se usa como prueba de un historial completo de WhatsApp.
+            String id = stableEventId(packageName, title, text, System.currentTimeMillis());
             item.put("id", id);
+            item.put("eventFingerprint", id);
             item.put("appName", packageName.equals("com.whatsapp.w4b") ? "WhatsApp Business" : "WhatsApp");
             item.put("title", title);
             item.put("text", text);
@@ -180,43 +186,46 @@ public class GfcNotificationListener extends NotificationListenerService {
             String existingJson = prefs.getString(KEY_PENDING_LIST, "[]");
             JSONArray array = new JSONArray(existingJson);
             
-            JSONArray tempArray = new JSONArray();
-            boolean updated = false;
-            String newTitle = newItem.getString("title");
-            String newText = newItem.getString("text");
-            JSONObject matchedItem = null;
-            
+            JSONArray finalArray = new JSONArray();
+            String fingerprint = newItem.optString("eventFingerprint", newItem.optString("id", ""));
+            boolean duplicate = false;
             for (int i = 0; i < array.length(); i++) {
                 JSONObject obj = array.getJSONObject(i);
-                if (newTitle.equals(obj.getString("title"))) {
-                    matchedItem = obj;
-                    String oldText = obj.getString("text");
-                    // Evitar duplicar exactamente el mismo mensaje en el historial del chat
-                    if (!oldText.contains(newText)) {
-                        obj.put("text", oldText + "\n" + newText);
-                    }
-                    obj.put("timestamp", newItem.getLong("timestamp"));
-                    updated = true;
-                } else {
-                    tempArray.put(obj);
+                if (fingerprint.equals(obj.optString("eventFingerprint", obj.optString("id", "")))) {
+                    duplicate = true;
                 }
+                // Cola acotada: conserva los eventos más recientes sin fusionar
+                // conversaciones distintas en una sola tarjeta por contacto.
+                if (finalArray.length() < 499) finalArray.put(obj);
             }
-            
-            JSONArray finalArray = new JSONArray();
-            if (updated && matchedItem != null) {
-                finalArray.put(matchedItem);
-            } else {
-                finalArray.put(newItem);
-            }
-            
-            for (int i = 0; i < tempArray.length(); i++) {
-                finalArray.put(tempArray.getJSONObject(i));
+            if (!duplicate) {
+                JSONArray newestFirst = new JSONArray();
+                newestFirst.put(newItem);
+                for (int i = 0; i < finalArray.length(); i++) newestFirst.put(finalArray.getJSONObject(i));
+                finalArray = newestFirst;
             }
             
             prefs.edit().putString(KEY_PENDING_LIST, finalArray.toString()).apply();
             Log.d(TAG, "Guardado acumulativo en SharedPreferences: " + finalArray.toString());
         } catch (Exception e) {
             Log.e(TAG, "Error guardando acumulativo en SharedPreferences", e);
+        }
+    }
+
+    private String stableEventId(String packageName, String title, String text, long timestamp) {
+        try {
+            // Dos publicaciones del mismo aviso durante el mismo minuto tienen
+            // la misma huella; el mismo texto en otro momento sigue siendo un
+            // evento distinto. No se persiste ningún secreto.
+            String source = packageName + "\u0000" + title + "\u0000" + text + "\u0000" + (timestamp / 60000L);
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8));
+            StringBuilder value = new StringBuilder("native-");
+            for (byte b : digest) value.append(String.format("%02x", b));
+            return value.toString();
+        } catch (Exception error) {
+            // Es extremadamente improbable; conservar un ID estable no debe
+            // impedir que la aplicación continúe capturando una notificación.
+            return "native-" + Long.toHexString(timestamp) + "-" + Integer.toHexString((title + text).hashCode());
         }
     }
 

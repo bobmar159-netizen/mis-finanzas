@@ -9380,11 +9380,101 @@ function gfcDebtState(ratio, cuota) {
 
 window._gfcWhatsappSuggestions = JSON.parse(localStorage.getItem('fnz_whatsapp_suggestions') || '[]');
 window._gfcImportingSuggestionId = null;
+const GFC_WHATSAPP_NOTIFICATION_OUTBOX_KEY = 'yarbi_whatsapp_notification_outbox_v1';
+
+function gfcNotificationOutbox() {
+  try {
+    const value = JSON.parse(localStorage.getItem(GFC_WHATSAPP_NOTIFICATION_OUTBOX_KEY) || '[]');
+    return Array.isArray(value) ? value.filter(item => item && typeof item === 'object').slice(0, 500) : [];
+  } catch (_) { return []; }
+}
+
+function gfcSaveNotificationOutbox(items) {
+  localStorage.setItem(GFC_WHATSAPP_NOTIFICATION_OUTBOX_KEY, JSON.stringify((Array.isArray(items) ? items : []).slice(0, 500)));
+}
+
+function gfcNotificationOutboxSummary() {
+  const rows = gfcNotificationOutbox();
+  return {
+    pending: rows.filter(item => ['queued', 'retry'].includes(String(item.state || ''))).length,
+    needs_identity: rows.filter(item => String(item.state || '') === 'needs_contact_confirmation').length,
+    needs_phone: rows.filter(item => String(item.state || '') === 'needs_phone').length
+  };
+}
+
+// La cola es independiente de las tarjetas de Bandeja. Cada evento se guarda
+// localmente antes de intentar red; así un cierre del WebView no lo elimina.
+function gfcQueueCapturedWhatsappNotification(notif, extractedPhone) {
+  const eventId = String(notif?.id || '').trim();
+  const title = String(notif?.title || '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+  const text = String(notif?.text || '').replace(/\u0000/g, '').trim().slice(0, 2000);
+  const timestamp = Number(notif?.timestamp || 0);
+  if (!/^[A-Za-z0-9:_-]{8,160}$/.test(eventId) || !title || !text || !Number.isSafeInteger(timestamp) || timestamp <= 0) return false;
+  const phone = gfcExtractPhoneNumber(extractedPhone || notif?.phone || notif?.title || '');
+  const entries = gfcNotificationOutbox();
+  const index = entries.findIndex(item => String(item.event_id) === eventId);
+  const next = {
+    event_id: eventId, title, text, phone: String(phone || ''), timestamp,
+    state: phone ? 'queued' : 'needs_phone', captured_at: new Date().toISOString(), attempts: Math.max(0, Number(entries[index]?.attempts || 0))
+  };
+  if (index >= 0) entries[index] = { ...entries[index], ...next };
+  else entries.unshift(next);
+  gfcSaveNotificationOutbox(entries);
+  return true;
+}
+
+async function gfcAcknowledgeNativeWhatsappNotifications(ids) {
+  const cleanIds = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(id => /^[A-Za-z0-9:_-]{8,160}$/.test(id)))];
+  if (!cleanIds.length || !window.Capacitor?.Plugins?.GfcNotificationPlugin?.acknowledgePendingNotifications) return;
+  try { await window.Capacitor.Plugins.GfcNotificationPlugin.acknowledgePendingNotifications({ ids: cleanIds }); }
+  catch (_) { /* La cola del WebView ya es durable; se volverá a deduplicar. */ }
+}
+
+async function gfcSyncCapturedWhatsappNotifications() {
+  if (window._gfcWhatsappNotificationSyncInFlight) return window._gfcWhatsappNotificationSyncInFlight;
+  const run = (async () => {
+    const all = gfcNotificationOutbox();
+    const now = Date.now();
+    const eligible = all.filter(item => item.state !== 'needs_phone' && (!item.retry_after || Number(item.retry_after) <= now)).slice(0, 24);
+    if (!eligible.length) return { skipped: true };
+    const accessToken = await gfcAccountFreshAccessToken();
+    if (!accessToken) return { skipped: true, reason: 'session_required' };
+    let response; let payload;
+    try {
+      response = await fetch(window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?action=local-ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+        body: JSON.stringify({ acknowledge_local_capture: true, events: eligible.map(item => ({ event_id:item.event_id, phone:item.phone, title:item.title, text:item.text, timestamp:item.timestamp })) })
+      });
+      payload = await response.json().catch(() => ({}));
+    } catch (_) {
+      payload = { error: 'network_unavailable' };
+    }
+    const outcomes = new Map((Array.isArray(payload?.outcomes) ? payload.outcomes : []).map(item => [String(item?.event_id || ''), String(item?.outcome || '')]));
+    const acknowledged = [];
+    const updated = all.map(item => {
+      const outcome = outcomes.get(String(item.event_id));
+      if (outcome === 'persisted') { acknowledged.push(String(item.event_id)); return null; }
+      if (outcome === 'unresolved_contact') return { ...item, state:'needs_contact_confirmation', retry_after: now + (10 * 60 * 1000), attempts:Number(item.attempts || 0) + 1 };
+      if (outcome === 'invalid') { acknowledged.push(String(item.event_id)); return null; }
+      return eligible.some(candidate => candidate.event_id === item.event_id)
+        ? { ...item, state:'retry', retry_after: now + (60 * 1000), attempts:Number(item.attempts || 0) + 1 }
+        : item;
+    }).filter(Boolean);
+    gfcSaveNotificationOutbox(updated);
+    await gfcAcknowledgeNativeWhatsappNotifications(acknowledged);
+    if (response?.ok && acknowledged.length && typeof gfcScheduleCanonicalYarbiDeltaSync === 'function') gfcScheduleCanonicalYarbiDeltaSync('android-notification-ingested');
+    gfcChatDiag('whatsapp-local-ingest', { status: response?.status || 0, persisted: acknowledged.length, unresolved: Number(payload?.unresolved || 0) });
+    return { ok: Boolean(response?.ok), persisted: acknowledged.length, unresolved: Number(payload?.unresolved || 0) };
+  })();
+  window._gfcWhatsappNotificationSyncInFlight = run;
+  try { return await run; } finally { window._gfcWhatsappNotificationSyncInFlight = null; }
+}
 
 // Deduplicar sugerencias al arrancar
 setTimeout(() => gfcDeduplicateWhatsappSuggestions(), 100);
 
-function gfcPollWhatsappNotifications() {
+async function gfcPollWhatsappNotifications() {
   if (window._gfcAppIsInBackground) {
     console.log('[GFC] Polling skipped because app is in background');
     return;
@@ -9400,6 +9490,7 @@ function gfcPollWhatsappNotifications() {
           const list = JSON.parse(res.notificationsJson);
           if (list && list.length) {
             let addedNew = false;
+            const locallyQueuedIds = [];
             list.forEach(notif => {
               // Filtrar notificaciones del sistema de WhatsApp: reacciones, estados, copias, grupos, etc.
               const titleLow = (notif.title || '').toLowerCase();
@@ -9422,6 +9513,11 @@ function gfcPollWhatsappNotifications() {
 
               const normTitle = gfcCleanNameForMatching(notif.title);
               const notifPhone = notif.phone ? gfcExtractPhoneNumber(notif.phone) : gfcExtractPhoneNumber(notif.title);
+
+              // Primero se conserva el evento sin transformar. La Bandeja puede
+              // agrupar visualmente por contacto, pero el respaldo canónico no
+              // pierde el identificador individual de la captura nativa.
+              if (gfcQueueCapturedWhatsappNotification(notif, notifPhone)) locallyQueuedIds.push(String(notif.id));
 
               // 1. Guardar mensaje en el hilo cronológico de la conversación
               gfcSaveConvMessage(notifPhone, notif.title, notif.text, notif.timestamp || Date.now());
@@ -9470,6 +9566,10 @@ function gfcPollWhatsappNotifications() {
               gfcDeduplicateWhatsappSuggestions();
               gfcRenderWhatsappBackgroundUpdate('android-notification');
             }
+            // Ya existe una copia durable en el outbox del WebView. Liberamos
+            // la cola nativa y dejamos el reintento de servidor al outbox.
+            void gfcAcknowledgeNativeWhatsappNotifications(locallyQueuedIds);
+            void gfcSyncCapturedWhatsappNotifications();
           }
         } catch(e) {
           console.error('Error parsing notifications JSON', e);
@@ -9495,7 +9595,12 @@ function gfcPollWhatsappNotifications() {
   // YCloud entregue con la misma marca de tiempo en milisegundos.
   const overlapTimestamp = Math.max(0, lastTimestamp - 2000);
   const cloudUrl = `${window.gfcRuntimeApiOrigin()}/api/whatsapp/messages?from_timestamp=${encodeURIComponent(String(overlapTimestamp))}&order=asc&limit=5000`;
-  const cloudHeaders = { 'X-Assistant-Token': localStorage.getItem('fnz_assistant_token') || '' };
+  const accessToken = await gfcAccountFreshAccessToken();
+  if (!accessToken) {
+    gfcChatDiag('whatsapp-cloud-poll-skipped', { reason: 'session-required' });
+    return null;
+  }
+  const cloudHeaders = { Authorization: 'Bearer ' + accessToken };
   const seenCloudIds = new Set(JSON.parse(localStorage.getItem('gfc_whatsapp_cloud_seen_ids') || '[]').map(String));
 
   const processCloudMessages = (messages) => {
@@ -12781,7 +12886,15 @@ async function gfcResolveAgendaCreationIdentity(args = {}, kind = 'visita') {
     const pendingCandidates = Array.isArray(session.clientDisambiguation?.candidates) ? session.clientDisambiguation.candidates.map(gfcClientCandidatePublic) : [];
     return { resolved:false, requires_disambiguation:true, candidates:pendingCandidates.slice(0,3), reply:gfcAgendaDisambiguationReply(pendingCandidates, requestedName), already_pending:true };
   }
-  const found = await gfcFindWhatsappClient({ name:requestedName, period:'latest' }).catch(error => ({ ok:false, candidates:[], error:error?.message || String(error) }));
+  const found = await gfcFindWhatsappClient({
+    name:requestedName,
+    district_hint:args.district_hint || args.district || '',
+    text_hint:args.text_hint || '',
+    service_hint:args.service_hint || args.service || '',
+    day_part_hint:args.day_part_hint || '',
+    period:args.period_hint || 'latest',
+    requires_location:args.requires_location === true,
+  }).catch(error => ({ ok:false, candidates:[], error:error?.message || String(error) }));
   const candidates = Array.isArray(found?.candidates) ? found.candidates.filter(candidate => candidate.phone || candidate.id) : [];
   const recentChoice = gfcYarbiPickRecentClientCandidate(candidates);
   const selectedCandidate = recentChoice.candidate || null;
@@ -12847,6 +12960,30 @@ function gfcAgendaCommandFacts(text) {
   return { value, normalized, wantsSave, kind:construction ? 'construccion' : (visit ? 'visita' : ''), date:gfcAgendaLimaDateFromText(value), time:gfcAgendaCommandTimeFromText(value), service:explicitService };
 }
 
+// Extrae la identidad y conserva las pistas que acompañan al nombre. El atajo
+// de Agenda no debe convertir "Oswaldo de Comas" ni "Mónica que envió
+// ubicación" en un nombre literal: esas palabras reducen el conjunto de
+// candidatos y, si siguen empatados, provocan una pregunta de aclaración.
+function gfcAgendaClientReference(text) {
+  const value = String(text || '').trim();
+  const leadMatches = Array.from(value.matchAll(/\bpara\s+(?:(?:el|la)\s+)?(?:(?:señor|señora|sr\.?|sra\.?)\s+)?([a-záéíóúñ][a-záéíóúñ.' -]{1,100})/gi));
+  if (!leadMatches.length) leadMatches.push(...Array.from(value.matchAll(/\ba\s+(?:(?:el|la)\s+)?(?:(?:señor|señora|sr\.?|sra\.?)\s+)?([a-záéíóúñ][a-záéíóúñ.' -]{1,100})/gi)));
+  let lead = String(leadMatches.at(-1)?.[1] || '')
+    .replace(/\s+\b(?:hoy|ayer|mañana|pasado\s+mañana|el\s+lunes|el\s+martes|el\s+miércoles|el\s+jueves|el\s+viernes|el\s+sábado|el\s+domingo|a\s+las|para\s+el)\b[\s\S]*$/i, '')
+    .trim();
+  const marker = lead.search(/\s+(?=(?:de|del|que|quien|con|por|en)\s+)/i);
+  const name = (marker >= 0 ? lead.slice(0, marker) : lead).trim();
+  const districtMatch = lead.match(/\bde\s+(.+)$/i);
+  const district = districtMatch && !/^(?:la\s+)?mañana|la\s+noche|la\s+tarde$/i.test(districtMatch[1].trim())
+    ? districtMatch[1].trim()
+    : '';
+  const locationHint = /\b(?:envió|envio|compartió|compartio)\s+(?:la\s+)?ubicaci[oó]n\b|\bubicaci[oó]n\b|\bmapa\b|\bdirecci[oó]n\b/i.test(value);
+  const serviceHint = /\b(?:construcci[oó]n|instalaci[oó]n|reparaci[oó]n|punto adicional|gasfiter[ií]a|servicio)\b/i.exec(value)?.[0] || '';
+  const period_hint = /\bayer\b/i.test(value) ? 'yesterday' : (/\bhoy\b/i.test(value) ? 'today' : 'latest');
+  const day_part_hint = /\b(?:por|de)\s+la\s+mañana\b/i.test(value) ? 'morning' : (/\b(?:por|de)\s+la\s+tarde\b/i.test(value) ? 'afternoon' : (/\b(?:por|de)\s+la\s+noche\b/i.test(value) ? 'night' : ''));
+  return { name, district, text_hint:locationHint ? 'ubicacion' : '', service_hint:serviceHint, period_hint, day_part_hint, requires_location:locationHint };
+}
+
 function gfcManualAgendaDraft(facts) {
   return { kind:facts.kind || 'visita', clientName:'', phone:'', date:facts.date || '', time:facts.time || '', service:facts.service || '', district:'', location:'', mapsUrl:'', price:0, notes:'Orden manual del Maestro. Sin conversación de WhatsApp Business asociada.', summary:'Orden manual del Maestro', _clientNameSource:'master_manual', _verifiedSources:{ explicit:true, stored:false, localAgenda:false, phonebook:false, processedMemory:false, dossier:false, whatsapp:false } };
 }
@@ -12856,9 +12993,8 @@ async function gfcFastAgendaCommand(text) {
   const facts = gfcAgendaCommandFacts(value);
   if (!facts.wantsSave || !facts.kind) return null;
   const kind = facts.kind;
-  const rawName = String(value.match(/\b(?:para|a)\s+(?:(?:el|la)\s+)?(?:(?:señor|señora|sr\.?|sra\.?)\s+)?([a-záéíóúñ][a-záéíóúñ.' -]{1,80})/i)?.[1] || '')
-    .replace(/\s+\b(?:hoy|mañana|pasado\s+mañana|el\s+lunes|el\s+martes|el\s+miércoles|el\s+jueves|el\s+viernes|el\s+sábado|el\s+domingo|a\s+las|para\s+el)\b[\s\S]*$/i, '')
-    .trim();
+  const reference = gfcAgendaClientReference(value);
+  const rawName = reference.name;
   const rawNameInvalid = /\b(?:este|esta|proximo|proxima|siguiente|domingo|lunes|martes|miercoles|jueves|viernes|sabado|cliente)\b/i.test(rawName);
   if (!rawName || rawNameInvalid) {
     const draft = gfcManualAgendaDraft(facts);
@@ -12866,7 +13002,7 @@ async function gfcFastAgendaCommand(text) {
     gfcChatDiag('agenda-manual-form-opened', { kind, date:draft.date, time:draft.time, service:draft.service, missing:applied?.missing || [] });
     return { handled:true, form_opened:true, draft, missing:applied?.missing || [], reply:'Abrí el formulario de ' + (kind === 'construccion' ? 'construcción' : 'visita') + (draft.date ? ' para ' + draft.date : '') + (draft.time ? ' a las ' + draft.time : '') + '. No asocié ningún chat ni inventé datos: falta identificar al cliente, teléfono y ubicación.' };
   }
-  const resolution = await gfcResolveAgendaCreationIdentity({ client_name:rawName }, kind);
+  const resolution = await gfcResolveAgendaCreationIdentity({ client_name:rawName, district_hint:reference.district, text_hint:reference.text_hint, service_hint:reference.service_hint, period_hint:reference.period_hint, day_part_hint:reference.day_part_hint, requires_location:reference.requires_location }, kind);
   if (resolution.requires_disambiguation) {
     gfcChatDiag('agenda-fast-disambiguation', { kind, client:rawName, count:resolution.candidates?.length || 0 });
     return { handled:true, requires_disambiguation:true, reply:resolution.reply, candidates:resolution.candidates || [], already_pending:resolution.already_pending === true };
@@ -15468,6 +15604,48 @@ function gfcFindWhatsappMatches(rows, query) {
   });
 }
 
+function gfcLocalNotificationMessages(period = 'today', direction = 'all', query = '') {
+  const requested = String(period || 'today').toLowerCase();
+  const requestedDirection = ['incoming', 'outgoing'].includes(direction) ? direction : 'all';
+  if (requestedDirection === 'outgoing') return null;
+  const bounds = requested === 'latest' || requested === 'ultimo' ? null : gfcLimaDayBounds(requested);
+  const raw = Array.isArray(window._gfcWhatsappSuggestions) ? window._gfcWhatsappSuggestions : [];
+  const rows = gfcAttachConversationIdentity(raw.map(item => ({
+    id: String(item?.id || ''),
+    name: String(item?._geminiNombre || item?.title || 'Cliente sin nombre'),
+    aliases: [],
+    phone: String(item?.phone || ''),
+    text: String(item?.text || ''),
+    direction: 'incoming',
+    mapsUrl: String(item?.mapsUrl || item?.maps_url || ''),
+    mediaType: '',
+    timestamp: Number(item?.timestamp || 0) || 0,
+    message_source: 'android_notification'
+  })).filter(item => item.id && item.timestamp > 0 && (!bounds || (item.timestamp >= bounds.startMs && item.timestamp < bounds.endMs))));
+  rows.sort((a, b) => b.timestamp - a.timestamp);
+  const visible = query ? gfcFindWhatsappMatches(rows, query) : rows;
+  if (!visible.length) return null;
+  const locations = visible.filter(item => Boolean(item.mapsUrl) || /https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)/i.test(item.text) || /ubicaci[oó]n compartida|coordenadas/i.test(item.text));
+  return {
+    ok: true,
+    period: requested,
+    date: bounds?.date || gfcLimaClock().date,
+    timezone: 'America/Lima',
+    source: 'android-notification-local',
+    source_limit: 'Solo incluye notificaciones de WhatsApp Business capturadas por esta instalación desde que se otorgó el permiso; no representa el historial completo de WhatsApp.',
+    local_snapshot_at: new Date().toISOString(),
+    local_snapshot_stale: false,
+    count: visible.length,
+    incomingCount: visible.length,
+    outgoingCount: 0,
+    locationCount: locations.length,
+    locationMessages: locations.slice(0, 80).map(item => ({ ...item, lima: gfcLimaClock(item.timestamp) })),
+    query: String(query || '').trim() || null,
+    messages: visible.slice(0, 40).map(item => ({ ...item, lima: gfcLimaClock(item.timestamp) })),
+    conversationCandidates: visible.slice(0, 20).map(item => ({ conversationName: item.conversationName, aliases: item.aliases, phone: item.phone, direction: item.direction, text: item.text.slice(0, 500), mapsUrl: item.mapsUrl || '', lima: gfcLimaClock(item.timestamp) }))
+  };
+}
+
 async function gfcFetchCloudWhatsAppMessages(period = 'today', direction = 'all', query = '') {
   const requested = String(period || 'today').toLowerCase();
   const requestedDirection = ['incoming', 'outgoing'].includes(direction) ? direction : 'all';
@@ -15476,6 +15654,7 @@ async function gfcFetchCloudWhatsAppMessages(period = 'today', direction = 'all'
     gfcChatDiag('live-cloud-messages', { period: requested, direction: requestedDirection, query: localMirror.query, count: localMirror.count, source: 'app-local-mirror' });
     return localMirror;
   }
+  const notificationFallback = gfcLocalNotificationMessages(requested, requestedDirection, query);
   // La superficie estable ya no acepta el token histórico del asistente. Cada
   // lectura usa la sesión Supabase fresca del propietario, igual que Chat y
   // Gemini Live. Esto evita que una cuenta autenticada reciba un 401 oculto al
@@ -15569,6 +15748,14 @@ async function gfcFetchCloudWhatsAppMessages(period = 'today', direction = 'all'
     result.messages = selected.slice(0, 20).map(item => ({ ...item, text: item.text.slice(0, 500), lima: gfcLimaClock(item.timestamp) }));
     result.locationMessages = result.locationMessages.filter(item => item.direction === requestedDirection);
     result.locationCount = result.locationMessages.length;
+  }
+  if (!result.count && notificationFallback) {
+    gfcChatDiag('live-cloud-messages', { period: requested, direction: requestedDirection, query: notificationFallback.query, count: notificationFallback.count, source: notificationFallback.source });
+    return notificationFallback;
+  }
+  if (!result.count) {
+    result.data_status = 'no_synchronized_messages_for_authorized_scope';
+    result.instruction = 'No hay mensajes sincronizados para esta cuenta y período en este momento. Esto no demuestra que WhatsApp no tenga mensajes: explica que la copia segura aún no recibió datos y no inventes ni afirmes que el chat está vacío.';
   }
   gfcChatDiag('live-cloud-messages', { period: requested, direction: requestedDirection, query: result.query, count: result.count, incomingCount: result.incomingCount, outgoingCount: result.outgoingCount, locationCount: result.locationCount, source: result.source });
   window._gfcLastCloudMessageDiagnostic = { at: new Date().toISOString(), period: requested, direction: requestedDirection, query: result.query, count: result.count, incomingCount: result.incomingCount, outgoingCount: result.outgoingCount, locationCount: result.locationCount, source: result.source };
@@ -15707,6 +15894,8 @@ function gfcYarbiParticipantNameMatch(haystack, needle) {
 function gfcYarbiBuildWhatsappCandidates(rows, args = {}) {
   const normalizedName = gfcNormalizeWhatsAppSearch(args.name || args.client_name || '');
   const normalizedTextHint = gfcNormalizeWhatsAppSearch(args.text_hint || args.message_hint || args.service_hint || '');
+  const normalizedDistrictHint = gfcNormalizeWhatsAppSearch(args.district_hint || args.district || '');
+  const normalizedDayPartHint = gfcNormalizeWhatsAppSearch(args.day_part_hint || '');
   const normalizedPhone = String(args.phone || '').replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '');
   const targetTime = gfcYarbiMinutesFromHint(args.time_hint || args.time || '');
   const requiresLocation = args.requires_location === true;
@@ -15733,6 +15922,10 @@ function gfcYarbiBuildWhatsappCandidates(rows, args = {}) {
     const textMatch = normalizedTextHint ? (haystack.includes(normalizedTextHint) || gfcYarbiFuzzyWordsMatch(haystack, normalizedTextHint)) : false;
     const phoneMatch = normalizedPhone ? group.phone.endsWith(normalizedPhone.slice(-8)) : false;
     const location = messages.find(item => item.mapsUrl || /https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)/i.test(String(item.text || '')) || /ubicaci[oó]n compartida|coordenadas/i.test(String(item.text || '')));
+    const dayPartMatch = normalizedDayPartHint && messages.some(item => {
+      const minutes = gfcYarbiMinutesFromHint(item.lima?.time || '');
+      return minutes !== null && ((normalizedDayPartHint === 'morning' && minutes >= 360 && minutes < 720) || (normalizedDayPartHint === 'afternoon' && minutes >= 720 && minutes < 1140) || (normalizedDayPartHint === 'night' && (minutes >= 1140 || minutes < 360)));
+    });
     const timed = targetTime === null ? null : messages.map(item => ({ item, minutes: gfcYarbiMinutesFromHint(item.lima?.time || '') })).filter(item => item.minutes !== null).sort((a, b) => Math.abs(a.minutes - targetTime) - Math.abs(b.minutes - targetTime))[0];
     const timeDistance = timed ? Math.abs(timed.minutes - targetTime) : null;
     const latest = messages[0] || {};
@@ -15745,7 +15938,12 @@ function gfcYarbiBuildWhatsappCandidates(rows, args = {}) {
     if (score <= 0) continue;
     const locationText = location ? String(location.text || '').slice(0, 280) : '';
     const district = messages.map(item => String(item?.metadata?.location_district || '').trim()).find(Boolean) || gfcExtractDistrict(messages.map(item => item.text || '').join(' '));
-    const candidate = { name: phonebookName || group.name || latest.name || 'Cliente sin nombre', aliases:aliases.filter(alias => gfcYarbiAgendaIdentity(alias) !== gfcYarbiAgendaIdentity(phonebookName || group.name)), name_source:phonebookName ? 'android_phonebook_index' : 'crm_or_whatsapp', phone: group.phone || latest.phone || '', phone_last3: String(group.phone || latest.phone || '').slice(-3), district, score, name_match: nameMatch, text_match: textMatch, phone_match: phoneMatch, has_location: !!location, maps_url: location?.mapsUrl || '', location_text: locationText, closest_time: timed?.item?.lima?.time || latest?.lima?.time || '', latest_date: latest?.lima?.date || '', latest_timestamp: Number(latest.timestamp || 0), relative_recency: recency.label, recency_score: recency.score, action_required: !!inboxMatch?.action_required, action: inboxMatch?.action || '', action_label: inboxMatch?.action_label || '', priority_score: Number(inboxMatch?.priority_score || 0), conversation_brief:inboxMatch?.conversation_brief || '', service: inboxMatch?.service || '', latest_message: String(latest.text || '').slice(0, 280), latest_direction: latest.direction || '', message_count: messages.length, source: Array.from(group.sources).join('+') || 'whatsapp_messages' };
+    const districtMatch = normalizedDistrictHint && gfcNormalizeWhatsAppSearch(district).includes(normalizedDistrictHint);
+    if (districtMatch) score += 95;
+    else if (normalizedDistrictHint) score -= 24;
+    if (dayPartMatch) score += 32;
+    else if (normalizedDayPartHint) score -= 8;
+    const candidate = { name: phonebookName || group.name || latest.name || 'Cliente sin nombre', aliases:aliases.filter(alias => gfcYarbiAgendaIdentity(alias) !== gfcYarbiAgendaIdentity(phonebookName || group.name)), name_source:phonebookName ? 'android_phonebook_index' : 'crm_or_whatsapp', phone: group.phone || latest.phone || '', phone_last3: String(group.phone || latest.phone || '').slice(-3), district, score, name_match: nameMatch, text_match: textMatch, phone_match: phoneMatch, district_match:!!districtMatch, has_location: !!location, maps_url: location?.mapsUrl || '', location_text: locationText, closest_time: timed?.item?.lima?.time || latest?.lima?.time || '', latest_date: latest?.lima?.date || '', latest_timestamp: Number(latest.timestamp || 0), relative_recency: recency.label, recency_score: recency.score, action_required: !!inboxMatch?.action_required, action: inboxMatch?.action || '', action_label: inboxMatch?.action_label || '', priority_score: Number(inboxMatch?.priority_score || 0), conversation_brief:inboxMatch?.conversation_brief || '', service: inboxMatch?.service || '', latest_message: String(latest.text || '').slice(0, 280), latest_direction: latest.direction || '', message_count: messages.length, source: Array.from(group.sources).join('+') || 'whatsapp_messages' };
     candidate.natural_clue = gfcYarbiConversationNaturalClue(candidate);
     candidate.confidence = phoneMatch || (nameMatch && textMatch) ? 'high' : (nameMatch && (location || recency.score >= 42 || activeContextScore > 0) ? 'medium' : 'low');
     candidates.push(candidate);
@@ -17469,11 +17667,12 @@ async function gfcSearchClientHistoryByClues(args = {}) {
     local = await gfcYarbiLocalHistoryByClues({ ...args, query });
     refreshed = true;
     if (!local.candidates.length || local.candidates[0].confidence === 'low') {
-      const token = localStorage.getItem('fnz_assistant_token') || '';
+        const token = await gfcAccountFreshAccessToken();
       const params = new URLSearchParams({ action:'clue-search', query });
       ['client_name','district','service','weekday','approximate_date'].forEach(key => { if(args[key]) params.set(key, String(args[key]).slice(0,120)); });
-      try {
-        const response = await fetch(window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?' + params.toString(), { headers:{ 'X-Assistant-Token':token } });
+        try {
+          if (!token) throw new Error('owner_session_required');
+          const response = await fetch(window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages?' + params.toString(), { headers:{ Authorization:'Bearer ' + token } });
         const payload = await response.json().catch(() => ({}));
         if (response.ok && Array.isArray(payload.candidates)) {
           remoteCandidates = await Promise.all(payload.candidates.map(async candidate => {
@@ -20871,7 +21070,10 @@ async function gfcSendCopilotChatMessage(promptText) {
   // Cargar contexto en tiempo real desde Supabase & Memoria Local
   gfcYarbiSetProcessStatus('writing', 'Yarbi está preparando la respuesta');
   const cloudMessagesUrl = window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages';
-  const cloudHeaders = { 'X-Assistant-Token': localStorage.getItem('fnz_assistant_token') || '' };
+  // La lectura de rescate debe usar exactamente la misma sesión del propietario
+  // que la réplica local. El token legado no está autorizado en esta ruta.
+  const cloudAccessToken = await gfcAccountFreshAccessToken();
+  const cloudHeaders = cloudAccessToken ? { Authorization: 'Bearer ' + cloudAccessToken } : null;
 
   let supaContext = '';
   const scopedAlert = gfcGetYarbiAlertContext(false);
@@ -20884,7 +21086,7 @@ async function gfcSendCopilotChatMessage(promptText) {
   try {
     // La nube es rescate, no la primera lectura. El límite evita que una consulta
     // ordinaria quede esperando una conexión lenta cuando ya existe copia local.
-    if (!supaContext && scopedPhone) {
+    if (!supaContext && scopedPhone && cloudHeaders) {
       const controller = typeof AbortController === 'function' ? new AbortController() : null;
       const timeoutId = controller ? window.setTimeout(() => controller.abort(), 1400) : 0;
       const variants = [scopedPhone, scopedPhone.length === 9 ? '51' + scopedPhone : ''];
@@ -21032,9 +21234,18 @@ function gfcSetYarbiProcessingUi(data = {}) {
     }
   };
   const localUpdating = local.status === 'syncing' || local.status === 'backfilling';
+  const notificationOutbox = typeof gfcNotificationOutboxSummary === 'function' ? gfcNotificationOutboxSummary() : { pending:0, needs_identity:0, needs_phone:0 };
   button.textContent = localUpdating ? '⬇ Actualizando…' : '⬇ Actualizar Yarbi';
   button.disabled = localUpdating;
   if (!navigator.onLine) { show(local.last_sync_at ? '📴 Sin conexión · copia local disponible' : '📴 Sin conexión · sin copia local', '#B45309'); return; }
+  if (notificationOutbox.needs_identity > 0) {
+    show('⚠️ ' + notificationOutbox.needs_identity + ' mensaje(s) esperan vincular cliente', '#B45309', 'Yarbi los conserva localmente, pero no los asignará a un cliente por nombre o teléfono sin coincidencia canónica.');
+    return;
+  }
+  if (notificationOutbox.pending > 0) {
+    show('🔄 ' + notificationOutbox.pending + ' mensaje(s) esperando copia segura', '#0369A1', 'La app los guardó localmente y reintentará sincronizarlos al recuperar sesión y conexión.');
+    return;
+  }
   if (local.status === 'syncing') { show('🔄 Actualizando memoria local…', '#0369A1', 'Sincronizando cambios nuevos; no vuelve a descargar todo el histórico.'); return; }
   if (local.status === 'backfilling') { show('⬇ Descargando histórico · ' + Number(local.stored?.message || 0) + ' mensajes locales', '#0369A1', 'Carga inicial del histórico hacia la copia local.'); return; }
   if (data.status === 'needs_attention' && data.blocker === 'gemini_quota') { show('⚠️ Gemini sin cuota: procesamiento en pausa', '#B45309', Number(totals.failed || 0) + ' análisis esperan; no se duplican mientras la cuota esté bloqueada.'); return; }
@@ -21045,7 +21256,7 @@ function gfcSetYarbiProcessingUi(data = {}) {
     return;
   }
   if (data.status === 'processing') {
-    show('🔄 Procesando ahora: ' + Number(totals.processing || 0) + ' · pendientes: ' + pending, '#0369A1', 'Es un proceso incremental. Los bloqueos de Supabase impiden que dos procesos tomen el mismo análisis.');
+    show('🔄 ' + Number(totals.processing || 0) + ' chat(s) en segundo plano', '#0369A1', 'Procesando ahora · pendientes: ' + pending + '. Es un proceso incremental; Supabase impide que dos procesos tomen el mismo análisis.');
     return;
   }
   if (data.status === 'needs_attention') {
@@ -21064,7 +21275,7 @@ function gfcSetYarbiProcessingUi(data = {}) {
     show('⚠️ Histórico: ' + (issues.length ? issues.join(' · ') : failed + ' con error'), '#B45309', details.join(' '));
     return;
   }
-  if (data.status === 'outdated' || pending > 0) { show(Number(totals.audio_pending || 0) > 0 ? '🎤 ' + Number(totals.audio_pending || 0) + ' nota(s) de voz pendientes' : '⚠️ ' + pending + ' chat(s) pendientes', '#B45309', 'Yarbi procesa solamente los elementos nuevos o pendientes.'); return; }
+  if (data.status === 'outdated' || pending > 0) { show(Number(totals.audio_pending || 0) > 0 ? '🎤 ' + Number(totals.audio_pending || 0) + ' nota(s) de voz pendientes' : '⚠️ ' + pending + ' chat(s) pendientes · proceso automático', '#B45309', 'Yarbi procesa solamente los elementos nuevos o pendientes.'); return; }
   if (data.status === 'up_to_date' && local.status === 'synced') {
     const unavailable = Number(totals.audio_unavailable || 0);
     show(unavailable > 0 ? '✅ Yarbi al día · ' + unavailable + ' audio(s) antiguo(s) no recuperables' : '✅ Yarbi al día · chats y memoria local', '#16734B', 'No hay mensajes nuevos ni análisis pendientes.');
@@ -21103,8 +21314,19 @@ function gfcMaybeRecoverYarbiFailures(data = {}) {
   }).finally(() => { window._gfcYarbiAutoRecoveryRunning = false; });
 }
 async function gfcRefreshYarbiProcessingStatus(options = {}) {
-  const label = document.getElementById('gfc-ai-process-status'), token = localStorage.getItem('fnz_assistant_token') || '';
-  if (!token) { if (label) { label.textContent = 'Configura el token para sincronizar.'; label.style.color = '#B45309'; } return null; }
+  const label = document.getElementById('gfc-ai-process-status'), legacyToken = localStorage.getItem('fnz_assistant_token') || '';
+  // Las instalaciones actuales autentican con la sesión Supabase y mantienen
+  // el histórico en el espejo local. El token interno quedó retirado del
+  // navegador; no bloquear la UI por una credencial que ya no debe existir.
+  if (!legacyToken) {
+    const local = gfcYarbiLocalStatusRead();
+    if (local.status === 'synced') gfcSetYarbiProcessingUi({ status: 'up_to_date', pending_work: 0, totals: {} });
+    else if (local.status === 'syncing' || local.status === 'backfilling') gfcSetYarbiProcessingUi({ status: 'processing', pending_work: 0, totals: {} });
+    else if (local.status === 'error') gfcSetYarbiProcessingUi({ status: 'local_error', pending_work: 0, totals: {} });
+    else if (label) { label.textContent = '⏳ Preparando copia local…'; label.style.color = '#64748B'; }
+    return { status: local.status || 'not-synced', local_only: true, local };
+  }
+  const token = legacyToken;
   try {
     const response = await fetch(gfcYarbiProcessingStatusEndpoint(), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token }, body: JSON.stringify({ action: 'status' }) });
     const data = await response.json().catch(() => ({}));
@@ -21158,30 +21380,17 @@ async function gfcLearnHistoricalReplyStyle() {
 }
 async function gfcProcessYarbiInformation() {
   const button = document.getElementById('gfc-ai-process-btn');
-  const token = localStorage.getItem('fnz_assistant_token') || '';
-  if (!token) return toast('Configura primero el token de Yarbi en Ajustes.', 'warning');
+  const accessToken = await gfcAccountFreshAccessToken();
+  if (!accessToken) return toast('Inicia sesión en Yarbi para actualizar la copia local.', 'warning');
   if (!navigator.onLine) return toast('Sin conexión. Yarbi seguirá usando la última copia local.', 'warning');
   if (button) { button.disabled = true; button.textContent = '♻ Recuperando…'; }
   try {
-    const before = await gfcRefreshYarbiProcessingStatus({ quiet: true });
-    let recovery = null;
-    if (before && before.status !== 'up_to_date') {
-      const recoveryResponse = await fetch(gfcYarbiProcessingStatusEndpoint(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Assistant-Token': token },
-        body: JSON.stringify({ action: 'recover', limit: 25, requested_by: 'yarbi-manual-recovery' })
-      });
-      recovery = await recoveryResponse.json().catch(() => ({}));
-      if (!recoveryResponse.ok) throw new Error(recovery.detail || recovery.error || 'No se pudo recuperar el procesamiento pendiente');
-      gfcChatDiag('ai-processing-recovery', recovery.recovery || {});
-    }
     if (button) button.textContent = '⬇ Actualizando…';
     const data = await gfcSyncYarbiLocalMirror({ reason: 'manual-download', backfill: true });
     const status = await gfcRefreshYarbiProcessingStatus({ quiet: true });
     const received = (data?.messages || []).length + (data?.entities?.memories || []).length + (data?.entities?.analyses || []).length;
-    const recovered = Number(recovery?.recovery?.analysis_processed || 0) + Number(recovery?.recovery?.audio_recovered || 0);
-    toast(data?.has_more_history ? '⬇ Copia actualizada. Yarbi continúa descargando el histórico en segundo plano.' : (status?.status === 'up_to_date' ? '✅ Yarbi está al día. Copia local actualizada.' : (recovered > 0 ? '✅ Se recuperaron ' + recovered + ' elemento(s). Lo restante conserva diagnóstico.' : '✅ Copia local actualizada. Los casos pendientes conservan su diagnóstico.')), 'success');
-    gfcChatDiag('yarbi-manual-download', { received, recovered, hasMoreHistory: !!data?.has_more_history, remoteStatus: status?.status || 'unknown' });
+    toast(data?.has_more_history ? '⬇ Copia actualizada. Yarbi continúa descargando el histórico en segundo plano.' : (status?.status === 'up_to_date' ? '✅ Yarbi está al día. Copia local actualizada.' : '✅ Copia local actualizada. Los casos pendientes conservan su diagnóstico.'), 'success');
+    gfcChatDiag('yarbi-manual-download', { received, hasMoreHistory: !!data?.has_more_history, remoteStatus: status?.status || 'unknown' });
   } catch (error) {
     gfcYarbiLocalStatusWrite({ status: 'error', reason: 'manual-download', last_error: error?.message || String(error) });
     toast('No se pudo actualizar la copia local: ' + (error.message || 'revisa la conexión'), 'error');
@@ -23381,7 +23590,9 @@ window._gfcContactsPermissionGranted = true;
 // ═══════════════════════════════════════════════════════════════
 async function gfcSyncSupabaseAlerts() {
   const cloudMessagesUrl = window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages';
-  const cloudHeaders = { 'X-Assistant-Token': localStorage.getItem('fnz_assistant_token') || '' };
+  const cloudAccessToken = await gfcAccountFreshAccessToken();
+  if (!cloudAccessToken) return;
+  const cloudHeaders = { Authorization: 'Bearer ' + cloudAccessToken };
   const syncKey = 'fnz_whatsapp_alerts_cloud_sync_at';
   const lastSync = Number(localStorage.getItem(syncKey) || 0);
   if (Date.now() - lastSync < 30000) return;
@@ -31284,9 +31495,11 @@ async function gfcRestoreWhatsappFromCloud() {
 
   toast('Consultando historial cloud…', 'info');
   try {
+    const accessToken = await gfcAccountFreshAccessToken();
+    if (!accessToken) throw new Error('La sesión de Yarbi debe iniciarse nuevamente para consultar el historial.');
     const query = '?include_deleted=true&from_timestamp=' + encodeURIComponent(String(fromMs)) + '&order=asc&limit=5000';
     const response = await fetch(window.gfcRuntimeApiOrigin() + '/api/whatsapp/messages' + query, {
-      headers: { 'X-Assistant-Token': localStorage.getItem('fnz_assistant_token') || '' }
+      headers: { Authorization: 'Bearer ' + accessToken }
     });
     const payload = await response.json().catch(() => ({}));
     const rows = Array.isArray(payload?.messages) ? payload.messages : [];
@@ -48134,7 +48347,14 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
    descarga deltas y construye la vista local; no vuelve a pedir a Gemini que
    analice por separado la misma conversación. */
 (function(){
-  const hasAssistantToken = () => Boolean(String(localStorage.getItem('fnz_assistant_token') || '').trim());
+  const hasAuthenticatedSession = () => {
+    try {
+      return Boolean(
+        (typeof window.gfcAccountAccessToken === 'function' && window.gfcAccountAccessToken())
+        || localStorage.getItem('gfc_supabase_refresh_token_v1')
+      );
+    } catch (_) { return false; }
+  };
   const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const sameText = (left, right) => normalize(left).replace(/\s+/g, ' ').trim() === normalize(right).replace(/\s+/g, ' ').trim();
 
@@ -48145,7 +48365,7 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
   const legacyLocalAnalysis = window.gfcScheduleBackgroundAnalysis;
   if (typeof legacyLocalAnalysis === 'function' && !legacyLocalAnalysis.__canonicalOnly) {
     window.gfcScheduleBackgroundAnalysis = function(suggestionId, phone, name) {
-      if (!hasAssistantToken()) return legacyLocalAnalysis.apply(this, arguments);
+      if (!hasAuthenticatedSession()) return legacyLocalAnalysis.apply(this, arguments);
       if (typeof window.gfcScheduleCanonicalYarbiDeltaSync === 'function') {
         window.gfcScheduleCanonicalYarbiDeltaSync('notification-canonical-delta');
       }
@@ -48161,7 +48381,7 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
   const refreshSlots = [0, 5000, 13000, 28000];
   const pendingTimers = window._gfcCanonicalDeltaTimers || (window._gfcCanonicalDeltaTimers = {});
   window.gfcScheduleCanonicalYarbiDeltaSync = function(reason) {
-    if (!hasAssistantToken()) return;
+    if (!hasAuthenticatedSession()) return;
     refreshSlots.forEach(delay => {
       const slot = 'delta_' + delay;
       if (pendingTimers[slot]) return;

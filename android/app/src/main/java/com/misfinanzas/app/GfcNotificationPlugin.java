@@ -87,16 +87,43 @@ public class GfcNotificationPlugin extends Plugin {
         try {
             SharedPreferences prefs = getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String listJson = prefs.getString(KEY_PENDING_LIST, "[]");
-            
-            // Limpiar la lista tras leerla
-            prefs.edit().remove(KEY_PENDING_LIST).apply();
-
+            // No se borra al leer. El WebView primero lo conserva en su outbox
+            // local y solo después confirma los IDs persistidos. Así un cierre
+            // de la app entre lectura y respaldo no pierde mensajes.
             ret.put("notificationsJson", listJson);
             call.resolve(ret);
         } catch (Exception e) {
             Log.e(TAG, "Error obteniendo notificaciones pendientes", e);
             ret.put("notificationsJson", "[]");
             call.resolve(ret);
+        }
+    }
+
+    @PluginMethod
+    public void acknowledgePendingNotifications(PluginCall call) {
+        try {
+            JSArray requested = call.getArray("ids", new JSArray());
+            Set<String> acknowledged = new HashSet<>();
+            for (int i = 0; i < requested.length(); i++) {
+                String id = requested.getString(i);
+                if (id != null && id.matches("[A-Za-z0-9:_-]{8,160}")) acknowledged.add(id);
+            }
+            SharedPreferences prefs = getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            org.json.JSONArray current = new org.json.JSONArray(prefs.getString(KEY_PENDING_LIST, "[]"));
+            org.json.JSONArray remaining = new org.json.JSONArray();
+            for (int i = 0; i < current.length(); i++) {
+                org.json.JSONObject row = current.getJSONObject(i);
+                String id = row.optString("id", "");
+                if (!acknowledged.contains(id)) remaining.put(row);
+            }
+            prefs.edit().putString(KEY_PENDING_LIST, remaining.toString()).apply();
+            JSObject ret = new JSObject();
+            ret.put("acknowledged", acknowledged.size());
+            ret.put("remaining", remaining.length());
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "No se pudo confirmar notificaciones pendientes", e);
+            call.reject("No se pudo confirmar notificaciones pendientes", e);
         }
     }
 

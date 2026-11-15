@@ -5,12 +5,19 @@
 // llega aquí con una sesión Supabase y alcance canónico de contactos.
 const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
 const { authenticateCompleteScopedOwner, blockedOwnerInput, scopedFilter } = require('../../lib/yarbi-authenticated-route');
+const crypto = require('node:crypto');
 
 const SCOPE_BATCH_SIZE = 100;
 const READ_CONCURRENCY = 3;
+const LOCAL_INGEST_MAX_EVENTS = 24;
+const LOCAL_INGEST_MAX_TEXT = 2000;
 
 function first(value) { return Array.isArray(value) ? value[0] : value; }
 function cleanPhone(value) { return String(first(value) || '').replace(/\D/g, '').slice(0, 20); }
+function normalizedPhone(value) {
+  const phone = cleanPhone(value);
+  return phone.startsWith('51') && phone.length === 11 ? phone.slice(2) : phone;
+}
 function timestamp(value) {
   const raw = String(first(value) || '').trim();
   if (!/^\d{1,16}$/.test(raw)) return null;
@@ -164,6 +171,116 @@ function maxNumber(rows, field, fallback = null) {
   return rows.reduce((latest, row) => Math.max(Number(latest || 0), Number(row?.[field] || 0)) || null, fallback);
 }
 
+function localEvent(input) {
+  const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const eventId = String(source.event_id || source.id || '').trim();
+  const phone = normalizedPhone(source.phone);
+  const title = String(source.title || '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+  const text = String(source.text || '').replace(/\u0000/g, '').trim().slice(0, LOCAL_INGEST_MAX_TEXT);
+  const occurredAt = Number(source.timestamp);
+  if (!/^[A-Za-z0-9:_-]{8,160}$/.test(eventId) || !/^\d{8,15}$/.test(phone) || !title || !text
+    || !Number.isSafeInteger(occurredAt) || occurredAt < 946684800000 || occurredAt > Date.now() + 86400000) return null;
+  return { event_id: eventId, phone, title, text, timestamp: occurredAt };
+}
+
+function localMessageId(ownerId, eventId) {
+  return 'android-local-' + crypto.createHash('sha256').update(String(ownerId) + '\u0000' + String(eventId)).digest('hex');
+}
+
+async function resolveScopedContactByPhone(supabase, scope, phone) {
+  const batches = scopeBatches(scope);
+  if (!batches.length) return null;
+  const matches = [];
+  for (const ids of batches) {
+    const params = new URLSearchParams();
+    params.set('select', 'contact_id');
+    params.set('identifier_type', 'eq.phone');
+    params.set('normalized_value', 'eq.' + phone);
+    params.set('contact_id', scopedFilter({ contact_ids: ids }));
+    params.set('limit', '2');
+    const result = await supabase('/rest/v1/contact_identifiers?' + params.toString());
+    if (!result?.response?.ok) {
+      const error = new Error('local_notification_contact_lookup_failed');
+      error.status = result?.response?.status;
+      throw error;
+    }
+    for (const row of Array.isArray(result.data) ? result.data : []) {
+      const contactId = Number(row?.contact_id);
+      if (Number.isSafeInteger(contactId) && contactId > 0 && !matches.includes(contactId)) matches.push(contactId);
+    }
+    if (matches.length > 1) return null;
+  }
+  return matches.length === 1 ? matches[0] : null;
+}
+
+async function ingestLocalNotifications(req, res, supabase, access) {
+  const input = body(req);
+  if (blockedOwnerInput(input)) return res.status(400).json({ error: 'owner_scope_client_input_forbidden' });
+  // No se acepta una carga genérica de texto. El cliente debe declarar que son
+  // eventos capturados localmente; la identidad del dueño sigue viniendo sólo
+  // del Bearer ya validado, nunca del cuerpo.
+  if (input.acknowledge_local_capture !== true) return res.status(400).json({ error: 'local_notification_capture_acknowledgement_required' });
+  const requested = Array.isArray(input.events) ? input.events.slice(0, LOCAL_INGEST_MAX_EVENTS) : [];
+  if (!requested.length || (Array.isArray(input.events) && input.events.length > LOCAL_INGEST_MAX_EVENTS)) {
+    return res.status(400).json({ error: 'local_notification_events_invalid' });
+  }
+  const outcomes = [];
+  let persisted = 0;
+  let unresolved = 0;
+  for (const rawEvent of requested) {
+    const event = localEvent(rawEvent);
+    if (!event) {
+      outcomes.push({ event_id: String(rawEvent?.event_id || rawEvent?.id || '').slice(0, 160), outcome: 'invalid' });
+      continue;
+    }
+    let contactId;
+    try {
+      contactId = await resolveScopedContactByPhone(supabase, access.scope, event.phone);
+    } catch (error) {
+      return res.status(error?.status >= 400 && error.status < 500 ? error.status : 502).json({ error: 'local_notification_contact_lookup_unavailable' });
+    }
+    if (!contactId) {
+      unresolved += 1;
+      outcomes.push({ event_id: event.event_id, outcome: 'unresolved_contact' });
+      continue;
+    }
+    const id = localMessageId(access.scope.owner_id, event.event_id);
+    const result = await supabase('/rest/v1/whatsapp_messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{
+        id,
+        contact_id: contactId,
+        phone: event.phone,
+        title: event.title,
+        text: event.text,
+        maps_url: null,
+        app_name: 'Android notification capture',
+        timestamp: event.timestamp,
+        // Las notificaciones de Android no prueban un historial completo ni
+        // una acción comercial. Su procedencia queda visible para que ningún
+        // componente posterior las trate como importación confirmada.
+        metadata: {
+          direction: 'incoming',
+          historical: false,
+          source_event: 'android_notification_capture',
+          local_event_id: event.event_id,
+          identity_status: 'contact_confirmed_by_owner_scope',
+          ingestion_version: 'yarbi.local-notification.v1'
+        }
+      }])
+    });
+    if (!result?.response?.ok) return res.status(502).json({ error: 'local_notification_persist_failed' });
+    persisted += 1;
+    outcomes.push({ event_id: event.event_id, outcome: 'persisted' });
+  }
+  return res.status(200).json({
+    status: 'ok', source: 'android_notification_capture', persisted, unresolved,
+    outcomes,
+    note: 'Solo se guardaron eventos con teléfono vinculado a un contacto dentro del alcance autenticado. Los no resueltos permanecen locales hasta una confirmación explícita.'
+  });
+}
+
 const LOCAL_ENTITY_SPECS = [
   { name:'contacts', table:'crm_contacts', scopeField:'id', select:'id,full_name,display_name,commercial_status,status_reason,commercial_status_event_at,commercial_status_source_message_ids,operational_status,operational_reason,operational_event_at,operational_status_source_message_ids,notes,source,created_at,updated_at' },
   { name:'identifiers', table:'contact_identifiers', select:'id,contact_id,identifier_type,identifier_value,normalized_value,is_primary,created_at,updated_at' },
@@ -236,15 +353,17 @@ function createWhatsAppMessagesHandler({ configResolver = () => validateServerRo
     const query = req.query || {};
     if (blockedOwnerInput(query)) return res.status(400).json({ error: 'owner_scope_client_input_forbidden' });
     const action = String(first(query.action) || '').trim();
-    if (action && action !== 'local-sync') return res.status(410).json({ error: 'interactive_whatsapp_action_moved' });
-    if (req.method === 'POST' && action !== 'local-sync') return res.status(405).json({ error: 'method_not_allowed' });
+    if (action && !['local-sync', 'local-ingest'].includes(action)) return res.status(410).json({ error: 'interactive_whatsapp_action_moved' });
+    if (req.method === 'POST' && !['local-sync', 'local-ingest'].includes(action)) return res.status(405).json({ error: 'method_not_allowed' });
     if (req.method === 'GET' && action === 'local-sync') return res.status(405).json({ error: 'method_not_allowed' });
+    if (req.method === 'GET' && action === 'local-ingest') return res.status(405).json({ error: 'method_not_allowed' });
     const config = configResolver();
     if (!config?.ok) return res.status(503).json({ error: 'configuration_invalid', code: config?.code || 'configuration_invalid' });
     const supabase = serviceClient(config, fetchImpl);
     const access = await authenticate(req, config, supabase, fetchImpl);
     if (!access?.ok) return res.status(access?.status || 403).json({ error: access?.code || 'owner_scope_forbidden' });
     if (action === 'local-sync') return ownerLocalSync(req, res, supabase, access);
+    if (action === 'local-ingest') return ingestLocalNotifications(req, res, supabase, access);
     if (!scopeBatches(access.scope).length) return res.status(200).json({ status: 'ok', source: 'supabase-backend', messages: [] });
     try {
       const messages = await readScopedMessages(supabase, query, access.scope);
@@ -259,3 +378,7 @@ module.exports = createWhatsAppMessagesHandler();
 module.exports.createWhatsAppMessagesHandler = createWhatsAppMessagesHandler;
 module.exports.messageQuery = messageQuery;
 module.exports.messageQueries = messageQueries;
+module.exports.ingestLocalNotifications = ingestLocalNotifications;
+module.exports.localEvent = localEvent;
+module.exports.localMessageId = localMessageId;
+module.exports.resolveScopedContactByPhone = resolveScopedContactByPhone;

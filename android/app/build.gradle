@@ -7,8 +7,8 @@ android {
         applicationId "com.misfinanzas.app.yarbitest"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 123
-        versionName "3.4.32-yarbi-bke-tutor-indexed"
+        versionCode 125
+        versionName "3.4.34-stable-production"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,16 +18,13 @@ android {
     }
     buildTypes {
         debug {
-            // R3 uses a separate application id so it starts with a fresh
-            // WebView/Service Worker storage namespace. This is essential
-            // when validating changes to runtime configuration against the
-            // earlier Preview test APKs, while still preserving 3.4.25.
+            // Esta variante conserva un application id independiente de la
+            // APK histórica 3.4.25, pero se actualiza sobre la instalación de
+            // pruebas estable ya existente para no perder su sesión local.
             applicationIdSuffix ".debug.r3"
-            versionNameSuffix "-chat-preview-local-r4"
-            // Visible label: allows the owner to distinguish this isolated
-            // validation app from the historical 3.4.25 and previous tests.
-            resValue "string", "app_name", "Yarbi Preview R4"
-            resValue "string", "title_activity_main", "Yarbi Preview R4"
+            versionNameSuffix "-r6"
+            resValue "string", "app_name", "Yarbi"
+            resValue "string", "title_activity_main", "Yarbi"
         }
         release {
             minifyEnabled false
