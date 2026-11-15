@@ -47384,6 +47384,7 @@ body.gfc-yarbi-screen #modal-box,.gfc-yarbi-shell{background:#FFFFFF !important}
 .gfc-yarbi-chat .yarbi-content-source{margin-top:15px;padding-top:10px;border-top:1px solid #E4EAE7;color:#718078;font-size:12px}
 .gfc-yarbi-message-actions{justify-content:flex-start;margin:7px 0 0;min-height:26px}
 .gfc-yarbi-message-copy{min-height:30px;padding:5px 8px;border-radius:8px;color:#78837E;font-size:11px}
+.gfc-yarbi-load-history{align-self:center;margin:2px auto 20px;border:1px solid #D9E6DF;border-radius:999px;background:#F5FAF7;color:#35624E;min-height:36px;padding:7px 13px;font:750 12px/1.15 var(--gfc-ui-font,inherit);cursor:pointer}.gfc-yarbi-load-history:focus-visible,.gfc-yarbi-load-history:hover{outline:none;border-color:#79A88F;background:#EDF6F0}
 .gfc-yarbi-chat-welcome{width:min(100%,680px);margin:auto;padding:30px 10px 26px}
 .gfc-yarbi-welcome-mark{width:54px;height:54px;border-radius:17px;font-size:25px}
 .gfc-yarbi-chat-welcome h1{font-size:28px;color:#203129}
@@ -47818,6 +47819,7 @@ body.gfc-yarbi-screen .gfc-pc-launch{display:none !important}
       const initials = crmEsc(record.name.split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase() || 'CL');
       const agenda = record.activeAgenda || record.agenda.slice().sort((a,b) => crmTimestamp(b.fecha,b.hora)-crmTimestamp(a.fecha,a.hora))[0];
       const temp = {caliente:['🔥 Caliente','#B45309','#FFF3DF'],tibio:['☀️ Tibio','#8A5A11','#FFF8E8'],frio:['❄️ Frío','#526779','#EEF4F7'],cerrado:['✓ Resuelto','#4E6E61','#EDF7F0']}[record.temperature] || ['• Contacto','#64748B','#F1F5F9'];
+      const commercialReason = String(record.inbox?.status_reason || '').trim();
       const domId = 'crmcard_' + crmDomKey(record.key);
       const isOpen = window._crmExpandedKey === String(record.key);
       const meta = [record.phone ? '📱 '+crmEsc(record.phone) : 'Teléfono pendiente', crmDateTime(record.lastAt)].join(' · ');
@@ -47844,6 +47846,7 @@ body.gfc-yarbi-screen .gfc-pc-launch{display:none !important}
         '<div class="mv-expand"><div class="mv-detail">'+
           '<div class="mv-d-item"><span class="mv-d-lbl">Último contacto</span><span class="mv-d-val">'+crmDateTime(record.lastAt)+'</span></div>'+
           '<div class="mv-d-item"><span class="mv-d-lbl">Agenda</span><span class="mv-d-val">'+agendaText+'</span></div>'+
+          '<div class="mv-d-item"><span class="mv-d-lbl">Interés comercial</span><span class="mv-d-val">'+crmEsc(commercialReason || 'Sin señal comercial verificable todavía.')+'</span></div>'+
           '<div class="crm-summary"><b style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;color:'+pal[1]+'">Contexto actualizado</b>'+crmEsc(crmOperationalSummary(record))+'</div>'+
           '<div class="mv-d-item"><span class="mv-d-lbl">Servicio</span><span class="mv-d-val">'+(record.service ? crmEsc(record.service) : 'Pendiente')+'</span></div>'+
           '<div class="mv-d-item"><span class="mv-d-lbl">Ubicación</span><span class="mv-d-val">'+(record.location ? crmEsc(record.location) : 'Pendiente')+'</span></div>'+

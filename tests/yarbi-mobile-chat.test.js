@@ -34,6 +34,14 @@ test('los saludos automáticos históricos no vuelven a duplicarse visualmente',
   assert.match(memory, /divider\.dataset\.dayKey = key/);
 });
 
+test('el chat abre en los mensajes recientes y deja el historial bajo demanda', () => {
+  assert.match(memory, /const INITIAL_CHAT_MESSAGES = 24/);
+  assert.match(memory, /const CHAT_HISTORY_PAGE = 36/);
+  assert.match(memory, /function renderTimelineWindow/);
+  assert.match(memory, /Ver .* mensajes anteriores/);
+  assert.match(memory, /renderTimelineWindow\(box, initialVisibleTimeline, INITIAL_CHAT_MESSAGES, true\)/);
+});
+
 test('el renderer conserva jerarquía rica y lectura móvil', () => {
   assert.match(html, /yarbi-content-heading-1/);
   assert.match(html, /yarbi-content-checklist/);

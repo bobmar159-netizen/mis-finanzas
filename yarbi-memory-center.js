@@ -20,6 +20,8 @@
   const DEFAULT_CONVERSATION_ID = 'default';
   const MAX_TRAINING_EXAMPLES = 80;
   const MAX_LOCAL_MESSAGES = 600;
+  const INITIAL_CHAT_MESSAGES = 24;
+  const CHAT_HISTORY_PAGE = 36;
   const LEARNING_INTENTS = ['cotizacion','ubicacion','agenda','reprogramacion','pago','postventa','consulta_general'];
 
   function interactionMode() {
@@ -225,6 +227,8 @@
   }
   let conversationStoreReady = null;
   let unsubscribeConversationStore = null;
+  let renderedTimelineCache = [];
+  let renderedTimelineLimit = INITIAL_CHAT_MESSAGES;
   function storageError(code) {
     return Object.assign(new Error(code), { code });
   }
@@ -786,16 +790,51 @@
     }
     return { handled:true, result:{ ok:true, timelineId:item.id, rendered:!!rendered } };
   };
+  function renderTimelineWindow(box, items, limit, restoreAtBottom) {
+    if (!box) return;
+    renderedTimelineCache = visibleTimeline(items);
+    renderedTimelineLimit = Math.max(INITIAL_CHAT_MESSAGES, Math.min(Number(limit) || INITIAL_CHAT_MESSAGES, renderedTimelineCache.length || INITIAL_CHAT_MESSAGES));
+    const hidden = Math.max(0, renderedTimelineCache.length - renderedTimelineLimit);
+    const windowItems = hidden ? renderedTimelineCache.slice(-renderedTimelineLimit) : renderedTimelineCache;
+    box.innerHTML = '';
+    renderedDay = '';
+    if (hidden) {
+      const older = document.createElement('button');
+      older.type = 'button';
+      older.className = 'gfc-yarbi-load-history';
+      older.textContent = '↑ Ver ' + Math.min(CHAT_HISTORY_PAGE, hidden) + ' mensajes anteriores';
+      older.setAttribute('aria-label', 'Cargar mensajes anteriores de esta conversación');
+      older.addEventListener('click', () => window.gfcLoadOlderYarbiMessages());
+      box.appendChild(older);
+    }
+    windowItems.forEach(renderTimelineItem);
+    if (!windowItems.length) ensureChatWelcome(box);
+    if (restoreAtBottom) box.scrollTop = box.scrollHeight;
+  }
+  window.gfcLoadOlderYarbiMessages = function() {
+    const box = document.getElementById('gfc-copilot-chat-messages');
+    if (!box || !renderedTimelineCache.length || renderedTimelineLimit >= renderedTimelineCache.length) return false;
+    const previousHeight = box.scrollHeight;
+    const previousTop = box.scrollTop;
+    renderTimelineWindow(box, renderedTimelineCache, renderedTimelineLimit + CHAT_HISTORY_PAGE, false);
+    // Conserva la lectura donde estaba: cargar historial no debe saltarte al inicio.
+    box.scrollTop = Math.max(0, box.scrollHeight - previousHeight + previousTop);
+    return true;
+  };
   async function refreshConversationTimelineRenderer() {
     const box = document.getElementById('gfc-copilot-chat-messages');
     if (!box || box.dataset.gfcRestored !== '1') return;
     let timeline;
     try { timeline = await loadTimeline(); } catch (_) { return; }
-    visibleTimeline(timeline).forEach(item => {
-      if (!box.querySelector('[data-message-id="' + item.id + '"]')) renderTimelineItem(item);
-    });
+    const nextVisibleTimeline = visibleTimeline(timeline);
+    const currentIds = renderedTimelineCache.map(item => item.id).join('|');
+    const nextIds = nextVisibleTimeline.map(item => item.id).join('|');
+    if (currentIds === nextIds) return;
+    const atBottom = chatIsNearBottom(box);
+    renderTimelineWindow(box, nextVisibleTimeline, renderedTimelineLimit, atBottom);
   }
-  function restoreConversationScroll(box) {
+  function restoreConversationScroll(box, latest) {
+    if (latest) { box.scrollTop = box.scrollHeight; return; }
     const saved = conversationScrollTop(activeConversationId());
     box.scrollTop = saved === null ? box.scrollHeight : Math.min(saved, Math.max(0, box.scrollHeight - box.clientHeight));
   }
@@ -838,19 +877,17 @@
       } catch (_) { box.dataset.gfcRestored = '0'; return; }
     }
     const initialVisibleTimeline = visibleTimeline(timeline);
-    renderedDay = '';
-    initialVisibleTimeline.forEach(renderTimelineItem);
-    if (!initialVisibleTimeline.length) ensureChatWelcome(box);
-    restoreConversationScroll(box);
+    // Al abrir, Yarbi se sitúa siempre en la conversación reciente. El resto
+    // permanece local y aparece solo cuando el usuario lo solicita.
+    renderTimelineWindow(box, initialVisibleTimeline, INITIAL_CHAT_MESSAGES, true);
     watchConversationScroll(box);
     syncTimelineFromCloud().then(list => {
       if (!document.getElementById('gfc-copilot-chat-messages')) return;
       const nextVisibleTimeline = visibleTimeline(list);
-      const currentIds = [...box.querySelectorAll('[data-message-id]')].map(node => node.dataset.messageId).join('|');
+      const currentIds = renderedTimelineCache.map(item => item.id).join('|');
       const nextIds = nextVisibleTimeline.map(item => item.id).join('|');
       if (currentIds !== nextIds) {
-        box.innerHTML = ''; renderedDay = ''; nextVisibleTimeline.forEach(renderTimelineItem); restoreConversationScroll(box);
-        if (!nextVisibleTimeline.length) ensureChatWelcome(box);
+        renderTimelineWindow(box, nextVisibleTimeline, INITIAL_CHAT_MESSAGES, true);
       }
     }).catch(() => {});
   };

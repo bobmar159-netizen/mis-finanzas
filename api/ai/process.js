@@ -1,6 +1,7 @@
 const { waitUntil } = require('@vercel/functions');
 const { buildObservationRows, normalizeObservationBundle } = require('../../lib/yarbi-observations');
 const { buildContactStatusPatch, normalizeStatusEvidence } = require('../../lib/yarbi-statuses');
+const { classifyCommercialStatus } = require('../../lib/yarbi-commercial-status-policy');
 const { buildHabitRpcPayload, normalizeHabitCandidates } = require('../../lib/yarbi-habits');
 const { buildReplyStyleRpcPayload, normalizeReplyStylePatterns, sanitizeStyleExample } = require('../../lib/yarbi-reply-style');
 const { normalizeDeclaredIdentity, buildContactNamePatch } = require('../../lib/yarbi-contact-identity');
@@ -216,10 +217,17 @@ function verifiedLocationDistrict(message) {
 function normalizeAnalysis(value, previousSummary, messages) {
   const messageIds = (messages || []).map(message => String(message.id));
   const statusMap = { frio: 'frio', tibio: 'tibio', caliente: 'caliente', cold: 'frio', warm: 'tibio', hot: 'caliente' };
-  const statusEvidence = normalizeStatusEvidence({
+  const modelStatusEvidence = normalizeStatusEvidence({
     ...value,
     commercial_status: statusMap[String(value?.commercial_status || '').toLowerCase()] || ''
   }, messageIds);
+  // El modelo puede explicar el contexto, pero no decide por intuición la
+  // temperatura comercial: la etiqueta se basa siempre en señales explícitas
+  // del cliente entrante y conserva sus mensajes de evidencia.
+  const commercialPolicy = classifyCommercialStatus(messages);
+  const statusEvidence = commercialPolicy
+    ? { ...modelStatusEvidence, ...commercialPolicy }
+    : { ...modelStatusEvidence, commercial_status:'', status_reason:'', commercial_status_source_message_ids:[] };
   const nextSteps = Array.isArray(value?.next_steps) ? value.next_steps.map(item => clampText(item, 240)).filter(Boolean).slice(0, 5) : [];
   const styleObservations = Array.isArray(value?.style_observations) ? value.style_observations.map(item => clampText(item, 180)).filter(Boolean).slice(0, 5) : [];
   return {
@@ -331,6 +339,7 @@ async function analyzeConversation(phone, messages, memory) {
     '{"summary":"","intent":"","service":"","follow_up_status":"","next_steps":[],"suggested_reply":"","style_observations":[],"habit_candidates":[],"reply_style_patterns":[],"declared_identity":null,"commercial_status":"frio|tibio|caliente","status_reason":"","commercial_status_source_message_ids":[],"operational_status":"sin_accion|seguimiento_pendiente|esperando_cliente|visita_por_confirmar|visita_agendada|trabajo_agendado|trabajo_en_progreso|servicio_completado|cobro_pendiente|cerrado|cancelado","operational_reason":"","operational_status_source_message_ids":[],"has_actionable_request":false,"appointment":{"date":"YYYY-MM-DD","time":"HH:mm","kind":"visita|construccion","title":"","service":"","location":"","maps_url":""},"observations":{"facts":[],"signals":[],"inferences":[]},"confidence":0}',
     'declared_identity se usa SOLO cuando el cliente declara explícitamente su propio nombre en un mensaje entrante, por ejemplo "soy Omar Mejía", "me llamo Omar Mejía", "mi nombre es Omar Mejía", o cuando el mensaje entrante consiste claramente en un nombre personal. Usa {"name":"Omar Mejía","source_message_ids":["id_entrante"],"confidence":0.95}. No lo deduzcas del título, del perfil, de mensajes del negocio, de terceros ni de la memoria previa. Si hay duda usa null.',
     'commercial_status mide SOLO interés comercial; nunca significa que una visita o trabajo esté completado. operational_status mide SOLO el avance comprobable del seguimiento, visita, trabajo o cobro.',
+    'La política comercial verificable es: caliente únicamente ante ubicación/Maps, coordinación o confirmación concreta, aceptación explícita, disponibilidad inmediata o urgencia; tibio ante consulta concreta de servicio, precio o disponibilidad; frío ante rechazo explícito. Si no hay una de estas señales directas del cliente, deja commercial_status vacío. Nunca subas o bajes el estado por un mensaje saliente del negocio ni por intuición.',
     'Cada estado debe incluir sus source_message_ids con evidencia de MENSAJES NUEVOS. Si no hay evidencia suficiente para una dimensión, deja ese estado y sus IDs vacíos.',
     'En observations separa estrictamente: facts son datos expresos y confirmados; signals son conductas observables como enviar ubicación, pedir precio o confirmar disponibilidad; inferences son hipótesis y nunca hechos.',
     'Para facts reutilizables en formularios usa estas categorías exactas cuando correspondan: client_name, phone, service, appointment_date, appointment_time, price, location, district, maps_url. Normaliza appointment_date como YYYY-MM-DD, appointment_time como HH:mm y price como importe numérico en soles dentro de value. No incluyas una categoría si el dato no fue expresado.',
