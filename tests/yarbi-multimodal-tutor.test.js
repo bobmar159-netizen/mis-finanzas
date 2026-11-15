@@ -65,9 +65,12 @@ test('BKE multimodal: la búsqueda dirigida exige cita y ubicación antes de afi
   assert.equal(found.found, true);
   assert.equal(unsafe.found, false);
   const formatted = api.formatDirectedAnswer(found, { title:'Norma técnica.pdf', sha256:'d'.repeat(64) });
-  assert.match(formatted, /^\*\*✅ Se admite bajo condiciones\./);
-  assert.match(formatted, /> \[📖 Numeral 7\.3\]/);
+  assert.match(formatted, /^## ✅ Respuesta breve/);
+  assert.ok(formatted.indexOf('Se admite bajo condiciones.') < formatted.indexOf('Cita literal'), 'la conclusión debe aparecer antes de la evidencia');
+  assert.match(formatted, /> \[📖 Cita literal · Numeral 7\.3\]/);
   assert.match(formatted, /“La válvula podrá alimentar dos artefactos\.”/);
+  assert.match(formatted, /### En palabras sencillas/);
+  assert.match(formatted, /la explicación sencilla es una interpretación de Yarbi/i);
   assert.match(api.formatDirectedAnswer(unsafe, { title:'Norma técnica.pdf' }), /No encontré/);
 });
 

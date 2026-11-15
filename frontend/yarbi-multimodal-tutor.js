@@ -231,13 +231,18 @@
   function formatDirectedAnswer(result, asset) {
     const title = clean(asset?.title || 'Fuente aprobada', 140);
     if (!result?.found) {
-      return '**No encontré una cita que responda eso en ' + title + '.**\n\n' + (result?.caveat ? '> [🔎 Qué falta verificar]\n> ' + brief(result.caveat, 42) + '\n\n' : '') + 'No afirmaré que está permitido o prohibido sin evidencia.';
+      return '## 🔎 Respuesta breve\n\n'
+        + 'No encontré una cita literal que responda esa pregunta en **' + title + '**.\n\n'
+        + '> [Evidencia insuficiente]\n> ' + (result?.caveat ? brief(result.caveat, 42) : 'La fuente revisada no contiene un fragmento verificable para sostener una respuesta.') + '\n\n'
+        + 'No afirmaré que está permitido o prohibido sin respaldo documental.';
     }
-    return (result.answer ? '**✅ ' + brief(result.answer, 38) + '**\n\n' : '')
-      + '> [📖 ' + result.reference + ']\n> “' + brief(result.quote, 54) + '”\n\n'
-      + (result.plain ? '**En fácil:** ' + brief(result.plain, 42) + '\n\n' : '')
-      + (result.caveat ? '⚠️ **Ten en cuenta:** ' + brief(result.caveat, 30) + '\n\n' : '')
-      + '_Fuente: ' + title + '_';
+    const reference = clean(result.reference, 180).replace(/[\[\]]/g, '');
+    return '## ✅ Respuesta breve\n\n'
+      + (result.answer ? brief(result.answer, 38) : 'Encontré evidencia relacionada en la fuente aprobada.') + '\n\n'
+      + '> [📖 Cita literal · ' + reference + ']\n> “' + brief(result.quote, 54) + '”\n> Fuente: ' + title + '\n\n'
+      + (result.plain ? '### En palabras sencillas\n\n' + brief(result.plain, 42) + '\n\n' : '')
+      + (result.caveat ? '> [⚠️ Condición importante]\n> ' + brief(result.caveat, 30) + '\n\n' : '')
+      + '_La cita es evidencia textual; la explicación sencilla es una interpretación de Yarbi._';
   }
   function sourceNames(rows) {
     return (Array.isArray(rows) ? rows : []).slice(0, 3).map(asset => '**' + clean(asset?.title || 'Fuente sin nombre', 100) + '**').join(', ');

@@ -140,6 +140,14 @@ test('chat visual: convierte una cita en tarjeta y conserva énfasis dentro de l
   assert.equal(result.blocks[2].text, 'El precio final requiere visita técnica.');
 });
 
+test('chat documental: separa respuesta, cita literal e interpretación en bloques compactos', () => {
+  const result = renderer.validateContent('## ✅ Respuesta breve\n\nSí, bajo las condiciones indicadas.\n\n> [📖 Cita literal · Numeral 8.4]\n> “Una llave podrá controlar dos aparatos.”\n> Fuente: NTP sintética\n\n### En palabras sencillas\n\nDebes revisar las condiciones del numeral.');
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.blocks.map(block => block.type), ['heading', 'paragraph', 'information_panel', 'heading', 'paragraph']);
+  assert.match(result.blocks[2].title, /Cita literal/);
+  assert.match(result.blocks[2].text, /Fuente: NTP sintética/);
+});
+
 test('Etapa 1.1: corta la validación estructural al exceder el presupuesto global', () => {
   const large = paragraph(Array.from({ length:renderer.LIMITS.runsPerParagraph }, () => ({ text:'x'.repeat(renderer.LIMITS.runChars) })));
   const unvisited = {};
