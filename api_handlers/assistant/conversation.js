@@ -24,11 +24,12 @@ function text(value, limit = 1200) { return String(value ?? '').replace(/[\u0000
 // listas, checks), no datos de control: conservarlos evita que el servidor
 // aplaste una respuesta útil en un solo párrafo antes de que llegue al móvil.
 function presentationText(value, limit = 4000) {
-  return String(value ?? '')
+  const cleaned = String(value ?? '')
     .replace(/\r\n?/g, '\n')
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ')
-    .trim()
-    .slice(0, limit);
+    .trim();
+  const characters = Array.from(cleaned);
+  return characters.length > limit ? characters.slice(0, limit).join('') : cleaned;
 }
 function containsBlocked(value, depth = 0) { return Boolean(value && typeof value === 'object' && depth <= 5 && Object.entries(value).some(([key, child]) => BLOCKED.has(String(key).replace(/[^a-z0-9_]/gi, '').toLowerCase()) || containsBlocked(child, depth + 1))); }
 function serviceClient(config, fetchImpl) { return async path => { const response = await fetchImpl(config.supabaseUrl + path, { headers: { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}` } }); return { response, data: await response.json().catch(() => []) }; }; }

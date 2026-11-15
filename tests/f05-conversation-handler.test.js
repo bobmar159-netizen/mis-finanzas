@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createConversationHandler } = require('../api_handlers/assistant/conversation');
+const { createConversationHandler, presentationText } = require('../api_handlers/assistant/conversation');
 const { createConversationToken } = require('../lib/yarbi-conversation-continuity');
 const renderer = require('../frontend/yarbi-conversation-renderer');
 
@@ -22,6 +22,13 @@ function withPreviewEnv(run) {
   delete process.env.YARBI_PREVIEW_OWNER_GEMINI_UNDERSTANDING; delete process.env.GEMINI_API_KEY; delete process.env.GEMINI_KEY;
   return Promise.resolve().then(run).finally(() => Object.entries(before).forEach(([key, value]) => value === undefined ? delete process.env[key] : process.env[key] = value));
 }
+
+test('la presentación segura conserva bloques Markdown y no corta Unicode a mitad de carácter', () => {
+  const structured = presentationText('## Resumen\r\n\r\n- ✅ **Correcto**\r\n- 😀', 80);
+  assert.equal(structured, '## Resumen\n\n- ✅ **Correcto**\n- 😀');
+  const limited = presentationText('😀😀😀', 2);
+  assert.equal(limited, '😀😀');
+});
 
 test('F05 handler autentica, mantiene scope y responde Agenda sintética sin Gemini ni egress externo', async () => withPreviewEnv(async () => {
   const calls = [];
