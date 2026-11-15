@@ -89,6 +89,18 @@ test('BKE multimodal: PDF.js extrae e indexa un PDF real sin enviarlo al proveed
   assert.match(asset.sections.map(section => section.text).join(' '), /dos artefactos/);
 });
 
+test('BKE multimodal: reimportar un PDF actualiza una ficha antigua bloqueada sin duplicarla', () => {
+  const upgraded = api.upgradeBlockedDuplicate(
+    { id:'old', status:'blocked', createdAt:100 },
+    { id:'new', status:'local_ready', createdAt:200, title:'Norma.pdf', sections:[{ id:'p1', label:'Página 1', text:'Regla' }] }
+  );
+  assert.equal(upgraded.id, 'old');
+  assert.equal(upgraded.createdAt, 100);
+  assert.equal(upgraded.status, 'local_ready');
+  assert.equal(api.upgradeBlockedDuplicate({ status:'approved' }, { status:'local_ready' }), null);
+  assert.equal(api.upgradeBlockedDuplicate({ status:'blocked' }, { status:'blocked' }), null);
+});
+
 test('BKE multimodal: selecciona el PDF aprobado sin mezclar varias normas', () => {
   const one = { id:'pdf-a', title:'Norma A', kind:'pdf', status:'approved', dataUrl:'data:application/pdf;base64,QQ==' };
   const other = { id:'pdf-b', title:'Norma B', kind:'pdf', status:'approved', dataUrl:'data:application/pdf;base64,Qg==' };
