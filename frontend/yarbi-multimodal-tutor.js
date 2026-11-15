@@ -9,6 +9,8 @@
     root.gfcYarbiMultimodalSaveOnly = () => api.importFromUi(false);
     root.gfcYarbiMultimodalAnalyze = api.analyzeFromUi;
     root.gfcYarbiMultimodalApprove = api.approveFromUi;
+    root.gfcYarbiMultimodalToggleLearning = api.toggleLearningFromUi;
+    root.gfcYarbiMultimodalDelete = api.deleteFromUi;
     root.gfcYarbiMultimodalFilesChosen = api.filesChosen;
     root.gfcYarbiTutorAsk = api.askTutorFromUi;
     root.gfcYarbiMultimodalAnswer = api.answerFromChat;
@@ -79,19 +81,20 @@
     });
     return sections.filter(item => item.text);
   }
-  function searchApproved(assets, query) {
+  function searchApproved(assets, query, options) {
     const terms = contentTokens(query);
-    return (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved').flatMap(asset => {
+    const limit = Math.max(1, Math.min(80, Number(options?.limit) || 36));
+    return (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && asset.learningEnabled !== false).flatMap(asset => {
       const sections = Array.isArray(asset.sections) ? asset.sections : [];
       return sections.map(section => {
         const haystack = normalize([asset.title, section.label, section.text, asset.analysis?.summary].join(' '));
         const hits = terms.filter(term => haystack.includes(term));
         return hits.length ? { assetId:asset.id, title:asset.title, kind:asset.kind, sourceHash:asset.sha256 || '', sectionId:section.id || '', sectionLabel:clean(section.label || 'Fragmento sin referencia', 240), excerpt:section.text.slice(0, 800), hits, score:hits.length } : null;
       }).filter(Boolean);
-    }).sort((a,b) => b.score - a.score || a.title.localeCompare(b.title, 'es-PE')).slice(0, 8);
+    }).sort((a,b) => b.score - a.score || a.title.localeCompare(b.title, 'es-PE')).slice(0, limit);
   }
   function firstApprovedEvidence(assets) {
-    const approved = (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && Array.isArray(asset.sections) && asset.sections.length);
+    const approved = (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && asset.learningEnabled !== false && Array.isArray(asset.sections) && asset.sections.length);
     if (approved.length !== 1) return [];
     return approved[0].sections.slice(0, 4).map(section => ({
       assetId:approved[0].id,
@@ -165,6 +168,10 @@
     const quote = normalize(result?.quote || '');
     return Boolean(quote) && (Array.isArray(evidence) ? evidence : []).some(row => normalize(row?.excerpt || '').includes(quote));
   }
+  function quoteSupportedByAsset(result, asset) {
+    const quote = normalize(result?.quote || '');
+    return Boolean(quote) && (Array.isArray(asset?.sections) ? asset.sections : []).some(section => normalize(section?.text || '').includes(quote));
+  }
   function localUnavailableReply() {
     return 'No puedo analizar esa fuente sin el servicio de comprensión configurado. La dejé guardada localmente como pendiente; no inventé su contenido ni la marqué como aprendida.';
   }
@@ -191,6 +198,7 @@
   async function list() { const rows = await transaction('readonly', store => requestValue(store.getAll())); return (Array.isArray(rows) ? rows : []).sort((a,b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0)); }
   async function get(id) { return transaction('readonly', store => requestValue(store.get(String(id || '')))); }
   async function put(asset) { return transaction('readwrite', store => { store.put(asset); return asset; }); }
+  async function removeAsset(id) { return transaction('readwrite', store => { store.delete(String(id || '')); return true; }); }
   async function digest(value) {
     if (!root?.crypto?.subtle || typeof root.TextEncoder === 'undefined') return null;
     const bytes = value instanceof ArrayBuffer ? value : new root.TextEncoder().encode(String(value));
@@ -371,22 +379,120 @@
     await put({ ...asset, sections:learnedSections, analysis, status:'analyzed_draft', updatedAt:Date.now() });
     await render(); return { ok:true, assetId:asset.id, analysis };
   }
-  async function approve(id) { const asset = await get(id); if (!asset || !asset.analysis?.text) throw new Error('multimodal_analysis_required'); await put({ ...asset, status:'approved', updatedAt:Date.now(), analysis:{ ...asset.analysis, reviewed:true, approvedAt:Date.now() } }); await render(); return true; }
+  async function approve(id) { const asset = await get(id); if (!asset || !asset.analysis?.text) throw new Error('multimodal_analysis_required'); await put({ ...asset, status:'approved', learningEnabled:true, updatedAt:Date.now(), analysis:{ ...asset.analysis, reviewed:true, approvedAt:Date.now() } }); await render(); return true; }
+  async function toggleLearning(id, enabled) {
+    const asset = await get(id);
+    if (!asset || asset.status !== 'approved') throw new Error('multimodal_asset_not_approved');
+    await put({ ...asset, learningEnabled:enabled !== false, updatedAt:Date.now() });
+    await render();
+    return true;
+  }
+  function approvedPdfAssets(assets) {
+    return (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && asset.learningEnabled !== false && asset.kind === 'pdf' && (asset.dataUrl || Array.isArray(asset.sections) && asset.sections.length));
+  }
+  function sourceCodes(value) {
+    return normalize(value).match(/\b(?:ntp|em|iso|rne)\s+\d+(?:\s+\d+){0,3}\b/g) || [];
+  }
+  function explicitSourceMatches(assets, question) {
+    const query = normalize(question);
+    const queryTerms = new Set(contentTokens(question));
+    const queryCodes = new Set(sourceCodes(question));
+    return approvedPdfAssets(assets).filter(asset => {
+      const title = normalize(String(asset.title || '').replace(/\.pdf$/i, ''));
+      if (title.length >= 5 && query.includes(title)) return true;
+      if (sourceCodes(asset.title).some(code => queryCodes.has(code))) return true;
+      const titleTerms = contentTokens(asset.title).filter(term => /\d/.test(term) || term.length >= 4);
+      if (!titleTerms.length) return false;
+      const hits = titleTerms.filter(term => queryTerms.has(term));
+      return hits.length >= 2 && hits.length / titleTerms.length >= 0.6;
+    });
+  }
+  function rankApprovedSources(assets, question) {
+    const terms = contentTokens(question);
+    return approvedPdfAssets(assets).map(asset => {
+      const titleHaystack = normalize(asset.title || '');
+      const titleHits = terms.filter(term => titleHaystack.includes(term));
+      const rows = (Array.isArray(asset.sections) ? asset.sections : []).map(section => {
+        const haystack = normalize([section.label, section.text].join(' '));
+        const hits = terms.filter(term => haystack.includes(term));
+        return { assetId:asset.id, title:asset.title, kind:asset.kind, sourceHash:asset.sha256 || '', sectionId:section.id || '', sectionLabel:clean(section.label || 'Fragmento sin referencia', 240), excerpt:String(section.text || '').slice(0, 900), hits, score:hits.length };
+      }).filter(row => row.score).sort((a,b) => b.score - a.score).slice(0, 4);
+      const covered = new Set([...titleHits, ...rows.flatMap(row => row.hits)]);
+      const coverage = terms.length ? covered.size / terms.length : 0;
+      const best = Number(rows[0]?.score || 0);
+      const score = Math.round(coverage * 100 + best * 12 + titleHits.length * 20);
+      return { asset, score, coverage, evidence:rows, summary:clean(asset.analysis?.text || asset.analysis?.summary || '', 900) };
+    }).sort((a,b) => b.score - a.score || String(a.asset.title || '').localeCompare(String(b.asset.title || ''), 'es-PE'));
+  }
+  function parseSourceRoute(value, allowedIds) {
+    const raw = String(value || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (_) { return { ok:false, selectedAssetId:'', confidence:'low', searchTerms:[] }; }
+    const selectedAssetId = clean(parsed?.selected_asset_id, 180);
+    const confidence = ['high','medium','low'].includes(String(parsed?.confidence || '').toLowerCase()) ? String(parsed.confidence).toLowerCase() : 'low';
+    const allowed = new Set((Array.isArray(allowedIds) ? allowedIds : []).map(String));
+    const searchTerms = (Array.isArray(parsed?.search_terms) ? parsed.search_terms : []).map(term => clean(term, 80)).filter(Boolean).slice(0, 8);
+    if (!selectedAssetId || !allowed.has(selectedAssetId)) return { ok:true, selectedAssetId:'', confidence:'low', searchTerms, reason:clean(parsed?.reason, 240) };
+    return { ok:true, selectedAssetId, confidence, searchTerms, reason:clean(parsed?.reason, 240) };
+  }
+  function localSourceDecision(rankings) {
+    const first = rankings?.[0];
+    const second = rankings?.[1];
+    if (!first || first.coverage < 0.8 || first.score < 100) return null;
+    if (second && first.score - second.score < 35) return null;
+    return first;
+  }
+  async function routeApprovedSource(assets, question) {
+    const candidates = approvedPdfAssets(assets);
+    if (!candidates.length) return { asset:null, code:'no_approved_pdf', candidates:[] };
+    if (candidates.length === 1) return { asset:candidates[0], confidence:'high', searchTerms:contentTokens(question), evidence:rankApprovedSources(candidates, question)[0]?.evidence || [] };
+    const explicitMatches = explicitSourceMatches(candidates, question);
+    if (explicitMatches.length === 1) return { asset:explicitMatches[0], confidence:'high', searchTerms:contentTokens(question), evidence:rankApprovedSources(explicitMatches, question)[0]?.evidence || [] };
+    const rankings = rankApprovedSources(candidates, question);
+    const catalogRows = rankings.slice(0, 12);
+    const token = typeof root.gfcAccountFreshAccessToken === 'function' ? await root.gfcAccountFreshAccessToken() : '';
+    if (token && typeof root.fetch === 'function') {
+      const catalog = catalogRows.map((row, index) => ({
+        candidate:index + 1,
+        asset_id:String(row.asset.id || ''),
+        title:clean(row.asset.title, 160),
+        summary:row.summary,
+        relevant_fragments:row.evidence.slice(0, 3).map(item => ({ reference:item.sectionLabel, text:clean(item.excerpt, 620) }))
+      }));
+      try {
+        const response = await root.fetch((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
+          body:JSON.stringify({
+            system_instruction:{ parts:[{ text:'Eres el enrutador de fuentes de la biblioteca de Yarbi. Tu única tarea es elegir qué documento debe consultarse. No respondas la pregunta. No inventes fuentes. Si el catálogo no permite decidir, deja selected_asset_id vacío. Devuelve SOLO JSON.' }] },
+            contents:[{ role:'user', parts:[{ text:'CONSULTA:\n' + clean(question, 1200) + '\n\nCATÁLOGO DE FUENTES APROBADAS:\n' + JSON.stringify(catalog) + '\n\nDevuelve: {"selected_asset_id":"id exacto o vacío","confidence":"high|medium|low","search_terms":["sinónimos técnicos útiles"],"reason":"motivo breve"}. Elige high o medium solo si el título, resumen o fragmentos son temáticamente pertinentes.' }] }],
+            generationConfig:{ temperature:0, maxOutputTokens:400, responseMimeType:'application/json' }
+          })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok) {
+          const routed = parseSourceRoute(responseText(data), candidates.map(asset => asset.id));
+          if (routed.selectedAssetId && routed.confidence !== 'low') {
+            const selected = candidates.find(asset => String(asset.id) === routed.selectedAssetId);
+            const ranked = rankings.find(row => String(row.asset.id) === routed.selectedAssetId);
+            if (selected) return { asset:selected, confidence:routed.confidence, searchTerms:routed.searchTerms, evidence:ranked?.evidence || [], routed:true };
+          }
+        }
+      } catch (_) {}
+    }
+    const local = localSourceDecision(rankings);
+    if (local) return { asset:local.asset, confidence:'high', searchTerms:contentTokens(question), evidence:local.evidence, routed:false };
+    return { asset:null, code:'source_ambiguous', candidates:rankings.slice(0, 4).map(row => row.asset) };
+  }
   function selectApprovedDirectAsset(assets, evidence, question) {
     const candidates = (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && asset.kind === 'pdf' && asset.dataUrl);
     if (candidates.length === 1) return candidates[0];
-    const evidenceIds = [...new Set((Array.isArray(evidence) ? evidence : []).map(row => String(row.assetId || '')).filter(Boolean))];
-    if (evidenceIds.length === 1) return candidates.find(asset => String(asset.id) === evidenceIds[0]) || null;
-    const terms = contentTokens(question);
-    const titleMatches = candidates.filter(asset => {
-      const title = normalize(asset.title);
-      return terms.some(term => title.includes(term));
-    });
-    return titleMatches.length === 1 ? titleMatches[0] : null;
+    const matches = explicitSourceMatches(candidates, question);
+    return matches.length === 1 ? matches[0] : null;
   }
   async function queryApprovedSource(asset, question) {
     if (!asset?.dataUrl || asset.status !== 'approved') return { ok:false, code:'approved_source_binary_unavailable' };
-    const queryKey = normalize(question).slice(0, 1200);
+    const queryKey = 'source-v2|' + normalize(question).slice(0, 1200);
     const cached = (Array.isArray(asset.queryCache) ? asset.queryCache : []).find(item => item?.key === queryKey && item?.result?.ok);
     if (cached) return { ok:true, cached:true, reply:formatDirectedAnswer(cached.result, asset), result:cached.result };
     const token = typeof root.gfcAccountFreshAccessToken === 'function' ? await root.gfcAccountFreshAccessToken() : '';
@@ -406,8 +512,11 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) return { ok:false, code:'direct_source_provider_unavailable' };
-    const result = parseDirectedAnswer(responseText(data));
+    let result = parseDirectedAnswer(responseText(data));
     if (!result.ok) return { ok:false, code:'direct_source_invalid_response' };
+    if (result.found && Array.isArray(asset.sections) && asset.sections.length && !quoteSupportedByAsset(result, asset)) {
+      result = { ok:true, found:false, answer:'', quote:'', reference:'', plain:'', caveat:'La cita devuelta no coincide literalmente con el índice local de esta fuente.' };
+    }
     const queryCache = [...(Array.isArray(asset.queryCache) ? asset.queryCache : []).filter(item => item?.key !== queryKey), { key:queryKey, result, at:Date.now() }].slice(-40);
     await put({ ...asset, queryCache });
     return { ok:true, cached:false, reply:formatDirectedAnswer(result, asset), result };
@@ -442,17 +551,26 @@
     const strongMatch = evidence.some(row => Number(row.score || 0) >= minimumHits);
     if (!evidence.length && explicit && terms.length === 0) evidence = firstApprovedEvidence(assets);
     if (!explicit && !strongMatch) return { handled:false };
-    if (explicit) {
-      const directAsset = selectApprovedDirectAsset(assets, evidence, text);
-      if (directAsset) {
-        const directed = await queryApprovedSource(directAsset, text);
-        if (directed.ok) return { handled:true, reply:directed.reply, directSource:true, cached:!!directed.cached };
-        return { handled:true, reply:'## ⚠️ No pude revisar el PDF completo\n\nLa fuente aprobada está guardada, pero la búsqueda dirigida no terminó ahora. No mostraré fragmentos generales como si respondieran tu consulta. Inténtalo nuevamente cuando la conexión de Yarbi esté disponible.' };
+    if (explicit || strongMatch) {
+      const route = await routeApprovedSource(assets, text);
+      if (route.asset) {
+        const expandedQuery = [text, ...(route.searchTerms || [])].join(' ');
+        const routedEvidence = searchApproved([route.asset], expandedQuery, { limit:12 });
+        evidence = routedEvidence.length ? routedEvidence : (route.evidence || []);
+        if (route.asset.dataUrl) {
+          const directed = await queryApprovedSource(route.asset, text);
+          if (directed.ok) return { handled:true, reply:directed.reply, directSource:true, cached:!!directed.cached, sourceRouted:true };
+          if (!evidence.length) return { handled:true, reply:'## ⚠️ No pude revisar el PDF completo\n\nLa fuente correcta está identificada, pero la consulta del documento no terminó ahora. No usaré otra norma como sustituto ni inventaré una respuesta.' };
+        }
+        if (evidence.length) {
+          const routedResult = await askTutor(text, { assets:[route.asset], evidence });
+          if (routedResult.ok) return { handled:true, reply:routedResult.text, evidence:routedResult.evidence, sourceRouted:true };
+        }
+        return { handled:true, reply:formatDirectedAnswer({ found:false, caveat:'La fuente fue seleccionada, pero el índice aprobado no contiene una cita literal verificable para esta consulta.' }, route.asset) };
       }
-      const approvedPdfCount = assets.filter(asset => asset.status === 'approved' && asset.kind === 'pdf' && asset.dataUrl).length;
-      if (approvedPdfCount > 1) {
-        const names = assets.filter(asset => asset.status === 'approved' && asset.kind === 'pdf' && asset.dataUrl).slice(0, 4).map(asset => '**' + clean(asset.title, 100) + '**').join(', ');
-        return { handled:true, reply:'## 📚 ¿En cuál norma busco?\n\nTienes varias fuentes aprobadas: ' + names + '. Dime el nombre de la norma o el archivo para buscar la cita exacta sin mezclar documentos.' };
+      if (route.code === 'source_ambiguous') {
+        const names = (route.candidates || []).slice(0, 4).map(asset => '**' + clean(asset.title, 100) + '**').join(', ');
+        return { handled:true, reply:'## 📚 Necesito identificar la norma correcta\n\nLa consulta puede corresponder a más de una fuente aprobada' + (names ? ': ' + names : '') + '. Indícame el nombre de la norma o un dato adicional. No elegiré un PDF por una coincidencia débil.' };
       }
     }
     if (!evidence.length) {
@@ -518,11 +636,24 @@
     if (rows.length) setProgress(0, 'Listo para procesar', rows.length === 1 ? rows[0].name : rows.length + ' fuentes seleccionadas', 'working');
     return rows.length;
   }
+  function formatBytes(value) {
+    const bytes = Math.max(0, Number(value || 0));
+    if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toLocaleString('es-PE', { maximumFractionDigits:1 }) + ' MB';
+    return Math.max(1, Math.round(bytes / 1024)).toLocaleString('es-PE') + ' KB';
+  }
   function card(asset) {
-    const analysis = asset.analysis?.text ? '<details><summary>Ver borrador</summary><p>' + escapeHtml(asset.analysis.text) + '</p>' + ((asset.analysis?.citations || []).length ? '<p><b>' + asset.analysis.citations.length + ' cita(s) extraída(s) para revisión.</b></p>' : '') + '</details>' : '';
-    const action = asset.status === 'analyzed_draft' ? '<button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalApprove(\'' + escapeHtml(asset.id) + '\')">Aprobar para tutoría</button>' : asset.status === 'approved' ? '<span class="gfc-mm-approved">✓ Aprobado</span>' : '<button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalAnalyze(\'' + escapeHtml(asset.id) + '\')">Analizar con Yarbi</button>';
-    const extraction = asset.extraction?.pages ? '<p>Índice local: ' + Number(asset.extraction.pages) + ' página(s) · ' + Number(asset.sections?.length || 0) + ' fragmento(s). No se vuelve a leer el archivo en cada consulta.</p>' : '';
-    return '<article class="gfc-mm-card"><div class="gfc-mm-card-head"><span class="gfc-mm-kind">' + ({ text:'📝', pdf:'📕', image:'🖼️', audio:'🎙️', video:'🎬' }[asset.kind] || '📎') + '</span><div><b>' + escapeHtml(asset.title) + '</b><small>' + kindLabel(asset.kind) + ' · ' + statusLabel(asset.status) + ' · ' + Math.max(1, Math.round(Number(asset.bytes || 0) / 1024)) + ' KB</small></div></div><p>Huella: ' + escapeHtml(String(asset.sha256 || '').slice(0, 16)) + '…</p>' + extraction + analysis + '<div class="gfc-mm-actions">' + action + '</div></article>';
+    const id = escapeHtml(asset.id);
+    const enabled = asset.status === 'approved' && asset.learningEnabled !== false;
+    const status = asset.status === 'approved' && !enabled ? 'Fuera del aprendizaje' : statusLabel(asset.status);
+    const statusTone = enabled ? 'approved' : asset.status === 'approved' ? 'paused' : 'pending';
+    const analysis = asset.analysis?.text ? '<div class="gfc-mm-detail-copy"><b>Resumen revisable</b><p>' + escapeHtml(asset.analysis.text) + '</p>' + ((asset.analysis?.citations || []).length ? '<small>' + asset.analysis.citations.length + ' cita(s) extraída(s).</small>' : '') + '</div>' : '';
+    const extraction = asset.extraction?.pages ? '<div class="gfc-mm-index-meta">' + Number(asset.extraction.pages) + ' páginas · ' + Number(asset.sections?.length || 0) + ' fragmentos indexados</div>' : '';
+    const primaryAction = asset.status === 'analyzed_draft'
+      ? '<button class="gfc-mm-btn primary" onclick="gfcYarbiMultimodalApprove(\'' + id + '\')">Aprobar</button>'
+      : asset.status === 'approved'
+        ? '<button class="gfc-mm-btn" onclick="gfcYarbiMultimodalToggleLearning(\'' + id + '\',' + (!enabled) + ')">' + (enabled ? 'Pausar uso' : 'Volver a usar') + '</button>'
+        : '<button class="gfc-mm-btn primary" onclick="gfcYarbiMultimodalAnalyze(\'' + id + '\')">Analizar</button>';
+    return '<article class="gfc-mm-card"><div class="gfc-mm-card-head"><span class="gfc-mm-kind">' + ({ text:'📝', pdf:'📕', image:'🖼️', audio:'🎙️', video:'🎬' }[asset.kind] || '📎') + '</span><div class="gfc-mm-file-main"><b title="' + escapeHtml(asset.title) + '">' + escapeHtml(asset.title) + '</b><small>' + kindLabel(asset.kind) + ' · ' + formatBytes(asset.bytes) + '</small></div><span class="gfc-mm-state ' + statusTone + '">' + escapeHtml(status) + '</span></div><div class="gfc-mm-actions">' + primaryAction + '<button class="gfc-mm-btn danger" onclick="gfcYarbiMultimodalDelete(\'' + id + '\')" aria-label="Borrar ' + escapeHtml(asset.title) + '">Borrar</button><details class="gfc-mm-more"><summary>Detalles</summary><div class="gfc-mm-details-body">' + extraction + analysis + '<small>SHA-256 ' + escapeHtml(String(asset.sha256 || '').slice(0, 16)) + '…</small></div></details></div></article>';
   }
   async function render() { const target = root?.document?.getElementById('gfc-mm-list'); if (!target) return; try { const rows = await list(); target.innerHTML = rows.length ? rows.map(card).join('') : '<p>Aún no hay fuentes multimodales. Puedes cargar documentos, imágenes, audios o videos.</p>'; } catch (_) { target.innerHTML = '<p>No se pudo abrir la biblioteca local.</p>'; } }
   function setStatus(message, error) { const target = root?.document?.getElementById('gfc-mm-status'); if (target) { target.textContent = message; target.dataset.tone = error ? 'error' : 'normal'; } }
@@ -582,8 +713,24 @@
     } catch (error) { clearProgressTimer(); setProgress(0, 'Análisis interrumpido', statusText(error), 'error'); setStatus(statusText(error), true); return { ok:false, message:statusText(error) }; }
   }
   async function approveFromUi(id) { try { setProgress(92, 'Guardando aprobación', 'Vinculando la revisión a esta fuente.', 'working'); await approve(id); setProgress(100, 'Fuente aprobada', 'Disponible para respuestas del tutor con citas verificables.', 'approved'); setStatus('Fuente aprobada para tutoría. No modifica CRM ni instrucciones permanentes.'); } catch (error) { setProgress(0, 'No se aprobó', statusText(error), 'error'); setStatus(statusText(error), true); } }
+  async function toggleLearningFromUi(id, enabled) {
+    try {
+      await toggleLearning(id, enabled);
+      setStatus(enabled ? 'La fuente volvió al aprendizaje de Yarbi.' : 'La fuente se conserva en el teléfono, pero Yarbi dejó de usarla para responder.', false);
+    } catch (error) { setStatus(statusText(error), true); }
+  }
+  async function deleteFromUi(id) {
+    const asset = await get(id).catch(() => null);
+    if (!asset) return false;
+    const accepted = typeof root.confirm !== 'function' || root.confirm('¿Borrar “' + clean(asset.title, 100) + '” de este teléfono? Su índice y análisis local también se eliminarán.');
+    if (!accepted) return false;
+    await removeAsset(id);
+    await render();
+    setStatus('La fuente y su índice local fueron eliminados. Los demás documentos no cambiaron.', false);
+    return true;
+  }
   async function askTutorFromUi() { const input = root.document.getElementById('gfc-mm-tutor-question'); const out = root.document.getElementById('gfc-mm-tutor-answer'); if (!out) return; out.textContent = 'El tutor está preparando una explicación…'; try { const result = await askTutor(input?.value || ''); out.textContent = result.ok ? result.text : (result.message || 'No pude responder sin inventar información.'); } catch (error) { out.textContent = statusText(error); } }
   function html() { return '<main class="gfc-yarbi-tool-page gfc-mm-page"><section class="gfc-mm-hero"><span>📚</span><div><h2>Conocimiento y Tutor</h2><p>Selecciona una fuente, observa su procesamiento y decide cuándo puede usarla Yarbi.</p></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Procesar</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div><label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>PDF de hasta 120 MB: Yarbi los indexa por páginas en el teléfono. Los PDF escaneados sin texto requieren OCR.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label><div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div><section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section><div id="gfc-mm-status" class="gfc-yarbi-import-summary">Tus fuentes aprobadas quedan indexadas localmente para responder rápido. La aprobación es obligatoria antes de usarlas como conocimiento. No se ejecutan acciones comerciales durante este proceso.</div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div></section><section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">🎓 Preguntar al Tutor</div><div class="gfc-yarbi-tool-copy">Yarbi responde primero de forma breve y muestra una sola cita literal con su capítulo, numeral o página. Si falta evidencia, se abstiene.</div><textarea id="gfc-mm-tutor-question" rows="4" placeholder="Ejemplo: ¿Qué exige esta norma y qué significa en palabras sencillas?"></textarea><button class="gfc-yarbi-primary" onclick="gfcYarbiTutorAsk()">Preguntar al tutor</button><article id="gfc-mm-tutor-answer" class="gfc-mm-tutor-answer">Aquí aparecerá una explicación respaldada por tus fuentes aprobadas.</article></section></main>'; }
   function attach() { void render(); }
-  return Object.freeze({ classifyFile, normalize, contentTokens, knowledgeIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, formatDirectedAnswer, citationMarkdown, citationListMarkdown, selectApprovedDirectAsset, queryApprovedSource, buildAsset, importFiles, list, analyze, approve, askTutor, answerFromChat, html, attach, render, analyzeFromUi, approveFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES });
+  return Object.freeze({ classifyFile, normalize, contentTokens, knowledgeIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, formatDirectedAnswer, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, buildAsset, importFiles, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, askTutorFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES });
 }));

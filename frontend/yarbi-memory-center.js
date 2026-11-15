@@ -727,6 +727,8 @@
     if (finalizedLiveTranscriptKeys.has(finalizationKey)) return true;
     const itemId = liveTranscriptItemId(role, turnId, opts);
     if (!itemId) return false;
+    const forceLatest = role === 'user' || Boolean(window._gfcYarbiTextRequestActive) || Date.now() < Number(window._gfcYarbiForceLatestUntil || 0);
+    if (forceLatest) window._gfcYarbiForceLatestUntil = Date.now() + 60000;
     const item = opts.persist === false
       ? normalizeTimelineItem({ id:itemId || undefined, role, text:value, at:Date.now(), channel:opts.channel || 'voice' })
       : await persistTimelineMessage(role, value, Date.now(), opts.channel || 'voice', itemId || undefined);
@@ -802,6 +804,7 @@
     const box = document.getElementById('gfc-copilot-chat-messages');
     if (!box) return { handled:false };
     if ([...box.querySelectorAll('[data-message-id]')].some(node => node.dataset.messageId === item.id)) {
+      if (forceLatest) scrollChatToLatest(box);
       if (role === 'assistant' && window._gfcYarbiTextRequestActive) {
         window._gfcYarbiTextRequestActive = false;
         window.gfcYarbiSetProcessStatus?.('ready', 'Respuesta lista');
@@ -809,6 +812,10 @@
       return { handled:true, result:{ ok:true, duplicate:true } };
     }
     const rendered = renderTimelineItem(item);
+    if (forceLatest) {
+      window._gfcYarbiForceLatestUntil = role === 'assistant' ? Date.now() + 1800 : Date.now() + 60000;
+      scrollChatToLatest(box);
+    }
     if (role === 'assistant' && window._gfcYarbiTextRequestActive) {
       window._gfcYarbiTextRequestActive = false;
       window.gfcYarbiSetProcessStatus?.('ready', 'Respuesta lista');

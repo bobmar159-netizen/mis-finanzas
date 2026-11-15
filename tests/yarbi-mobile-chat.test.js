@@ -42,6 +42,9 @@ test('el chat abre en los mensajes recientes y deja el historial bajo demanda', 
   assert.match(memory, /renderTimelineWindow\(box, initialVisibleTimeline, INITIAL_CHAT_MESSAGES, true\)/);
   assert.match(memory, /function scrollChatToLatest/);
   assert.match(memory, /_gfcYarbiForceLatestUntil = Date\.now\(\) \+ 1600/);
+  assert.match(memory, /const forceLatest = role === 'user'/);
+  assert.match(memory, /scrollChatToLatest\(box\)/);
+  assert.match(html, /_gfcYarbiForceLatestUntil = Date\.now\(\) \+ 60000/);
   assert.match(memory, /box\.style\.scrollBehavior = 'auto'/);
   assert.match(memory, /box\.dataset\.gfcRestoring === '1'/);
   assert.match(html, /\.gfc-yarbi-chat\[data-gfc-restoring="1"\]\{visibility:hidden\}/);

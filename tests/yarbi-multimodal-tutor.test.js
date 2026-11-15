@@ -101,12 +101,60 @@ test('BKE multimodal: reimportar un PDF actualiza una ficha antigua bloqueada si
   assert.equal(api.upgradeBlockedDuplicate({ status:'blocked' }, { status:'blocked' }), null);
 });
 
-test('BKE multimodal: selecciona el PDF aprobado sin mezclar varias normas', () => {
-  const one = { id:'pdf-a', title:'Norma A', kind:'pdf', status:'approved', dataUrl:'data:application/pdf;base64,QQ==' };
-  const other = { id:'pdf-b', title:'Norma B', kind:'pdf', status:'approved', dataUrl:'data:application/pdf;base64,Qg==' };
+test('BKE multimodal: no elige una norma por una coincidencia débil', () => {
+  const one = { id:'pdf-a', title:'NTP 111.011.pdf', kind:'pdf', status:'approved', dataUrl:'data:application/pdf;base64,QQ==' };
+  const other = { id:'pdf-b', title:'EM.040 Instalaciones de gas.pdf', kind:'pdf', status:'approved', dataUrl:'data:application/pdf;base64,Qg==' };
   assert.equal(api.selectApprovedDirectAsset([one], [], 'válvula para artefactos').id, 'pdf-a');
-  assert.equal(api.selectApprovedDirectAsset([one, other], [{ assetId:'pdf-b' }], 'según la norma').id, 'pdf-b');
+  assert.equal(api.selectApprovedDirectAsset([one, other], [{ assetId:'pdf-b' }], 'válvula para dos artefactos'), null);
+  assert.equal(api.selectApprovedDirectAsset([one, other], [], 'según la NTP 111.011').id, 'pdf-a');
+  assert.equal(api.selectApprovedDirectAsset([one, other], [], 'según EM.040').id, 'pdf-b');
   assert.equal(api.selectApprovedDirectAsset([one, other], [], 'según la norma'), null);
+});
+
+test('BKE multimodal: enruta fuentes con identificadores permitidos y rechaza IDs inventados', () => {
+  const routed = api.parseSourceRoute('{"selected_asset_id":"ntp","confidence":"high","search_terms":["llave de corte","artefactos"]}', ['ntp','em040']);
+  const invented = api.parseSourceRoute('{"selected_asset_id":"produccion","confidence":"high","search_terms":[]}', ['ntp','em040']);
+  assert.equal(routed.selectedAssetId, 'ntp');
+  assert.deepEqual(routed.searchTerms, ['llave de corte','artefactos']);
+  assert.equal(invented.selectedAssetId, '');
+  assert.equal(invented.confidence, 'low');
+});
+
+test('BKE multimodal: el ranking conserva fuentes separadas y las pausadas no participan', () => {
+  const assets = [
+    { id:'ntp', title:'NTP 111.011', kind:'pdf', status:'approved', sections:[{ label:'Numeral 8.4', text:'Una válvula puede controlar dos artefactos bajo estas condiciones.' }] },
+    { id:'em040', title:'EM.040', kind:'pdf', status:'approved', sections:[{ label:'Artículo 1', text:'Requisitos generales para instalaciones de gas.' }] },
+    { id:'paused', title:'Manual antiguo', kind:'pdf', status:'approved', learningEnabled:false, sections:[{ label:'Página 2', text:'válvula dos artefactos' }] }
+  ];
+  const ranking = api.rankApprovedSources(assets, 'una válvula para dos artefactos');
+  assert.equal(ranking[0].asset.id, 'ntp');
+  assert.equal(ranking.some(row => row.asset.id === 'paused'), false);
+});
+
+test('BKE multimodal: Gemini enruta la consulta sin responderla ni cambiar el catálogo', async () => {
+  const previousToken = global.gfcAccountFreshAccessToken;
+  const previousOrigin = global.gfcRuntimeApiOrigin;
+  const previousFetch = global.fetch;
+  global.gfcAccountFreshAccessToken = async () => 'synthetic-token';
+  global.gfcRuntimeApiOrigin = () => 'https://synthetic.invalid';
+  global.fetch = async (_url, options) => {
+    const payload = JSON.parse(options.body);
+    assert.match(payload.system_instruction.parts[0].text, /No respondas la pregunta/);
+    return { ok:true, json:async () => ({ candidates:[{ content:{ parts:[{ text:'{"selected_asset_id":"ntp","confidence":"high","search_terms":["llave de corte"]}' }] } }] }) };
+  };
+  try {
+    const assets = [
+      { id:'ntp', title:'NTP 111.011', kind:'pdf', status:'approved', sections:[{ label:'Numeral 8', text:'Válvulas para artefactos.' }] },
+      { id:'em040', title:'EM.040', kind:'pdf', status:'approved', sections:[{ label:'Artículo 1', text:'Instalaciones de gas.' }] }
+    ];
+    const routed = await api.routeApprovedSource(assets, '¿puedo usar una sola válvula para dos artefactos?');
+    assert.equal(routed.asset.id, 'ntp');
+    assert.deepEqual(routed.searchTerms, ['llave de corte']);
+  } finally {
+    global.gfcAccountFreshAccessToken = previousToken;
+    global.gfcRuntimeApiOrigin = previousOrigin;
+    global.fetch = previousFetch;
+  }
 });
 
 test('BKE multimodal: solo usa fuentes aprobadas como evidencia del tutor', () => {
@@ -164,7 +212,17 @@ test('BKE multimodal: limita el envío inline y procesa PDF grandes mediante ín
   assert.match(source, /extractPdfSections/);
   assert.match(source, /pdf\.worker\.min\.mjs/);
   assert.match(source, /locallyIndexed \? 'local_ready'/);
-  assert.match(source, /Índice local:/);
+  assert.match(source, /fragmentos indexados/);
+});
+
+test('BKE multimodal: presenta fuentes compactas con peso, pausa y borrado independientes', () => {
+  assert.equal(api.formatBytes(2.45 * 1024 * 1024), '2.5 MB');
+  assert.match(source, /gfcYarbiMultimodalToggleLearning/);
+  assert.match(source, /gfcYarbiMultimodalDelete/);
+  assert.match(source, /Fuera del aprendizaje/);
+  assert.match(source, /La fuente y su índice local fueron eliminados/);
+  assert.match(index, /\.gfc-mm-state\.paused/);
+  assert.match(index, /\.gfc-mm-btn\.danger/);
 });
 
 test('BKE multimodal: los controles visibles usan flujos UI con progreso y revisión', () => {
