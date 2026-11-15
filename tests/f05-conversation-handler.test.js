@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createConversationHandler } = require('../api_handlers/assistant/conversation');
 const { createConversationToken } = require('../lib/yarbi-conversation-continuity');
+const renderer = require('../frontend/yarbi-conversation-renderer');
 
 const OWNER = '00000000-0000-4000-8000-0000000000a1';
 const ENV_KEYS = ['VERCEL_ENV', 'YARBI_PREVIEW_OWNER_REFERENCES_ONLY', 'YARBI_PREVIEW_SUPABASE_PROJECT_REF', 'SUPABASE_URL', 'SUPABASE_SECRET_KEY', 'SUPABASE_PUBLISHABLE_KEY', 'YARBI_TRACE_HMAC_KEY', 'YARBI_PREVIEW_OWNER_GEMINI_UNDERSTANDING', 'GEMINI_API_KEY', 'GEMINI_KEY'];
@@ -44,6 +45,7 @@ test('F05 handler autentica, mantiene scope y responde Agenda sintética sin Gem
   assert.equal(res.state.body.intelligence.tier, 'FAST');
   assert.equal(res.state.body.commercial_effects_allowed, false);
   assert.equal(typeof res.state.body.conversation_token, 'string');
+  assert.deepEqual(renderer.validateContent(res.state.body.reply).blocks.map(block => block.type), ['heading', 'paragraph', 'ordered_list']);
   assert.equal(calls.some(call => /gemini|google|whatsapp|notion|calendar/i.test(call.host)), false);
   assert.equal(calls.filter(call => call.path === '/rest/v1/yarbi_agent_actions').length, 3, 'start, terminal and close trace only');
 }));

@@ -19,6 +19,17 @@ const BLOCKED = new Set(['owner_id', 'owner_account_id', 'ownerid', 'owneraccoun
 
 function object(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
 function text(value, limit = 1200) { return String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, limit); }
+// Las respuestas de Yarbi se renderizan con el subconjunto Markdown seguro del
+// cliente. Los saltos de línea son estructura de presentación (títulos,
+// listas, checks), no datos de control: conservarlos evita que el servidor
+// aplaste una respuesta útil en un solo párrafo antes de que llegue al móvil.
+function presentationText(value, limit = 4000) {
+  return String(value ?? '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ')
+    .trim()
+    .slice(0, limit);
+}
 function containsBlocked(value, depth = 0) { return Boolean(value && typeof value === 'object' && depth <= 5 && Object.entries(value).some(([key, child]) => BLOCKED.has(String(key).replace(/[^a-z0-9_]/gi, '').toLowerCase()) || containsBlocked(child, depth + 1))); }
 function serviceClient(config, fetchImpl) { return async path => { const response = await fetchImpl(config.supabaseUrl + path, { headers: { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}` } }); return { response, data: await response.json().catch(() => []) }; }; }
 function traceEvent({ operationId, secret, startedAt, stage, outcome, eventKey, counts = {}, error = null }) {
@@ -56,7 +67,7 @@ function safeIntelligence(value) {
   };
 }
 function safeResponse(result) {
-  return { schema: RESPONSE_SCHEMA, ok: true, execute: false, outcome: text(result.outcome, 80), reply: text(result.reply, 1000), proposal: { kind: text(result.proposal?.kind, 64) || 'none', execute: false }, commercial_effects_allowed: false, selected_contact_id: Number.isSafeInteger(Number(result.selected_contact_id)) ? Number(result.selected_contact_id) : null, facts: object(result.facts), intelligence: safeIntelligence(result.intelligence), metrics: object(result.metrics) };
+  return { schema: RESPONSE_SCHEMA, ok: true, execute: false, outcome: text(result.outcome, 80), reply: presentationText(result.reply), proposal: { kind: text(result.proposal?.kind, 64) || 'none', execute: false }, commercial_effects_allowed: false, selected_contact_id: Number.isSafeInteger(Number(result.selected_contact_id)) ? Number(result.selected_contact_id) : null, facts: object(result.facts), intelligence: safeIntelligence(result.intelligence), metrics: object(result.metrics) };
 }
 
 function createConversationHandler({ fetchImpl = fetch, providerFactory = createGeminiV4OwnerUnderstandingProvider, now = () => Date.now() } = {}) {
@@ -113,3 +124,4 @@ module.exports.createConversationHandler = createConversationHandler;
 module.exports.containsBlocked = containsBlocked;
 module.exports.safeIntelligence = safeIntelligence;
 module.exports.focusedDossierFrom = focusedDossierFrom;
+module.exports.presentationText = presentationText;
