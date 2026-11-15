@@ -10814,13 +10814,20 @@ function gfcRefreshVoicePipelinePanel() {
 async function gfcAppendCopilotChatMessage(role, text) {
   if (typeof text !== 'string' || !text.trim()) return { ok:false, code:'content_empty' };
   const isUser = role === 'user';
+  const complete = result => {
+    if (!isUser && result?.ok) {
+      window._gfcYarbiTextRequestActive = false;
+      if (typeof gfcYarbiSetProcessStatus === 'function') gfcYarbiSetProcessStatus('ready', 'Respuesta lista');
+    }
+    return result;
+  };
   // Timeline persistence is registered by yarbi-memory-center.js. It is a hook,
   // not a replacement: this remains the only global chat entry point.
   if (typeof window.gfcAppendCopilotTimelineMessage === 'function') {
     const timelineResult = await window.gfcAppendCopilotTimelineMessage(isUser ? 'user' : 'assistant', text);
     if (timelineResult && timelineResult.handled) {
       if (window._gfcMascot && typeof window._gfcMascot.syncDialogueMessage === 'function') window._gfcMascot.syncDialogueMessage(isUser ? 'user' : 'assistant', String(text));
-      return timelineResult.result || { ok:true };
+      return complete(timelineResult.result || { ok:true });
     }
     // En el flujo canónico la ausencia del repositorio no habilita un fallback
     // con escritura local no transaccional. El llamador conserva el borrador.
@@ -10832,7 +10839,7 @@ async function gfcAppendCopilotChatMessage(role, text) {
     const rendered = window.YarbiConversationRenderer.appendMessage(box, { role:isUser ? 'user' : 'assistant', text:String(text), status:'complete' });
     if (rendered.ok) {
       if (window._gfcMascot && typeof window._gfcMascot.syncDialogueMessage === 'function') window._gfcMascot.syncDialogueMessage(isUser ? 'user' : 'assistant', String(text));
-      return rendered;
+      return complete(rendered);
     }
     if (rendered.code === 'content_empty') return rendered;
   }
@@ -10850,7 +10857,7 @@ async function gfcAppendCopilotChatMessage(role, text) {
   if (window._gfcMascot && typeof window._gfcMascot.syncDialogueMessage === 'function') {
     window._gfcMascot.syncDialogueMessage(isUser ? 'user' : 'assistant', String(text));
   }
-  return { ok:true, legacy:true };
+  return complete({ ok:true, legacy:true });
 }
 const GFC_OWNER_CONVERSATION_TOKEN_KEY = 'gfc_owner_conversation_token_v1';
 function gfcOwnerConversationToken() {
@@ -12163,10 +12170,16 @@ async function gfcSupabaseAuthConfig() {
 }
 async function gfcSupabaseAuthRequest(path, body) {
   const config = await gfcSupabaseAuthConfig();
-  const response = await fetch(config.supabaseUrl.replace(/\/$/, '') + '/auth/v1/' + path, { method: 'POST', headers: { apikey: config.publishableKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error_description || data.msg || data.message || 'Supabase Auth HTTP ' + response.status);
-  return { config, data };
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeoutId = controller ? window.setTimeout(() => controller.abort(), 9000) : 0;
+  try {
+    const response = await fetch(config.supabaseUrl.replace(/\/$/, '') + '/auth/v1/' + path, { method: 'POST', headers: { apikey: config.publishableKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body), ...(controller ? { signal:controller.signal } : {}) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error_description || data.msg || data.message || 'Supabase Auth HTTP ' + response.status);
+    return { config, data };
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
 }
 function gfcAccountAccessToken() {
   try {
@@ -20939,6 +20952,19 @@ async function gfcYarbiFocusedLocalContext(focus = {}) {
   }
 }
 
+async function gfcAwaitYarbiKnowledgeReply(task, timeoutMs = 22000) {
+  let timeoutId = 0;
+  const deadline = new Promise(resolve => {
+    timeoutId = window.setTimeout(() => resolve({
+      handled:true,
+      code:'knowledge_deadline',
+      reply:'## ⏱️ Consulta documental detenida\n\nLa búsqueda superó el límite seguro. Tus fuentes siguen guardadas; Yarbi cerró el proceso y no inventó una respuesta.'
+    }), Math.max(50, Number(timeoutMs) || 22000));
+  });
+  try { return await Promise.race([Promise.resolve(task), deadline]); }
+  finally { if (timeoutId) window.clearTimeout(timeoutId); }
+}
+
 async function gfcSendCopilotChatMessage(promptText) {
   try {
     if (window._gfcMascot) window._gfcMascot.setState('procesando', 'Analizando conversación...');
@@ -20979,7 +21005,7 @@ async function gfcSendCopilotChatMessage(promptText) {
   let multimodalKnowledgeReply = null;
   if (typeof window.gfcYarbiMultimodalAnswer === 'function') {
     try {
-      multimodalKnowledgeReply = await window.gfcYarbiMultimodalAnswer(text);
+      multimodalKnowledgeReply = await gfcAwaitYarbiKnowledgeReply(window.gfcYarbiMultimodalAnswer(text));
     } catch (error) {
       gfcChatDiag('multimodal-knowledge-error', { code:error?.code || error?.message || 'unknown' });
       multimodalKnowledgeReply = {
@@ -20989,7 +21015,12 @@ async function gfcSendCopilotChatMessage(promptText) {
     }
   }
   if (multimodalKnowledgeReply?.handled) {
-    await gfcAppendCopilotChatMessage('assistant', multimodalKnowledgeReply.reply);
+    const appendedKnowledgeReply = await gfcAppendCopilotChatMessage('assistant', multimodalKnowledgeReply.reply);
+    gfcChatDiag('multimodal-knowledge-complete', { code:multimodalKnowledgeReply.code || 'ok', saved:!!appendedKnowledgeReply?.ok, degraded:!!multimodalKnowledgeReply.degraded });
+    if (!appendedKnowledgeReply?.ok) {
+      window._gfcYarbiTextRequestActive = false;
+      gfcYarbiSetProcessStatus('error', 'No se pudo mostrar la respuesta');
+    }
     if (window._gfcMascot) window._gfcMascot.setState('reposo', multimodalKnowledgeReply.reply);
     gfcSpeakText(multimodalKnowledgeReply.reply);
     return;
@@ -47197,6 +47228,7 @@ body.gfc-agenda-form-screen .gfc-agenda-form-actions{
 .gfc-mm-progress-card{margin-top:11px;padding:11px;border:1px solid #BAE6FD;border-radius:14px;background:#F0F9FF}.gfc-mm-progress-card[hidden]{display:none}.gfc-mm-progress-card[data-tone="success"]{border-color:#A7F3D0;background:#ECFDF5}.gfc-mm-progress-card[data-tone="review"]{border-color:#DDD6FE;background:#FAF5FF}.gfc-mm-progress-card[data-tone="error"]{border-color:#FECACA;background:#FEF2F2}.gfc-mm-progress-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.gfc-mm-progress-head strong{color:#0F172A;font-size:13px}.gfc-mm-progress-chip{display:inline-flex;align-items:center;border-radius:999px;background:#0EA5E9;color:#fff;padding:5px 9px;font-size:9.5px;font-weight:900}.gfc-mm-progress-card[data-tone="success"] .gfc-mm-progress-chip{background:#059669}.gfc-mm-progress-card[data-tone="review"] .gfc-mm-progress-chip{background:#7C3AED}.gfc-mm-progress-card[data-tone="error"] .gfc-mm-progress-chip{background:#DC2626}.gfc-mm-progress-track{height:8px;margin-top:9px;overflow:hidden;border-radius:999px;background:rgba(148,163,184,.25)}.gfc-mm-progress-track i{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#14B8A6,#2563EB);transition:width .28s ease}.gfc-mm-progress-card p{margin:7px 0 0;color:#475569;font-size:9.5px;line-height:1.4}
 #gfc-mm-status[data-tone="error"]{border-color:#FECACA;background:#FEF2F2;color:#B91C1C}
 #gfc-mm-list{display:grid;gap:8px;margin-top:9px}.gfc-mm-card{padding:10px;border:1px solid #DCE5E3;border-radius:14px;background:#fff;box-shadow:0 3px 12px rgba(15,23,42,.035)}.gfc-mm-card-head{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:9px}.gfc-mm-file-main{min-width:0}.gfc-mm-card-head b,.gfc-mm-card-head small{display:block}.gfc-mm-card-head b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0F172A;font-size:12px;line-height:1.3}.gfc-mm-card-head small{margin-top:2px;color:#64748B;font-size:9px}.gfc-mm-kind{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#F1F5F9;font-size:17px}.gfc-mm-state{max-width:116px;padding:4px 7px;border-radius:999px;font-size:8px;font-weight:850;line-height:1.2;text-align:center}.gfc-mm-state.approved{background:#ECFDF5;color:#047857}.gfc-mm-state.paused{background:#FFF7ED;color:#9A3412}.gfc-mm-state.pending{background:#EFF6FF;color:#1D4ED8}.gfc-mm-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}.gfc-mm-btn{min-height:30px;padding:6px 10px;border:1px solid #CBD5E1;border-radius:9px;background:#fff;color:#334155;font-size:9.5px;font-weight:850}.gfc-mm-btn.primary{border-color:#0F766E;background:#0F766E;color:#fff}.gfc-mm-btn.danger{border-color:#FECACA;color:#B91C1C}.gfc-mm-more{margin-left:auto;position:relative}.gfc-mm-more>summary{min-height:30px;display:flex;align-items:center;padding:6px 9px;border-radius:9px;background:#F8FAFC;color:#475569;font-size:9px;font-weight:850;cursor:pointer;list-style:none}.gfc-mm-more>summary::-webkit-details-marker{display:none}.gfc-mm-more[open]{flex-basis:100%;margin-left:0}.gfc-mm-details-body{margin-top:6px;padding:8px;border-radius:10px;background:#F8FAFC;color:#475569;font-size:9px;line-height:1.45}.gfc-mm-details-body p{margin:5px 0}.gfc-mm-detail-copy>b{color:#0F766E}.gfc-mm-index-meta{margin-bottom:5px;color:#334155;font-weight:750}.gfc-mm-approved{display:inline-flex;border-radius:999px;background:#ECFDF5;color:#047857;padding:6px 9px;font-size:9.5px;font-weight:900}
+.gfc-mm-text-import{margin:10px 0 0}.gfc-mm-text-import>summary{min-height:42px;padding:10px 12px;border:1px solid #CFE5DA;border-radius:12px;background:#F0FDFA;color:#115E59;font-size:11px}.gfc-mm-text-import .gfc-mm-details-body{padding:10px;background:#F8FAFC}.gfc-mm-text-import input,.gfc-mm-text-import textarea{width:100%;box-sizing:border-box;margin:0 0 8px;border:1px solid #CBD5E1;border-radius:11px;background:#fff;padding:10px;color:#0F172A;font:inherit;font-size:11px;line-height:1.45}.gfc-mm-text-import textarea{resize:vertical;min-height:108px}#gfc-mm-migration-status[hidden]{display:none}
 #gfc-mm-tutor-question{width:100%;box-sizing:border-box;border:1px solid #CBD5E1;border-radius:13px;background:#F8FAFC;padding:11px;color:#0F172A;font:inherit;font-size:12px;line-height:1.45;resize:vertical;margin-bottom:8px}.gfc-mm-tutor-answer{margin-top:10px;padding:12px;border:1px solid #E2E8F0;border-left:4px solid #0F766E;border-radius:12px;background:#FAFAF9;color:#334155;font-size:11px;line-height:1.55;white-space:pre-wrap}
 .gfc-yarbi-safety{padding:9px 10px;margin:8px 0 12px;border:1px solid #A7F3D0;border-radius:10px;background:#ECFDF5;color:#047857;font-size:11px;font-weight:900}
 .gfc-yarbi-training-label{display:block;margin:11px 0 5px;color:#334155;font-size:11.5px;font-weight:900}
@@ -47407,7 +47439,7 @@ body.gfc-yarbi-screen #modal-box,.gfc-yarbi-shell{background:#FFFFFF !important}
 .gfc-yarbi-message-label,.gfc-yarbi-chat .yarbi-conversation-label{display:flex;align-items:center;gap:7px;margin:0 0 6px;color:#456B5B;font-size:11px;font-weight:850;letter-spacing:.02em;text-transform:none}
 .gfc-yarbi-message.assistant>.gfc-yarbi-message-label::before,.gfc-yarbi-chat .yarbi-conversation-message:not([data-role="user"])>.yarbi-conversation-label::before{content:"Y";width:23px;height:23px;display:grid;place-items:center;flex:0 0 23px;border-radius:8px;background:#507A68;color:#fff;font-size:11px;font-weight:900}
 .gfc-yarbi-message.user .gfc-yarbi-message-label,.gfc-yarbi-chat .yarbi-conversation-message[data-role="user"] .yarbi-conversation-label{margin-bottom:5px;color:#727C77;font-size:10px}
-.gfc-yarbi-message-body,.gfc-yarbi-chat .yarbi-content-paragraph{font-size:15.5px;line-height:1.52;color:inherit}
+.gfc-yarbi-message-body,.gfc-yarbi-chat .yarbi-content-paragraph{font-size:16px;line-height:1.62;color:inherit}
 .gfc-yarbi-message-body{white-space:pre-wrap}
 .gfc-yarbi-message-time{margin-top:7px;color:#9AA39F;font-size:10px;text-align:right}
 .gfc-yarbi-chat .yarbi-content-paragraph{margin:0 0 8px}
@@ -47421,6 +47453,7 @@ body.gfc-yarbi-screen #modal-box,.gfc-yarbi-shell{background:#FFFFFF !important}
 .gfc-yarbi-chat .yarbi-content-checklist{list-style:"✓  ";padding-left:25px}
 .gfc-yarbi-chat .yarbi-content-checklist li::marker{color:#2F8A64;font-weight:900}
 .gfc-yarbi-chat .yarbi-content-panel{margin:8px 0;padding:9px 11px;border:1px solid #DCE9E2;border-left:3px solid #6E9A84;border-radius:12px;background:#F8FAF9;box-shadow:0 2px 8px rgba(37,55,46,.035)}
+.gfc-yarbi-chat .yarbi-content-panel-evidence{border-color:#CFE2D8;border-left-color:#41775F;background:#F6FAF8}
 .gfc-yarbi-chat .yarbi-content-panel-warning{border-color:#F0DCAA;border-left-color:#C58A22;background:#FFF9EA}
 .gfc-yarbi-chat .yarbi-content-panel-title{font-size:12.5px;font-weight:850}
 .gfc-yarbi-chat .yarbi-content-panel p{margin-top:3px;font-size:13.5px;line-height:1.48;white-space:pre-wrap}

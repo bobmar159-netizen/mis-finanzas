@@ -4,7 +4,7 @@
   const config = Object.freeze({
     apiOrigin: '__YARBI_SAME_ORIGIN__',
     environment: 'web',
-    releaseId: 'p02i-2ebc530ab46d719b',
+    releaseId: 'p02i-f4c460d8cb0beb22',
     remoteEnabled: 'true' === 'true',
     nativeAuthCallbackScheme: 'com.misfinanzas.app',
     supabaseUrl: '',
