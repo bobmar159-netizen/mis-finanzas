@@ -30,6 +30,8 @@
   const MAX_PDF_INDEX_CHARS = 12 * 1024 * 1024;
   const MAX_PDF_SECTIONS = 8000;
   const GEMINI_REQUEST_TIMEOUT_MS = 15000;
+  const KNOWLEDGE_INTENT_TIMEOUT_MS = 3500;
+  const KNOWLEDGE_ANSWER_TIMEOUT_MS = 9000;
   const SEMANTIC_QUERY_TIMEOUT_MS = 3500;
   const SEMANTIC_INDEX_VERSION = 'gemini-embedding-001@768-r1';
   const SEMANTIC_BATCH_SIZE = 24;
@@ -180,7 +182,7 @@
           contents:[{ role:'user', parts:[{ text:'Consulta del propietario:\n' + clean(question, 1200) }] }],
           generationConfig:{ temperature:0, maxOutputTokens:120, responseMimeType:'application/json' }
         })
-      }, 5000);
+      }, KNOWLEDGE_INTENT_TIMEOUT_MS);
       if (!response.ok) return { intent:knowledgeIntent(question) ? 'knowledge' : 'unknown', source:'local_fallback' };
       return { ...parseKnowledgeIntent(responseText(data)), source:'gemini_intent' };
     } catch (_) {
@@ -900,8 +902,8 @@
   function localSourceDecision(rankings) {
     const first = rankings?.[0];
     const second = rankings?.[1];
-    if (!first?.evidence?.length || first.coverage < 0.8 || first.score < 100) return null;
-    if (second && first.score - second.score < 35) return null;
+    if (!first?.evidence?.length || first.coverage < 0.5 || first.score < 70) return null;
+    if (second && first.score - second.score < 28) return null;
     return first;
   }
   async function routeApprovedSource(assets, question) {
@@ -1019,7 +1021,11 @@
         const queryKey = 'library-v4|' + normalize(question).slice(0, 1200);
         const cached = (Array.isArray(deterministic.asset.queryCache) ? deterministic.asset.queryCache : []).find(item => item?.key === queryKey && item?.result?.ok && item.result.found === true);
         if (cached) return { ok:true, cached:true, reply:formatDirectedAnswer(cached.result, deterministic.asset), result:cached.result, asset:deterministic.asset };
-        const result = await askTutor(question, { assets:[deterministic.asset], evidence });
+        let result;
+        try { result = await askTutor(question, { assets:[deterministic.asset], evidence }); }
+        catch (error) {
+          return { ok:false, code:'library_provider_unavailable', evidence, candidates:[deterministic.asset], timedOut:error?.code === 'multimodal_request_timeout' };
+        }
         if (!result.ok) return { ok:false, code:'library_provider_unavailable', evidence, candidates:[deterministic.asset] };
         const refreshed = await get(deterministic.asset.id) || deterministic.asset;
         const parsed = result.result || null;
@@ -1043,15 +1049,27 @@
       fragments:row.evidence.slice(0, 3).map(item => ({ reference:item.sectionLabel, text:clean(item.excerpt, 600) }))
     }));
     setChatProcess('consulting', 'Buscando la cita exacta en tus normas');
-    const { response, data } = await fetchJsonWithTimeout((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
-      body:JSON.stringify({
-        system_instruction:{ parts:[{ text:'Eres el buscador documental de Yarbi. Resuelve la consulta en una sola pasada usando exclusivamente los fragmentos aprobados. Primero identifica la fuente correcta y luego responde. Devuelve SOLO JSON válido. No mezcles normas, no uses conocimiento externo y no inventes citas ni numerales.' }] },
-        contents:[{ role:'user', parts:[{ text:('CONSULTA:\n' + clean(question, 1200) + '\n\nFUENTES Y FRAGMENTOS APROBADOS:\n' + JSON.stringify(catalog) + '\n\nDevuelve {"selected_asset_id":"id exacto o vacío","found":true|false,"answer":"respuesta directa en máximo 38 palabras","exact_quote":"cita literal única","reference":"capítulo, numeral o página","plain_explanation":"explicación sencilla en máximo 42 palabras","caveat":"condición relevante o vacío"}. found=true exige una cita literal presente en los fragmentos de la fuente elegida.').slice(0, 15800) }] }],
-        generationConfig:{ temperature:0, maxOutputTokens:750, responseMimeType:'application/json' }
-      })
-    }, GEMINI_REQUEST_TIMEOUT_MS);
+    let response;
+    let data;
+    try {
+      ({ response, data } = await fetchJsonWithTimeout((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
+        body:JSON.stringify({
+          system_instruction:{ parts:[{ text:'Eres el buscador documental de Yarbi. Resuelve la consulta en una sola pasada usando exclusivamente los fragmentos aprobados. Primero identifica la fuente correcta y luego responde. Devuelve SOLO JSON válido. No mezcles normas, no uses conocimiento externo y no inventes citas ni numerales.' }] },
+          contents:[{ role:'user', parts:[{ text:('CONSULTA:\n' + clean(question, 1200) + '\n\nFUENTES Y FRAGMENTOS APROBADOS:\n' + JSON.stringify(catalog) + '\n\nDevuelve {"selected_asset_id":"id exacto o vacío","found":true|false,"answer":"respuesta directa en máximo 38 palabras","exact_quote":"cita literal única","reference":"capítulo, numeral o página","plain_explanation":"explicación sencilla en máximo 42 palabras","caveat":"condición relevante o vacío"}. found=true exige una cita literal presente en los fragmentos de la fuente elegida.').slice(0, 15800) }] }],
+          generationConfig:{ temperature:0, maxOutputTokens:750, responseMimeType:'application/json' }
+        })
+      }, KNOWLEDGE_ANSWER_TIMEOUT_MS));
+    } catch (error) {
+      return {
+        ok:false,
+        code:'library_provider_unavailable',
+        evidence:rows.flatMap(row => row.evidence || []).slice(0, 3),
+        candidates:rows.map(row => row.asset),
+        timedOut:error?.code === 'multimodal_request_timeout'
+      };
+    }
     if (!response.ok) return { ok:false, code:response.status === 504 ? 'multimodal_request_timeout' : 'library_provider_unavailable' };
     let result = parseLibraryAnswer(responseText(data), candidates.map(asset => asset.id));
     const selected = candidates.find(asset => String(asset.id) === String(result.selectedAssetId));

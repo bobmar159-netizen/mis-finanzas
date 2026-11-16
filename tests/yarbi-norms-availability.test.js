@@ -198,6 +198,19 @@ test('Gemini interpreta una consulta técnica sin exigir la palabra norma o PDF'
   assert.match(requestBody, /una sola válvula para dos artefactos/i);
 });
 
+test('un timeout del proveedor conserva la evidencia local en vez de ocultarla', async () => {
+  rows.clear();
+  rows.set('one', { id:'one', title:'NTP gas.pdf', kind:'pdf', status:'approved', learningEnabled:true, sections:[{ id:'p1', label:'Numeral 8 · Página 1', text:'Una llave de corte podrá controlar dos aparatos bajo condiciones.' }] });
+  rows.set('two', { id:'two', title:'EM.040.pdf', kind:'pdf', status:'approved', learningEnabled:true, sections:[{ id:'p1', label:'Página 1', text:'Requisitos generales de ventilación.' }] });
+  global.gfcAccountFreshAccessToken = async () => 'synthetic-token';
+  global.gfcRuntimeApiOrigin = () => 'https://synthetic.invalid';
+  global.fetch = async () => { throw Object.assign(new Error('timeout'), { code:'multimodal_request_timeout' }); };
+  const result = await api.answerFromChat('¿Puedo usar una sola válvula para dos artefactos según la norma?');
+  assert.equal(result.handled, true);
+  assert.match(result.reply, /Evidencia local encontrada|No pude completar ahora la interpretación/i);
+  assert.match(result.reply, /Una llave de corte podrá controlar dos aparatos/);
+});
+
 test.after(() => {
   for (const [key, value] of Object.entries(saved)) {
     if (value === undefined) delete global[key]; else global[key] = value;
