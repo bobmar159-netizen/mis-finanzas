@@ -163,8 +163,12 @@
     const raw = String(value || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
     try {
       const parsed = JSON.parse(raw);
-      return ['knowledge','business','general'].includes(String(parsed?.intent || '').toLowerCase())
-        ? { intent:String(parsed.intent).toLowerCase(), reason:clean(parsed.reason, 180) }
+      const intent = String(parsed?.intent || '').toLowerCase();
+      const normalizedQuery = clean(parsed?.normalized_query || '', 900);
+      const searchTerms = Array.isArray(parsed?.search_terms) ? parsed.search_terms.map(term => clean(term, 80)).filter(Boolean).slice(0, 16) : [];
+      const variants = Array.isArray(parsed?.query_variants) ? parsed.query_variants.map(term => clean(term, 240)).filter(Boolean).slice(0, 6) : [];
+      return ['knowledge','business','general'].includes(intent)
+        ? { intent, reason:clean(parsed.reason, 180), normalizedQuery, searchTerms, variants }
         : { intent:'general', reason:'' };
     } catch (_) { return { intent:'general', reason:'' }; }
   }
@@ -178,7 +182,7 @@
         method:'POST',
         headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
         body:JSON.stringify({
-          system_instruction:{ parts:[{ text:'Eres el clasificador de intención de Yarbi. No respondas la pregunta y no uses conocimiento externo. Decide si la consulta debe buscarse en una biblioteca de normas, manuales o documentos aprobados (knowledge), si pertenece a los datos operativos del negocio como clientes, agenda, WhatsApp o finanzas (business), o si es conversación general (general). Una pregunta técnica como “¿se puede usar una sola válvula para dos artefactos?” o “¿qué exige una prueba de hermeticidad?” es knowledge aunque no mencione norma ni PDF. Devuelve SOLO JSON: {"intent":"knowledge|business|general","reason":"motivo breve"}.' }] },
+          system_instruction:{ parts:[{ text:'Eres el intérprete de consultas de Yarbi. No respondas la pregunta y no uses conocimiento externo. Decide si debe buscarse en una biblioteca de normas, manuales o documentos aprobados (knowledge), si pertenece a los datos operativos del negocio como clientes, agenda, WhatsApp o finanzas (business), o si es conversación general (general). Comprende lenguaje desordenado, omisiones, sinónimos y preguntas técnicas indirectas. Por ejemplo, “¿se puede usar una sola válvula para dos artefactos?” y “si tengo dos equipos, ¿los puedo alimentar desde la misma llave?” representan el mismo concepto documental aunque no mencionen norma ni PDF. Para knowledge, devuelve una reformulación técnica corta y variantes de búsqueda; no inventes numerales ni respuestas. Devuelve SOLO JSON: {"intent":"knowledge|business|general","reason":"motivo breve","normalized_query":"reformulación para buscar en los documentos","search_terms":["concepto","sinónimo"],"query_variants":["otra forma de expresar la misma pregunta"]}.' }] },
           contents:[{ role:'user', parts:[{ text:'Consulta del propietario:\n' + clean(question, 1200) }] }],
           generationConfig:{ temperature:0, maxOutputTokens:120, responseMimeType:'application/json' }
         })
@@ -246,6 +250,21 @@
         return { assetId:asset.id, title:asset.title, kind:asset.kind, sourceHash:asset.sha256 || '', sectionId:section.id || '', sectionLabel:clean(section.label || 'Fragmento sin referencia', 240), excerpt:evidenceExcerpt(section.text, groups), hits:[...matched.keys()], score };
       }).filter(Boolean);
     }).sort((a,b) => b.score - a.score || a.title.localeCompare(b.title, 'es-PE')).slice(0, limit);
+  }
+  function mergeEvidenceRows(rows, limit = 36) {
+    const merged = new Map();
+    (Array.isArray(rows) ? rows : []).forEach(row => {
+      const key = String(row?.assetId || '') + '|' + String(row?.sectionId || '');
+      if (!key || key === '|') return;
+      const previous = merged.get(key);
+      if (!previous || Number(row.score || 0) > Number(previous.score || 0)) merged.set(key, previous ? { ...row, hits:[...new Set([...(previous.hits || []), ...(row.hits || [])])] } : row);
+      else if (previous) previous.hits = [...new Set([...(previous.hits || []), ...(row.hits || [])])];
+    });
+    return [...merged.values()].sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || String(a.title || '').localeCompare(String(b.title || ''), 'es-PE')).slice(0, Math.max(1, Math.min(80, Number(limit) || 36)));
+  }
+  function searchApprovedQueries(assets, queries, options) {
+    const unique = [...new Set((Array.isArray(queries) ? queries : [queries]).map(value => clean(value, 1200)).filter(Boolean))].slice(0, 8);
+    return mergeEvidenceRows(unique.flatMap(query => searchApproved(assets, query, { limit:80 })), options?.limit);
   }
   function firstApprovedEvidence(assets) {
     const approved = (Array.isArray(assets) ? assets : []).filter(asset => asset.status === 'approved' && asset.learningEnabled !== false && Array.isArray(asset.sections) && asset.sections.length);
@@ -1122,7 +1141,9 @@
     if (explicit || strongMatch || semanticAvailable) {
       try {
         setChatProcess('consulting', 'Interpretando el significado de tu pregunta');
-        const semantic = await semanticSearchApproved(assets, text, { limit:14 });
+        const interpretedQueries = [text, intent.normalizedQuery, ...(intent.searchTerms || []), ...(intent.variants || [])].filter(Boolean);
+        if (documentIntent && interpretedQueries.length > 1) evidence = searchApprovedQueries(assets, interpretedQueries, { limit:36 });
+        const semantic = await semanticSearchApproved(assets, interpretedQueries.join(' · '), { limit:14 });
         const semanticStrong = semantic.mode === 'semantic' && Number(semantic.evidence?.[0]?.semanticScore || -1) >= 0.48;
         if (!documentIntent && !strongMatch && !semanticStrong) return { handled:false };
         const libraryResult = await queryApprovedLibrary(assets, text, semantic);
@@ -1358,7 +1379,27 @@
       return { ok:false, message:statusText(error) };
     }
   }
-  async function approveFromUi(id) { try { setProgress(92, 'Guardando aprobación', 'Vinculando la revisión a esta fuente.', 'working'); await approve(id); setProgress(100, 'Fuente aprobada', 'Disponible para respuestas del chat de Yarbi con citas verificables.', 'approved'); setStatus('Fuente aprobada para el chat de Yarbi. No modifica CRM ni instrucciones permanentes.'); } catch (error) { setProgress(0, 'No se aprobó', statusText(error), 'error'); setStatus(statusText(error), true); } }
+  async function approveFromUi(id) {
+    try {
+      setProgress(92, 'Guardando aprobación', 'Vinculando la revisión a esta fuente.', 'working');
+      await approve(id);
+      const approved = await get(id);
+      if (approved?.sections?.length) {
+        setStatus('Fuente aprobada. Ahora preparo su índice de significado una sola vez para entender preguntas naturales.', false);
+        const result = await indexSemanticAsset(id, state => setProgress(92 + Math.round(Number(state?.fraction || 0) * 8), 'Comprendiendo el documento', 'Fragmento ' + state.indexed + ' de ' + state.total, 'working'));
+        setProgress(100, result.cached ? 'Índice ya disponible' : 'Fuente comprendida', result.indexed + ' fragmentos preparados para preguntas con palabras diferentes.', 'approved');
+        setStatus('Fuente aprobada y preparada para el chat de Yarbi con búsqueda por significado y citas verificables.', false);
+      } else {
+        setProgress(100, 'Fuente aprobada', 'Disponible para respuestas verificables cuando exista un extractor compatible.', 'approved');
+        setStatus('Fuente aprobada para el chat de Yarbi. Este formato todavía necesita extracción de contenido.', false);
+      }
+      await render();
+    } catch (error) {
+      setProgress(0, 'Índice pendiente', statusText(error), 'error');
+      setStatus('La fuente quedó aprobada y el avance del índice se conservará para reanudarlo. ' + statusText(error), true);
+      await render();
+    }
+  }
   async function toggleLearningFromUi(id, enabled) {
     try {
       await toggleLearning(id, enabled);
@@ -1384,10 +1425,10 @@
     return '<main class="gfc-yarbi-tool-page gfc-mm-page">' +
       '<section class="gfc-mm-hero"><span>📚</span><div><h2>Biblioteca de Yarbi</h2><p>Carga y revisa las fuentes aquí. Todas las preguntas se hacen en el chat de Yarbi.</p></div></section>' +
       '<section class="gfc-yarbi-tool-card"><div class="gfc-mm-steps"><span><b>1</b> Elegir</span><span><b>2</b> Extraer</span><span><b>3</b> Revisar</span><span><b>4</b> Aprobar</span></div>' +
-      '<label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>PDF de hasta 120 MB: Yarbi extrae el texto página por página. La búsqueda semántica puede añadirse después. Los PDF escaneados sin texto requieren OCR.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label>' +
+      '<label class="gfc-mm-picker" for="gfc-mm-input"><span class="gfc-mm-picker-icon">⌕</span><div><b>Buscar archivos en el teléfono</b><small>PDF de hasta 120 MB: Yarbi extrae el texto página por página y prepara automáticamente su índice de significado. Los PDF escaneados sin texto requieren OCR.</small><em id="gfc-mm-selected">Ningún archivo seleccionado</em></div><input id="gfc-mm-input" type="file" multiple onchange="gfcYarbiMultimodalFilesChosen(this.files)" accept=".txt,.md,.csv,.json,.xml,.pdf,.jpg,.jpeg,.png,.webp,.heic,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.mov,.webm,text/plain,application/pdf,image/*,audio/*,video/*"></label>' +
       '<div class="gfc-mm-primary-actions"><button class="gfc-yarbi-primary" onclick="gfcYarbiMultimodalImport()">Agregar y procesar</button><button class="gfc-yarbi-secondary" onclick="gfcYarbiMultimodalSaveOnly()">Solo guardar</button></div>' +
       '<section id="gfc-mm-progress" class="gfc-mm-progress-card" data-tone="working" hidden aria-live="polite"><div class="gfc-mm-progress-head"><span id="gfc-mm-progress-chip" class="gfc-mm-progress-chip">Procesando archivo</span><strong id="gfc-mm-progress-percent">0%</strong></div><div class="gfc-mm-progress-track"><i id="gfc-mm-progress-bar"></i></div><p id="gfc-mm-progress-detail">Preparando…</p></section>' +
-      '<div id="gfc-mm-status" class="gfc-yarbi-import-summary">Una fuente con texto extraído se puede aprobar sin esperar el índice semántico. La aprobación es obligatoria y no se ejecutan acciones comerciales durante el procesamiento.</div></section>' +
+      '<div id="gfc-mm-status" class="gfc-yarbi-import-summary">Yarbi extrae el documento y prepara su índice de significado una sola vez. La aprobación es obligatoria y no se ejecutan acciones comerciales durante el procesamiento.</div></section>' +
       '<section class="gfc-yarbi-tool-card"><div class="gfc-yarbi-tool-title">Fuentes de esta biblioteca</div><div id="gfc-mm-list"></div><button class="gfc-yarbi-primary gfc-mm-chat-link" onclick="gfcSetYarbiInteractionMode(\'normal\')">Ir al chat de Yarbi</button></section></main>';
   }
   function attach() {
@@ -1400,7 +1441,8 @@
         notice.textContent = '✓ ' + migration.migrated + ' fuente(s) anterior(es) integradas sin duplicar ni borrar la biblioteca original.';
       }
       await render();
+      void upgradeSemanticIndexesInBackground().catch(() => {});
     })();
   }
-  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, libraryOverviewQuestion, libraryOverviewReply, isEmptyGreeting, parseKnowledgeIntent, classifyKnowledgeIntent, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, libraryAvailabilityReply, legacySourceToAsset, planLegacyMigration, migrateLegacyKnowledge, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, approvedKnowledgeAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, buildTextAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, importTextFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
+  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, libraryOverviewQuestion, libraryOverviewReply, isEmptyGreeting, parseKnowledgeIntent, classifyKnowledgeIntent, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, searchApprovedQueries, mergeEvidenceRows, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, libraryAvailabilityReply, legacySourceToAsset, planLegacyMigration, migrateLegacyKnowledge, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, approvedKnowledgeAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, buildTextAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, importTextFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
 }));

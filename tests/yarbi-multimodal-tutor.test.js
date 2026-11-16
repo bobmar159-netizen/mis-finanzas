@@ -309,6 +309,31 @@ test('BKE multimodal: distingue consultas documentales de lecturas normales del 
   assert.deepEqual(api.contentTokens('¿Qué dice la norma sobre ventilación permanente?'), ['ventilacion', 'permanente']);
 });
 
+test('BKE tutor: conserva la reformulación semántica de una pregunta desordenada', () => {
+  const plan = api.parseKnowledgeIntent(JSON.stringify({
+    intent:'knowledge',
+    reason:'pregunta técnica',
+    normalized_query:'condiciones para alimentar dos artefactos desde una válvula común',
+    search_terms:['válvula común','dos artefactos','alimentación','condiciones'],
+    query_variants:['una llave para dos aparatos de gas']
+  }));
+  assert.equal(plan.intent, 'knowledge');
+  assert.match(plan.normalizedQuery, /dos artefactos/);
+  assert.deepEqual(plan.searchTerms, ['válvula común','dos artefactos','alimentación','condiciones']);
+  assert.deepEqual(plan.variants, ['una llave para dos aparatos de gas']);
+});
+
+test('BKE tutor: combina pregunta original y conceptos interpretados sin duplicar fragmentos', () => {
+  const assets = [{ id:'norma-1', title:'Norma de gas', status:'approved', learningEnabled:true, sections:[
+    { id:'p1', label:'Numeral 6.2 · Página 10', text:'Una válvula común puede alimentar dos artefactos bajo las condiciones indicadas.' },
+    { id:'p2', label:'Numeral 7 · Página 12', text:'La prueba de hermeticidad debe realizarse antes de operar.' }
+  ] }];
+  const rows = api.searchApprovedQueries(assets, ['¿puedo usar una sola llave para dos equipos?', 'válvula común dos artefactos'], { limit:10 });
+  assert.equal(rows.filter(row => row.sectionId === 'p1').length, 1);
+  assert.equal(rows[0].sectionId, 'p1');
+  assert.ok(rows[0].hits.includes('valvula') || rows[0].hits.includes('artefacto'));
+});
+
 test('BKE multimodal: el chat principal consulta la misma biblioteca aprobada', () => {
   assert.match(source, /root\.gfcYarbiMultimodalAnswer = api\.answerFromChat/);
   assert.match(source, /function answerFromChat/);
