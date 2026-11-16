@@ -179,6 +179,25 @@ test('Live usa la misma biblioteca local aprobada y conserva su respuesta en el 
   assert.equal(networkCalls, 0);
 });
 
+test('Gemini interpreta una consulta técnica sin exigir la palabra norma o PDF', async () => {
+  rows.clear();
+  rows.set('gas', {
+    id:'gas', title:'NTP gas.pdf', kind:'pdf', status:'approved', learningEnabled:true,
+    sections:[{ id:'p1', label:'Página 1', text:'Regla técnica sobre válvulas y artefactos.' }]
+  });
+  global.gfcAccountFreshAccessToken = async () => 'synthetic-token';
+  global.gfcRuntimeApiOrigin = () => 'https://synthetic.invalid';
+  let requestBody = '';
+  global.fetch = async (_url, options) => {
+    requestBody = String(options.body || '');
+    return { ok:true, json:async () => ({ candidates:[{ content:{ parts:[{ text:'{"intent":"knowledge","reason":"consulta técnica que debe contrastarse con los documentos aprobados"}' }] } }] }) };
+  };
+  const result = await api.classifyKnowledgeIntent('¿Se puede utilizar una sola válvula para dos artefactos?', await api.list());
+  assert.equal(result.intent, 'knowledge');
+  assert.equal(result.source, 'gemini_intent');
+  assert.match(requestBody, /una sola válvula para dos artefactos/i);
+});
+
 test.after(() => {
   for (const [key, value] of Object.entries(saved)) {
     if (value === undefined) delete global[key]; else global[key] = value;

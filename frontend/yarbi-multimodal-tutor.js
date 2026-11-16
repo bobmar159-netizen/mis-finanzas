@@ -154,6 +154,39 @@
       + (remaining ? '\n- Y ' + remaining + ' más.' : '')
       + '\n\nPregúntame por un tema concreto, una norma o un numeral y buscaré la cita exacta antes de explicártela. No necesitas volver a cargar los PDF.';
   }
+  function isEmptyGreeting(value) {
+    return /^(?:hola|ola|holi|buenas|buenos d[ií]as|buenas tardes|buenas noches)(?:\s+(?:chat|yarbi|yarbis))?[.!?\s]*$/i.test(clean(value, 120));
+  }
+  function parseKnowledgeIntent(value) {
+    const raw = String(value || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    try {
+      const parsed = JSON.parse(raw);
+      return ['knowledge','business','general'].includes(String(parsed?.intent || '').toLowerCase())
+        ? { intent:String(parsed.intent).toLowerCase(), reason:clean(parsed.reason, 180) }
+        : { intent:'general', reason:'' };
+    } catch (_) { return { intent:'general', reason:'' }; }
+  }
+  async function classifyKnowledgeIntent(question, assets) {
+    const approved = approvedKnowledgeAssets(assets);
+    if (!approved.length || isEmptyGreeting(question)) return { intent:'general', source:'local_guard' };
+    const token = typeof root.gfcAccountFreshAccessToken === 'function' ? await root.gfcAccountFreshAccessToken() : '';
+    if (!token) return { intent:knowledgeIntent(question) ? 'knowledge' : 'unknown', source:'local_fallback' };
+    try {
+      const { response, data } = await fetchJsonWithTimeout((typeof root.gfcRuntimeApiOrigin === 'function' ? root.gfcRuntimeApiOrigin() : '') + '/api/assistant/gemini', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
+        body:JSON.stringify({
+          system_instruction:{ parts:[{ text:'Eres el clasificador de intención de Yarbi. No respondas la pregunta y no uses conocimiento externo. Decide si la consulta debe buscarse en una biblioteca de normas, manuales o documentos aprobados (knowledge), si pertenece a los datos operativos del negocio como clientes, agenda, WhatsApp o finanzas (business), o si es conversación general (general). Una pregunta técnica como “¿se puede usar una sola válvula para dos artefactos?” o “¿qué exige una prueba de hermeticidad?” es knowledge aunque no mencione norma ni PDF. Devuelve SOLO JSON: {"intent":"knowledge|business|general","reason":"motivo breve"}.' }] },
+          contents:[{ role:'user', parts:[{ text:'Consulta del propietario:\n' + clean(question, 1200) }] }],
+          generationConfig:{ temperature:0, maxOutputTokens:120, responseMimeType:'application/json' }
+        })
+      }, 5000);
+      if (!response.ok) return { intent:knowledgeIntent(question) ? 'knowledge' : 'unknown', source:'local_fallback' };
+      return { ...parseKnowledgeIntent(responseText(data)), source:'gemini_intent' };
+    } catch (_) {
+      return { intent:knowledgeIntent(question) ? 'knowledge' : 'unknown', source:'local_fallback' };
+    }
+  }
   function obviousBusinessIntent(value) {
     return /\b(?:cliente|crm|agenda|visita|cita|mensaje|whatsapp|cobro|cobrar|deuda|balance|ingreso|gasto|movimiento|stock|cotizaci[oó]n|recordatorio|llamar|hoy|ma[ñn]ana|ayer)\b/i.test(String(value || ''));
   }
@@ -1064,13 +1097,16 @@
     const strongMatch = evidence.some(row => Number(row.score || 0) >= minimumHits);
     const semanticAvailable = assets.some(asset => asset.status === 'approved' && asset.learningEnabled !== false && (asset.sections || []).some(semanticReady));
     if (!evidence.length && explicit && terms.length === 0) evidence = firstApprovedEvidence(assets);
-    if (!explicit && !strongMatch && (!semanticAvailable || obviousBusinessIntent(text))) return { handled:false };
+    const needsInterpretation = !explicit && !strongMatch && !obviousBusinessIntent(text) && !isEmptyGreeting(text);
+    const intent = needsInterpretation ? await classifyKnowledgeIntent(text, assets) : { intent:explicit ? 'knowledge' : 'unknown', source:'local_shortcut' };
+    const documentIntent = explicit || intent.intent === 'knowledge';
+    if (!documentIntent && !strongMatch && (!semanticAvailable || intent.intent !== 'knowledge')) return { handled:false };
     if (explicit || strongMatch || semanticAvailable) {
       try {
         setChatProcess('consulting', 'Interpretando el significado de tu pregunta');
         const semantic = await semanticSearchApproved(assets, text, { limit:14 });
         const semanticStrong = semantic.mode === 'semantic' && Number(semantic.evidence?.[0]?.semanticScore || -1) >= 0.48;
-        if (!explicit && !strongMatch && !semanticStrong) return { handled:false };
+        if (!documentIntent && !strongMatch && !semanticStrong) return { handled:false };
         const libraryResult = await queryApprovedLibrary(assets, text, semantic);
         if (libraryResult.ok) {
           setChatProcess('writing', 'Ordenando la respuesta verificada');
@@ -1348,5 +1384,5 @@
       await render();
     })();
   }
-  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, libraryOverviewQuestion, libraryOverviewReply, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, libraryAvailabilityReply, legacySourceToAsset, planLegacyMigration, migrateLegacyKnowledge, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, approvedKnowledgeAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, buildTextAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, importTextFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
+  return Object.freeze({ classifyFile, normalize, contentTokens, retrievalGroups, knowledgeIntent, libraryOverviewQuestion, libraryOverviewReply, isEmptyGreeting, parseKnowledgeIntent, classifyKnowledgeIntent, obviousBusinessIntent, sectionsFromText, pdfPageSections, upgradeBlockedDuplicate, searchApproved, semanticEvidence, semanticSearchApproved, normalizeEmbedding, encodeEmbedding, quantizedCosine, firstApprovedEvidence, responseText, parseStructuredAnalysis, parseDirectedAnswer, parseLibraryAnswer, formatDirectedAnswer, libraryAvailabilityReply, legacySourceToAsset, planLegacyMigration, migrateLegacyKnowledge, citationMarkdown, citationListMarkdown, quoteSupportedByAsset, approvedPdfAssets, approvedKnowledgeAssets, sourceCodes, explicitSourceMatches, rankApprovedSources, parseSourceRoute, localSourceDecision, routeApprovedSource, selectApprovedDirectAsset, queryApprovedSource, queryApprovedLibrary, fetchJsonWithTimeout, requestEmbeddings, buildAsset, buildTextAsset, importFiles, indexSemanticAsset, list, analyze, approve, toggleLearning, removeAsset, askTutor, answerFromChat, html, attach, render, analyzeFromUi, semanticIndexFromUi, approveFromUi, toggleLearningFromUi, deleteFromUi, importFromUi, importTextFromUi, filesChosen, setProgress, formatBytes, MAX_INLINE_BYTES, MAX_PDF_FILE_BYTES, GEMINI_REQUEST_TIMEOUT_MS, SEMANTIC_INDEX_VERSION, SEMANTIC_DIMENSIONS });
 }));
