@@ -5,7 +5,7 @@
 // canónica yarbi_owner_contact_scope.
 const { configuration, decidePreviewOwnerReferenceRequest } = require('../../lib/preview-owner-reference-policy');
 const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
-const { createCanonicalOwnerScopeResolver } = require('../../lib/yarbi-owner-scope');
+const { createPaginatedCanonicalOwnerScopeResolver } = require('../../lib/yarbi-owner-scope');
 const { searchScopedCrm } = require('../../lib/yarbi-crm-search-runtime');
 const { planCrmSearchFromUnderstanding } = require('../../lib/yarbi-crm-search-conversation');
 const { errorCode, eventIdFor, newOperationId, recordTrace, recordTerminalTrace, traceSecret, traceVersion } = require('../../lib/yarbi-trace');
@@ -77,7 +77,7 @@ module.exports = async function crmSearchHandler(req, res) {
     const search = await searchScopedCrm({
       supabase,
       validatedIdentity: authenticated.identity,
-      ownerScopeResolver: createCanonicalOwnerScopeResolver({ supabase }),
+      ownerScopeResolver: createPaginatedCanonicalOwnerScopeResolver({ supabase }),
       query: resolvedQuery,
       filters: resolvedFilters,
       page: integer(body.page, 1, 1000),

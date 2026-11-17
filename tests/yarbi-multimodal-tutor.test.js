@@ -36,6 +36,56 @@ test('BKE multimodal: reconoce documentos, imágenes, audio y video sin mezclar 
   assert.equal(api.classifyFile({ name:'secreto.exe', type:'application/octet-stream' }), 'unsupported');
 });
 
+test('BKE audio/video: convierte transcripción y observaciones temporales en fragmentos buscables y revisables', () => {
+  const parsed = api.parseStructuredAnalysis(JSON.stringify({
+    summary:'Se explica una prueba de hermeticidad.',
+    transcript:'Primero cierro las válvulas y verifico la presión. Luego registro el resultado.',
+    observations:[
+      { timestamp:'00:12', text:'Se observa un manómetro conectado a la instalación.' },
+      { timestamp:'99:99', text:'Este tiempo inválido se descarta.' }
+    ],
+    citations:[]
+  }));
+  const audio = api.mediaTranscriptSections('audio', parsed);
+  const video = api.mediaTranscriptSections('video', parsed);
+  assert.ok(audio.length > 0);
+  assert.match(audio.map(row => row.text).join(' '), /cierro las válvulas/);
+  assert.equal(audio.some(row => /observa un manómetro/.test(row.text)), false);
+  assert.ok(video.some(row => row.label.includes('00:12') && /manómetro/.test(row.text)));
+  assert.ok(video.some(row => /cierro las válvulas/.test(row.text)));
+  assert.equal(video.some(row => row.text.includes('tiempo inválido')), false);
+  assert.deepEqual(api.mediaTranscriptSections('audio', { summary:'Solo un resumen, sin transcripción.' }), []);
+});
+
+function syntheticPng(width, height) {
+  const bytes=new Uint8Array(24);
+  bytes.set([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82]);
+  const view=new DataView(bytes.buffer);
+  view.setUint32(16, width, false); view.setUint32(20, height, false);
+  return bytes;
+}
+
+test('File Search de imágenes valida PNG/JPEG real, MIME y tope de 4096 × 4096', () => {
+  const png=syntheticPng(3200, 1800);
+  assert.deepEqual(api.inspectFileSearchImage(png, 'image/png'), { mimeType:'image/png', width:3200, height:1800 });
+  assert.equal(api.inspectFileSearchImage(png, 'image/jpeg'), null);
+  assert.equal(api.inspectFileSearchImage(syntheticPng(4097, 100), 'image/png'), null);
+  const jpeg=new Uint8Array(24);
+  jpeg.set([0xff,0xd8,0xff,0xc0,0,17,8,0,10,0,20]);
+  assert.deepEqual(api.inspectFileSearchImage(jpeg, 'image/jpeg'), { mimeType:'image/jpeg', width:20, height:10 });
+  assert.equal(api.inspectFileSearchImage(new Uint8Array(24), 'image/png'), null);
+});
+
+test('BKE conserva PNG/JPEG apto para Gemini como original, con dimensiones verificadas', async () => {
+  const file=new File([syntheticPng(640, 480)], 'plano.png', { type:'image/png' });
+  const asset=await api.buildAsset(file);
+  assert.equal(asset.kind, 'image');
+  assert.equal(asset.mime, 'image/png');
+  assert.deepEqual(asset.fileSearchImage, { mimeType:'image/png', width:640, height:480 });
+  assert.equal(asset.originalBlob.size, file.size);
+  assert.equal(asset.originalBlob.type, 'image/png');
+});
+
 test('BKE multimodal: fragmenta texto de manera determinista para tutoría', () => {
   const sections = api.sectionsFromText('Primera regla.\n\nSegunda regla con más detalle.');
   assert.deepEqual(sections.map(section => section.text), ['Primera regla.', 'Segunda regla con más detalle.']);
@@ -74,14 +124,17 @@ test('BKE multimodal: la búsqueda dirigida exige cita y ubicación antes de afi
   assert.match(api.formatDirectedAnswer(unsafe, { title:'Norma técnica.pdf' }), /No encontré/);
 });
 
-test('BKE multimodal: recupera sinónimos técnicos sin convertir el chat en comandos rígidos', () => {
-  const results = api.searchApproved([{
+test('BKE multimodal: usa variantes semánticas generadas para recuperar paráfrasis sin un diccionario rígido', () => {
+  const assets = [{
     id:'ntp', title:'NTP 111.011', kind:'pdf', status:'approved',
     sections:[{ label:'Numeral 8.4', text:'Una misma llave de corte podrá controlar dos aparatos bajo las condiciones indicadas.' }]
-  }], '¿puedo usar una sola válvula para dos artefactos?');
+  }];
+  const question = '¿puedo usar una sola válvula para dos artefactos?';
+  const results = api.searchApprovedQueries(assets, [question, 'llave de corte para aparatos']);
+  assert.ok(api.searchApproved(assets, question)[0].coverage < 0.25, 'la recuperación local debe reconocer que la consulta literal solo coincide parcialmente');
   assert.equal(results.length, 1);
   assert.equal(results[0].assetId, 'ntp');
-  assert.ok(results[0].score >= 10);
+  assert.equal(results[0].coverage, 1, 'la consulta reformulada debe recuperar el fragmento con cobertura completa');
   assert.deepEqual(api.retrievalGroups('válvula artefactos').map(group => group.term), ['valvula','artefactos']);
 });
 
@@ -128,7 +181,7 @@ test('BKE semántico: una coincidencia local fuerte evita una llamada redundante
     const result = await api.semanticSearchApproved([{
       id:'ntp-local', title:'NTP local', kind:'pdf', status:'approved', learningEnabled:true,
       sections:[{ id:'p1', label:'Numeral 8.4', text:'Una válvula común podrá alimentar dos artefactos bajo condiciones verificadas.', semantic:{ version:api.SEMANTIC_INDEX_VERSION, vector } }]
-    }], '¿puedo usar una sola válvula para dos artefactos?');
+    }], 'Una válvula común podrá alimentar dos artefactos bajo condiciones verificadas.');
     assert.equal(result.mode, 'lexical_confident');
     assert.equal(result.evidence[0].sectionId, 'p1');
     assert.equal(fetchCalls, 0);
@@ -323,6 +376,128 @@ test('BKE tutor: conserva la reformulación semántica de una pregunta desordena
   assert.deepEqual(plan.variants, ['una llave para dos aparatos de gas']);
 });
 
+test('BKE tutor: preserva cifras, unidades y códigos y pide aclaración si el intérprete los cambia', () => {
+  const question = '¿La NTP 111.011 permite 2 artefactos con 21 m de tubería?';
+  const values = api.protectedValues(question);
+  assert.deepEqual(values, ['ntp111.011','2','21m']);
+  const safe = api.validateProtectedKnowledgeIntent(question, [], {
+    normalizedQuery:'Según NTP 111.011, condiciones para 2 artefactos y tubería de 21 m.'
+  });
+  const changed = api.validateProtectedKnowledgeIntent(question, [], {
+    normalizedQuery:'Según NTP 111.011, condiciones para 1 artefacto y tubería de 12 m.'
+  });
+  const invented = api.validateProtectedKnowledgeIntent('¿Qué indica el numeral?', [], {
+    normalizedQuery:'La norma indica un máximo de 2 artefactos en este caso.'
+  });
+  assert.equal(safe.ok, true);
+  assert.equal(changed.clarificationRequired, true);
+  assert.match(changed.clarificationQuestion, /2|21m/);
+  assert.equal(invented.clarificationRequired, true);
+  assert.match(invented.clarificationQuestion, /añadió el valor/);
+});
+
+test('BKE tutor: el intérprete solicita aclaración sin convertirla en consulta documental', async () => {
+  const previousToken = global.gfcAccountFreshAccessToken;
+  const previousOrigin = global.gfcRuntimeApiOrigin;
+  const previousFetch = global.fetch;
+  global.gfcAccountFreshAccessToken = async () => 'synthetic-token';
+  global.gfcRuntimeApiOrigin = () => 'https://synthetic.invalid';
+  global.fetch = async (_url, options) => {
+    const payload = JSON.parse(options.body);
+    assert.match(payload.system_instruction.parts[0].text, /Conserva exactamente cada número/);
+    return { ok:true, json:async () => ({ candidates:[{ content:{ parts:[{ text:JSON.stringify({
+      intent:'knowledge', normalized_query:'NTP 111.011 permite 1 artefacto', search_terms:['válvula'],
+      query_variants:[], clarification_required:false
+    }) }] } }] }) };
+  };
+  try {
+    const result = await api.classifyKnowledgeIntent('¿NTP 111.011 permite 2 artefactos?', [{
+      id:'ntp', title:'NTP 111.011', kind:'pdf', status:'approved', sections:[{ label:'Numeral 7', text:'Regla sintética.' }]
+    }], []);
+    assert.equal(result.intent, 'knowledge');
+    assert.equal(result.clarificationRequired, true);
+    assert.match(result.clarificationQuestion, /2/);
+    assert.equal(result.source, 'gemini_intent_clarification');
+  } finally {
+    global.gfcAccountFreshAccessToken = previousToken;
+    global.gfcRuntimeApiOrigin = previousOrigin;
+    global.fetch = previousFetch;
+  }
+});
+
+test('BKE tutor: resuelve una pregunta elíptica usando el contexto y la fuente ya mencionada', async () => {
+  const previousToken = global.gfcAccountFreshAccessToken;
+  const previousOrigin = global.gfcRuntimeApiOrigin;
+  const previousFetch = global.fetch;
+  let sent = '';
+  global.gfcAccountFreshAccessToken = async () => 'synthetic-token';
+  global.gfcRuntimeApiOrigin = () => 'https://synthetic.invalid';
+  global.fetch = async (_url, options) => {
+    const payload = JSON.parse(options.body);
+    sent = payload.contents[0].parts[0].text;
+    return { ok:true, json:async () => ({ candidates:[{ content:{ parts:[{ text:JSON.stringify({
+      intent:'knowledge', normalized_query:'¿Qué establece NTP 111.011 sobre válvula para 2 artefactos?',
+      search_terms:['válvula común','dos artefactos'], query_variants:[], source_asset_id:'ntp'
+    }) }] } }] }) };
+  };
+  try {
+    const context = [
+      { role:'user', text:'Estoy revisando NTP 111.011 sobre una válvula para dos artefactos.' },
+      { role:'assistant', text:'¿Quieres que busque las condiciones de esa conexión?' }
+    ];
+    const result = await api.classifyKnowledgeIntent('¿Y qué pasa si uso la otra?', [
+      { id:'ntp', title:'NTP 111.011', kind:'pdf', status:'approved', sections:[{ label:'Numeral 8.4', text:'Texto sintético.' }] },
+      { id:'em040', title:'EM.040', kind:'pdf', status:'approved', sections:[{ label:'Numeral 3', text:'Otro texto sintético.' }] }
+    ], context);
+    assert.match(sent, /Estoy revisando NTP 111\.011/);
+    assert.match(sent, /¿Y qué pasa si uso la otra\?/);
+    assert.equal(result.intent, 'knowledge');
+    assert.equal(result.sourceAssetId, 'ntp');
+    assert.equal(result.clarificationRequired, false);
+  } finally {
+    global.gfcAccountFreshAccessToken = previousToken;
+    global.gfcRuntimeApiOrigin = previousOrigin;
+    global.fetch = previousFetch;
+  }
+});
+
+test('BKE local y respaldo: las fuentes locales quedan separadas por propietario', () => {
+  const ownerA = '11111111-1111-4111-8111-111111111111';
+  const ownerB = '22222222-2222-4222-8222-222222222222';
+  const rows = [
+    { id:'a', ownerAccountId:ownerA, title:'Norma privada A' },
+    { id:'b', ownerAccountId:ownerB, title:'Norma privada B' },
+    { id:'device', ownerAccountId:'device', title:'Biblioteca local sin cuenta' },
+    { id:'legacy', title:'Biblioteca local anterior' }
+  ];
+  const firstOwner = api.scopeLocalKnowledgeAssets(rows, ownerA);
+  const sharedStoreAfterMigration = [...firstOwner.assets, rows.find(asset => asset.id === 'b')];
+  const secondOwner = api.scopeLocalKnowledgeAssets(sharedStoreAfterMigration, ownerB);
+  assert.deepEqual(firstOwner.assets.map(asset => asset.id).sort(), ['a','device','legacy']);
+  assert.deepEqual(firstOwner.migrated.map(asset => asset.ownerAccountId), [ownerA, ownerA]);
+  assert.deepEqual(secondOwner.assets.map(asset => asset.id), ['b']);
+  assert.equal(api.scopeLocalKnowledgeAssets(rows, 'device').assets.some(asset => asset.id === 'a'), false);
+});
+
+test('BKE local: el índice léxico reutilizado invalida cuando cambia la versión de una fuente', () => {
+  const asset = { id:'cached-source', sha256:'d'.repeat(64), updatedAt:100, title:'Manual', kind:'pdf', status:'approved', sections:[{ id:'p1', label:'Página 1', text:'Válvula de seguridad.' }] };
+  assert.equal(api.searchApproved([asset], 'válvula').length, 1);
+  asset.sections[0].text = 'Prueba de hermeticidad.';
+  asset.updatedAt = 101;
+  assert.equal(api.searchApproved([asset], 'válvula').length, 0);
+  assert.equal(api.searchApproved([asset], 'hermeticidad').length, 1);
+});
+
+test('BKE RAG: verifica la cita contra la evidencia de la fuente seleccionada', () => {
+  const rankings = [
+    { asset:{ id:'ntp', title:'NTP 111.011' }, evidence:[{ sectionLabel:'Numeral 8.4 · Página 22' }] },
+    { asset:{ id:'em040', title:'EM.040' }, evidence:[{ sectionLabel:'Numeral 5.1 · Página 9' }] }
+  ];
+  assert.equal(api.verifiedReferenceForSelectedRanking({ reference:'Numeral 8.4' }, 'ntp', rankings), 'Numeral 8.4 · Página 22');
+  assert.equal(api.verifiedReferenceForSelectedRanking({ reference:'Numeral 5.1' }, 'ntp', rankings), '');
+  assert.equal(api.verifiedReferenceForSelectedRanking({ reference:'Numeral 5.1' }, 'em040', rankings), 'Numeral 5.1 · Página 9');
+});
+
 test('BKE tutor: combina pregunta original y conceptos interpretados sin duplicar fragmentos', () => {
   const assets = [{ id:'norma-1', title:'Norma de gas', status:'approved', learningEnabled:true, sections:[
     { id:'p1', label:'Numeral 6.2 · Página 10', text:'Una válvula común puede alimentar dos artefactos bajo las condiciones indicadas.' },
@@ -340,16 +515,18 @@ test('BKE multimodal: el chat principal consulta la misma biblioteca aprobada', 
   assert.match(source, /Fuente procesada, aprobación pendiente/);
   assert.match(source, /No usaré su contenido como conocimiento definitivo/);
   assert.match(index, /window\.gfcYarbiMultimodalAnswer/);
+  assert.match(index, /window\.gfcYarbiMultimodalAnswer\(query, \{ context \}\)/);
+  assert.match(index, /get_approved_knowledge/);
   assert.match(index, /let multimodalKnowledgeReply = null/);
   assert.ok(index.indexOf('let multimodalKnowledgeReply = null') < index.indexOf('const knowledgeReply = typeof window.gfcYarbiKnowledgeAnswer'), 'la biblioteca PDF debe preceder a la biblioteca textual heredada');
   assert.match(index, /multimodal-knowledge-error/);
   assert.match(index, /gfcAwaitYarbiKnowledgeReply/);
   assert.match(index, /knowledge_deadline/);
   assert.match(index, /multimodal-knowledge-complete/);
-  assert.match(source, /Busca la respuesta exclusivamente dentro del PDF adjunto/);
+  assert.match(source, /Eres el buscador documental de Yarbi/);
   assert.match(source, /responseMimeType:'application\/json'/);
   assert.match(source, /queryCache/);
-  assert.match(source, /queryApprovedLibrary\(assets, text, semantic\)/);
+  assert.match(source, /queryApprovedLibrary\(assets, queryForRetrieval/);
   assert.match(source, /Interpretando el significado de tu pregunta/);
   assert.match(source, /RETRIEVAL_DOCUMENT/);
   assert.match(source, /RETRIEVAL_QUERY/);
@@ -378,7 +555,8 @@ test('BKE multimodal: el resultado analizado queda indexado y no obliga a reproc
   assert.equal(results[0].assetId, 'pdf-1');
   assert.match(source, /status === 'analyzed_draft' \|\| asset\.status === 'approved'/);
   assert.match(source, /cached:true/);
-  assert.match(source, /const learnedSections = asset\.sections\?\.length \? asset\.sections : \(analysis\.citations\.length \? analysis\.citations : sectionsFromText\(analysis\.text\)\)/);
+  assert.match(source, /mediaTranscriptSections\(asset\.kind, extracted\)/);
+  assert.match(source, /const learnedSections = asset\.sections\?\.length \? asset\.sections : mediaSections\.length \? mediaSections/);
 });
 
 test('BKE multimodal: no anuncia aprendizaje automático ni acciones comerciales', () => {
@@ -415,6 +593,10 @@ test('BKE multimodal: los controles visibles usan flujos UI con progreso y revis
   assert.match(source, /root\.gfcYarbiMultimodalImport = \(\) => api\.importFromUi\(true\)/);
   assert.match(source, /root\.gfcYarbiMultimodalAnalyze = api\.analyzeFromUi/);
   assert.match(source, /root\.gfcYarbiMultimodalApprove = api\.approveFromUi/);
+  assert.match(source, /root\.gfcYarbiMultimodalFileSearch = api\.syncApprovedAssetToFileSearchFromUi/);
+  assert.match(source, /root\.gfcYarbiMultimodalSelectPdf = api\.selectOriginalPdfForFileSearchFromUi/);
+  assert.match(source, /El archivo seleccionado no coincide exactamente con el PDF aprobado/);
+  assert.match(source, /knowledge_file_search_index_failed/);
   assert.doesNotMatch(source, /root\.gfcYarbiTutorAsk =/);
   assert.match(markup, /gfc-mm-progress-chip/);
   assert.match(markup, /gfc-mm-progress-percent/);
@@ -454,4 +636,33 @@ test('pasarela Gemini: limita embeddings y acepta solo tareas de recuperación d
   assert.deepEqual(valid.texts, ['Fragmento uno', 'Fragmento dos']);
   assert.equal(invalid, null);
   assert.equal(coerced.taskType, 'RETRIEVAL_QUERY');
+});
+
+test('respaldo de conocimiento: el servidor vincula dueño y fragmentos a la identidad autenticada', () => {
+  const ownerA = '11111111-1111-4111-8111-111111111111';
+  const ownerB = '22222222-2222-4222-8222-222222222222';
+  const accepted = gemini.validateKnowledgeSync({
+    operation:'knowledge_sync',
+    asset:{ owner_account_id:ownerB, sha256:'a'.repeat(64), title:'NTP sintética', kind:'pdf', bytes:1200, section_count:1 },
+    sections:[{ index:0, id:'p1-1', label:'Numeral 1 · Página 1', text:'Contenido sintético.' }]
+  }, ownerA);
+  assert.equal(accepted.asset.owner_account_id, ownerA);
+  assert.equal(accepted.sections[0].owner_account_id, ownerA);
+  assert.equal(gemini.knowledgeCoverageComplete(2, 0, 1, 2), true);
+  assert.equal(gemini.knowledgeCoverageComplete(2, 0, 2, 2), false, 'un índice con hueco o sección sobrante no debe declararse completo');
+  assert.equal(gemini.knowledgeCoverageComplete(1, 1, 1, 1), false, 'la primera sección debe comenzar en índice cero');
+});
+
+test('respaldo rechaza embeddings sin versión y acepta el vector cuantizado contractual', () => {
+  const owner = '11111111-1111-4111-8111-111111111111';
+  const base = {
+    operation:'knowledge_sync',
+    asset:{ sha256:'c'.repeat(64), title:'Fuente sintética', kind:'pdf', bytes:1200, section_count:1 },
+    sections:[{ index:0, id:'p1-1', label:'Página 1', text:'Contenido sintético.' }]
+  };
+  const vector = Buffer.alloc(768, 7).toString('base64');
+  assert.equal(gemini.validateKnowledgeSync({ ...base, sections:[{ ...base.sections[0], embedding_base64:vector }] }, owner), null);
+  const accepted = gemini.validateKnowledgeSync({ ...base, sections:[{ ...base.sections[0], embedding_base64:vector, embedding_version:'quantized-768-v1' }] }, owner);
+  assert.equal(accepted.sections[0].embedding_base64.length, 1024);
+  assert.equal(accepted.sections[0].embedding_version, 'quantized-768-v1');
 });

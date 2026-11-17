@@ -88,11 +88,17 @@ test('una norma aprobada con índice parcial entrega al modelo el fragmento dond
   assert.equal(evidence[0].assetId, 'correct');
   assert.match(evidence[0].excerpt, /Una misma llave de corte podrá controlar dos aparatos/);
   assert.equal(api.rankApprovedSources([...rows.values()], query)[0].asset.id, 'correct');
-  let calls = 0;
+  let intentCalls = 0; let answerCalls = 0;
   global.gfcAccountFreshAccessToken = async () => 'synthetic-token';
   global.gfcRuntimeApiOrigin = () => 'https://synthetic.invalid';
   global.fetch = async (_url, options) => {
-    calls += 1;
+    const payload = JSON.parse(options.body);
+    if (payload.operation === 'knowledge_file_search_query') return { ok:false, status:503, json:async () => ({ error:'knowledge_file_search_disabled' }) };
+    if (/intérprete semántico/.test(payload.system_instruction?.parts?.[0]?.text || '')) {
+      intentCalls += 1;
+      return { ok:true, json:async () => ({ candidates:[{ content:{ parts:[{ text:JSON.stringify({ intent:'knowledge', normalized_query:query, search_terms:['válvula común','dos artefactos'], query_variants:[], source_asset_id:'' }) }] } }] }) };
+    }
+    answerCalls += 1;
     assert.match(options.body, /Una misma llave de corte podrá controlar dos aparatos/);
     assert.doesNotMatch(options.body, /Disposiciones generales de ventilación/);
     const answer = JSON.stringify({ selected_asset_id:'correct', found:true, answer:'La norma contempla una llave común bajo condiciones.', exact_quote:exact, reference:'Numeral 8.4 · Página 8', plain_explanation:'Debe verificarse cada condición de la regla.', caveat:'' });
@@ -102,7 +108,8 @@ test('una norma aprobada con índice parcial entrega al modelo el fragmento dond
   assert.equal(result.handled, true);
   assert.match(result.reply, /La norma contempla una llave común/);
   assert.match(result.reply, /111\.011\.pdf/);
-  assert.equal(calls, 1);
+  assert.equal(intentCalls, 1);
+  assert.equal(answerCalls, 1);
 });
 
 test('un no encontrado antiguo no bloquea una búsqueda nueva en el chat único', async () => {
@@ -114,18 +121,27 @@ test('un no encontrado antiguo no bloquea una búsqueda nueva en el chat único'
     result:{ ok:true, found:false, caveat:'Resultado anterior sin cita' }
   }];
   rows.set('correct', asset);
-  let calls = 0;
-  global.fetch = async () => {
-    calls += 1;
+  let intentCalls = 0; let answerCalls = 0;
+  global.gfcAccountFreshAccessToken = async () => 'synthetic-token';
+  global.gfcRuntimeApiOrigin = () => 'https://synthetic.invalid';
+  global.fetch = async (_url, options) => {
+    const payload = JSON.parse(options.body);
+    if (/intérprete semántico/.test(payload.system_instruction?.parts?.[0]?.text || '')) {
+      intentCalls += 1;
+      return { ok:true, json:async () => ({ candidates:[{ content:{ parts:[{ text:JSON.stringify({ intent:'knowledge', normalized_query:question, search_terms:['válvula común','dos artefactos'], query_variants:[], source_asset_id:'' }) }] } }] }) };
+    }
+    answerCalls += 1;
     const answer = JSON.stringify({ found:true, answer:'Hay una regla aplicable bajo condiciones.', exact_quote:'Una misma llave de corte podrá controlar dos aparatos bajo estas condiciones.', reference:'Numeral 8.4 · Página 8', plain_explanation:'Verifica las condiciones del numeral.', caveat:'' });
     return { ok:true, json:async () => ({ candidates:[{ content:{ parts:[{ text:answer }] } }] }) };
   };
   const first = await api.answerFromChat(question);
   assert.match(first.reply, /Hay una regla aplicable/);
-  assert.equal(calls, 1);
+  assert.equal(intentCalls, 1);
+  assert.equal(answerCalls, 1);
   const second = await api.answerFromChat(question);
   assert.match(second.reply, /Hay una regla aplicable/);
-  assert.equal(calls, 1, 'la respuesta positiva verificada sí se reutiliza');
+  assert.equal(intentCalls, 2, 'el turno nuevo vuelve a interpretarse con su contexto');
+  assert.equal(answerCalls, 1, 'la respuesta positiva verificada sí se reutiliza sin repetir la generación');
 
   const library = api.html();
   assert.match(library, /Ir al chat de Yarbi/);
@@ -190,7 +206,7 @@ test('Gemini interpreta una consulta técnica sin exigir la palabra norma o PDF'
   let requestBody = '';
   global.fetch = async (_url, options) => {
     requestBody = String(options.body || '');
-    return { ok:true, json:async () => ({ candidates:[{ content:{ parts:[{ text:'{"intent":"knowledge","reason":"consulta técnica que debe contrastarse con los documentos aprobados"}' }] } }] }) };
+    return { ok:true, json:async () => ({ candidates:[{ content:{ parts:[{ text:JSON.stringify({ intent:'knowledge', reason:'consulta técnica que debe contrastarse con los documentos aprobados', normalized_query:'¿Se puede utilizar una sola válvula para dos artefactos?', search_terms:['válvula común','dos artefactos'], query_variants:[], source_asset_id:'' }) }] } }] }) };
   };
   const result = await api.classifyKnowledgeIntent('¿Se puede utilizar una sola válvula para dos artefactos?', await api.list());
   assert.equal(result.intent, 'knowledge');

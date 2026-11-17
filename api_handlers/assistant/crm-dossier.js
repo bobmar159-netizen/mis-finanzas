@@ -4,7 +4,7 @@
 // cliente, no muta CRM y conserva trazabilidad del recorrido de lectura.
 const { configuration, decidePreviewOwnerReferenceRequest } = require('../../lib/preview-owner-reference-policy');
 const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
-const { createCanonicalOwnerScopeResolver, verifiedOwnerId } = require('../../lib/yarbi-owner-scope');
+const { createPaginatedCanonicalOwnerScopeResolver, verifiedOwnerId } = require('../../lib/yarbi-owner-scope');
 const { getScopedCrmDossier } = require('../../lib/yarbi-crm-dossier-runtime');
 const { createConversationToken } = require('../../lib/yarbi-conversation-continuity');
 const { errorCode, eventIdFor, newOperationId, recordTrace, recordTerminalTrace, traceSecret, traceVersion } = require('../../lib/yarbi-trace');
@@ -49,7 +49,7 @@ function createCrmDossierHandler({ fetchImpl = (...args) => fetch(...args) } = {
     await recordTrace({ supabaseUrl: config.supabaseUrl, supabaseKey: config.supabaseKey, traceSecret: secret, fetchImpl, event: traceEvent({ operationId, secret, startedAt, stage: 'crm_dossier_started', outcome: 'started', eventKey: 'started', counts: { authenticated: 1 } }) });
     traceStarted = true;
     const supabase = serviceClient(config, fetchImpl);
-    const dossier = await getScopedCrmDossier({ supabase, validatedIdentity: authenticated.identity, ownerScopeResolver: createCanonicalOwnerScopeResolver({ supabase }), contactId });
+    const dossier = await getScopedCrmDossier({ supabase, validatedIdentity: authenticated.identity, ownerScopeResolver: createPaginatedCanonicalOwnerScopeResolver({ supabase }), contactId });
     const terminal = await recordTerminalTrace({ supabaseUrl: config.supabaseUrl, supabaseKey: config.supabaseKey, traceSecret: secret, fetchImpl, event: traceEvent({ operationId, secret, startedAt, stage: 'crm_dossier_completed', outcome: dossier.outcome, eventKey: 'completed', counts: { timeline: dossier.timeline?.length || 0 } }), closeEventKey: 'crm_dossier_closed' });
     if (!terminal.ok) return res.status(502).json({ ok: false, error: 'crm_dossier_trace_close_failed', operation_id: operationId });
     // The browser cannot nominate a contact for conversation state. A dossier

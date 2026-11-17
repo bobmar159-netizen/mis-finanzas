@@ -14,8 +14,8 @@ function store(calls, scoped = { [OWNER_A]: [11], [OWNER_B]: [21] }) {
     if (path.startsWith('/rest/v1/yarbi_owner_contact_scope')) {
       const params = new URL('https://scope.invalid' + path).searchParams;
       const limit = Number(params.get('limit') || 100);
-      const offset = Number(params.get('offset') || 0);
-      return { response: { ok: true }, data: (scoped[owner] || []).slice(offset, offset + limit).map(contact_id => ({ contact_id })) };
+      const cursor = Number(params.get('contact_id')?.match(/^gt\.(\d+)$/)?.[1] || 0);
+      return { response: { ok: true }, data: (scoped[owner] || []).filter(contact_id => contact_id > cursor).slice(0, limit).map(contact_id => ({ contact_id })) };
     }
     if (path.startsWith('/rest/v1/crm_contacts')) {
       const ids = decodeURIComponent(path).match(/id=in\.\(([^)]+)\)/)?.[1] || '';
@@ -69,7 +69,8 @@ for (const count of [97, 500, 2000]) {
     assert.equal(scope.contact_ids.length, count);
     assert.equal(scope.contact_ids.at(-1), count);
     assert.equal(scope.pagination.complete, true);
-    assert.ok(calls.length >= Math.ceil(count / 100));
+    assert.ok(calls.length >= Math.ceil(count / 500));
+    assert.ok(calls.every(path => /contact_id=gt\.\d+/.test(path) && !path.includes('offset=')));
   });
 }
 

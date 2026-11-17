@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
-const api = fs.readFileSync(path.join(root, 'api', 'assistant', 'preferences.js'), 'utf8');
+const api = fs.readFileSync(path.join(root, 'api_handlers', 'assistant', 'preferences.js'), 'utf8');
 const migration = fs.readFileSync(path.join(root, 'migrations', 'YARBI_AGENT_ACTION_LEDGER_20261025.sql'), 'utf8');
 
 test('agent ledger inside Preferences persists an idempotent action ledger', () => {

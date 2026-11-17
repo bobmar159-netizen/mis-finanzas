@@ -4,7 +4,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const { requestedReadKind, replyForContext } = require('../lib/yarbi-client-context-read');
+const renderer = require('../frontend/yarbi-conversation-renderer');
 
 const base = {
   contact: { display_name: 'Carlos' },
@@ -76,4 +78,21 @@ test('browser adapter may attach only the locally approved historical context to
   const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-client-context-read-ui.js'), 'utf8');
   assert.match(source, /gfcYarbiHistoricalContactContext/);
   assert.match(source, /historical_context/);
+});
+
+test('resolved client reads produce a validated client card through the canonical renderer', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-client-context-read-ui.js'), 'utf8');
+  const window = {
+    YarbiClientContextRead:require('../lib/yarbi-client-context-read'),
+    YarbiConversationRenderer:renderer,
+    gfcYarbiConversationFocusRead:() => ({ client_name:'Carlos', confirmed:true }),
+    gfcYarbiLocalFindMemory:async () => ({ ...base, timeline:[{ id:'visit-1', kind:'agenda', at:'2026-11-12T15:00:00Z', title:'Visita técnica', detail:'Surco' }] })
+  };
+  vm.runInNewContext(source, { window, String, Array, Date, Number, Boolean });
+  const result = await window.gfcTryClientContextReadMessage('¿Qué pasó con Carlos?');
+  const rich = renderer.validateContent(result.presentation);
+  assert.equal(result.outcome, 'client_context_found');
+  assert.equal(rich.ok, true);
+  assert.ok(rich.blocks.some(block => block.type === 'client_card'));
+  assert.ok(rich.blocks.some(block => block.type === 'unordered_list'));
 });

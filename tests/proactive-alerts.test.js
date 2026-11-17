@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const frontend = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const frontend = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
 
 function loadAlerts({ agenda = [], suggestions = [], debts = [] } = {}) {
   const start = frontend.indexOf('function gfcBuildProactiveAlerts(options = {})');
@@ -17,6 +17,7 @@ function loadAlerts({ agenda = [], suggestions = [], debts = [] } = {}) {
     gfcExtractPhoneNumber: value => String(value || '').replace(/\D/g, ''),
     gfcExtractMapsLink: value => (/https?:\/\/\S+/i.exec(String(value || '')) || [])[0] || '',
     gfcYarbiLocalNormalize: value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
+    gfcYarbiConversationInboxRead: () => [],
     gfcEscHtml: value => String(value || ''),
     gfcAppendCopilotChatMessage: () => {}
   };

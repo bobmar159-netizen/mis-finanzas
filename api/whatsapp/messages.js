@@ -187,6 +187,32 @@ function localMessageId(ownerId, eventId) {
   return 'android-local-' + crypto.createHash('sha256').update(String(ownerId) + '\u0000' + String(eventId)).digest('hex');
 }
 
+function localNotificationRowMatches(existing, expected) {
+  if (!existing || !expected) return false;
+  const left = Number(existing.timestamp);
+  const right = Number(expected.timestamp);
+  return String(existing.id || '') === String(expected.id || '')
+    && Number(existing.contact_id) === Number(expected.contact_id)
+    && normalizedPhone(existing.phone) === normalizedPhone(expected.phone)
+    && String(existing.title || '') === String(expected.title || '')
+    && String(existing.text || '') === String(expected.text || '')
+    && Number.isSafeInteger(left) && left === right
+    && String(existing.app_name || '') === String(expected.app_name || '')
+    && existing.metadata?.source_event === expected.metadata?.source_event
+    && existing.metadata?.local_event_id === expected.metadata?.local_event_id
+    && existing.metadata?.direction === expected.metadata?.direction
+    && existing.metadata?.identity_status === expected.metadata?.identity_status
+    && existing.metadata?.ingestion_version === expected.metadata?.ingestion_version;
+}
+
+async function readLocalNotificationById(supabase, id) {
+  const params = new URLSearchParams();
+  params.set('select', 'id,contact_id,phone,title,text,app_name,timestamp,metadata');
+  params.set('id', 'eq.' + id);
+  params.set('limit', '1');
+  return supabase('/rest/v1/whatsapp_messages?' + params.toString());
+}
+
 async function resolveScopedContactByPhone(supabase, scope, phone) {
   const batches = scopeBatches(scope);
   if (!batches.length) return null;
@@ -227,6 +253,7 @@ async function ingestLocalNotifications(req, res, supabase, access) {
   const outcomes = [];
   let persisted = 0;
   let unresolved = 0;
+  let conflicts = 0;
   for (const rawEvent of requested) {
     const event = localEvent(rawEvent);
     if (!event) {
@@ -245,37 +272,69 @@ async function ingestLocalNotifications(req, res, supabase, access) {
       continue;
     }
     const id = localMessageId(access.scope.owner_id, event.event_id);
+    const row = {
+      id,
+      contact_id: contactId,
+      phone: event.phone,
+      title: event.title,
+      text: event.text,
+      maps_url: null,
+      app_name: 'Android notification capture',
+      timestamp: event.timestamp,
+      // Las notificaciones de Android no prueban un historial completo ni
+      // una acción comercial. Su procedencia queda visible para que ningún
+      // componente posterior las trate como importación confirmada.
+      metadata: {
+        direction: 'incoming',
+        historical: false,
+        source_event: 'android_notification_capture',
+        local_event_id: event.event_id,
+        identity_status: 'contact_confirmed_by_owner_scope',
+        ingestion_version: 'yarbi.local-notification.v1'
+      }
+    };
+    let existing;
+    try {
+      const current = await readLocalNotificationById(supabase, id);
+      if (!current?.response?.ok) throw new Error('local_notification_read_failed');
+      existing = Array.isArray(current.data) ? current.data[0] : null;
+    } catch (_) {
+      return res.status(502).json({ error: 'local_notification_read_unavailable' });
+    }
+    if (existing) {
+      if (localNotificationRowMatches(existing, row)) {
+        outcomes.push({ event_id: event.event_id, outcome: 'duplicate_ignored' });
+      } else {
+        conflicts += 1;
+        outcomes.push({ event_id: event.event_id, outcome: 'identity_conflict' });
+      }
+      continue;
+    }
     const result = await supabase('/rest/v1/whatsapp_messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify([{
-        id,
-        contact_id: contactId,
-        phone: event.phone,
-        title: event.title,
-        text: event.text,
-        maps_url: null,
-        app_name: 'Android notification capture',
-        timestamp: event.timestamp,
-        // Las notificaciones de Android no prueban un historial completo ni
-        // una acción comercial. Su procedencia queda visible para que ningún
-        // componente posterior las trate como importación confirmada.
-        metadata: {
-          direction: 'incoming',
-          historical: false,
-          source_event: 'android_notification_capture',
-          local_event_id: event.event_id,
-          identity_status: 'contact_confirmed_by_owner_scope',
-          ingestion_version: 'yarbi.local-notification.v1'
-        }
-      }])
+      headers: { 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify([row])
     });
     if (!result?.response?.ok) return res.status(502).json({ error: 'local_notification_persist_failed' });
+    let readback;
+    try {
+      readback = await readLocalNotificationById(supabase, id);
+      if (!readback?.response?.ok) throw new Error('local_notification_readback_failed');
+    } catch (_) {
+      return res.status(502).json({ error: 'local_notification_readback_unavailable' });
+    }
+    const saved = Array.isArray(readback.data) ? readback.data[0] : null;
+    if (!saved) return res.status(502).json({ error: 'local_notification_readback_missing' });
+    if (!localNotificationRowMatches(saved, row)) {
+      conflicts += 1;
+      outcomes.push({ event_id: event.event_id, outcome: 'identity_conflict' });
+      continue;
+    }
     persisted += 1;
     outcomes.push({ event_id: event.event_id, outcome: 'persisted' });
   }
   return res.status(200).json({
-    status: 'ok', source: 'android_notification_capture', persisted, unresolved,
+    status: conflicts ? 'partial_conflict' : 'ok', source: 'android_notification_capture', persisted, unresolved, conflicts,
     outcomes,
     note: 'Solo se guardaron eventos con teléfono vinculado a un contacto dentro del alcance autenticado. Los no resueltos permanecen locales hasta una confirmación explícita.'
   });
@@ -381,4 +440,5 @@ module.exports.messageQueries = messageQueries;
 module.exports.ingestLocalNotifications = ingestLocalNotifications;
 module.exports.localEvent = localEvent;
 module.exports.localMessageId = localMessageId;
+module.exports.localNotificationRowMatches = localNotificationRowMatches;
 module.exports.resolveScopedContactByPhone = resolveScopedContactByPhone;

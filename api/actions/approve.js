@@ -5,7 +5,7 @@
  */
 
 const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
-const { authenticateScopedOwner, blockedOwnerInput, scopedContact } = require('../../lib/yarbi-authenticated-route');
+const { authenticateCompleteScopedOwner, blockedOwnerInput, scopedContact } = require('../../lib/yarbi-authenticated-route');
 let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
 
@@ -137,12 +137,12 @@ async function upsertCanonicalAgenda(payload, scope) {
   };
   let eventId = requestedEvent?.id || null;
   if (eventId) {
-    const collision = await supabaseRequest('/rest/v1/agenda_events?dedupe_key=eq.' + encodeURIComponent(dedupeKey) + '&select=id&limit=1');
+    const collision = await supabaseRequest('/rest/v1/agenda_events?dedupe_key=eq.' + encodeURIComponent(dedupeKey) + '&source=eq.yarbi_form&select=id&limit=1');
     if (!collision.response.ok) throw new Error('No se pudo comprobar duplicados de agenda');
     const collisionId = Array.isArray(collision.data) ? collision.data[0]?.id : null;
     if (collisionId && String(collisionId) !== String(eventId)) throw new Error('Ya existe otro evento canónico con ese horario');
   } else {
-    const existing = await supabaseRequest('/rest/v1/agenda_events?dedupe_key=eq.' + encodeURIComponent(dedupeKey) + '&select=id&limit=1');
+    const existing = await supabaseRequest('/rest/v1/agenda_events?dedupe_key=eq.' + encodeURIComponent(dedupeKey) + '&source=eq.yarbi_form&select=id&limit=1');
     if (!existing.response.ok) throw new Error('No se pudo comprobar duplicados de agenda');
     eventId = Array.isArray(existing.data) ? existing.data[0]?.id : null;
   }
@@ -153,17 +153,29 @@ async function upsertCanonicalAgenda(payload, scope) {
     if (!sameSlot.response.ok) throw new Error('No se pudo comprobar el horario canónico de agenda');
     eventId = Array.isArray(sameSlot.data) ? sameSlot.data[0]?.id : null;
   }
-  const savePath = '/rest/v1/agenda_events' + (eventId ? '?id=eq.' + encodeURIComponent(String(eventId)) : '');
+  const savePath = () => '/rest/v1/agenda_events' + (eventId ? '?id=eq.' + encodeURIComponent(String(eventId)) : '');
   const saveOptions = body => ({
     method: eventId ? 'PATCH' : 'POST',
     headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
     body: JSON.stringify(eventId ? body : [body])
   });
   let extendedColumnsPersisted = true;
-  let saved = await supabaseRequest(savePath, saveOptions(extendedEvent));
+  let saved = await supabaseRequest(savePath(), saveOptions(extendedEvent));
+  // If two retries race and the database has the proposed unique dedupe guard,
+  // recover the winner only after proving it is the same canonical contact,
+  // event type and instant. Never adopt another owner's conflicting row.
+  if (!saved.response.ok && String(saved.data?.code || '') === '23505' && !eventId) {
+    const raced = await supabaseRequest('/rest/v1/agenda_events?dedupe_key=eq.' + encodeURIComponent(dedupeKey) + '&source=eq.yarbi_form&select=id,contact_id,event_type,starts_at&limit=1');
+    const racedRow = Array.isArray(raced.data) ? raced.data[0] : null;
+    if (!raced.response.ok || !racedRow || String(racedRow.contact_id || '') !== String(contactId || '') || String(racedRow.event_type || '') !== type || !sameInstant(racedRow.starts_at, startsAt)) {
+      const conflict = new Error('agenda_dedupe_conflict'); conflict.code = conflict.message; throw conflict;
+    }
+    eventId = racedRow.id;
+    saved = await supabaseRequest(savePath(), saveOptions(extendedEvent));
+  }
   if (!saved.response.ok && /column|schema cache|price|service_details|parent_event_id|local_ref|metadata/i.test(JSON.stringify(saved.data || ''))) {
     extendedColumnsPersisted = false;
-    saved = await supabaseRequest(savePath, saveOptions(event));
+    saved = await supabaseRequest(savePath(), saveOptions(event));
   }
   const row = Array.isArray(saved.data) ? saved.data[0] : null;
   if (!saved.response.ok || !row?.id) throw new Error('No se pudo guardar la agenda en Supabase');
@@ -228,7 +240,9 @@ export default async function handler(req, res) {
   try {
     const { draft_id, payload, operation } = req.body || {};
     if (blockedOwnerInput(req.body || {})) return res.status(400).json({ error: 'owner_scope_client_input_forbidden' });
-    const access = await authenticateScopedOwner(req, runtime, supabaseRequest);
+    // Agenda writes must authorize against the complete canonical owner scope;
+    // the 96-contact fast resolver can silently exclude older/later contacts.
+    const access = await authenticateCompleteScopedOwner(req, runtime, supabaseRequest);
     if (!access.ok) return res.status(access.status).json({ error: access.code });
 
     if (operation === 'delete_agenda') {

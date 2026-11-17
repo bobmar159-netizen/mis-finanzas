@@ -173,6 +173,20 @@ test('historial: la identidad inmutable no puede mover un mensaje a otra convers
   assert.equal((await store.listTimeline('conversation_b')).length, 0);
 });
 
+test('historial: conserva bloques visuales locales y protege su identidad inmutable', async () => {
+  const shared = createSharedBrowser();
+  const store = createTab(shared);
+  await store.initialize({});
+  const presentation = { schema:'yarbi.conversation-content.v2', blocks:[{ id:'metric-1', type:'metric_card', version:1, label:'Caja libre', value:'S/ 200.00', tone:'success' }] };
+  const saved = await store.persist({ ...message('rich-message','Caja libre: S/ 200.00'), presentation });
+  assert.equal(saved.ok,true);
+  assert.deepEqual((await store.listTimeline('default'))[0].presentation,presentation);
+  const changedPresentation = { schema:'yarbi.conversation-content.v2', blocks:[{ id:'metric-1', type:'metric_card', version:1, label:'Caja libre', value:'S/ 900.00', tone:'success' }] };
+  const conflict = await store.persist({ ...message('rich-message','Caja libre: S/ 200.00'), presentation:changedPresentation });
+  assert.equal(conflict.code,'identity_conflict');
+  assert.equal((await store.listTimeline('default'))[0].presentation.blocks[0].value,'S/ 200.00');
+});
+
 test('historial: editar y eliminar una conversación nueva afecta solo sus filas locales', async () => {
   const shared = createSharedBrowser();
   const store = createTab(shared);

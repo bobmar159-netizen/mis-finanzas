@@ -78,7 +78,7 @@ test('Etapa 1: el chat existente carga el renderer después de conservar su ruta
 
 test('Etapa 1.1: el punto de entrada real usa el renderer una sola vez para un mensaje del asistente', async () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
-  const start = html.indexOf('async function gfcAppendCopilotChatMessage(role, text) {');
+  const start = html.indexOf('async function gfcAppendCopilotChatMessage(role, text, options) {');
   assert.ok(start >= 0);
   let depth = 0; let end = -1;
   for (let index = html.indexOf('{', start); index < html.length; index += 1) {
@@ -95,6 +95,26 @@ test('Etapa 1.1: el punto de entrada real usa el renderer una sola vez para un m
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].message, { role:'assistant', text:'Respuesta real', status:'complete' });
   assert.equal(windowMock._gfcYarbiTextRequestActive, false);
+});
+
+test('chat: pasa bloques estructurados al mismo renderer y conserva el texto accesible', async () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  const start = html.indexOf('async function gfcAppendCopilotChatMessage(role, text, options) {');
+  assert.ok(start >= 0);
+  let depth = 0; let end = -1;
+  for (let index = html.indexOf('{', start); index < html.length; index += 1) {
+    if (html[index] === '{') depth += 1;
+    if (html[index] === '}' && --depth === 0) { end = index + 1; break; }
+  }
+  const source = html.slice(start, end);
+  const calls = [];
+  const content = { schema:'yarbi.conversation-content.v2', blocks:[{ id:'h1', type:'heading', version:1, level:2, text:'Respuesta' }] };
+  const box = { scrollHeight:0, scrollTop:0, clientHeight:0, dataset:{}, appendChild() {} };
+  const windowMock = { YarbiConversationRenderer:{ validateContent:value=>({ok:true,blocks:value.blocks}), SCHEMA:'yarbi.conversation-content.v2', appendMessage(container,message){calls.push(message);return {ok:true};} } };
+  const fn = new Function('window', 'document', source + '; return gfcAppendCopilotChatMessage;')(windowMock, { getElementById:id=>id==='gfc-copilot-chat-messages'?box:null });
+  const result = await fn('assistant','Respuesta breve',{ presentation:content });
+  assert.equal(result.ok,true);
+  assert.deepEqual(calls[0],{role:'assistant',content,status:'complete'});
 });
 
 test('chat documental: el watchdog siempre cierra una consulta remota bloqueada', async () => {
@@ -161,6 +181,94 @@ test('chat documental: separa respuesta, cita literal e interpretación en bloqu
   assert.deepEqual(result.blocks.map(block => block.type), ['heading', 'paragraph', 'information_panel', 'heading', 'paragraph']);
   assert.match(result.blocks[2].title, /Cita literal/);
   assert.match(result.blocks[2].text, /Fuente: NTP sintética/);
+});
+
+test('renderer v2: valida tarjetas de dominios, extractos con página, prioridades y marcas suaves', () => {
+  const result = renderer.validateContent(content([
+    {id:'h',type:'heading',version:1,level:2,text:'Resumen',priority:'important'},
+    {id:'p',type:'paragraph',version:1,runs:[{text:'Dato resaltado',marks:['bold','highlight']}]},
+    {id:'metric',type:'metric_card',version:1,label:'Caja libre',value:'S/ 500.00',tone:'success'},
+    {id:'client',type:'client_card',version:1,title:'Cliente sintético',fields:[{label:'Estado',value:'Seguimiento',tone:'warning'}]},
+    {id:'appointment',type:'appointment_card',version:1,title:'Visita',summary:'Mañana',fields:[{label:'Distrito',value:'Comas'}]},
+    {id:'finance',type:'finance_card',version:1,title:'Resumen de caja',fields:[{label:'Cobrado',value:'S/ 200.00'}]},
+    {id:'recommendation',type:'recommendation_block',version:1,title:'Siguiente paso',items:['Confirmar horario']},
+    {id:'example',type:'example_block',version:1,title:'Ejemplo',text:'Caso sintético'},
+    {id:'steps',type:'next_steps_block',version:1,title:'Pasos',items:[{text:'Revisar',detail:'Solo lectura'}]},
+    {id:'excerpt',type:'document_excerpt',version:1,source_id:'doc-1',label:'Cita literal',file_name:'Norma.pdf',section:'Capítulo 4',page:18,excerpt:'Texto citado de prueba.',quotation:'literal',metadata:{verified:true}},
+    {id:'source',type:'source_reference',version:1,source_id:'doc-1',label:'Norma.pdf',page:18},
+    {id:'image',type:'image_reference',version:1,source_id:'doc-1',alt:'Diagrama de prueba'}
+  ]));
+  assert.equal(result.ok,true);
+  assert.equal(result.schema,undefined);
+  assert.equal(result.blocks.length,12);
+  assert.equal(result.blocks.find(block=>block.id==='excerpt').page,18);
+  assert.deepEqual(result.blocks[1].runs[0].marks,['bold','highlight']);
+});
+
+test('renderer v2: adapta citas del proveedor a tarjetas documentales sin inventar páginas', () => {
+  const response = renderer.contentFromResponse({
+    reply:'La válvula puede derivar el flujo según la condición indicada.',
+    citations:[{fileName:'NTP sintética.pdf',page:7,source:'Numeral 5.2',excerpt:'El dispositivo se instalará conforme al numeral.',sha256:'a'.repeat(64),verified:true}]
+  },'test');
+  const result = renderer.validateContent(response);
+  assert.equal(result.ok,true);
+  const excerpt = result.blocks.find(block=>block.type==='document_excerpt');
+  assert.equal(excerpt.page,7);
+  assert.equal(excerpt.file_name,'NTP sintética.pdf');
+  assert.equal(excerpt.section,'Numeral 5.2');
+  assert.equal(excerpt.metadata.verified,true);
+  const noPage = renderer.validateContent(renderer.contentFromResponse({reply:'Respuesta',citations:[{fileName:'Sin página.pdf',excerpt:'Texto de fuente real.'}]}));
+  assert.equal(noPage.blocks.find(block=>block.type==='document_excerpt').page,undefined);
+});
+
+test('renderer v2: rechaza contenido inseguro y degrada el bloque incompleto a texto seguro', () => {
+  const result = renderer.validateContent(content([
+    {id:'bad',type:'document_excerpt',version:1,source_id:'doc-1',label:'Fuente',excerpt:'<img src=x onerror=alert(1)>',file_name:'Norma.pdf'},
+    {id:'good',type:'paragraph',version:1,runs:[{text:'La respuesta continúa de forma segura.'}]}
+  ]));
+  assert.equal(result.ok,false);
+  assert.equal(result.blocks[0].fallback,true);
+  assert.equal(result.blocks[1].runs[0].text,'La respuesta continúa de forma segura.');
+});
+
+test('renderer v2: aplica contenedores visuales responsivos a métricas, clientes y fuentes', () => {
+  const priorDocument = global.document;
+  const makeNode = () => ({ dataset:{}, children:[], appendChild(node) { this.children.push(node); return node; }, append(...nodes) { nodes.forEach(node => this.appendChild(node)); }, setAttribute() {} });
+  const head = makeNode();
+  global.document = { getElementById() { return null; }, createElement() { return makeNode(); }, createTextNode(value) { return { textContent:value }; }, head };
+  try {
+    const rendered = renderer.renderMessage({ role:'assistant', content:content([
+      { id:'metric-visual', type:'metric_card', version:1, label:'Caja libre', value:'S/ 500.00', tone:'success' },
+      { id:'client-visual', type:'client_card', version:1, title:'Cliente', fields:[{ label:'Estado', value:'Seguimiento' }] },
+      { id:'source-visual', type:'source_reference', version:1, source_id:'norma-1', label:'NTP', page:12 }
+    ]) });
+    assert.ok(rendered.element);
+    assert.match(head.children[0].textContent,/yarbi-content-metric-card/);
+    assert.match(head.children[0].textContent,/yarbi-content-document-excerpt/);
+    assert.match(head.children[0].textContent,/@media\(max-width:430px\)/);
+  } finally { global.document = priorDocument; }
+});
+
+test('CRM: convierte el resumen local en una sola presentación de clientes y agenda', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+  const start = html.indexOf('function gfcYarbiTodayBoardPresentation(board) {');
+  assert.ok(start >= 0);
+  let depth = 0, end = -1;
+  for (let index = html.indexOf('{', start); index < html.length; index += 1) {
+    if (html[index] === '{') depth += 1;
+    if (html[index] === '}' && --depth === 0) { end = index + 1; break; }
+  }
+  const windowMock = { YarbiConversationRenderer:{ SCHEMA:renderer.SCHEMA } };
+  const helper = new Function('window','GFC_YARBI_BOARD_PREFIX',html.slice(start,end)+'; return gfcYarbiTodayBoardPresentation;')(windowMock,'[YARBI_BOARD_V2]');
+  const board = { summary:'1 cliente pendiente y 1 visita.', encoded:'[YARBI_BOARD_V2]'+JSON.stringify({ subtitle:'Hoy', stats:[{label:'pendiente',value:1}], groups:[
+    { title:'Acciones recomendadas', items:[{ client:'Carlos', detail:'Falta confirmar distrito.', tone:'hot', recommendation:'Pedir ubicación.' }] },
+    { title:'Agenda de hoy', items:[{ client:'Ana', detail:'Visita · evaluación · agendada', recommendation:'Confirmar resultado.' }] }
+  ] }) };
+  const rich = renderer.validateContent(helper(board));
+  assert.equal(rich.ok,true);
+  assert.ok(rich.blocks.some(block=>block.type==='client_card'&&block.title==='Carlos'));
+  assert.ok(rich.blocks.some(block=>block.type==='appointment_card'&&block.title==='Ana'));
+  assert.equal(rich.blocks.filter(block=>['client_card','appointment_card'].includes(block.type)).length,2);
 });
 
 test('Etapa 1.1: corta la validación estructural al exceder el presupuesto global', () => {

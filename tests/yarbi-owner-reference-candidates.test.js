@@ -116,3 +116,44 @@ test('L: límite, timezone obligatoria y regresión de contrato', async () => {
   const missingZone = await getOwnerReferenceCandidates({ supabase: fakeStore([]), ownerId: OWNER_A, ownerScopeResolver, understanding: { temporal_clues: [{ days: 0, day_part: 'morning' }] }, now: NOW });
   assert.equal(missingZone.outcome, 'timezone_required'); const { result } = await find({}); assert.ok(result.candidates.length <= 8);
 });
+
+test('M: combinación de nombre/distrito recorre clientes más allá del primer bloque de 96', async () => {
+  const scopeIds = Array.from({ length: 500 }, (_, index) => index + 1);
+  const calls = [];
+  const supabase = async path => {
+    calls.push(path);
+    const allowed = idsIn(path);
+    if (path.startsWith('/rest/v1/yarbi_contact_operational_memory')) {
+      const districtFilter = decodeURIComponent(path).includes('value->>district=eq.Comas');
+      return { response: { ok: true }, data: allowed.has(150) ? [{ contact_id: 150, memory_type: 'district', value: { district: 'Comas' }, occurred_at: NOW.toISOString() }] : [] };
+    }
+    if (path.startsWith('/rest/v1/crm_contacts')) {
+      return { response: { ok: true }, data: allowed.has(150) ? [{ id: 150, display_name: 'Oswaldo', commercial_status: 'tibio', latest_service: 'terma', last_contact_at: NOW.toISOString() }] : [] };
+    }
+    if (path.startsWith('/rest/v1/contact_identifiers')) return { response: { ok: true }, data: [] };
+    throw new Error('unexpected ' + path);
+  };
+  const scopeResolver = async () => ({ owner_id: OWNER_A, contact_ids: scopeIds, verification: 'canonical_owner_contact_scope', pagination: { complete: true, page_size: 100 } });
+  const result = await getOwnerReferenceCandidates({
+    supabase, ownerId: OWNER_A, ownerScopeResolver: scopeResolver,
+    understanding: { constraints: { name: { value: 'Oswaldo', certainty: 'confirmed' }, district: { value: 'Comas', certainty: 'confirmed' } } },
+    now: NOW, timeZone: 'America/Lima'
+  });
+  assert.equal(result.outcome, 'candidates_found');
+  assert.equal(result.candidates[0].contact_id, 150);
+  assert.equal(result.candidates[0].district, 'Comas');
+  assert.ok(calls.some(path => idsIn(path).has(150)));
+  assert.ok(calls.every(path => idsIn(path).size <= 96));
+});
+
+test('N: una lista de más de 96 contactos sin prueba de paginación se rechaza explícitamente', async () => {
+  let calls = 0;
+  const result = await getOwnerReferenceCandidates({
+    supabase: async () => { calls += 1; return { response: { ok: true }, data: [] }; },
+    ownerId: OWNER_A,
+    ownerScopeResolver: async () => ({ owner_id: OWNER_A, contact_ids: Array.from({ length: 97 }, (_, index) => index + 1), verification: 'canonical_owner_contact_scope' }),
+    understanding: { constraints: { name: { value: 'Oswaldo', certainty: 'confirmed' } } }
+  });
+  assert.equal(result.outcome, 'owner_scope_incomplete');
+  assert.equal(calls, 0);
+});

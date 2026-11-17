@@ -6,9 +6,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const coach = require('../lib/yarbi-financial-coach');
+const renderer = require('../frontend/yarbi-conversation-renderer');
 
 function uiWith(input) {
-  const window = { YarbiFinancialCoach:coach, gfcGetFinancialCoachInput:() => input };
+  const window = { YarbiFinancialCoach:coach, YarbiConversationRenderer:renderer, gfcGetFinancialCoachInput:() => input };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'frontend', 'yarbi-financial-coach-ui.js'), 'utf8'), { window, Number, String, Intl });
   return window;
 }
@@ -56,6 +57,29 @@ test('Financial Coach answers balance del mes immediately with separated cash fa
   assert.match(response.reply, /Ingresos cobrados: \*\*S\/ 1,500\.00\*\*/);
   assert.match(response.reply, /Egresos registrados: \*\*S\/ 420\.00\*\*/);
   assert.match(response.reply, /Por cobrar, fuera de caja: \*\*S\/ 300\.00\*\*/);
+  assert.match(response.reply, /2 movimientos locales válidos/);
+  const rich = renderer.validateContent(response.presentation);
+  assert.equal(rich.ok, true);
+  assert.ok(rich.blocks.some(block => block.type === 'metric_card'));
+});
+
+test('Financial Coach abstains from showing zero as a verified balance when the movement source is unavailable', () => {
+  const window = uiWith({ now:Date.parse('2026-11-13T15:00:00Z'), transactions:null, receivables:[], commitments:[] });
+  const response = window.gfcTryFinancialCoachMessage('¿Cuál es mi balance del mes?');
+  assert.equal(response.handled, true);
+  assert.match(response.reply, /Balance del mes no disponible/);
+  assert.doesNotMatch(response.reply, /S\/ 0\.00/);
+});
+
+test('Financial Coach does not report zero receivables when that local source is unavailable', () => {
+  const window = uiWith({
+    now:Date.parse('2026-11-13T15:00:00Z'),
+    transactions:[{ id:'income', type:'ingreso', amount:150, date:'2026-11-13' }],
+    receivables:null, commitments:[]
+  });
+  const response = window.gfcTryFinancialCoachMessage('¿Cuál es mi balance del mes?');
+  assert.match(response.reply, /Por cobrar, fuera de caja: \*\*No disponible\*\*/);
+  assert.doesNotMatch(response.reply, /Por cobrar, fuera de caja: \*\*S\/ 0\.00\*\*/);
 });
 
 test('Financial Coach reports a recorded upcoming commitment without inventing a payment', () => {
@@ -125,4 +149,9 @@ test('the final local chat dispatcher preserves the Financial Coach fast read', 
   assert.match(finalDispatcher, /kind:'agenda_read'/);
   assert.match(finalDispatcher, /gfcTryClientContextReadMessage/);
   assert.match(finalDispatcher, /kind:'client_context_read'/);
+  assert.match(finalDispatcher, /presentation:financial\.presentation/);
+  assert.match(finalDispatcher, /presentation:agendaRead\.presentation/);
+  assert.match(finalDispatcher, /presentation:clientContextRead\.presentation/);
+  assert.match(finalDispatcher, /gfcYarbiTodayBoardPresentation/);
+  assert.doesNotMatch(finalDispatcher, /gfcShowYarbiTodayBoard\(/);
 });

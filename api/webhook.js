@@ -10,10 +10,13 @@ const { errorCode, eventIdFor, hashReference, operationIdFromReference, recordTe
 const { validateRuntimeConfig } = require('../lib/yarbi-runtime-config');
 const { adaptCommercialEvidence, attachCommercialEvidence, createVerifiedWebhookEvidenceEvent } = require('../lib/yarbi-commercial-evidence');
 const { authenticateYCloudWebhook, extractYCloudInteractiveSelection } = require('../lib/yarbi-ycloud-webhook-auth');
+const { authenticateMetaWebhook, normalizeMetaReferral } = require('../lib/yarbi-meta-webhook');
 const { sanitizeWebhookReceipt, sanitizeWebhookIdentity, sanitizeWebhookProcessing, sanitizeExtraction } = require('../lib/yarbi-webhook-log');
 const { normalizeWhatsAppBusinessEvent } = require('../lib/yarbi-whatsapp-business');
 
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || '';
+const META_WEBHOOK_VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN || VERIFY_TOKEN;
+const META_APP_SECRET = process.env.META_APP_SECRET || '';
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || '';
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
@@ -407,7 +410,7 @@ export default async function handler(req, res) {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    if (mode === 'subscribe' && META_WEBHOOK_VERIFY_TOKEN && token === META_WEBHOOK_VERIFY_TOKEN) {
       console.log('[WEBHOOK] Verificado exitosamente por Meta!');
       return res.status(200).send(challenge);
     }
@@ -423,25 +426,76 @@ export default async function handler(req, res) {
     // efectos. Los flujos interactivos están en rutas autenticadas separadas.
   let postBody = req.body;
   let ycloudAuthentication = { authenticated: false, code: 'not_post' };
+  let metaAuthentication = { authenticated: false, code: 'not_post' };
+  let webhookProvider = '';
   if (req.method === 'POST') {
     const rawBody = await readRawRequestBody(req);
     const signature = req.headers?.['ycloud-signature'] || req.headers?.['YCloud-Signature'];
-    if (signature) {
+    const metaSignature = req.headers?.['x-hub-signature-256'] || req.headers?.['X-Hub-Signature-256'];
+    if (signature && metaSignature) {
+      return res.status(401).json({ error: 'webhook_unauthorized', code: 'webhook_signature_ambiguous' });
+    } else if (signature) {
       ycloudAuthentication = authenticateYCloudWebhook({ rawBody, headers: req.headers, secret: YCLOUD_WEBHOOK_SECRET });
       if (!ycloudAuthentication.authenticated) {
         console.warn('[WEBHOOK AUTH REJECTED]', ycloudAuthentication.code);
         return res.status(401).json({ error: 'webhook_unauthorized', code: ycloudAuthentication.code });
       }
+      webhookProvider = 'ycloud';
+      try {
+        postBody = parseWebhookJson(rawBody);
+      } catch (error) {
+        return res.status(400).json({ error: 'webhook_invalid_body', code: error.code || 'webhook_json_invalid' });
+      }
+    } else if (metaSignature) {
+      metaAuthentication = authenticateMetaWebhook({ rawBody, signatureHeader: metaSignature, appSecret: META_APP_SECRET });
+      if (!metaAuthentication.authenticated) {
+        console.warn('[WEBHOOK AUTH REJECTED]', metaAuthentication.code);
+        return res.status(401).json({ error: 'webhook_unauthorized', code: metaAuthentication.code });
+      }
+      webhookProvider = 'meta_cloud';
       try {
         postBody = parseWebhookJson(rawBody);
       } catch (error) {
         return res.status(400).json({ error: 'webhook_invalid_body', code: error.code || 'webhook_json_invalid' });
       }
     } else {
-      console.warn('[WEBHOOK AUTH REJECTED] ycloud_signature_missing');
+      console.warn('[WEBHOOK AUTH REJECTED] provider_signature_missing');
       return res.status(401).json({ error: 'webhook_unauthorized', code: 'ycloud_signature_missing' });
     }
     req.body = postBody;
+  }
+
+  // Meta may batch several messages or delivery receipts in one signed
+  // changes.value. Feed each unit through the same canonical persistence path
+  // so the single-message path cannot silently drop the rest of the batch.
+  if (req.method === 'POST' && webhookProvider === 'meta_cloud') {
+    const units = [];
+    for (const entry of Array.isArray(postBody?.entry) ? postBody.entry : []) {
+      for (const change of Array.isArray(entry?.changes) ? entry.changes : []) {
+        const value = change?.value || {};
+        for (const message of Array.isArray(value.messages) ? value.messages : []) units.push({ entry: { ...entry, changes: [{ ...change, value: { ...value, messages: [message], statuses: [] } }] } });
+        for (const status of Array.isArray(value.statuses) ? value.statuses : []) units.push({ entry: { ...entry, changes: [{ ...change, value: { ...value, messages: [], statuses: [status] } }] } });
+      }
+    }
+    if (units.length > 1) {
+      if (units.length > 50) return res.status(503).json({ error: 'meta_webhook_batch_too_large', retryable: true });
+      const outcomes = [];
+      for (const entry of units) {
+        const payload = JSON.stringify({ object: postBody.object, entry: [entry.entry] });
+        const rawBody = Buffer.from(payload, 'utf8');
+        const signature = 'sha256=' + require('node:crypto').createHmac('sha256', META_APP_SECRET).update(rawBody).digest('hex');
+        const nestedReq = { method: 'POST', url: '/api/webhook', query: {}, headers: { 'x-hub-signature-256': signature }, body: rawBody, rawBody };
+        const nestedRes = {
+          code: 200, body: null, status(code) { this.code = code; return this; },
+          json(value) { this.body = value; return this; }, send(value) { this.body = value; return this; },
+          end() { return this; }, setHeader() { return this; }
+        };
+        await handler(nestedReq, nestedRes);
+        if (nestedRes.code >= 500) return res.status(503).json({ error: 'meta_webhook_batch_processing_incomplete', retryable: true });
+        outcomes.push(nestedRes.body?.status || nestedRes.body?.delivery_state || 'processed');
+      }
+      return res.status(200).json({ status: 'meta_batch_processed', received: units.length, outcomes });
+    }
   }
 
   // La memoria CRM comparte esta función para respetar el límite Hobby de Vercel.
@@ -474,14 +528,14 @@ export default async function handler(req, res) {
   }
   // 4. Recepción de mensajes en tiempo real (POST /api/webhook)
   if (req.method === 'POST') {
-    if (!ycloudAuthentication.authenticated) {
-      return res.status(401).json({ error: 'webhook_unauthorized', code: 'ycloud_signature_required' });
+    if (!ycloudAuthentication.authenticated && !metaAuthentication.authenticated) {
+      return res.status(401).json({ error: 'webhook_unauthorized', code: 'provider_signature_required' });
     }
     try {
       const body = postBody;
       console.log('[WEBHOOK RECEIVED]', JSON.stringify(sanitizeWebhookReceipt(body)));
 
-      const businessEvent = normalizeWhatsAppBusinessEvent({ provider: ycloudAuthentication.authenticated ? 'ycloud' : 'meta_cloud', payload: body });
+      const businessEvent = normalizeWhatsAppBusinessEvent({ provider: webhookProvider, payload: body });
       if (businessEvent.outcome === 'delivery_status') {
         const receipt = await recordWhatsAppDeliveryReceipt({ event: businessEvent, runtime });
         return res.status(200).json({ status: 'delivery_status_received', delivery_state: businessEvent.status || 'unknown', persisted: receipt.status === 'recorded' });
@@ -540,12 +594,12 @@ export default async function handler(req, res) {
           const messageId = msg.id || ('meta_' + Date.now());
           const messageDirection = msg._yarbiDirection === 'outgoing' ? 'outgoing' : 'incoming';
           const isHistoricalMessage = Boolean(msg._yarbiHistorical);
-          const messageSourceEvent = String(msg._yarbiYcloudEvent || 'meta.cloud');
+          const messageSourceEvent = String(msg._yarbiYcloudEvent || (webhookProvider === 'meta_cloud' ? 'meta.cloud' : 'ycloud.cloud'));
           const messageSourceLabel = messageSourceEvent === 'whatsapp.smb.history'
             ? 'YCloud Coexistence · Historial'
             : messageSourceEvent === 'whatsapp.smb.message.echoes'
               ? 'YCloud Coexistence · Enviado desde WhatsApp Business'
-              : 'WhatsApp Business API (Cloud)';
+              : webhookProvider === 'meta_cloud' ? 'Meta WhatsApp Cloud API' : 'YCloud WhatsApp Business API';
           const senderPhone = cleanPhone(msg.from);
           const contacts = Array.isArray(value.contacts) ? value.contacts : [];
           const contact = contacts.find(item => cleanPhone(item && item.wa_id) === senderPhone) || contacts[0] || {};
@@ -571,10 +625,10 @@ export default async function handler(req, res) {
           // conserva y se consulta aparte de `msg.id`: ambos deben coincidir
           // en una reentrega normal, pero el primero evita repetir efectos si
           // un payload repetido llegara con otra representación del mensaje.
-          const signedYcloudEventId = ycloudAuthentication.authenticated && body?.id != null
+          const signedYcloudEventId = webhookProvider === 'ycloud' && ycloudAuthentication.authenticated && body?.id != null
             ? String(body.id).trim().slice(0, 200)
             : '';
-          if (ycloudAuthentication.authenticated && messageDirection === 'incoming' && !isHistoricalMessage && ycloudEventType === 'whatsapp.inbound_message.received') {
+          if (webhookProvider === 'ycloud' && ycloudAuthentication.authenticated && messageDirection === 'incoming' && !isHistoricalMessage && ycloudEventType === 'whatsapp.inbound_message.received') {
             const interactiveSelection = extractYCloudInteractiveSelection(body);
             const verifiedEvent = createVerifiedWebhookEvidenceEvent({
               providerVerified: true,
@@ -698,6 +752,9 @@ export default async function handler(req, res) {
           // client_id en el contrato actual, por lo que una identidad pendiente
           // es válida y no requiere migración.
           const traceStartedAt = new Date().toISOString();
+          const metaAttribution = webhookProvider === 'meta_cloud' && metaAuthentication.authenticated
+            ? normalizeMetaReferral(msg.referral, msg.timestamp)
+            : null;
           const whatsappSaveResponse = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_messages`, {
             method: 'POST',
             headers: {
@@ -713,7 +770,7 @@ export default async function handler(req, res) {
               text: messageText,
               maps_url: finalMapsUrl || null,
               app_name: messageSourceLabel,
-            metadata: attachCommercialEvidence({ direction: messageDirection, historical: isHistoricalMessage, source_event: messageSourceEvent, ycloud_event_id: body?.id || null, ycloud_message_id: msg.id || null, wamid: msg.wamid || null, media_type: mediaType, profile_name: profileName || null, profile_username: profileUsername || null, from_user_id: fromUserId || null, identity_aliases: identityAliases, identity_source: profileName ? 'cloud_profile' : (profileUsername ? 'cloud_username' : 'phone_fallback'), location_district: verifiedLocationDistrict || null, location_district_source: verifiedLocationDistrict ? 'maps_or_native_address' : null, audio_summary_status: audioSummaryStatus, audio_summary_source: audioSummarySource || null, audio_summary_error_code: audioSummaryError?.code || null, audio_summary_error: audioSummaryError?.detail || null, audio_summary_updated_at: audioSummaryStatus ? new Date().toISOString() : null }, commercialEvidence),
+            metadata: attachCommercialEvidence({ provider: webhookProvider, direction: messageDirection, historical: isHistoricalMessage, source_event: messageSourceEvent, ycloud_event_id: webhookProvider === 'ycloud' ? body?.id || null : null, ycloud_message_id: webhookProvider === 'ycloud' ? msg.id || null : null, meta_provider_event_id: webhookProvider === 'meta_cloud' ? body?.entry?.[0]?.changes?.[0]?.id || null : null, wamid: msg.wamid || null, media_type: mediaType, profile_name: profileName || null, profile_username: profileUsername || null, from_user_id: fromUserId || null, identity_aliases: identityAliases, identity_source: profileName ? 'cloud_profile' : (profileUsername ? 'cloud_username' : 'phone_fallback'), location_district: verifiedLocationDistrict || null, location_district_source: verifiedLocationDistrict ? 'maps_or_native_address' : null, audio_summary_status: audioSummaryStatus, audio_summary_source: audioSummarySource || null, audio_summary_error_code: audioSummaryError?.code || null, audio_summary_error: audioSummaryError?.detail || null, audio_summary_updated_at: audioSummaryStatus ? new Date().toISOString() : null, ...(metaAttribution ? { meta_attribution: metaAttribution } : {}) }, commercialEvidence),
               timestamp: msg.timestamp ? (parseInt(msg.timestamp) * 1000) : Date.now()
             }])
           }).catch(e => { console.warn('[SUPABASE WA MSG SAVE WARN]', errorCode(e)); return null; });

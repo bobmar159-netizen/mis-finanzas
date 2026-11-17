@@ -21,12 +21,24 @@
     const id = typeof value === 'string' ? value.trim() : '';
     return /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(id) ? id : DEFAULT_CONVERSATION_ID;
   }
+  function normalizePresentation(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)
+      || !['yarbi.conversation-content.v1','yarbi.conversation-content.v2'].includes(value.schema)
+      || !Array.isArray(value.blocks) || value.blocks.length > 100) return null;
+    try {
+      const serialized = JSON.stringify(value);
+      if (!serialized || serialized.length > 60000) return null;
+      const copy = JSON.parse(serialized);
+      return { schema:copy.schema, blocks:copy.blocks };
+    } catch (_) { return null; }
+  }
   function immutableMatch(left, right) {
     const normalizedLeft = normalize(left);
     const normalizedRight = normalize(right);
     return !!normalizedLeft && !!normalizedRight && normalizedLeft.id === normalizedRight.id && normalizedLeft.role === normalizedRight.role
       && normalizedLeft.text === normalizedRight.text && normalizedLeft.channel === normalizedRight.channel
-      && normalizedLeft.conversation_id === normalizedRight.conversation_id;
+      && normalizedLeft.conversation_id === normalizedRight.conversation_id
+      && JSON.stringify(normalizedLeft.presentation || null) === JSON.stringify(normalizedRight.presentation || null);
   }
   function normalize(value) {
     const role = value && (value.role === 'user' ? 'user' : (value.role === 'assistant' || value.role === 'model' ? 'assistant' : ''));
@@ -34,6 +46,7 @@
     const id = typeof value?.id === 'string' ? value.id.trim() : '';
     if (!role || !text || !id) return null;
     const at = Number(value.at || value.message_at || Date.now());
+    const presentation = normalizePresentation(value?.presentation);
     return {
       id,
       role,
@@ -42,7 +55,8 @@
       channel:String(value.channel || 'chat').slice(0, 30),
       // Las filas v1 no tenían conversación. Se conservan de forma explícita
       // dentro de la conversación heredada, sin perder ni reescribir texto.
-      conversation_id:normalizeConversationId(value.conversation_id || value.conversationId)
+      conversation_id:normalizeConversationId(value.conversation_id || value.conversationId),
+      ...(presentation ? { presentation } : {})
     };
   }
   function cleanTitle(value, fallback) {

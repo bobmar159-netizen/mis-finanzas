@@ -3,7 +3,7 @@
 const { configuration, decidePreviewOwnerReferenceRequest } = require('../../lib/preview-owner-reference-policy');
 const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 const { getOwnerReferenceCandidates } = require('../../lib/yarbi-owner-reference-candidates');
-const { createCanonicalOwnerScopeResolver, verifiedOwnerId } = require('../../lib/yarbi-owner-scope');
+const { createPaginatedCanonicalOwnerScopeResolver, verifiedOwnerId } = require('../../lib/yarbi-owner-scope');
 const { resolveCandidateReference } = require('../../lib/yarbi-candidate-resolver');
 const { understandOwnerUtterance } = require('../../lib/yarbi-owner-understanding');
 const { createGeminiOwnerUnderstandingProvider } = require('../../lib/yarbi-gemini-owner-understanding');
@@ -173,7 +173,7 @@ module.exports = async function referenceCandidatesHandler(req, res) {
     // paralelo tras validar la sesión; la recuperación de candidatos espera
     // ambos para aplicar solo restricciones ya validadas.
     const scopeStarted = performance.now();
-    const ownerScopeResolver = createCanonicalOwnerScopeResolver({ supabase: serviceClient(config) });
+    const ownerScopeResolver = createPaginatedCanonicalOwnerScopeResolver({ supabase: serviceClient(config) });
     const scopePromise = ownerScopeResolver(authenticated.identity).then(value => ({ value, scopeMs: performance.now() - scopeStarted }));
     const understandingPromise = understandingForRequest({ body, config });
     let understandingResult;

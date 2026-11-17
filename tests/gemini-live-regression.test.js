@@ -25,14 +25,14 @@ test('Gemini Live: production setup remains audio-to-audio with the selected Yar
   assert.match(block, /responseModalities: \['AUDIO'\]/);
   assert.match(block, /maxOutputTokens: 768/);
   assert.match(block, /voiceName: liveVoiceName/);
-  assert.match(block, /model: 'models\/' \+ GFC_YARBI_LIVE_MODEL/);
+  assert.match(block, /model: 'models\/' \+ tokenInfo\.model/);
 });
 
 test('Gemini Live: Spanish transcription and sliding context stay enabled', () => {
   const block = liveSetupBlock();
   assert.match(block, /contextWindowCompression: \{ slidingWindow: \{\} \}/);
   assert.match(block, /inputAudioTranscription: \{ languageCodes: \['es-PE'\] \}/);
-  assert.match(block, /outputAudioTranscription: \{ languageCodes: \['es-PE'\] \}/);
+  assert.match(block, /outputAudioTranscription: \{\}/);
 });
 
 test('Gemini Live: server VAD remains disabled because the protected local VAD owns interruption', () => {

@@ -68,7 +68,22 @@ function safeIntelligence(value) {
   };
 }
 function safeResponse(result) {
-  return { schema: RESPONSE_SCHEMA, ok: true, execute: false, outcome: text(result.outcome, 80), reply: presentationText(result.reply), proposal: { kind: text(result.proposal?.kind, 64) || 'none', execute: false }, commercial_effects_allowed: false, selected_contact_id: Number.isSafeInteger(Number(result.selected_contact_id)) ? Number(result.selected_contact_id) : null, facts: object(result.facts), intelligence: safeIntelligence(result.intelligence), metrics: object(result.metrics) };
+  const rawDiagnosticCode = text(result.code, 96);
+  const diagnosticCode = /^(?:gemini_v4_[a-z0-9_]+|owner_understanding_[a-z0-9_]+)$/i.test(rawDiagnosticCode) ? rawDiagnosticCode : null;
+  const providerDiagnostic = object(result.provider_diagnostic);
+  const httpStatus = Number(providerDiagnostic.http_status);
+  const diagnosticCategory = text(providerDiagnostic.category, 64).replace(/[^a-z0-9_:-]/gi, '') || null;
+  return {
+    schema: RESPONSE_SCHEMA, ok: true, execute: false, outcome: text(result.outcome, 80),
+    reply: presentationText(result.reply),
+    diagnostic: diagnosticCode || httpStatus || diagnosticCategory ? {
+      code: diagnosticCode, http_status: Number.isInteger(httpStatus) && httpStatus >= 400 && httpStatus <= 599 ? httpStatus : null,
+      category: diagnosticCategory
+    } : null,
+    proposal: { kind: text(result.proposal?.kind, 64) || 'none', execute: false }, commercial_effects_allowed: false,
+    selected_contact_id: Number.isSafeInteger(Number(result.selected_contact_id)) ? Number(result.selected_contact_id) : null,
+    facts: object(result.facts), intelligence: safeIntelligence(result.intelligence), metrics: object(result.metrics)
+  };
 }
 
 function createConversationHandler({ fetchImpl = fetch, providerFactory = createGeminiV4OwnerUnderstandingProvider, now = () => Date.now() } = {}) {
@@ -79,43 +94,57 @@ function createConversationHandler({ fetchImpl = fetch, providerFactory = create
     if (!config) return res.status(503).json({ ok: false, error: 'owner_conversation_preview_not_configured' });
     const secret = traceSecret(process.env.YARBI_TRACE_HMAC_KEY);
     if (!secret) return res.status(503).json({ ok: false, error: 'trace_hmac_key_missing' });
-    const operationId = newOperationId('owner_conversation', secret); const startedAt = new Date().toISOString(); let traceStarted = false;
+    const operationId = newOperationId('owner_conversation', secret); const startedAt = new Date().toISOString(); let traceStarted = false; let diagnosticStage = 'request_validation';
     try {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : object(req.body);
       if (containsBlocked(body)) return res.status(400).json({ ok: false, error: 'owner_scope_client_input_forbidden' });
       const utterance = text(body.utterance || body.text, 1200);
       if (!utterance) return res.status(400).json({ ok: false, error: 'conversation_utterance_required' });
+      diagnosticStage = 'owner_authentication';
       const authenticated = await authenticatedOwnerIdentity(req, config, fetchImpl);
       if (!authenticated.ok) return res.status(authenticated.status).json({ ok: false, error: authenticated.code });
       const ownerId = verifiedOwnerId(authenticated.identity);
       const continuity = body.conversation_token ? readConversationToken({ token: body.conversation_token, ownerId, secret, now: now() }) : { ok: true, state: null, candidate_ids: [] };
       if (!continuity.ok) return res.status(400).json({ ok: false, error: continuity.code });
+      diagnosticStage = 'trace_start';
       await recordTrace({ supabaseUrl: config.supabaseUrl, supabaseKey: config.supabaseKey, traceSecret: secret, fetchImpl, event: traceEvent({ operationId, secret, startedAt, stage: 'owner_conversation_started', outcome: 'started', eventKey: 'started', counts: { authenticated: 1 } }) });
       traceStarted = true;
       const supabase = serviceClient(config, fetchImpl);
       const scopeResolver = createCanonicalOwnerScopeResolver({ supabase });
+      diagnosticStage = 'owner_scope';
       const scope = normalizeScope(ownerId, await scopeResolver(authenticated.identity));
+      diagnosticStage = 'crm_source_read';
       const sources = needsVerifiedFacts(utterance) && scope.ok ? await loadScopedCrmSources({ supabase, contactIds: scope.ids, metrics: { query_count: 0, sources: {} } }) : { contacts: [], agenda: [], analyses: [], receivables: [] };
+      diagnosticStage = 'gemini_provider_init';
       const provider = config.gemini.enabled ? providerFactory({ apiKey: config.gemini.apiKey, model: config.gemini.model, timeoutMs: config.gemini.timeoutMs, fetchImpl }) : null;
       const state = continuity.state || undefined;
       const dossier = focusedDossierFrom({ state, scope, sources });
+      diagnosticStage = 'owner_turn_runtime';
       const result = await runOwnerConversation({ utterance, state, provider, candidates: continuity.candidate_ids, agendaEvents: sources.agenda, financeRows: financeRowsFrom(sources), dossier, now: now(), ownerId, deepIdempotencyKey: operationId });
       let candidateIds = continuity.candidate_ids;
       let search = null;
       if (result.crm_search?.outcome === 'crm_search_ready') {
+        diagnosticStage = 'crm_search';
         search = await searchScopedCrm({ supabase, validatedIdentity: authenticated.identity, ownerScopeResolver: scopeResolver, query: result.crm_search.query, filters: result.crm_search.filters, limit: 12 });
         candidateIds = (search.results || []).map(row => row.contact_id);
       }
+      diagnosticStage = 'response_formatting';
       const response = safeResponse(result);
       response.operation_id = operationId;
+      diagnosticStage = 'continuity_token';
       response.conversation_token = createConversationToken({ ownerId, state: result.state, candidateIds, secret, now: now() });
       if (search) response.crm_search = { outcome: search.outcome, execute: false, results: (search.results || []).map(row => ({ contact_id: row.contact_id, display_name: text(row.display_name, 160) || null, district: text(row.district, 100) || null, latest_service: text(row.latest_service, 80) || null })), source_status: search.metrics?.sources || {} };
+      diagnosticStage = 'trace_close';
       const terminal = await recordTerminalTrace({ supabaseUrl: config.supabaseUrl, supabaseKey: config.supabaseKey, traceSecret: secret, fetchImpl, event: traceEvent({ operationId, secret, startedAt, stage: 'owner_conversation_completed', outcome: 'completed', eventKey: 'completed', counts: { candidates: candidateIds.length, gemini: config.gemini.enabled ? 1 : 0 } }), closeEventKey: 'owner_conversation_closed' });
-      if (!terminal.ok) return res.status(502).json({ ok: false, error: 'owner_conversation_trace_close_failed', operation_id: operationId });
+      if (!terminal.ok) return res.status(502).json({ ok: false, error: 'owner_conversation_trace_close_failed', diagnostic: { stage: 'trace_close', code: 'owner_conversation_trace_close_failed' }, operation_id: operationId });
       return res.status(200).json(response);
     } catch (error) {
       if (traceStarted) { try { await recordTerminalTrace({ supabaseUrl: config.supabaseUrl, supabaseKey: config.supabaseKey, traceSecret: secret, fetchImpl, event: traceEvent({ operationId, secret, startedAt, stage: 'owner_conversation_failed', outcome: 'failed', eventKey: 'failed', error }), closeEventKey: 'owner_conversation_failed_closed' }); } catch (_) {} }
-      return res.status(502).json({ ok: false, error: error?.code || errorCode(error), operation_id: operationId });
+      const safeErrorCode = String(error?.code || errorCode(error)).replace(/[^a-z0-9_.-]/gi, '_').slice(0, 80) || 'operation_failed';
+      const errorType = ['Error', 'TypeError', 'ReferenceError', 'RangeError', 'SyntaxError', 'URIError', 'EvalError', 'AbortError'].includes(error?.name) ? error.name : 'Error';
+      const stackLocation = String(error?.stack || '').match(/((?:lib|api_handlers)[\\/][A-Za-z0-9_./\\-]+:\d+):\d+/);
+      const location = stackLocation ? stackLocation[1].replace(/\\/g, '/').slice(0, 160) : null;
+      return res.status(502).json({ ok: false, error: safeErrorCode, diagnostic: { stage: diagnosticStage, code: safeErrorCode, exception: errorType, location }, operation_id: operationId });
     }
   };
 }

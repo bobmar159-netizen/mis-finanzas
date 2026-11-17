@@ -45,6 +45,39 @@ test('Financial Coach refuses malformed or conflicting rows instead of manufactu
   assert.equal(result.recommendations[0].kind, 'source_unavailable');
 });
 
+test('Financial Coach parses PEN grouping formats and exposes calculation provenance', () => {
+  const result = buildFinancialCoach({
+    now:NOW,
+    transactions:[
+      { id:'us-format', type:'ingreso', amount:'S/ 1,250.50', date:'2026-11-10' },
+      { id:'pe-format', type:'ingreso', amount:'S/ 1.250,50', date:'2026-11-10' },
+      { id:'decimal-comma', type:'egreso', amount:'12,50', date:'2026-11-10' },
+      { id:'bad-precision', type:'egreso', amount:'1,2345', date:'2026-11-10' }
+    ], receivables:[], commitments:[]
+  });
+  assert.equal(result.summary.collected_cash_today, 2501);
+  assert.equal(result.summary.operating_expenses_today, 12.5);
+  assert.equal(result.quality.accepted_transactions, 3);
+  assert.equal(result.quality.incomplete_records, 1);
+  assert.equal(result.provenance.transactions.source, 'local_business_transactions');
+  assert.equal(result.provenance.transactions.included, 3);
+  assert.match(result.provenance.transactions.calculation, /exclude personal, cancelled and non-cash rows/);
+  assert.equal(result.provenance.receivables.counted_as_cash, false);
+});
+
+test('Financial Coach excludes amounts without stable record identity instead of risking double counting', () => {
+  const result = buildFinancialCoach({
+    now:NOW,
+    transactions:[{ type:'ingreso', amount:900, date:'2026-11-10' }],
+    receivables:[{ name:'Cliente sin ID', balance_amount:400 }],
+    commitments:[{ amount:250, due_at:'2026-11-12' }]
+  });
+  assert.equal(result.summary.collected_cash_today, 0);
+  assert.equal(result.summary.pending_receivables, 0);
+  assert.equal(result.summary.known_commitments_due, 0);
+  assert.equal(result.quality.incomplete_records, 3);
+});
+
 test('Financial Coach is deterministic, read-only and performs no network or commercial operation', () => {
   const input = { now:NOW, transactions:[{ id:'a', type:'ingreso', amount:300, date:'2026-11-10' }], policy:{ daily_free_cash_goal:500 } };
   const before = JSON.stringify(input);
@@ -73,6 +106,17 @@ test('Financial Coach projects only from recorded cash and labels the elapsed-da
   assert.ok(result.recommendations.some(item => item.kind === 'monthly_projection'));
 });
 
+test('Financial Coach does not project a zero balance when there are no verified current-month movements', () => {
+  const result = buildFinancialCoach({
+    now:Date.parse('2026-11-10T15:00:00Z'),
+    transactions:[{ id:'old', type:'ingreso', amount:900, date:'2026-10-31' }],
+    receivables:[], commitments:[]
+  });
+  assert.equal(result.quality.accepted_transactions_month, 0);
+  assert.equal(result.summary.projected_free_cash_month, null);
+  assert.equal(result.summary.monthly_projection_status, 'unavailable');
+});
+
 test('Financial Coach exposes only a dated and recorded upcoming commitment', () => {
   const result = buildFinancialCoach({
     now:NOW,
@@ -80,6 +124,7 @@ test('Financial Coach exposes only a dated and recorded upcoming commitment', ()
     commitments:[
       { id:'later', amount:900, next_due_amount:100, due_at:'2026-11-28' },
       { id:'first', amount:300, next_due_amount:75, due_at:'2026-11-13' },
+      { id:'settled', amount:0, next_due_amount:0, due_at:'2026-11-11' },
       { id:'no-date', amount:120 }
     ]
   });
@@ -107,6 +152,7 @@ test('Financial Coach returns only named and pending receivables, ordered by ver
       { id:'first', name:'Ana', balance_amount:80 },
       { id:'second', nombre:'Bruno', balance_amount:150 },
       { id:'unknown', balance_amount:500 },
+      { id:'settled', name:'Carlos', balance_amount:0 },
       { id:'ignored', name:'Cancelado', balance_amount:999, status:'cancelado' }
     ]
   });

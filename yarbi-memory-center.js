@@ -217,12 +217,19 @@
     const text = String(item?.text || item?.parts?.[0]?.text || '').trim();
     if (!role || !text) return null;
     const at = Number(item.at || item.message_at || Date.now());
+    const presentation = item?.presentation && window.YarbiConversationRenderer?.validateContent
+      ? (() => {
+        const validated = window.YarbiConversationRenderer.validateContent(item.presentation);
+        return validated?.ok ? { schema:window.YarbiConversationRenderer.SCHEMA, blocks:validated.blocks } : null;
+      })()
+      : null;
     return {
       id: String(item.id || makeId('yt', role + ':' + at + ':' + text)),
       role, text: text.slice(0, 8000),
       at: Number.isFinite(at) ? at : Date.now(),
       channel: String(item.channel || 'chat').slice(0, 30),
-      conversation_id:safeConversationId(item.conversation_id || item.conversationId || activeConversationId())
+      conversation_id:safeConversationId(item.conversation_id || item.conversationId || activeConversationId()),
+      ...(presentation ? { presentation } : {})
     };
   }
   let conversationStoreReady = null;
@@ -246,6 +253,25 @@
     const store = await conversationStore();
     return (await store.listTimeline(conversationId || activeConversationId())).map(normalizeTimelineItem).filter(Boolean).sort((a,b) => a.at - b.at).slice(-MAX_LOCAL_MESSAGES);
   }
+  window.gfcYarbiRecentConversationContext = function(options = {}) {
+    const conversationId = activeConversationId();
+    const limit = Math.max(2, Math.min(10, Number(options.limit) || 8));
+    const rows = renderedTimelineCache
+      .filter(item => safeConversationId(item?.conversation_id || item?.conversationId) === conversationId)
+      .slice(-limit);
+    return rows.map(item => ({
+      role:item.role === 'user' ? 'user' : 'assistant',
+      text:String(item.text || '').trim().slice(0, 900),
+      at:Number(item.at) || 0
+    })).filter(item => item.text);
+  };
+  function rememberTimelineItem(item) {
+    if (!item || safeConversationId(item.conversation_id) !== activeConversationId()) return;
+    const belongsToAnotherConversation = renderedTimelineCache.some(row => safeConversationId(row?.conversation_id) !== activeConversationId());
+    if (belongsToAnotherConversation) renderedTimelineCache = [];
+    if (renderedTimelineCache.some(row => row.id === item.id)) return;
+    renderedTimelineCache = visibleTimeline([...renderedTimelineCache, item].sort((a,b) => a.at - b.at)).slice(-MAX_LOCAL_MESSAGES);
+  }
   async function importTimeline(items) {
     const store = await conversationStore();
     const imported = [];
@@ -266,7 +292,9 @@
     const response = await fetch(BACKEND + '/api/assistant/preferences?action=conversation', {
       method:'POST',
       headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + accessToken },
-      body:JSON.stringify({ messages:outgoing })
+      // El endpoint histórico no tiene un contrato visual versionado. Los
+      // bloques enriquecidos se conservan localmente y no cambian el payload remoto.
+      body:JSON.stringify({ messages:outgoing.map(({ presentation, ...item }) => item) })
     });
     if (!response.ok) throw new Error('HTTP ' + response.status);
     return true;
@@ -311,16 +339,17 @@
   }
   function timelineImmutableMatch(left, right) {
     return !!left && !!right && left.id === right.id && left.role === right.role
-      && left.text === right.text && left.channel === right.channel && left.conversation_id === right.conversation_id;
+      && left.text === right.text && left.channel === right.channel && left.conversation_id === right.conversation_id
+      && JSON.stringify(left.presentation || null) === JSON.stringify(right.presentation || null);
   }
-  async function persistTimelineMessage(role, text, at, channel, id, conversationId) {
+  async function persistTimelineMessage(role, text, at, channel, id, conversationId, presentation) {
     if (typeof id !== 'undefined' && (typeof id !== 'string' || !id.trim())) {
       setTimelinePersistence('identity_invalid');
       return null;
     }
     const explicitId = typeof id === 'string' ? id.trim() : '';
     const resolvedConversationId = conversationId || (typeof activeConversationId === 'function' ? activeConversationId() : 'yarbi-default');
-    const normalized = normalizeTimelineItem({ id:explicitId || undefined, role, text, at:at || Date.now(), channel:channel || 'chat', conversation_id:resolvedConversationId });
+    const normalized = normalizeTimelineItem({ id:explicitId || undefined, role, text, at:at || Date.now(), channel:channel || 'chat', conversation_id:resolvedConversationId, presentation });
     if (!normalized) { setTimelinePersistence('content_invalid'); return null; }
     try {
       const store = await conversationStore();
@@ -484,7 +513,7 @@
     body.className = 'gfc-yarbi-message-body';
     const dashboard = item.role === 'assistant' ? boardPayload(item.text) : null;
     if (!dashboard && window.YarbiConversationRenderer && typeof window.YarbiConversationRenderer.appendMessage === 'function') {
-      const rendered = window.YarbiConversationRenderer.appendMessage(box, { role:item.role, text:item.text, status:'complete' });
+      const rendered = window.YarbiConversationRenderer.appendMessage(box, { role:item.role, ...(item.presentation ? { content:item.presentation } : { text:item.text }), status:'complete' });
       if (rendered.ok && rendered.element) {
         rendered.element.classList.add('gfc-yarbi-message');
         rendered.element.dataset.messageId = item.id;
@@ -730,8 +759,8 @@
     const forceLatest = role === 'user' || Boolean(window._gfcYarbiTextRequestActive) || Date.now() < Number(window._gfcYarbiForceLatestUntil || 0);
     if (forceLatest) window._gfcYarbiForceLatestUntil = Date.now() + 60000;
     const item = opts.persist === false
-      ? normalizeTimelineItem({ id:itemId || undefined, role, text:value, at:Date.now(), channel:opts.channel || 'voice' })
-      : await persistTimelineMessage(role, value, Date.now(), opts.channel || 'voice', itemId || undefined);
+      ? normalizeTimelineItem({ id:itemId || undefined, role, text:value, at:Date.now(), channel:opts.channel || 'voice', presentation:opts.presentation })
+      : await persistTimelineMessage(role, value, Date.now(), opts.channel || 'voice', itemId || undefined, undefined, opts.presentation);
     if (!item) return false;
     const training = interactionMode() === 'training';
     const box = training ? document.getElementById('gfc-yarbi-training-chat') : document.getElementById('gfc-copilot-chat-messages');
@@ -795,12 +824,13 @@
     }
     recentTimelineReservations.set(reservationKey, reservationAt);
     const item = opts.persist === false
-      ? normalizeTimelineItem({ id:opts.id, role, text, at:at || opts.at || Date.now(), channel:opts.channel || 'chat', conversation_id:opts.conversationId || opts.conversation_id || activeConversationId() })
-      : await persistTimelineMessage(role, text, at || opts.at, opts.channel, opts.id, opts.conversationId || opts.conversation_id);
+      ? normalizeTimelineItem({ id:opts.id, role, text, at:at || opts.at || Date.now(), channel:opts.channel || 'chat', conversation_id:opts.conversationId || opts.conversation_id || activeConversationId(), presentation:opts.presentation })
+      : await persistTimelineMessage(role, text, at || opts.at, opts.channel, opts.id, opts.conversationId || opts.conversation_id, opts.presentation);
     if (!item) {
       if (recentTimelineReservations.get(reservationKey) === reservationAt) recentTimelineReservations.delete(reservationKey);
       return { handled:true, result:{ ok:false, code:'timeline_item_invalid' } };
     }
+    rememberTimelineItem(item);
     const box = document.getElementById('gfc-copilot-chat-messages');
     if (!box) return { handled:false };
     if ([...box.querySelectorAll('[data-message-id]')].some(node => node.dataset.messageId === item.id)) {

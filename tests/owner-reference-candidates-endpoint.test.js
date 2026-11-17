@@ -121,6 +121,22 @@ test('auth-config: únicamente el bootstrap público exacto queda disponible en 
   assert.equal(decidePreviewOwnerReferenceRequest({ method: 'GET', url: '/api/assistant/preferences?action=auth-config', headers: {} }, { ...ENV, VERCEL_ENV: 'production' }).allow, false);
 });
 
+test('Meta Marketing API: Preview admite únicamente acciones explícitas y callback OAuth con state', () => {
+  const connect = decidePreviewOwnerReferenceRequest({ method: 'POST', url: '/api/assistant/meta-ads?action=connect', headers: { authorization: 'Bearer jwt-owner-a' } }, ENV);
+  assert.equal(connect.allow, true);
+  const status = decidePreviewOwnerReferenceRequest({ method: 'GET', url: '/api/assistant/meta-ads?action=status', headers: { authorization: 'Bearer jwt-owner-a' } }, ENV);
+  assert.equal(status.allow, true);
+  const budget = decidePreviewOwnerReferenceRequest({ method: 'POST', url: '/api/assistant/meta-ads?action=save-budget', headers: { authorization: 'Bearer jwt-owner-a' } }, ENV);
+  assert.equal(budget.allow, true);
+  assert.equal(decidePreviewOwnerReferenceRequest({ method: 'POST', url: '/api/assistant/meta-ads?action=save-budget', headers: {} }, ENV).status, 401);
+  const callback = decidePreviewOwnerReferenceRequest({ method: 'GET', url: '/api/assistant/meta-ads?action=callback&code=synthetic&state=signed-state', headers: {} }, ENV);
+  assert.equal(callback.allow, true);
+  assert.equal(decidePreviewOwnerReferenceRequest({ method: 'GET', url: '/api/assistant/meta-ads?action=callback&code=synthetic', headers: {} }, ENV).allow, false);
+  assert.equal(decidePreviewOwnerReferenceRequest({ method: 'POST', url: '/api/assistant/meta-ads?action=sync', headers: {} }, ENV).status, 401);
+  assert.equal(decidePreviewOwnerReferenceRequest({ method: 'POST', url: '/api/assistant/meta-ads?action=campaign-edit', headers: { authorization: 'Bearer jwt-owner-a' } }, ENV).allow, false);
+  assert.equal(decidePreviewOwnerReferenceRequest({ method: 'POST', url: '/api/assistant/meta-ads?action=connect', headers: { authorization: 'Bearer jwt-owner-a' } }, { ...ENV, VERCEL_ENV: 'production' }).allow, false);
+});
+
 test('J: presupuesto local de lectura queda medido sin egress ni llamadas de IA', async () => {
   const samples = [];
   for (let index = 0; index < 20; index += 1) {

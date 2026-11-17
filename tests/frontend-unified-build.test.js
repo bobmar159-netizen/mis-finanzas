@@ -29,12 +29,13 @@ test('P0.2I: source preserves Android-only flows and backend owner inbox', () =>
     'gfcManualAgendaDraft', 'gfcRepairLegacyVisitedAgenda', 'crm-followup-planner', 'crm-delete-record-sheet',
     "case 'yarbi-pendientes':", 'yarbi-owner-inbox-ui.js', 'gfcStartGeminiLive', 'gfcCallGeminiAPI',
     'gfcYarbiApplyQuickAgendaStatus', 'crmSendFollowUpNow', '/api/notion-proxy', 'yarbi-owner-memory-ui.js', 'yarbi-app-voice.js', 'yarbi-financial-coach.js', 'yarbi-financial-coach-ui.js', 'yarbi-finance-context.js', 'yarbi-business-timeline.js', 'yarbi-agenda-intelligence.js', 'yarbi-agenda-read-ui.js', 'yarbi-client-context-read.js', 'yarbi-client-context-read-ui.js',
-    '/api/assistant/send-whatsapp', '/api/assistant/chat', '/api/assistant/conversation', 'gfcCallAuthenticatedOwnerConversation', '/api/assistant/live-token', '/api/whatsapp/messages'
+    '/api/assistant/send-whatsapp', '/api/assistant/chat', '/api/assistant/conversation', 'gfcCallAuthenticatedOwnerConversation', '/api/assistant/live-token', 'yarbi-meta-ads-local.js', '/api/whatsapp/messages'
   ]) {
     assert.ok(html.includes(marker), `missing ${marker}`);
   }
   assert.ok(html.indexOf('runtime-config.js') < html.indexOf('gfcRuntimeApiOrigin()'));
   assert.match(fs.readFileSync(path.join(frontend, 'yarbi-owner-memory-ui.js'), 'utf8'), /\/api\/assistant\/memory/);
+  assert.match(fs.readFileSync(path.join(frontend, 'yarbi-meta-ads-local.js'), 'utf8'), /\/api\/assistant\/meta-ads/);
   assert.match(html, /<\/script>\s*<script src="\.\/yarbi-owner-inbox-ui\.js"><\/script>\s*<\/body>/);
   for (const marker of ['gfcYarbiOwnerDecision', '/api/assistant/owner-inbox', '/api/assistant/owner-action']) assert.ok(ownerInbox.includes(marker), `missing owner inbox ${marker}`);
   assert.equal(html.includes(productionOrigin), false);
@@ -69,7 +70,7 @@ test('P0.2I: web and Android builds are reproducible and environment-specific', 
     assert.ok(fs.readdirSync(path.join(output, 'vendor', 'cmaps')).length > 0);
     assert.ok(fs.readdirSync(path.join(output, 'vendor', 'standard_fonts')).length > 0);
     assert.ok(fs.readdirSync(path.join(output, 'vendor', 'wasm')).length > 0);
-    for (const file of ['index.html', 'yarbi-assistant.js', 'yarbi-memory-center.js', 'yarbi-owner-memory-ui.js', 'yarbi-app-voice.js', 'yarbi-owner-inbox-ui.js', 'yarbi-financial-coach.js', 'yarbi-financial-coach-ui.js', 'yarbi-finance-context.js', 'yarbi-business-timeline.js', 'yarbi-agenda-intelligence.js', 'yarbi-agenda-read-ui.js', 'yarbi-client-context-read.js', 'yarbi-client-context-read-ui.js']) assert.ok(fs.existsSync(path.join(output, file)));
+    for (const file of ['index.html', 'yarbi-assistant.js', 'yarbi-memory-center.js', 'yarbi-owner-memory-ui.js', 'yarbi-app-voice.js', 'yarbi-owner-inbox-ui.js', 'yarbi-financial-coach.js', 'yarbi-financial-coach-ui.js', 'yarbi-finance-context.js', 'yarbi-business-timeline.js', 'yarbi-agenda-intelligence.js', 'yarbi-agenda-read-ui.js', 'yarbi-client-context-read.js', 'yarbi-client-context-read-ui.js', 'yarbi-meta-ads-local.js']) assert.ok(fs.existsSync(path.join(output, file)));
     for (const file of fs.readdirSync(output)) {
       const full = path.join(output, file);
       if (fs.statSync(full).isFile()) assert.equal(fs.readFileSync(full, 'utf8').includes(productionOrigin), false, `${file} has production literal`);

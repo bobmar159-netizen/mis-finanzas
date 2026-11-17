@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { safeEnv, intervalPolicy } = require('../api/assistant/proactive-loop');
+const { safeEnv, intervalPolicy } = require('../api_handlers/assistant/proactive-loop');
 const { compactInboxPayload } = require('../lib/yarbi-proactive-supabase-store');
 const { decidePreviewRouteRequest } = require('../lib/preview-route-policy');
 

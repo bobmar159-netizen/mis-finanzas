@@ -1,6 +1,8 @@
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || '';
-const GEMINI_LIVE_MODEL = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
-const GEMINI_LIVE_API_VERSION = process.env.GEMINI_LIVE_API_VERSION || 'v1alpha';
+// One server-side source of truth. The model is also locked into each
+// ephemeral token so a browser cannot connect the token to a different model.
+const GEMINI_LIVE_MODEL = 'gemini-3.8-live';
+const GEMINI_LIVE_API_VERSION = 'v1beta';
 const { validateServerRouteConfig } = require('../../lib/yarbi-runtime-config');
 const { authenticatedOwnerIdentity } = require('../../lib/yarbi-owner-ui-auth');
 
@@ -23,15 +25,14 @@ module.exports = async function handler(req, res) {
   if (!identity.ok) return res.status(identity.status).json({ error: identity.code });
 
   try {
-    const requestedProtocol = String(req.query?.protocol || req.headers?.['x-gemini-live-protocol'] || '').trim().toLowerCase();
-    const apiVersion = requestedProtocol === 'v1beta' ? 'v1beta' : GEMINI_LIVE_API_VERSION;
     const now = Date.now();
     const payload = {
       uses: 1,
       expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
-      newSessionExpireTime: new Date(now + 60 * 1000).toISOString()
+      newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
+      liveConnectConstraints: { model: GEMINI_LIVE_MODEL }
     };
-    const result = await fetch('https://generativelanguage.googleapis.com/' + apiVersion + '/auth_tokens', {
+    const result = await fetch('https://generativelanguage.googleapis.com/' + GEMINI_LIVE_API_VERSION + '/auth_tokens', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY },
       body: JSON.stringify(payload)
@@ -44,7 +45,7 @@ module.exports = async function handler(req, res) {
       console.error('[ASSISTANT LIVE TOKEN ERROR]', JSON.stringify({ status: result.status, category: 'provider_rejected' }));
       return res.status(502).json({ error: 'live_token_error' });
     }
-    return res.status(200).json({ token: tokenName, model: GEMINI_LIVE_MODEL, apiVersion, protocol: apiVersion === 'v1beta' ? 'gemini-live-v1beta-384' : 'legacy-default' });
+    return res.status(200).json({ token: tokenName, model: GEMINI_LIVE_MODEL, apiVersion: GEMINI_LIVE_API_VERSION, protocol: 'gemini-live-v1beta' });
   } catch (_) {
     console.error('[ASSISTANT LIVE TOKEN]', JSON.stringify({ category: 'request_failed' }));
     return res.status(500).json({ error: 'live_token_failed' });

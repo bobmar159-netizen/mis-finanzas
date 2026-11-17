@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yarbi-static-p02i-09ddc926b8aafa97';
+const CACHE_NAME = 'yarbi-static-p02i-aa78ce9a4376f7d6';
 // runtime-config.js queda fuera del precache: en Android puede cambiar entre
 // builds de Preview y debe leerse siempre desde los assets de la APK actual.
 // Así una versión anterior no puede apuntar a un entorno ya reemplazado.

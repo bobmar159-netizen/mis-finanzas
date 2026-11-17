@@ -24,6 +24,14 @@ token.txt
 output-metadata.json
 .tools/
 .gradle-user-home/
+# No publicar documentación, fixtures, migraciones ni snapshots históricos del workspace.
+docs/
+tests/
+migrations/
+*.md
+*.txt
+*.sql
+**/*.before-*
 # El plan Hobby admite 12 funciones. Esta tarea se conserva en el código para
 # moverla a Supabase Cron o Vercel Pro; no se publica hasta entonces.
 api/assistant/scheduled-followups.js
