@@ -1,9 +1,9 @@
 /* Owner-authenticated read-only Meta Marketing API UI plus auxiliary local CSV import. */
 (function(root, factory){
-  const api=factory();
+  const api=factory(root);
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(root){root.YarbiMetaAdsLocal=api;root.gfcYarbiMetaAdsHtml=api.html;root.gfcYarbiMetaAdsAttach=api.attach;root.gfcYarbiMetaAdsImport=api.importFromUi;root.gfcYarbiMetaAdsSetStatus=api.setStatusUi;root.gfcYarbiMetaAdsDelete=api.removeUi;root.gfcTryMetaAdsMessage=api.answer;root.gfcYarbiMetaAdsConnect=api.connectMeta;root.gfcYarbiMetaAdsSelectAccount=api.selectAccount;root.gfcYarbiMetaAdsSync=api.syncOfficial;root.gfcYarbiMetaAdsDisconnect=api.disconnectOfficial;root.gfcYarbiMetaAdsSaveBudget=api.saveWeeklyBudget;}
-}(typeof window==='undefined'?null:window,function(){
+}(typeof window==='undefined'?null:window,function(root){
   'use strict';
   const DB='yarbi_meta_ads_local_v1',STORE='imports',MAX=24;let dbPromise=null;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
