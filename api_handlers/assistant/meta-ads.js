@@ -12,6 +12,7 @@ const APP_SECRET = String(process.env.META_APP_SECRET || '');
 const STATE_SECRET = String(process.env.META_OAUTH_STATE_SECRET || '');
 const ENCRYPTION_KEY = String(process.env.YARBI_VAULT_KEY || '');
 const REDIRECT_URI = String(process.env.META_OAUTH_REDIRECT_URI || '').trim();
+const OAUTH_CONFIG_ID = String(process.env.META_OAUTH_CONFIG_ID || '').trim();
 const DB_URL = String(process.env.SUPABASE_URL || '').trim().replace(/\/$/, '');
 const DB_KEY = String(process.env.SUPABASE_SECRET_KEY || '');
 const PUBLISHABLE_KEY = String(process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '');
@@ -23,7 +24,7 @@ function safeConfig() {
   let databaseUrl;
   try { databaseUrl = new URL(DB_URL); } catch (_) { return { ok: false, code: 'meta_ads_preview_destination_not_authorized' }; }
   if (String(process.env.YARBI_PREVIEW_SUPABASE_PROJECT_REF || '').toLowerCase() !== PREVIEW_REF || databaseUrl.hostname !== `${PREVIEW_REF}.supabase.co`) return { ok: false, code: 'meta_ads_preview_destination_not_authorized' };
-  if (!APP_ID || !APP_SECRET.trim() || STATE_SECRET.length < 32 || ENCRYPTION_KEY.length < 32 || !REDIRECT_URI) return { ok: false, code: 'meta_ads_oauth_not_configured' };
+  if (!APP_ID || !APP_SECRET.trim() || STATE_SECRET.length < 32 || ENCRYPTION_KEY.length < 32 || !REDIRECT_URI || !/^\d{5,30}$/.test(OAUTH_CONFIG_ID)) return { ok: false, code: 'meta_ads_oauth_not_configured' };
   const expectedHost = String(process.env.YARBI_PREVIEW_DEPLOYMENT_HOST || '').trim().toLowerCase();
   if (!isPreviewMetaRedirectAllowed({ vercelEnv: process.env.VERCEL_ENV, expectedHost, branchUrl: process.env.VERCEL_BRANCH_URL, productionUrl: process.env.VERCEL_PROJECT_PRODUCTION_URL, redirectUri: REDIRECT_URI })) return { ok: false, code: 'meta_ads_redirect_uri_invalid' };
   const runtime = validateServerRouteConfig({ requirePublicAuth: true });
@@ -216,7 +217,7 @@ async function handle(req, res) {
       url.searchParams.set('client_id', APP_ID);
       url.searchParams.set('redirect_uri', REDIRECT_URI);
       url.searchParams.set('response_type', 'code');
-      url.searchParams.set('scope', ALLOWED_SCOPES.join(','));
+      url.searchParams.set('config_id', OAUTH_CONFIG_ID);
       url.searchParams.set('state', state);
       return res.status(200).json({ ok: true, authorization_url: url.toString(), permissions: ALLOWED_SCOPES });
     }
