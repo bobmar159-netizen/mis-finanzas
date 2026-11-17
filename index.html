@@ -4178,6 +4178,8 @@ const DEFAULT_CATS_NEG_EX = [
   {id:'cne7',name:'Reparacion de auto',icon:'transport',color:'#77746D',type:'egreso'},
   {id:'cne_agregados',name:'Agregados',icon:'box',color:'#A9895C',type:'egreso'},
   {id:'cne_meta',name:'META',icon:'target',color:'#6D8C82',type:'egreso'},
+  {id:'cne_meta_ads_spend',name:'Publicidad Meta',icon:'📣',color:'#316D60',type:'egreso'},
+  {id:'cne_meta_topup',name:'Recarga saldo Meta',icon:'💳',color:'#58718A',type:'egreso'},
   {id:'cne_documentacion',name:'Documentacion',icon:'document',color:'#77746D',type:'egreso'},
   {id:'cne6',name:'Otros gastos de negocio',icon:'box',color:'#77746D',type:'egreso'},
   {id:'1778866533436',name:'Reparacion de maquinas',icon:'🔧',color:'var(--gold)',type:'egreso'},
@@ -4739,6 +4741,7 @@ function isAgregadoCategory(catId, category, description=''){
 }
 
 function isMetaCategory(catId, category, description=''){
+  if(['cne_meta_ads_spend','cne_meta_topup'].includes(String(catId||''))) return false;
   const text = normSimpleText([category, description].filter(Boolean).join(' '));
   return catId === 'cne_meta' || /\b(meta|meta mensual|meta diaria|objetivo|ahorro|ahorrar|separado|separada|separe|guardar|guardado|reserva|fondo|alcancia|inversion|inversiones)\b/.test(text);
 }
@@ -25890,6 +25893,8 @@ function limpiarDuplicadosNotion() {
 
 function _getCatIdByName(nombre) {
   const n = (nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(/publicidad meta|anuncios meta|meta ads/.test(n)) return 'cne_meta_ads_spend';
+  if(/recarga.*meta|saldo.*meta/.test(n)) return 'cne_meta_topup';
   if(n.includes('punto adicional')) return 'cn1';
   if(n.includes('modificacion')) return 'cn2';
   if(n.includes('instalacion')) return 'cn3';
@@ -48621,6 +48626,13 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
   const previousBuild=window.crmBuildRecords;
   if(typeof previousBuild==='function'&&!previousBuild.__crmHiddenRecords){window.crmBuildRecords=function(){const hidden=crmHiddenRead();const now=Date.now();const rows=previousBuild.apply(this,arguments).filter(record=>{const item=hidden[String(record.key)];if(!item)return true;if(Number(record.lastAt||0)>Number(item.at||0)){delete hidden[String(record.key)];crmHiddenWrite(hidden);return true;}return false;});return rows;};window.crmBuildRecords.__crmHiddenRecords=true;}
   const previousRender=window.renderCRM;
+  window.gfcOpenMetaFinanceMovement=function(kind){
+    const topup=String(kind||'')==='topup';
+    const category=topup?'Recarga saldo Meta':'Publicidad Meta';
+    const catId=topup?'cne_meta_topup':'cne_meta_ads_spend';
+    if(typeof openTxModal!=='function')return toast('No pude abrir Movimientos. Ve a Movim. y registra el importe confirmado.','error');
+    openTxModal(null,{type:'egreso',modo:'negocio',date:todayStr(),category,catId,description:topup?'Recarga verificada de saldo Meta':'Cargo publicitario verificado de Meta',negocio:true});
+  };
   function decorateCards(){
     const root=document.getElementById('crm-root'); if(!root)return;
     // El Yarbi genérico no conoce cliente y sólo duplicaba el acceso de la tarjeta.
@@ -48635,7 +48647,7 @@ html.gfc-icons-ready .tab-icon{opacity:1;transition:opacity .08s ease-out}
       if(actions&&!actions.querySelector('[data-action="delete"]')){const button=document.createElement('button');button.className='crm-quick-btn';button.dataset.key=key;button.dataset.action='delete';button.textContent='Eliminar';button.style.cssText='border-color:#F0BBBB;color:#B33A3A;background:#FFF0F0';button.onclick=event=>window.crmRequestDelete(event,key);actions.appendChild(button);}
     });
   }
-  if(typeof previousRender==='function'&&!previousRender.__crmProposalDecorator){window.renderCRM=function(){const html=previousRender.apply(this,arguments);setTimeout(decorateCards,0);return html;};window.renderCRM.__crmProposalDecorator=true;}
+  if(typeof previousRender==='function'&&!previousRender.__crmProposalDecorator){window.renderCRM=function(){let html=previousRender.apply(this,arguments);const opening='<div id="crm-root" style="padding-bottom:110px">';if(html.includes(opening)&&!html.includes('data-meta-ads-entry'))html=html.replace(opening,opening+'<section data-meta-ads-entry style="background:#FFFDF9;border:1px solid #DDE8E0;border-radius:15px;padding:12px;margin:0 0 12px;box-shadow:0 3px 12px rgba(56,65,78,.045)"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><b style="font-size:12px;color:#172033">📣 Meta Ads</b><div style="font-size:10px;color:#64748B;margin-top:3px">Conecta la cuenta oficial y contrasta anuncios con oportunidades CRM.</div></div><button type="button" onclick="gfcOpenCopilotModal(\'ads\')" style="border:0;border-radius:10px;background:#1D3557;color:#fff;padding:9px 12px;font-weight:900;font-size:10px">Abrir métricas</button></div></section>');setTimeout(decorateCards,0);return html;};window.renderCRM.__crmProposalDecorator=true;}
 })();
 </script>
 <script>
