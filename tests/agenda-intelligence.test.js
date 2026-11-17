@@ -2,9 +2,23 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 const { activityState, normalizeAgendaStatus, summarizeAgenda, planAgendaRead, limaParts } = require('../lib/yarbi-agenda-intelligence');
 
 const NOW = Date.parse('2026-11-05T15:00:00.000Z'); // 10:00 America/Lima
+
+test('browser globals coexist with the Financial Coach without redeclaring Lima timezone', () => {
+  const context = vm.createContext({});
+  const financialCoach = fs.readFileSync(path.join(__dirname, '../lib/yarbi-financial-coach.js'), 'utf8');
+  const agenda = fs.readFileSync(path.join(__dirname, '../lib/yarbi-agenda-intelligence.js'), 'utf8');
+
+  vm.runInContext(financialCoach, context, { filename: 'yarbi-financial-coach.js' });
+  vm.runInContext(agenda, context, { filename: 'yarbi-agenda-intelligence.js' });
+
+  assert.equal(context.YarbiAgendaIntelligence.LIMA_TIME_ZONE, 'America/Lima');
+});
 
 test('F03 normalizes current Agenda states without treating a service as paid or closed', () => {
   assert.equal(normalizeAgendaStatus('agendado'), 'scheduled');
